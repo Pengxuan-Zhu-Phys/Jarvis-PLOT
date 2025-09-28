@@ -1485,101 +1485,101 @@ DataSet:
     - source_name: data/scanID
       new_name: Var553@h5
 Figures: 
-# - name: N1_comps
-#   # debug:  true
-#   style: ["a4paper_2x1", "TernaryCmap"]
-#   frame: 
-#     axtri: 
-#       labels: {left: "$|N_{11}|^2$", bottom: "$|N_{12}|^2$", right: "$|N_{13}|^2 + |N_{14}|^2$"}
-#     axc: 
-#       label:  {ylabel: "$m_{\\tilde{\\chi}_1^0}~[{\\rm TeV}]$"}
-#   legend: 
-#     loc: 1 
-#   layers:
-#     - name: triscatter
-#       data: 
-#         - source: h5
-#           transform:
-#             - filter: LogL > -3.09
-#             - sortby: LogL
-#       axes: axtri 
-#       method: scatter
-#       coordinates: 
-#         left:   {expr: np.abs(N11)**2, label: "a"}
-#         right:  {expr: np.abs(N12)**2, label: "b"}
-#         bottom: {expr: np.abs(N13)**2 + np.abs(N14)**2, label: "c"}
-#         c:      {expr: np.abs(mN1) / 1000}
-#       style: 
-#         s:  1.5
-#         cmap:  "rainbow"
-#         vmin:   0.
-#         vmax:   1.5
+- name: N1_comps
+  # debug:  true
+  style: ["a4paper_2x1", "TernaryCmap"]
+  frame: 
+    axtri: 
+      labels: {left: "$|N_{11}|^2$", bottom: "$|N_{12}|^2$", right: "$|N_{13}|^2 + |N_{14}|^2$"}
+    axc: 
+      label:  {ylabel: "$m_{\\tilde{\\chi}_1^0}~[{\\rm TeV}]$"}
+  legend: 
+    loc: 1 
+  layers:
+    - name: triscatter
+      data: 
+        - source: h5
+          transform:
+            - filter: LogL > -3.09
+            - sortby: LogL
+      axes: axtri 
+      method: scatter
+      coordinates: 
+        left:   {expr: np.abs(N11)**2, label: "a"}
+        right:  {expr: np.abs(N12)**2, label: "b"}
+        bottom: {expr: np.abs(N13)**2 + np.abs(N14)**2, label: "c"}
+        c:      {expr: np.abs(mN1) / 1000}
+      style: 
+        s:  1.5
+        cmap:  "rainbow"
+        vmin:   0.
+        vmax:   1.5
 
-#     - name: triscatters
-#       data: 
-#         - source: h5
-#           transform:
-#             - filter: LogL < -3.09
-#             - sortby: LogL
-#       axes: axtri 
-#       method: scatter
-#       coordinates: 
-#         left:   {expr: np.abs(N11)**2, label: "a"}
-#         right:  {expr: np.abs(N12)**2, label: "b"}
-#         bottom: {expr: np.abs(N13)**2 + np.abs(N14)**2, label: "c"}
-#       style: 
-#         s:  1.5
-#         facecolor:  "black"
-#         edgecolor:  "none"
-#         zorder: 20
+    - name: triscatters
+      data: 
+        - source: h5
+          transform:
+            - filter: LogL < -3.09
+            - sortby: LogL
+      axes: axtri 
+      method: scatter
+      coordinates: 
+        left:   {expr: np.abs(N11)**2, label: "a"}
+        right:  {expr: np.abs(N12)**2, label: "b"}
+        bottom: {expr: np.abs(N13)**2 + np.abs(N14)**2, label: "c"}
+      style: 
+        s:  1.5
+        facecolor:  "black"
+        edgecolor:  "none"
+        zorder: 20
 
-# - name: N1_comps_LogL
-#   # debug:  true
-#   style: ["a4paper_2x1", "TernaryCmap"]
-#   frame: 
-#     axtri: 
-#       labels: {left: "$|N_{11}|^2$", bottom: "$|N_{12}|^2$", right: "$|N_{13}|^2 + |N_{14}|^2$"}
-#     axc: 
-#       label:  {ylabel: "$\\ln{\\mathcal{L}}$"}
-#   legend: 
-#     loc: 1 
-#   layers:
-#     - name: triscatter
-#       data: 
-#         - source: h5
-#           transform: 
-#             - filter: LogL > -3.09
-#             - sortby: LogL
-#       axes: axtri 
-#       method: scatter
-#       coordinates: 
-#         left:   {expr: np.abs(N11)**2, label: "a"}
-#         right:  {expr: np.abs(N12)**2, label: "b"}
-#         bottom: {expr: np.abs(N13)**2 + np.abs(N14)**2, label: "c"}
-#         c:      {expr: LogL}
-#       style: 
-#         s:  1.
-#         marker: '.'
-#         cmap:  "seismic_r"
-#         vmin:   -3.09
-#         vmax:   3.09
-#     - name: exc
-#       data: 
-#         - source: h5
-#           transform: 
-#             - filter: LogL <= -3.09
-#       axes: axtri 
-#       method: scatter
-#       coordinates: 
-#         left:   {expr: np.abs(N11)**2, label: "a"}
-#         right:  {expr: np.abs(N12)**2, label: "b"}
-#         bottom: {expr: np.abs(N13)**2 + np.abs(N14)**2, label: "c"}
-#       style: 
-#         s:  1.
-#         marker: '.'        
-#         facecolor:  "black"
-#         edgecolor:  "none"
-#         zorder: 20
+- name: N1_comps_LogL
+  # debug:  true
+  style: ["a4paper_2x1", "TernaryCmap"]
+  frame: 
+    axtri: 
+      labels: {left: "$|N_{11}|^2$", bottom: "$|N_{12}|^2$", right: "$|N_{13}|^2 + |N_{14}|^2$"}
+    axc: 
+      label:  {ylabel: "$\\ln{\\mathcal{L}}$"}
+  legend: 
+    loc: 1 
+  layers:
+    - name: triscatter
+      data: 
+        - source: h5
+          transform: 
+            - filter: LogL > -3.09
+            - sortby: LogL
+      axes: axtri 
+      method: scatter
+      coordinates: 
+        left:   {expr: np.abs(N11)**2, label: "a"}
+        right:  {expr: np.abs(N12)**2, label: "b"}
+        bottom: {expr: np.abs(N13)**2 + np.abs(N14)**2, label: "c"}
+        c:      {expr: LogL}
+      style: 
+        s:  1.
+        marker: '.'
+        cmap:  "seismic_r"
+        vmin:   -3.09
+        vmax:   3.09
+    - name: exc
+      data: 
+        - source: h5
+          transform: 
+            - filter: LogL <= -3.09
+      axes: axtri 
+      method: scatter
+      coordinates: 
+        left:   {expr: np.abs(N11)**2, label: "a"}
+        right:  {expr: np.abs(N12)**2, label: "b"}
+        bottom: {expr: np.abs(N13)**2 + np.abs(N14)**2, label: "c"}
+      style: 
+        s:  1.
+        marker: '.'        
+        facecolor:  "black"
+        edgecolor:  "none"
+        zorder: 20
 
 - name: N1_comps_prof
   # debug:  true
