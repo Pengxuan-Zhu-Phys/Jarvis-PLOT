@@ -1,0 +1,9 @@
+{
+    "a4paper_1x1":  {
+        "Ternary":  "&JP/src/cards/a4paper/1x1/ternary.json"
+    },
+    "a4paper_2x1":  {
+        "Ternary":  "&JP/src/cards/a4paper/2x1/ternary.json",
+        "TernaryCmap":  "&JP/src/cards/a4paper/2x1/ternary_cmap.json"
+    }
+}

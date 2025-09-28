@@ -1,0 +1,44 @@
+{
+    "positionals": [
+        {
+            "name": "file",
+            "help": "path of the input file, in yaml format"
+        }
+    ],
+    "options": [
+        {
+            "short": "-v",
+            "long": "--version",
+            "dest": "version",
+            "help": "show JarvisPLOT version",
+            "action": "version"
+        },
+        {
+            "short": "-d",
+            "long": "--debug",
+            "dest": "debug",
+            "help": "Run JarvisPLOT in debug mode",
+            "action": "store_true"
+        },
+        {
+            "long": "--parse-data",
+            "dest": "parse_data",
+            "help": "Parse datasets (CSV/HDF5), sanitize column names, and write Variables/ColumnMap back to YAML",
+            "action": "store_true"
+        },
+        {
+            "long": "--out",
+            "dest": "out",
+            "help": "Output YAML path (used with --parse-data). If omitted and --inplace not set, prints to stdout",
+            "action": "store",
+            "metavar": "YAML_FILE"
+
+        },
+        {
+            "long": "--inplace",
+            "dest": "inplace",
+            "help": "Modify the input YAML file in place (used with --parse-data)",
+            "action": "store_true"
+        }
+    ]
+}

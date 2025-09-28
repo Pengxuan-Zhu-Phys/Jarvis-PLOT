@@ -1,0 +1,11 @@
+{
+    "output":   {
+        "savefig":  {
+            "dpi":  150
+        },
+        "format":   [
+            "pdf"
+        ]
+    }
+
+}
