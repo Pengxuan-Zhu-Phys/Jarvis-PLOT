@@ -1,0 +1,1644 @@
+DataSet:
+- name: df
+  path: ../Workshop/datas/triangle.csv
+  type: csv
+- dataset: data
+  is_gambit: true
+  name: h5
+  path: ../Workshop/datas/Gravitinopp_lightweight_for_PengXuan.hdf5
+  type: hdf5
+  columnmap:
+    list:
+    - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::Ad_3
+      new_name: Var0@h5
+    - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::Ae_3
+      new_name: Var1@h5
+    - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::Au_3
+      new_name: Var2@h5
+    - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::M1
+      new_name: pM1
+    - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::M2
+      new_name: pM2
+    - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::M3
+      new_name: pM3
+    - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::Qin
+      new_name: pQin
+    - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::TanBeta
+      new_name: pTanBeta
+    - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::mA
+      new_name: Var8@h5
+    - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::mG
+      new_name: pMG
+    - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::ml2
+      new_name: Var10@h5
+    - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::mq2
+      new_name: Var11@h5
+    - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::mu
+      new_name: pMu
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::A0 Pole_Mass
+      new_name: Var13@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::A0_(1,1)
+        Pole_Mixing
+      new_name: Var14@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::A0_(1,2)
+        Pole_Mixing
+      new_name: Var15@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::A0_(2,1)
+        Pole_Mixing
+      new_name: Var16@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::A0_(2,2)
+        Pole_Mixing
+      new_name: Var17@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::BMu mass2
+      new_name: Var18@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::H+ Pole_Mass
+      new_name: Var19@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::H+_(1,1)
+        Pole_Mixing
+      new_name: Var20@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::H+_(1,2)
+        Pole_Mixing
+      new_name: Var21@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::H+_(2,1)
+        Pole_Mixing
+      new_name: Var22@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::H+_(2,2)
+        Pole_Mixing
+      new_name: Var23@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::M1 mass1
+      new_name: Var24@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::M2 mass1
+      new_name: Var25@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::M3 mass1
+      new_name: Var26@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Mu mass1
+      new_name: Var27@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYd_(1,1)
+        mass1
+      new_name: Var28@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYd_(1,2)
+        mass1
+      new_name: Var29@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYd_(1,3)
+        mass1
+      new_name: Var30@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYd_(2,1)
+        mass1
+      new_name: Var31@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYd_(2,2)
+        mass1
+      new_name: Var32@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYd_(2,3)
+        mass1
+      new_name: Var33@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYd_(3,1)
+        mass1
+      new_name: Var34@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYd_(3,2)
+        mass1
+      new_name: Var35@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYd_(3,3)
+        mass1
+      new_name: Var36@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYe_(1,1)
+        mass1
+      new_name: Var37@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYe_(1,2)
+        mass1
+      new_name: Var38@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYe_(1,3)
+        mass1
+      new_name: Var39@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYe_(2,1)
+        mass1
+      new_name: Var40@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYe_(2,2)
+        mass1
+      new_name: Var41@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYe_(2,3)
+        mass1
+      new_name: Var42@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYe_(3,1)
+        mass1
+      new_name: Var43@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYe_(3,2)
+        mass1
+      new_name: Var44@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYe_(3,3)
+        mass1
+      new_name: Var45@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYu_(1,1)
+        mass1
+      new_name: Var46@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYu_(1,2)
+        mass1
+      new_name: Var47@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYu_(1,3)
+        mass1
+      new_name: Var48@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYu_(2,1)
+        mass1
+      new_name: Var49@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYu_(2,2)
+        mass1
+      new_name: Var50@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYu_(2,3)
+        mass1
+      new_name: Var51@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYu_(3,1)
+        mass1
+      new_name: Var52@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYu_(3,2)
+        mass1
+      new_name: Var53@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::TYu_(3,3)
+        mass1
+      new_name: Var54@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::W+ Pole_Mass
+      new_name: Var55@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Xb
+      new_name: Var56@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Xt
+      new_name: Var57@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Yd_(1,1)
+        dimensionless
+      new_name: Var58@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Yd_(1,2)
+        dimensionless
+      new_name: Var59@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Yd_(1,3)
+        dimensionless
+      new_name: Var60@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Yd_(2,1)
+        dimensionless
+      new_name: Var61@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Yd_(2,2)
+        dimensionless
+      new_name: Var62@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Yd_(2,3)
+        dimensionless
+      new_name: Var63@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Yd_(3,1)
+        dimensionless
+      new_name: Var64@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Yd_(3,2)
+        dimensionless
+      new_name: Var65@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Yd_(3,3)
+        dimensionless
+      new_name: Var66@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Ye_(1,1)
+        dimensionless
+      new_name: Var67@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Ye_(1,2)
+        dimensionless
+      new_name: Var68@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Ye_(1,3)
+        dimensionless
+      new_name: Var69@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Ye_(2,1)
+        dimensionless
+      new_name: Var70@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Ye_(2,2)
+        dimensionless
+      new_name: Var71@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Ye_(2,3)
+        dimensionless
+      new_name: Var72@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Ye_(3,1)
+        dimensionless
+      new_name: Var73@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Ye_(3,2)
+        dimensionless
+      new_name: Var74@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Ye_(3,3)
+        dimensionless
+      new_name: Var75@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Yu_(1,1)
+        dimensionless
+      new_name: Var76@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Yu_(1,2)
+        dimensionless
+      new_name: Var77@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Yu_(1,3)
+        dimensionless
+      new_name: Var78@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Yu_(2,1)
+        dimensionless
+      new_name: Var79@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Yu_(2,2)
+        dimensionless
+      new_name: Var80@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Yu_(2,3)
+        dimensionless
+      new_name: Var81@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Yu_(3,1)
+        dimensionless
+      new_name: Var82@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Yu_(3,2)
+        dimensionless
+      new_name: Var83@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Yu_(3,3)
+        dimensionless
+      new_name: Var84@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Z0 Pole_Mass
+      new_name: Var85@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ad_(1,1)
+        mass1
+      new_name: Var86@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ad_(1,2)
+        mass1
+      new_name: Var87@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ad_(1,3)
+        mass1
+      new_name: Var88@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ad_(2,1)
+        mass1
+      new_name: Var89@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ad_(2,2)
+        mass1
+      new_name: Var90@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ad_(2,3)
+        mass1
+      new_name: Var91@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ad_(3,1)
+        mass1
+      new_name: Var92@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ad_(3,2)
+        mass1
+      new_name: Var93@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ad_(3,3)
+        mass1
+      new_name: Var94@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ae_(1,1)
+        mass1
+      new_name: Var95@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ae_(1,2)
+        mass1
+      new_name: Var96@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ae_(1,3)
+        mass1
+      new_name: Var97@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ae_(2,1)
+        mass1
+      new_name: Var98@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ae_(2,2)
+        mass1
+      new_name: Var99@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ae_(2,3)
+        mass1
+      new_name: Var100@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ae_(3,1)
+        mass1
+      new_name: Var101@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ae_(3,2)
+        mass1
+      new_name: Var102@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ae_(3,3)
+        mass1
+      new_name: Var103@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::alpha dimensionless
+      new_name: Var104@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::alphaS
+        dimensionless
+      new_name: Var105@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::au_(1,1)
+        mass1
+      new_name: Var106@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::au_(1,2)
+        mass1
+      new_name: Var107@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::au_(1,3)
+        mass1
+      new_name: Var108@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::au_(2,1)
+        mass1
+      new_name: Var109@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::au_(2,2)
+        mass1
+      new_name: Var110@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::au_(2,3)
+        mass1
+      new_name: Var111@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::au_(3,1)
+        mass1
+      new_name: Var112@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::au_(3,2)
+        mass1
+      new_name: Var113@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::au_(3,3)
+        mass1
+      new_name: Var114@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::b Pole_Mass
+      new_name: Var115@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::d_1 mass1
+      new_name: Var116@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::d_2 mass1
+      new_name: Var117@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::d_3 Pole_Mass
+      new_name: Var118@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::d_3 mass1
+      new_name: Var119@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::e- Pole_Mass
+      new_name: Var120@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::e-_1 Pole_Mass
+      new_name: Var121@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::e-_1 mass1
+      new_name: Var122@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::e-_2 Pole_Mass
+      new_name: Var123@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::e-_2 mass1
+      new_name: Var124@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::e-_3 Pole_Mass
+      new_name: Var125@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::e-_3 mass1
+      new_name: Var126@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::g Pole_Mass
+      new_name: Var127@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::g mass1
+      new_name: Var128@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::g1 dimensionless
+      new_name: Var129@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::g2 dimensionless
+      new_name: Var130@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::g3 dimensionless
+      new_name: Var131@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::gamma Pole_Mass
+      new_name: Var132@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::gamma mass1
+      new_name: Var133@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::h0_(1,1)
+        Pole_Mixing
+      new_name: Var134@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::h0_(1,2)
+        Pole_Mixing
+      new_name: Var135@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::h0_(2,1)
+        Pole_Mixing
+      new_name: Var136@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::h0_(2,2)
+        Pole_Mixing
+      new_name: Var137@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::h0_1 Pole_Mass
+      new_name: Var138@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::h0_1 Pole_Mass
+        (unimproved)
+      new_name: Var139@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::h0_2 Pole_Mass
+      new_name: Var140@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mA2 mass2
+      new_name: Var141@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mHd2 mass2
+      new_name: Var142@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mHu2 mass2
+      new_name: Var143@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::md2_(1,1)
+        mass2
+      new_name: Var144@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::md2_(1,2)
+        mass2
+      new_name: Var145@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::md2_(1,3)
+        mass2
+      new_name: Var146@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::md2_(2,1)
+        mass2
+      new_name: Var147@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::md2_(2,2)
+        mass2
+      new_name: Var148@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::md2_(2,3)
+        mass2
+      new_name: Var149@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::md2_(3,1)
+        mass2
+      new_name: Var150@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::md2_(3,2)
+        mass2
+      new_name: Var151@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::md2_(3,3)
+        mass2
+      new_name: Var152@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::me2_(1,1)
+        mass2
+      new_name: Var153@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::me2_(1,2)
+        mass2
+      new_name: Var154@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::me2_(1,3)
+        mass2
+      new_name: Var155@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::me2_(2,1)
+        mass2
+      new_name: Var156@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::me2_(2,2)
+        mass2
+      new_name: Var157@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::me2_(2,3)
+        mass2
+      new_name: Var158@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::me2_(3,1)
+        mass2
+      new_name: Var159@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::me2_(3,2)
+        mass2
+      new_name: Var160@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::me2_(3,3)
+        mass2
+      new_name: Var161@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ml2_(1,1)
+        mass2
+      new_name: Var162@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ml2_(1,2)
+        mass2
+      new_name: Var163@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ml2_(1,3)
+        mass2
+      new_name: Var164@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ml2_(2,1)
+        mass2
+      new_name: Var165@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ml2_(2,2)
+        mass2
+      new_name: Var166@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ml2_(2,3)
+        mass2
+      new_name: Var167@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ml2_(3,1)
+        mass2
+      new_name: Var168@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ml2_(3,2)
+        mass2
+      new_name: Var169@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::ml2_(3,3)
+        mass2
+      new_name: Var170@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mq2_(1,1)
+        mass2
+      new_name: Var171@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mq2_(1,2)
+        mass2
+      new_name: Var172@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mq2_(1,3)
+        mass2
+      new_name: Var173@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mq2_(2,1)
+        mass2
+      new_name: Var174@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mq2_(2,2)
+        mass2
+      new_name: Var175@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mq2_(2,3)
+        mass2
+      new_name: Var176@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mq2_(3,1)
+        mass2
+      new_name: Var177@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mq2_(3,2)
+        mass2
+      new_name: Var178@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mq2_(3,3)
+        mass2
+      new_name: Var179@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::msbottom1
+      new_name: Var180@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::msbottom2
+      new_name: Var181@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mscharmL
+      new_name: Var182@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mscharmR
+      new_name: Var183@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::msdownL
+      new_name: Var184@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::msdownR
+      new_name: Var185@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mselectronL
+      new_name: Var186@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mselectronR
+      new_name: Var187@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::msmuonL
+      new_name: Var188@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::msmuonR
+      new_name: Var189@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::msnue
+      new_name: Var190@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::msnumu
+      new_name: Var191@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::msnutau
+      new_name: Var192@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::msstrangeL
+      new_name: Var193@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::msstrangeR
+      new_name: Var194@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mstau1
+      new_name: Var195@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mstau2
+      new_name: Var196@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mstop1
+      new_name: Var197@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mstop2
+      new_name: Var198@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::msupL
+      new_name: Var199@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::msupR
+      new_name: Var200@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mu- Pole_Mass
+      new_name: Var201@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mu2_(1,1)
+        mass2
+      new_name: Var202@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mu2_(1,2)
+        mass2
+      new_name: Var203@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mu2_(1,3)
+        mass2
+      new_name: Var204@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mu2_(2,1)
+        mass2
+      new_name: Var205@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mu2_(2,2)
+        mass2
+      new_name: Var206@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mu2_(2,3)
+        mass2
+      new_name: Var207@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mu2_(3,1)
+        mass2
+      new_name: Var208@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mu2_(3,2)
+        mass2
+      new_name: Var209@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::mu2_(3,3)
+        mass2
+      new_name: Var210@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::nu_1 Pole_Mass
+      new_name: Var211@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::nu_2 Pole_Mass
+      new_name: Var212@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::nu_3 Pole_Mass
+      new_name: Var213@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::scale(Q)
+      new_name: Var214@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::sinW2 Pole_Mixing
+      new_name: Var215@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::sinW2 dimensionless
+      new_name: Var216@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::t Pole_Mass
+      new_name: Var217@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::tanbeta
+        dimensionless
+      new_name: Var218@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::tau- Pole_Mass
+      new_name: Var219@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::u_1 mass1
+      new_name: Var220@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::u_2 mass1
+      new_name: Var221@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::u_3 Pole_Mass
+      new_name: Var222@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::u_3 mass1
+      new_name: Var223@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::vd mass1
+      new_name: Var224@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::vu mass1
+      new_name: Var225@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~G Pole_Mass
+      new_name: Var226@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi+_(1,1)
+        Pole_Mixing
+      new_name: Var227@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi+_(1,2)
+        Pole_Mixing
+      new_name: Var228@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi+_(2,1)
+        Pole_Mixing
+      new_name: Var229@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi+_(2,2)
+        Pole_Mixing
+      new_name: Var230@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi+_1
+        Pole_Mass
+      new_name: mC1
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi+_2
+        Pole_Mass
+      new_name: mC2
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi-_(1,1)
+        Pole_Mixing
+      new_name: Var233@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi-_(1,2)
+        Pole_Mixing
+      new_name: Var234@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi-_(2,1)
+        Pole_Mixing
+      new_name: Var235@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi-_(2,2)
+        Pole_Mixing
+      new_name: Var236@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(1,1)
+        Pole_Mixing
+      new_name: N11
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(1,2)
+        Pole_Mixing
+      new_name: N12
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(1,3)
+        Pole_Mixing
+      new_name: N13
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(1,4)
+        Pole_Mixing
+      new_name: N14
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(2,1)
+        Pole_Mixing
+      new_name: N21
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(2,2)
+        Pole_Mixing
+      new_name: N22
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(2,3)
+        Pole_Mixing
+      new_name: N23
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(2,4)
+        Pole_Mixing
+      new_name: N24
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(3,1)
+        Pole_Mixing
+      new_name: N31
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(3,2)
+        Pole_Mixing
+      new_name: N32
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(3,3)
+        Pole_Mixing
+      new_name: N33
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(3,4)
+        Pole_Mixing
+      new_name: N34
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(4,1)
+        Pole_Mixing
+      new_name: N41
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(4,2)
+        Pole_Mixing
+      new_name: N42
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(4,3)
+        Pole_Mixing
+      new_name: N43
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(4,4)
+        Pole_Mixing
+      new_name: N44
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_1
+        Pole_Mass
+      new_name: mN1
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_2
+        Pole_Mass
+      new_name: mN2
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_3
+        Pole_Mass
+      new_name: mN3
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_4
+        Pole_Mass
+      new_name: mN4
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(1,1)
+        Pole_Mixing
+      new_name: Var257@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(1,2)
+        Pole_Mixing
+      new_name: Var258@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(1,3)
+        Pole_Mixing
+      new_name: Var259@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(1,4)
+        Pole_Mixing
+      new_name: Var260@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(1,5)
+        Pole_Mixing
+      new_name: Var261@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(1,6)
+        Pole_Mixing
+      new_name: Var262@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(2,1)
+        Pole_Mixing
+      new_name: Var263@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(2,2)
+        Pole_Mixing
+      new_name: Var264@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(2,3)
+        Pole_Mixing
+      new_name: Var265@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(2,4)
+        Pole_Mixing
+      new_name: Var266@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(2,5)
+        Pole_Mixing
+      new_name: Var267@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(2,6)
+        Pole_Mixing
+      new_name: Var268@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(3,1)
+        Pole_Mixing
+      new_name: Var269@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(3,2)
+        Pole_Mixing
+      new_name: Var270@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(3,3)
+        Pole_Mixing
+      new_name: Var271@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(3,4)
+        Pole_Mixing
+      new_name: Var272@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(3,5)
+        Pole_Mixing
+      new_name: Var273@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(3,6)
+        Pole_Mixing
+      new_name: Var274@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(4,1)
+        Pole_Mixing
+      new_name: Var275@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(4,2)
+        Pole_Mixing
+      new_name: Var276@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(4,3)
+        Pole_Mixing
+      new_name: Var277@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(4,4)
+        Pole_Mixing
+      new_name: Var278@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(4,5)
+        Pole_Mixing
+      new_name: Var279@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(4,6)
+        Pole_Mixing
+      new_name: Var280@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(5,1)
+        Pole_Mixing
+      new_name: Var281@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(5,2)
+        Pole_Mixing
+      new_name: Var282@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(5,3)
+        Pole_Mixing
+      new_name: Var283@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(5,4)
+        Pole_Mixing
+      new_name: Var284@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(5,5)
+        Pole_Mixing
+      new_name: Var285@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(5,6)
+        Pole_Mixing
+      new_name: Var286@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(6,1)
+        Pole_Mixing
+      new_name: Var287@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(6,2)
+        Pole_Mixing
+      new_name: Var288@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(6,3)
+        Pole_Mixing
+      new_name: Var289@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(6,4)
+        Pole_Mixing
+      new_name: Var290@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(6,5)
+        Pole_Mixing
+      new_name: Var291@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(6,6)
+        Pole_Mixing
+      new_name: Var292@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_1 Pole_Mass
+      new_name: Var293@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_2 Pole_Mass
+      new_name: Var294@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_3 Pole_Mass
+      new_name: Var295@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_4 Pole_Mass
+      new_name: Var296@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_5 Pole_Mass
+      new_name: Var297@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_6 Pole_Mass
+      new_name: Var298@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(1,1)
+        Pole_Mixing
+      new_name: Var299@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(1,2)
+        Pole_Mixing
+      new_name: Var300@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(1,3)
+        Pole_Mixing
+      new_name: Var301@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(1,4)
+        Pole_Mixing
+      new_name: Var302@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(1,5)
+        Pole_Mixing
+      new_name: Var303@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(1,6)
+        Pole_Mixing
+      new_name: Var304@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(2,1)
+        Pole_Mixing
+      new_name: Var305@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(2,2)
+        Pole_Mixing
+      new_name: Var306@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(2,3)
+        Pole_Mixing
+      new_name: Var307@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(2,4)
+        Pole_Mixing
+      new_name: Var308@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(2,5)
+        Pole_Mixing
+      new_name: Var309@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(2,6)
+        Pole_Mixing
+      new_name: Var310@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(3,1)
+        Pole_Mixing
+      new_name: Var311@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(3,2)
+        Pole_Mixing
+      new_name: Var312@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(3,3)
+        Pole_Mixing
+      new_name: Var313@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(3,4)
+        Pole_Mixing
+      new_name: Var314@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(3,5)
+        Pole_Mixing
+      new_name: Var315@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(3,6)
+        Pole_Mixing
+      new_name: Var316@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(4,1)
+        Pole_Mixing
+      new_name: Var317@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(4,2)
+        Pole_Mixing
+      new_name: Var318@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(4,3)
+        Pole_Mixing
+      new_name: Var319@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(4,4)
+        Pole_Mixing
+      new_name: Var320@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(4,5)
+        Pole_Mixing
+      new_name: Var321@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(4,6)
+        Pole_Mixing
+      new_name: Var322@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(5,1)
+        Pole_Mixing
+      new_name: Var323@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(5,2)
+        Pole_Mixing
+      new_name: Var324@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(5,3)
+        Pole_Mixing
+      new_name: Var325@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(5,4)
+        Pole_Mixing
+      new_name: Var326@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(5,5)
+        Pole_Mixing
+      new_name: Var327@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(5,6)
+        Pole_Mixing
+      new_name: Var328@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(6,1)
+        Pole_Mixing
+      new_name: Var329@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(6,2)
+        Pole_Mixing
+      new_name: Var330@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(6,3)
+        Pole_Mixing
+      new_name: Var331@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(6,4)
+        Pole_Mixing
+      new_name: Var332@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(6,5)
+        Pole_Mixing
+      new_name: Var333@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_(6,6)
+        Pole_Mixing
+      new_name: Var334@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_1 Pole_Mass
+      new_name: Var335@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_2 Pole_Mass
+      new_name: Var336@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_3 Pole_Mass
+      new_name: Var337@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_4 Pole_Mass
+      new_name: Var338@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_5 Pole_Mass
+      new_name: Var339@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~e-_6 Pole_Mass
+      new_name: Var340@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~g Pole_Mass
+      new_name: Var341@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~nu_(1,1)
+        Pole_Mixing
+      new_name: Var342@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~nu_(1,2)
+        Pole_Mixing
+      new_name: Var343@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~nu_(1,3)
+        Pole_Mixing
+      new_name: Var344@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~nu_(2,1)
+        Pole_Mixing
+      new_name: Var345@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~nu_(2,2)
+        Pole_Mixing
+      new_name: Var346@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~nu_(2,3)
+        Pole_Mixing
+      new_name: Var347@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~nu_(3,1)
+        Pole_Mixing
+      new_name: Var348@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~nu_(3,2)
+        Pole_Mixing
+      new_name: Var349@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~nu_(3,3)
+        Pole_Mixing
+      new_name: Var350@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~nu_1 Pole_Mass
+      new_name: Var351@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~nu_2 Pole_Mass
+      new_name: Var352@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~nu_3 Pole_Mass
+      new_name: Var353@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(1,1)
+        Pole_Mixing
+      new_name: Var354@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(1,2)
+        Pole_Mixing
+      new_name: Var355@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(1,3)
+        Pole_Mixing
+      new_name: Var356@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(1,4)
+        Pole_Mixing
+      new_name: Var357@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(1,5)
+        Pole_Mixing
+      new_name: Var358@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(1,6)
+        Pole_Mixing
+      new_name: Var359@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(2,1)
+        Pole_Mixing
+      new_name: Var360@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(2,2)
+        Pole_Mixing
+      new_name: Var361@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(2,3)
+        Pole_Mixing
+      new_name: Var362@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(2,4)
+        Pole_Mixing
+      new_name: Var363@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(2,5)
+        Pole_Mixing
+      new_name: Var364@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(2,6)
+        Pole_Mixing
+      new_name: Var365@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(3,1)
+        Pole_Mixing
+      new_name: Var366@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(3,2)
+        Pole_Mixing
+      new_name: Var367@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(3,3)
+        Pole_Mixing
+      new_name: Var368@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(3,4)
+        Pole_Mixing
+      new_name: Var369@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(3,5)
+        Pole_Mixing
+      new_name: Var370@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(3,6)
+        Pole_Mixing
+      new_name: Var371@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(4,1)
+        Pole_Mixing
+      new_name: Var372@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(4,2)
+        Pole_Mixing
+      new_name: Var373@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(4,3)
+        Pole_Mixing
+      new_name: Var374@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(4,4)
+        Pole_Mixing
+      new_name: Var375@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(4,5)
+        Pole_Mixing
+      new_name: Var376@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(4,6)
+        Pole_Mixing
+      new_name: Var377@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(5,1)
+        Pole_Mixing
+      new_name: Var378@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(5,2)
+        Pole_Mixing
+      new_name: Var379@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(5,3)
+        Pole_Mixing
+      new_name: Var380@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(5,4)
+        Pole_Mixing
+      new_name: Var381@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(5,5)
+        Pole_Mixing
+      new_name: Var382@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(5,6)
+        Pole_Mixing
+      new_name: Var383@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(6,1)
+        Pole_Mixing
+      new_name: Var384@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(6,2)
+        Pole_Mixing
+      new_name: Var385@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(6,3)
+        Pole_Mixing
+      new_name: Var386@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(6,4)
+        Pole_Mixing
+      new_name: Var387@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(6,5)
+        Pole_Mixing
+      new_name: Var388@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_(6,6)
+        Pole_Mixing
+      new_name: Var389@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_1 Pole_Mass
+      new_name: Var390@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_2 Pole_Mass
+      new_name: Var391@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_3 Pole_Mass
+      new_name: Var392@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_4 Pole_Mass
+      new_name: Var393@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_5 Pole_Mass
+      new_name: Var394@h5
+    - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~u_6 Pole_Mass
+      new_name: Var395@h5
+    - source_name: data/#SLHA1_violation @DecayBit::check_first_sec_gen_mixing
+      new_name: Var396@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::CKM_A
+      new_name: Var397@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::CKM_etabar
+      new_name: Var398@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::CKM_lambda
+      new_name: Var399@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::CKM_rhobar
+      new_name: Var400@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::GF
+      new_name: Var401@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::alpha1
+      new_name: Var402@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::alpha2
+      new_name: Var403@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::alphaS
+      new_name: Var404@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::alphainv
+      new_name: Var405@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::delta13
+      new_name: Var406@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::mBmB
+      new_name: Var407@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::mCmC
+      new_name: Var408@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::mD
+      new_name: Var409@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::mE
+      new_name: Var410@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::mMu
+      new_name: Var411@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::mNu1
+      new_name: Var412@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::mNu2
+      new_name: Var413@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::mNu3
+      new_name: Var414@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::mS
+      new_name: Var415@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::mT
+      new_name: Var416@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::mTau
+      new_name: Var417@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::mU
+      new_name: Var418@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::mZ
+      new_name: Var419@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::theta12
+      new_name: Var420@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::theta13
+      new_name: Var421@h5
+    - source_name: data/#StandardModel_SLHA2_parameters @StandardModel_SLHA2::primary_parameters::theta23
+      new_name: Var422@h5
+    - source_name: data/#TotalCrossSectionAsMap @ColliderBit::getTotalCrossSectionAsMap::LHC_13TeV__trust_level
+      new_name: Var423@h5
+    - source_name: data/#TotalCrossSectionAsMap @ColliderBit::getTotalCrossSectionAsMap::LHC_13TeV__xsec_err_fb
+      new_name: Var424@h5
+    - source_name: data/#TotalCrossSectionAsMap @ColliderBit::getTotalCrossSectionAsMap::LHC_13TeV__xsec_fb
+      new_name: Var425@h5
+    - source_name: data/#TotalCrossSectionAsMap @ColliderBit::getTotalCrossSectionAsMap::LHC_13TeV__xsec_relerr
+      new_name: Var426@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi+_1->W++~G
+      new_name: Var427@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi+_1->W++~chi0_1
+      new_name: Var428@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi+_1->W++~chi0_2
+      new_name: Var429@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi+_1->W++~chi0_3
+      new_name: Var430@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi+_1->W++~chi0_4
+      new_name: Var431@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi+_2->W++~G
+      new_name: Var432@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi+_2->W++~chi0_1
+      new_name: Var433@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi+_2->W++~chi0_2
+      new_name: Var434@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi+_2->W++~chi0_3
+      new_name: Var435@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi+_2->W++~chi0_4
+      new_name: Var436@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi+_2->Z0+~chi+_1
+      new_name: Var437@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi+_2->h0_1+~chi+_1
+      new_name: Var438@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_1->W++~chi-_1
+      new_name: Var439@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_1->Z0+~G
+      new_name: Var440@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_1->gamma+~G
+      new_name: Var441@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_1->h0_1+~G
+      new_name: Var442@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_2->W++~chi-_1
+      new_name: Var443@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_2->W++~chi-_2
+      new_name: Var444@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_2->Z0+~G
+      new_name: Var445@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_2->Z0+~chi0_1
+      new_name: Var446@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_2->gamma+~G
+      new_name: Var447@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_2->h0_1+~G
+      new_name: Var448@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_2->h0_1+~chi0_1
+      new_name: Var449@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_3->W++~chi-_1
+      new_name: Var450@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_3->W++~chi-_2
+      new_name: Var451@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_3->Z0+~G
+      new_name: Var452@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_3->Z0+~chi0_1
+      new_name: Var453@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_3->Z0+~chi0_2
+      new_name: Var454@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_3->gamma+~G
+      new_name: Var455@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_3->h0_1+~G
+      new_name: Var456@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_3->h0_1+~chi0_1
+      new_name: Var457@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_3->h0_1+~chi0_2
+      new_name: Var458@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_4->W++~chi-_1
+      new_name: Var459@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_4->W++~chi-_2
+      new_name: Var460@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_4->Z0+~G
+      new_name: Var461@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_4->Z0+~chi0_1
+      new_name: Var462@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_4->Z0+~chi0_2
+      new_name: Var463@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_4->Z0+~chi0_3
+      new_name: Var464@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_4->gamma+~G
+      new_name: Var465@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_4->h0_1+~G
+      new_name: Var466@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_4->h0_1+~chi0_1
+      new_name: Var467@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_4->h0_1+~chi0_2
+      new_name: Var468@h5
+    - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_4->h0_1+~chi0_3
+      new_name: Var469@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::A0
+        Width
+      new_name: Var470@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::H+
+        Width
+      new_name: Var471@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::H-
+        Width
+      new_name: Var472@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::W+
+        Width
+      new_name: Var473@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::W-
+        Width
+      new_name: Var474@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::Z0
+        Width
+      new_name: Var475@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::e+_2
+        Width
+      new_name: Var476@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::e+_3
+        Width
+      new_name: Var477@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::e-_2
+        Width
+      new_name: Var478@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::e-_3
+        Width
+      new_name: Var479@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::eta
+        Width
+      new_name: Var480@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::h0_1
+        Width
+      new_name: Var481@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::h0_2
+        Width
+      new_name: Var482@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::mu+
+        Width
+      new_name: Var483@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::mu-
+        Width
+      new_name: Var484@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::omega
+        Width
+      new_name: Var485@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::pi+
+        Width
+      new_name: Var486@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::pi-
+        Width
+      new_name: Var487@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::pi0
+        Width
+      new_name: Var488@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::rho+
+        Width
+      new_name: Var489@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::rho-
+        Width
+      new_name: Var490@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::rho0
+        Width
+      new_name: Var491@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::t
+        Width
+      new_name: Var492@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::tau+
+        Width
+      new_name: Var493@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::tau-
+        Width
+      new_name: Var494@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::tbar
+        Width
+      new_name: Var495@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::u_3
+        Width
+      new_name: Var496@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::ubar_3
+        Width
+      new_name: Var497@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi+_1
+        Width
+      new_name: wC1p 
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi+_2
+        Width
+      new_name: wC2p
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi-_1
+        Width
+      new_name: wC1m 
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi-_2
+        Width
+      new_name: wC2m
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi0_1
+        Width
+      new_name: wN1
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi0_2
+        Width
+      new_name: wN2
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi0_3
+        Width
+      new_name: wN3
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi0_4
+        Width
+      new_name: wN4
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~d_1
+        Width
+      new_name: Var506@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~d_2
+        Width
+      new_name: Var507@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~d_3
+        Width
+      new_name: Var508@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~d_4
+        Width
+      new_name: Var509@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~d_5
+        Width
+      new_name: Var510@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~d_6
+        Width
+      new_name: Var511@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~dbar_1
+        Width
+      new_name: Var512@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~dbar_2
+        Width
+      new_name: Var513@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~dbar_3
+        Width
+      new_name: Var514@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~dbar_4
+        Width
+      new_name: Var515@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~dbar_5
+        Width
+      new_name: Var516@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~dbar_6
+        Width
+      new_name: Var517@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~e+_1
+        Width
+      new_name: Var518@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~e+_2
+        Width
+      new_name: Var519@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~e+_3
+        Width
+      new_name: Var520@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~e+_4
+        Width
+      new_name: Var521@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~e+_5
+        Width
+      new_name: Var522@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~e+_6
+        Width
+      new_name: Var523@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~e-_1
+        Width
+      new_name: Var524@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~e-_2
+        Width
+      new_name: Var525@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~e-_3
+        Width
+      new_name: Var526@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~e-_4
+        Width
+      new_name: Var527@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~e-_5
+        Width
+      new_name: Var528@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~e-_6
+        Width
+      new_name: Var529@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~g
+        Width
+      new_name: Var530@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~nu_1
+        Width
+      new_name: Var531@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~nu_2
+        Width
+      new_name: Var532@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~nu_3
+        Width
+      new_name: Var533@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~nubar_1
+        Width
+      new_name: Var534@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~nubar_2
+        Width
+      new_name: Var535@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~nubar_3
+        Width
+      new_name: Var536@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~u_1
+        Width
+      new_name: Var537@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~u_2
+        Width
+      new_name: Var538@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~u_3
+        Width
+      new_name: Var539@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~u_4
+        Width
+      new_name: Var540@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~u_5
+        Width
+      new_name: Var541@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~u_6
+        Width
+      new_name: Var542@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~ubar_1
+        Width
+      new_name: Var543@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~ubar_2
+        Width
+      new_name: Var544@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~ubar_3
+        Width
+      new_name: Var545@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~ubar_4
+        Width
+      new_name: Var546@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~ubar_5
+        Width
+      new_name: Var547@h5
+    - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~ubar_6
+        Width
+      new_name: Var548@h5
+    - source_name: data/LogLike
+      new_name: LogL
+    - source_name: data/MPIrank
+      new_name: Var550@h5
+    - source_name: data/input_dataset_index
+      new_name: Var551@h5
+    - source_name: data/pointID
+      new_name: Var552@h5
+    - source_name: data/scanID
+      new_name: Var553@h5
+Figures: 
+# - name: N1_comps
+#   # debug:  true
+#   style: ["a4paper_2x1", "TernaryCmap"]
+#   frame: 
+#     axtri: 
+#       labels: {left: "$|N_{11}|^2$", bottom: "$|N_{12}|^2$", right: "$|N_{13}|^2 + |N_{14}|^2$"}
+#     axc: 
+#       label:  {ylabel: "$m_{\\tilde{\\chi}_1^0}~[{\\rm TeV}]$"}
+#   legend: 
+#     loc: 1 
+#   layers:
+#     - name: triscatter
+#       data: 
+#         - source: h5
+#           transform:
+#             - filter: LogL > -3.09
+#             - sortby: LogL
+#       axes: axtri 
+#       method: scatter
+#       coordinates: 
+#         left:   {expr: np.abs(N11)**2, label: "a"}
+#         right:  {expr: np.abs(N12)**2, label: "b"}
+#         bottom: {expr: np.abs(N13)**2 + np.abs(N14)**2, label: "c"}
+#         c:      {expr: np.abs(mN1) / 1000}
+#       style: 
+#         s:  1.5
+#         cmap:  "rainbow"
+#         vmin:   0.
+#         vmax:   1.5
+
+#     - name: triscatters
+#       data: 
+#         - source: h5
+#           transform:
+#             - filter: LogL < -3.09
+#             - sortby: LogL
+#       axes: axtri 
+#       method: scatter
+#       coordinates: 
+#         left:   {expr: np.abs(N11)**2, label: "a"}
+#         right:  {expr: np.abs(N12)**2, label: "b"}
+#         bottom: {expr: np.abs(N13)**2 + np.abs(N14)**2, label: "c"}
+#       style: 
+#         s:  1.5
+#         facecolor:  "black"
+#         edgecolor:  "none"
+#         zorder: 20
+
+# - name: N1_comps_LogL
+#   # debug:  true
+#   style: ["a4paper_2x1", "TernaryCmap"]
+#   frame: 
+#     axtri: 
+#       labels: {left: "$|N_{11}|^2$", bottom: "$|N_{12}|^2$", right: "$|N_{13}|^2 + |N_{14}|^2$"}
+#     axc: 
+#       label:  {ylabel: "$\\ln{\\mathcal{L}}$"}
+#   legend: 
+#     loc: 1 
+#   layers:
+#     - name: triscatter
+#       data: 
+#         - source: h5
+#           transform: 
+#             - filter: LogL > -3.09
+#             - sortby: LogL
+#       axes: axtri 
+#       method: scatter
+#       coordinates: 
+#         left:   {expr: np.abs(N11)**2, label: "a"}
+#         right:  {expr: np.abs(N12)**2, label: "b"}
+#         bottom: {expr: np.abs(N13)**2 + np.abs(N14)**2, label: "c"}
+#         c:      {expr: LogL}
+#       style: 
+#         s:  1.
+#         marker: '.'
+#         cmap:  "seismic_r"
+#         vmin:   -3.09
+#         vmax:   3.09
+#     - name: exc
+#       data: 
+#         - source: h5
+#           transform: 
+#             - filter: LogL <= -3.09
+#       axes: axtri 
+#       method: scatter
+#       coordinates: 
+#         left:   {expr: np.abs(N11)**2, label: "a"}
+#         right:  {expr: np.abs(N12)**2, label: "b"}
+#         bottom: {expr: np.abs(N13)**2 + np.abs(N14)**2, label: "c"}
+#       style: 
+#         s:  1.
+#         marker: '.'        
+#         facecolor:  "black"
+#         edgecolor:  "none"
+#         zorder: 20
+
+- name: N1_comps_prof
+  # debug:  true
+  style: ["a4paper_2x1", "TernaryCmap"]
+  frame: 
+    axtri: 
+      labels: {left: "$|N_{11}|^2$", bottom: "$|N_{12}|^2$", right: "$|N_{13}|^2 + |N_{14}|^2$"}
+    axc: 
+      label:  {ylabel: "$\\ln{\\mathcal{L}}$"}
+  legend: 
+    loc: 1 
+  layers:
+    - name: triscatter 
+      data: 
+        - source: h5 
+          transform:
+          - filter: LogL > -3.09 
+          - sortby: "LogL"
+          - profile: 
+              bin: 130
+              coordinates:
+                x: { expr: 0.5 * (np.abs(N13)**2 + np.abs(N14)**2) + np.abs(N12)**2,  name: "xx" }
+                y: { expr: np.abs(N13)**2 + np.abs(N14)**2,                         name: "yy"}
+                z: { expr: -np.max(LogL) + LogL,                                    name: "DNLL" }
+              objective: max 
+              grid_points: "ternary" 
+      share_data: tri_N1comp_prof 
+      axes: axtri 
+      method: scatter 
+      coordinates: 
+        x:      {expr: xx}
+        y:      {expr: yy}
+      style: 
+        s:  1.0
+        c:  "#FF42A1"
+        marker: '.'
+        zorder: 7
+    - name: tric 
+      data: 
+        - source: tri_N1comp_prof 
+      axes: axtri 
+      method: tricontourf 
+      coordinates:
+        x:      {expr: xx}
+        y:      {expr: yy}
+        z:      {expr: LogL, fillna: -3.10 }
+      style: 
+        cmap: "Purples"
+        vmin: -3.09
+        vmax: 3.09
+        levels: 100
+        zorder: 8
+
+output:
+  dir: ../Workshop/IMAGE
+  dpi: 600
+  formats:
+  - png
+  - pdf
+project:
+  name: JarvisPLOT Demo (minimal)
+version: 0.3
