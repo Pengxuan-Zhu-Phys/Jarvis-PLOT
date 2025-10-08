@@ -1,0 +1,573 @@
+DataSet:
+- name: b2fmumu
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/2F.E240.Pe2e2.e0.p0.csv
+  type: csv
+- name: b2ftata
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/2F.E240.Pe3e3.e0.p0.csv
+  type: csv
+- name: b2fqq
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/2F.E240.Pqq.e0.p0.csv
+  type: csv
+- name: b4fZeemm
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/4F.E240.Psze_l0mu.e0.p0.csv
+  type: csv
+- name: b4fZeett
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/4F.E240.Psze_l0tau.e0.p0.csv
+  type: csv
+- name: b4fZvvmm
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/4F.E240.Psznu_l0mumu.e0.p0.csv
+  type: csv
+- name: b4fZvvtt
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/4F.E240.Psznu_l0tautau.e0.p0.csv
+  type: csv
+- name: b4fWWmvtv
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/4F.E240.Pww_l0ll.e0.p0.csv
+  type: csv
+- name: b4fWW
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/4F.E240.Pwwbosons.e0.p0.csv
+  type: csv
+- name: b4fZZ4m
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/4F.E240.Pzz_l04mu.e0.p0.csv
+  type: csv
+- name: b4fZZ4t
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/4F.E240.Pzz_l04tau.e0.p0.csv
+  type: csv
+- name: b4fZZvvmm
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/4F.E240.Pzz_l0mumu.e0.p0.csv
+  type: csv
+- name: b4fZZttmm
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/4F.E240.Pzz_l0taumu.e0.p0.csv
+  type: csv
+- name: b4fZZvvtt
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/4F.E240.Pzz_l0tautau.e0.p0.csv
+  type: csv
+- name: b4fZZmmDD
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/4F.E240.Pzz_sl0mu_down.e0.p0.csv
+  type: csv
+- name: b4fZZmmUU
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/4F.E240.Pzz_sl0mu_up.e0.p0.csv
+  type: csv
+- name: b4fZZttDD
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/4F.E240.Pzz_sl0tau_down.e0.p0.csv
+  type: csv
+- name: b4fZZttUU
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/4F.E240.Pzz_sl0tau_up.e0.p0.csv
+  type: csv
+- name: b4fZZ
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/4F.E240.Pzzbosons.e0.p0.csv
+  type: csv
+- name: s4fvvmm
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/4F.E240.Pzzorww_l0mumu.e0.p0.csv
+  type: csv
+- name: s4fvvtt
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/4F.E240.Pzzorww_l0tautau.e0.p0.csv
+  type: csv
+- name: bHmm
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/Higgs.E240.e2e2h_X.e0.p0.csv
+  type: csv
+- name: bHtt
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/Higgs.E240.e3e3h_X.e0.p0.csv
+  type: csv
+- name: bHvv
+  path: /Users/p.zhu/Workshop/CEPC/CSVs/Higgs.E240.nnh_X.e0.p0.csv
+  type: csv
+
+Figures:
+  - name: dist_mrcmin 
+    enable: false 
+    style: ['a4paper_2x1', "rect"]
+    frame: 
+      ax: 
+        labels: {x: "$m^{\\rm RC}_{\\rm min}$ [GeV]", y: "Events / bin"}
+        xlim: [0, 120]
+        # ylim: [1, 1.e8]
+        # yscale: "log"
+        legend:
+          loc: 1 
+          fontsize: 3
+          ncols: 3
+    layers: 
+      - name: BKG_distri 
+        data:
+          - source: b2ftata
+            label: "$\\tau\\tau$"
+            transform: 
+              - add_column: 
+                  name: "weight"
+                  expr: 22.18  
+          - source: b2fqq
+            label: "$qq$"
+            transform: 
+              - add_column: 
+                  name: "weight"
+                  expr: 467.37   
+          # - source: b4fZeemm
+            # label: "single-$Z \\to e^+ e^- \\mu^+ \\mu^-$"
+            # transform: 
+            #   - add_column: 
+            #       name: "weight"
+            #       expr: 23.68  
+          # - source: b4fZeett
+          #   label: "single-$Z \\to e^+ e^- \\tau^+ \\tau^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 4.12   
+          # - source: b4fZvvmm
+          #   label: "single-$Z \\to \\nu_{e} \\bar{\\nu}_e \\mu^+ \\mu^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 1.22  
+          # - source: b4fZvvtt
+          #   label: "single-$Z \\to \\nu_{e} \\bar{\\nu}_e \\tau^+ \\tau^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.41
+          # - source: b4fWWmvtv
+          #   label: "$WW \\to \\nu_{\\mu} \\mu \\nu{\\tau} \\tau$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 11.30   
+          # - source: b4fZZ4m
+          #   label: "$ZZ \\to \\mu^+ \\mu^- \\mu^+ \\mu^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.44  
+          # - source: b4fZZ4t
+          #   label: "$ZZ \\to \\tau^+ \\tau^- \\tau^+ \\tau^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.13 
+          # - source: b4fZZvvmm
+          #   label: "$ZZ \\to \\nu_{\\tau} \\bar{\\nu}_{\\tau} \\mu^+ \\mu^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.54                     
+          # - source: b4fZZttmm
+          #   label: "$ZZ \\to \\mu^+ \\mu^- \\tau^+ \\tau^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.52   
+          # - source: b4fZZvvtt
+          #   label: "$ZZ \\to \\nu_{\\mu} \\bar{\\nu}_{\\mu} \\tau^+ \\tau^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.27  
+          # - source: b4fZZmmDD
+          #   label: "$ZZ \\to \\mu^+ \\mu^-  D D $"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 3.81  
+          # - source: b4fZZmmUU
+          #   label: "$ZZ \\to \\mu^+ \\mu^-  U U $"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 2.45   
+          # - source: b4fZZttDD
+          #   label: "$ZZ \\to \\tau^+ \\tau^-  D D $"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 1.88  
+          # - source: b4fZZttUU
+          #   label: "$ZZ \\to \\tau^+ \\tau^-  U U $"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 1.16  
+          # - source: s4fvvmm
+          #   label: "Signal$(\\mu^+ \\mu^- \\nu_{\\mu} \\bar{\\nu}_{\\mu})$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 6.19
+          # - source: s4fvvtt
+          #   label: "Signal$(\\tau^+ \\tau^- \\nu_{\\tau} \\bar{\\nu}_{\\tau})$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 5.91  
+          # - source: bHmm
+          #   label: "$H\\mu \\mu$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.04                     
+          # - source: bHtt
+          #   label: "$H\\tau \\tau$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.04   
+          # - source: bHvv
+          #   label: "$H \\nu \\nu$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.26
+          - source: b2fmumu
+            label: "$\\mu\\mu$"
+            transform:
+              - add_column:
+                  name: "weight"
+                  expr: 74.66
+        combine:  seperate
+        axes: ax  
+        method: hist 
+        coordinates:
+          x: {expr: mRCmin}
+          weights: {expr: weight}
+        style: 
+          bins: 120
+          range:  [0., 120.]
+          stacked: true 
+
+  - name: dist_pVa.E 
+    style: ['a4paper_2x1', "rect"]
+    frame: 
+      ax: 
+        labels: {x: "$p_{\\rm Va}^{\\rm E}$ [GeV]", y: "Events / bin"}
+        xlim: [0, 120]
+        # ylim: [1, 1.e8]
+        # yscale: "log"
+        legend:
+          loc: 1 
+          fontsize: 3
+          ncols: 3
+    layers: 
+      - name: BKG_distri 
+        data:
+          # - source: b2ftata
+          #   label: "$\\tau\\tau$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 22.18  
+          - source: b2fqq
+            label: "$qq$"
+            transform: 
+              - add_column: 
+                  name: "weight"
+                  expr: 467.37   
+          # - source: b4fZeemm
+            # label: "single-$Z \\to e^+ e^- \\mu^+ \\mu^-$"
+            # transform: 
+            #   - add_column: 
+            #       name: "weight"
+            #       expr: 23.68  
+          # - source: b4fZeett
+          #   label: "single-$Z \\to e^+ e^- \\tau^+ \\tau^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 4.12   
+          # - source: b4fZvvmm
+          #   label: "single-$Z \\to \\nu_{e} \\bar{\\nu}_e \\mu^+ \\mu^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 1.22  
+          # - source: b4fZvvtt
+          #   label: "single-$Z \\to \\nu_{e} \\bar{\\nu}_e \\tau^+ \\tau^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.41
+          # - source: b4fWWmvtv
+          #   label: "$WW \\to \\nu_{\\mu} \\mu \\nu{\\tau} \\tau$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 11.30   
+          # - source: b4fZZ4m
+          #   label: "$ZZ \\to \\mu^+ \\mu^- \\mu^+ \\mu^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.44  
+          # - source: b4fZZ4t
+          #   label: "$ZZ \\to \\tau^+ \\tau^- \\tau^+ \\tau^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.13 
+          # - source: b4fZZvvmm
+          #   label: "$ZZ \\to \\nu_{\\tau} \\bar{\\nu}_{\\tau} \\mu^+ \\mu^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.54                     
+          # - source: b4fZZttmm
+          #   label: "$ZZ \\to \\mu^+ \\mu^- \\tau^+ \\tau^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.52   
+          # - source: b4fZZvvtt
+          #   label: "$ZZ \\to \\nu_{\\mu} \\bar{\\nu}_{\\mu} \\tau^+ \\tau^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.27  
+          # - source: b4fZZmmDD
+          #   label: "$ZZ \\to \\mu^+ \\mu^-  D D $"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 3.81  
+          # - source: b4fZZmmUU
+          #   label: "$ZZ \\to \\mu^+ \\mu^-  U U $"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 2.45   
+          # - source: b4fZZttDD
+          #   label: "$ZZ \\to \\tau^+ \\tau^-  D D $"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 1.88  
+          # - source: b4fZZttUU
+          #   label: "$ZZ \\to \\tau^+ \\tau^-  U U $"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 1.16  
+          - source: s4fvvmm
+            label: "Signal$(\\mu^+ \\mu^- \\nu_{\\mu} \\bar{\\nu}_{\\mu})$"
+            transform: 
+              - add_column: 
+                  name: "weight"
+                  expr: 6.19
+          # - source: s4fvvtt
+          #   label: "Signal$(\\tau^+ \\tau^- \\nu_{\\tau} \\bar{\\nu}_{\\tau})$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 5.91  
+          # - source: bHmm
+          #   label: "$H\\mu \\mu$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.04                     
+          # - source: bHtt
+          #   label: "$H\\tau \\tau$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.04   
+          # - source: bHvv
+          #   label: "$H \\nu \\nu$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.26
+          # - source: b2fmumu
+          #   label: "$\\mu\\mu$"
+          #   transform:
+          #     - add_column:
+          #         name: "weight"
+          #         expr: 74.66
+        combine:  seperate
+        axes: ax  
+        method: hist 
+        coordinates:
+          x: {expr: "pVa.E"}
+          weights: {expr: weight}
+        style: 
+          bins: 120
+          range:  [0., 120.]
+          stacked: true 
+
+  - name: dist_pVb.E 
+    style: ['a4paper_2x1', "rect"]
+    frame: 
+      ax: 
+        labels: {x: "$p_{\\rm Vb}^{\\rm E}$ [GeV]", y: "Events / bin"}
+        xlim: [0, 120]
+        legend:
+          loc: 1 
+          fontsize: 3
+          ncols: 3
+    layers: 
+      - name: BKG_distri 
+        data:
+          # - source: b2ftata
+          #   label: "$\\tau\\tau$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 22.18  
+          - source: b2fqq
+            label: "$qq$"
+            transform: 
+              - add_column: 
+                  name: "weight"
+                  expr: 467.37   
+          # - source: b4fZeemm
+            # label: "single-$Z \\to e^+ e^- \\mu^+ \\mu^-$"
+            # transform: 
+            #   - add_column: 
+            #       name: "weight"
+            #       expr: 23.68  
+          # - source: b4fZeett
+          #   label: "single-$Z \\to e^+ e^- \\tau^+ \\tau^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 4.12   
+          # - source: b4fZvvmm
+          #   label: "single-$Z \\to \\nu_{e} \\bar{\\nu}_e \\mu^+ \\mu^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 1.22  
+          # - source: b4fZvvtt
+          #   label: "single-$Z \\to \\nu_{e} \\bar{\\nu}_e \\tau^+ \\tau^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.41
+          # - source: b4fWWmvtv
+          #   label: "$WW \\to \\nu_{\\mu} \\mu \\nu{\\tau} \\tau$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 11.30   
+          # - source: b4fZZ4m
+          #   label: "$ZZ \\to \\mu^+ \\mu^- \\mu^+ \\mu^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.44  
+          # - source: b4fZZ4t
+          #   label: "$ZZ \\to \\tau^+ \\tau^- \\tau^+ \\tau^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.13 
+          # - source: b4fZZvvmm
+          #   label: "$ZZ \\to \\nu_{\\tau} \\bar{\\nu}_{\\tau} \\mu^+ \\mu^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.54                     
+          # - source: b4fZZttmm
+          #   label: "$ZZ \\to \\mu^+ \\mu^- \\tau^+ \\tau^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.52   
+          # - source: b4fZZvvtt
+          #   label: "$ZZ \\to \\nu_{\\mu} \\bar{\\nu}_{\\mu} \\tau^+ \\tau^-$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.27  
+          # - source: b4fZZmmDD
+          #   label: "$ZZ \\to \\mu^+ \\mu^-  D D $"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 3.81  
+          # - source: b4fZZmmUU
+          #   label: "$ZZ \\to \\mu^+ \\mu^-  U U $"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 2.45   
+          # - source: b4fZZttDD
+          #   label: "$ZZ \\to \\tau^+ \\tau^-  D D $"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 1.88  
+          # - source: b4fZZttUU
+          #   label: "$ZZ \\to \\tau^+ \\tau^-  U U $"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 1.16  
+          - source: s4fvvmm
+            label: "Signal$(\\mu^+ \\mu^- \\nu_{\\mu} \\bar{\\nu}_{\\mu})$"
+            transform: 
+              - add_column: 
+                  name: "weight"
+                  expr: 6.19
+          # - source: s4fvvtt
+          #   label: "Signal$(\\tau^+ \\tau^- \\nu_{\\tau} \\bar{\\nu}_{\\tau})$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 5.91  
+          # - source: bHmm
+          #   label: "$H\\mu \\mu$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.04                     
+          # - source: bHtt
+          #   label: "$H\\tau \\tau$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.04   
+          # - source: bHvv
+          #   label: "$H \\nu \\nu$"
+          #   transform: 
+          #     - add_column: 
+          #         name: "weight"
+          #         expr: 0.26
+          # - source: b2fmumu
+          #   label: "$\\mu\\mu$"
+          #   transform:
+          #     - add_column:
+          #         name: "weight"
+          #         expr: 74.66
+        combine:  seperate
+        axes: ax  
+        method: hist 
+        coordinates:
+          x: {expr: "pVb.E"}
+          weights: {expr: weight}
+        style: 
+          bins: 120
+          range:  [0., 120.]
+          stacked: true 
+
+
+
+
+output:
+  dir: ./Workshop/CEPCmW
+  dpi: 600
+  formats:
+  - png
+project:
+  name: JarvisPLOT Demo (minimal)
+version: 0.3
+
+
+
+
+
+
+
+
+
+
+
+
+
+

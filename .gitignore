@@ -25,6 +25,8 @@ ENV/
 build/
 dist/
 *.egg-info/
+Workshop/
+
 
 # Logs
 *.log

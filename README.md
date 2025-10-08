@@ -18,6 +18,7 @@ Run JarvisPLOT by pointing it at one or more YAML configuration files:
   ```bash
   ./jarvisplot ./bin/susyrun2.yaml
   ```
+Requirements: the data file path need to be CHANGED. 
 
 ---
 

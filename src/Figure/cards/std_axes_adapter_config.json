@@ -1,0 +1,23 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "hist": {
+        "color": [
+            "#FFC9C9",
+            "#FFD6A7",
+            "#FEE685",
+            "#FFF085",
+            "#D8F999",
+            "#B9F8CF",
+            "#A4F4CF",
+            "#46ECD5",
+            "#A2F4FD",
+            "#B8E6FE",
+            "#BEDBFF",
+            "#C6D2FF",
+            "#DDD6FF",
+            "#F6CFFF",
+            "#FCCEE8",
+            "#FF8A99"
+        ]
+    }
+}

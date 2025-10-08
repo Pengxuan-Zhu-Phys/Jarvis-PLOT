@@ -7,12 +7,12 @@ import threading
 
 class SharedContent:
     """
-    会话级可变共享存储，供所有 Figure 共享使用（懒计算 + 可更新）。
-    - register(name, compute_fn): 注册懒计算函数
-    - get(name): 命中则返缓存；否则调用 compute_fn 计算并缓存
-    - update(name, value): 显式写入/覆盖
-    - invalidate(name=None): 失效一个或全部
-    - stats(): 诊断信息
+    Session-level variable shared storage for all Figures (supports lazy evaluation and updates).
+    - register(name, compute_fn): Register a lazy evaluation function.
+    - get(name): Return cached value if available; otherwise, compute using compute_fn and cache the result.
+    - update(name, value): Explicitly write or overwrite a value.
+    - invalidate(name=None): Invalidate a specific entry or all entries.
+    - stats(): Diagnostic information.
     """
     def __init__(self, seed: Optional[int] = None, logger: Any = None):
         self._logger = logger
@@ -65,8 +65,8 @@ class SharedContent:
 
 class DataContext:
     """
-    注入到每个 Figure 的门面，隔离 Figure 与核心实现。
-    Figure 用它来 get/update/register/invalidate 共享内容。
+    Inject it into the facade of each Figure to isolate the Figure from the core implementation.
+    Figures use it to get, update, register, and invalidate shared content.
     """
     def __init__(self, shared: SharedContent):
         self._shared = shared

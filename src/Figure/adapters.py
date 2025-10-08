@@ -4,7 +4,50 @@
 from __future__ import annotations
 from typing import Any, Dict, Optional
 import numpy as np
+import os
+import json
+
 from matplotlib.axes import Axes
+
+# ---- helpers for masking by extend on filled contours ----
+
+def _resolve_vlim(z, vmin=None, vmax=None, levels=None, norm=None):
+    """Derive effective vmin/vmax from norm/levels/fallback to data."""
+    import numpy as _np
+    if norm is not None:
+        vmin = getattr(norm, "vmin", vmin)
+        vmax = getattr(norm, "vmax", vmax)
+    if levels is not None and _np.ndim(levels) > 0:
+        vmin = levels[0] if vmin is None else vmin
+        vmax = levels[-1] if vmax is None else vmax
+    if vmin is None:
+        vmin = float(_np.nanmin(z))
+    if vmax is None:
+        vmax = float(_np.nanmax(z))
+    return float(vmin), float(vmax)
+
+
+def _mask_by_extend(z, *, extend="neither", vmin=None, vmax=None, levels=None, norm=None):
+    """
+    Return masked z according to extend semantics:
+      - 'min'  : mask z < vmin
+      - 'max'  : mask z > vmax
+      - 'both' : mask outside [vmin, vmax]
+      - 'neither': no masking
+    Also returns effective (vmin, vmax).
+    """
+    import numpy as _np
+    z = _np.asarray(z)
+    e = (extend or "neither").lower()
+    if e not in ("neither", "min", "max", "both"):
+        e = "neither"
+    vmin_eff, vmax_eff = _resolve_vlim(z, vmin=vmin, vmax=vmax, levels=levels, norm=norm)
+    mask = _np.zeros_like(z, dtype=bool)
+    if e in ("min", "both"):
+        mask |= (z < vmin_eff)
+    if e in ("max", "both"):
+        mask |= (z > vmax_eff)
+    return _np.ma.masked_array(z, mask=mask), vmin_eff, vmax_eff
 
 # —— 小工具：对 artist 或容器做统一 clip_path 应用 ——
 def _auto_clip(artists, ax: Axes, clip_path):
@@ -52,6 +95,17 @@ class StdAxesAdapter:
         self.ax = ax
         self._defaults = defaults or {}
         self._clip_path = clip_path  # None 表示不用裁剪
+        self.config = self._load_internal_config()
+        self._legend = False 
+
+    def _load_internal_config(self):
+        default_path = os.path.join(os.path.dirname(__file__), "cards", "std_axes_adapter_config.json")
+        try:
+            with open(default_path, "r") as f:
+                return json.load(f)
+        except FileNotFoundError:
+            # 可选：返回默认空配置或 raise
+            return {}
 
     # 参数合并：用户优先，默认兜底
     def _merge(self, method: str, kwargs: Dict[str, Any]) -> Dict[str, Any]:
@@ -91,34 +145,92 @@ class StdAxesAdapter:
         return _auto_clip(artists, self.ax, self._clip_path)
     
     def tricontour(self, **kwargs):
-        print("tricontour method ...")
         x, y, z = kwargs.pop("x"), kwargs.pop("y"), kwargs.pop("z")
-        import matplotlib.tri as tri 
+        import matplotlib.tri as tri
         triang = tri.Triangulation(x, y)
         refiner = tri.UniformTriRefiner(triang)
         tri_refi, z_test_refi = refiner.refine_field(z, subdiv=3)
         kw = self._merge("tricontour", kwargs)
         artists = self.ax.tricontour(tri_refi, z_test_refi, **kw)
-        print("tricontour method succesful")
         return _auto_clip(artists, self.ax, self._clip_path)
 
     def tricontourf(self, **kwargs):
-        print("Line 99 -> ", kwargs.keys())
         x, y, z = kwargs.pop("x"), kwargs.pop("y"), kwargs.pop("z")
-        print(x, y, z)
-        import matplotlib.tri as tri 
+        import matplotlib.tri as tri
+        import numpy as _np
+
         triang = tri.Triangulation(x, y)
         refiner = tri.UniformTriRefiner(triang)
-        tri_refi, z_test_refi = refiner.refine_field(z, subdiv=3)
-        kw = self._merge("tricontour", kwargs)
-        artists = self.ax.tricontourf(tri_refi, z_test_refi, **kw)
-        # return _auto_clip(artists, self.ax, self._clip_path)
-        return artists
+        tri_refi, z_refi = refiner.refine_field(z, subdiv=3)
+
+        # Merge defaults for tricontourf (not tricontour)
+        kw = self._merge("tricontourf", kwargs)
+
+        # Mask by extend; also resolve effective vmin/vmax for color scaling
+        z_masked, vmin_eff, vmax_eff = _mask_by_extend(
+            z_refi,
+            extend=kw.get("extend", "neither"),
+            vmin=kw.get("vmin"),
+            vmax=kw.get("vmax"),
+            levels=kw.get("levels"),
+            norm=kw.get("norm"),
+        )
+
+        # Avoid Matplotlib conflict: norm cannot be combined with vmin/vmax
+        if kw.get("norm") is not None:
+            kw.pop("vmin", None)
+            kw.pop("vmax", None)
+        else:
+            kw.setdefault("vmin", vmin_eff)
+            kw.setdefault("vmax", vmax_eff)
+
+        # Mask triangles that include any masked vertex
+        z_mask_arr = _np.ma.getmaskarray(z_masked)
+        if z_mask_arr is not False and z_mask_arr is not None:
+            tri_mask = _np.any(z_mask_arr[tri_refi.triangles], axis=1)
+            tri_refi.set_mask(tri_mask)
+            z_for_plot = _np.asarray(_np.ma.filled(z_masked, 0.0))
+        else:
+            z_for_plot = _np.asarray(z_masked)
+
+        artists = self.ax.tricontourf(tri_refi, z_for_plot, **kw)
+        return _auto_clip(artists, self.ax, self._clip_path)
 
     # 为了兼容现有框架，暴露底层的方法/属性
     def __getattr__(self, name: str):
         # 未覆写的方法透传给原始 Axes
         return getattr(self.ax, name)
+
+    def hist(self, *args, **kwargs):
+        import matplotlib.pyplot as plt
+        stacked = kwargs.get('stacked', False)
+        colors = kwargs.get('color', None) or kwargs.get('colors', None)
+
+        # 获取数据分组数：支持 x 作为 args[0] 或 kwargs['x']
+        x = kwargs.get('x', args[0] if args else None)
+        n_groups = None
+        if stacked and colors is None and x is not None:
+            # 只有当x为二维数据时，len(x)为分组数（多数组堆叠情况）
+            try:
+                n_groups = len(x) if hasattr(x, '__len__') and not isinstance(x, (str, bytes)) else 1
+            except Exception:
+                n_groups = 1
+            default_colors = self._get_default_colors(n_groups)
+            kwargs['color'] = default_colors
+
+        kw = self._merge("hist", kwargs)
+        artists = self.ax.hist(*args, **kw)
+        return _auto_clip(artists, self.ax, self._clip_path)
+
+    def _get_default_colors(self, n):
+        import matplotlib.pyplot as plt
+        # print(getattr(self, "color_palette"))
+        palette = self.config['hist']['color']
+        print(len(palette), n)
+        
+        # palette = getattr(self, 'color_palette', plt.cm.tab10.colors)
+        # print(palette)
+        return [palette[i % len(palette)] for i in range(n)]
 
 # —— Ternary 适配器：在 Std 基础上增加 (a,b,c)->(x,y) 投影 ——
 class TernaryAxesAdapter(StdAxesAdapter):
@@ -168,3 +280,4 @@ class TernaryAxesAdapter(StdAxesAdapter):
         return super().tricontourf(**kwargs)
         # else:
         #     raise ValueError("scatter() needs either (a,b,c) or (x,y) inputs")
+

@@ -80,20 +80,21 @@ class JarvisPLOT():
         return path
 
     def plot(self):
-
-        
-        for fig in self.yaml.config["Figures"]: 
+        for fig in self.yaml.config["Figures"]:
             from .Figure.figure import Figure
-            plt = Figure()
-            plt.config      = self.yaml.config
-            plt.logger      = self.logger
-            plt.jpstyles    = self.style
-            # plt.jpdatas     = self.dataset
-            plt.context     = self.ctx
+            figobj = Figure()
+            figobj.config = self.yaml.config
+            figobj.logger = self.logger
+            figobj.jpstyles = self.style
+            figobj.context = self.ctx
 
-            if plt.set(fig): 
-                self.logger.warning("Succefully loading figure -> {} setting".format(plt.name))
-                plt.plot()
+            try:
+                if figobj.set(fig):
+                    self.logger.warning(f"Succefully loading figure -> {figobj.name} setting")
+                    figobj.plot()
+            except Exception as e:
+                self.logger.warning(f"Figure {fig.get('name', '<noname>')} failed: {e}")
+                continue
             
 
             

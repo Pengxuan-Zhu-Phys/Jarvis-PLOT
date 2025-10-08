@@ -8,7 +8,7 @@ import pandas as pd
 import matplotlib as mpl
 from types import MethodType
 from .adapters import StdAxesAdapter, TernaryAxesAdapter
-
+import json
 
 
 class Figure:
@@ -73,16 +73,7 @@ class Figure:
     def logger(self, value):
         if value is not None: 
             self._logger = value 
-    
-    # @property
-    # def jpdatas(self):
-    #     return self._jpdatas
-    
-    # @jpdatas.setter
-    # def jpdatas(self, value) -> None: 
-    #     self._jpdatas = value 
-    #     self.dtmap = {dt.name: dt.data for dt in self.jpdatas}
-    
+
     @property
     def frame(self):
         return self._frame 
@@ -102,13 +93,14 @@ class Figure:
     
     @style.setter
     def style(self, value) -> None: 
+        from copy import deepcopy 
         if len(value) == 2: 
-            self._frame = self.jpstyles[value[0]][value[1]]['Frame']
-            self._style = self.jpstyles[value[0]][value[1]]['Style']
+            self._frame = deepcopy(self.jpstyles[value[0]][value[1]]['Frame'])
+            self._style = deepcopy(self.jpstyles[value[0]][value[1]]['Style'])
             self.logger.debug("Style: [{} : {}] used for figure -> {}".format(value[0], value[1], self.name))
         elif len(value) == 1: 
-            self._frame = self.jpstyles[value[0]]["default"]['Frame']
-            self._style = self.jpstyles[value[0]]["default"]['Style']
+            self._frame = deepcopy(self.jpstyles[value[0]]["default"]['Frame'])
+            self._style = deepcopy(self.jpstyles[value[0]]["default"]['Style'])
             self.logger.debug("Style: [{} : {}] used for figure -> {}".format(value[0], "default", self.name))
         else:
             self.logger.error("Undefined style -> {}".format(value))
@@ -121,6 +113,8 @@ class Figure:
     @context.setter
     def context(self, value):
         self._ctx = value  # 期望是 DataContext
+
+
     
     
     @property
@@ -133,7 +127,8 @@ class Figure:
             info = {}
             ax  = getattr(self, layer['axes'])
             info['name'] = layer.get("name", "")
-            info['data'] = self.load_layer_data(layer['data'])
+            info['data'] = self.load_layer_data(layer)
+            info['combine'] = layer.get("combine", "concat")
             if layer.get("share_data") and info['data'] is not None:
                 from copy import deepcopy
                 self.context.update(layer["share_data"], deepcopy(info['data']))
@@ -142,24 +137,44 @@ class Figure:
             info['style'] = layer.get("style", {})
             ax.layers.append(info)
                         
-    def load_layer_data(self, lyinfo):
-        if isinstance(lyinfo, list):
-            dts = []
-            for ds in lyinfo:
-                src = ds.get('source')
-                if src and self.context and self.context.get(src) is not None:
-                    from copy import deepcopy
-                    dt = deepcopy(self.context.get(src))
-                    dt = self.load_bool_df(dt, ds.get("transform", None))
-                    dts.append(dt)
-                else:
-                    self.logger.error("DataSet -> {} not specified".format(src))
-            if len(dts) == 0:
-                return None
-            try:
-                return pd.concat(dts, ignore_index=False)
-            except Exception:
-                return dts[0]
+    def load_layer_data(self, layer):
+        lyinfo = layer.get("data", False)
+        lycomb = layer.get("combine", "concat")
+        if lyinfo:
+            if lycomb == "concat":
+                dts = []
+                for ds in lyinfo:
+                    src = ds.get('source')
+                    self.logger.debug("Loading layer data source -> {}".format(src))
+                    if src and self.context and self.context.get(src) is not None:
+                        from copy import deepcopy
+                        dt = deepcopy(self.context.get(src))
+                        dt = self.load_bool_df(dt, ds.get("transform", None))
+                        dts.append(dt)
+                    else:
+                        self.logger.error("DataSet -> {} not specified".format(src))
+                if len(dts) == 0:
+                    return None
+                try:
+                        return pd.concat(dts, ignore_index=False)
+                except Exception:
+                    return dts[0]
+            elif lycomb == "seperate":
+                dts = {}
+                for ds in lyinfo: 
+                    src = ds.get("source")
+                    label = ds.get("label")
+                    self.logger.debug("Loading layer data source -> {}".format(src))
+                    if src and self.context and self.context.get(src) is not None:
+                        from copy import deepcopy
+                        dt = deepcopy(self.context.get(src))
+                        dt = self.load_bool_df(dt, ds.get("transform", None))
+                        dts[label] = dt
+                    else:
+                        self.logger.error("DataSet -> {} not specified".format(src))
+                if len(dts) == 0: 
+                    return None 
+                return dts 
         # Unsupported lyinfo shape -> no data
         return None
          
@@ -226,7 +241,7 @@ class Figure:
                 return df[mask]
 
             except Exception as e:
-                print(f"Errors when evaluating condition -> {condition}:\n\t", e)
+                self.logger.error(f"Errors when evaluating condition -> {condition}:\n\t{e}")
                 return pd.DataFrame(index=df.index).iloc[0:0].copy()
 
         def profiling(df, prof):
@@ -346,24 +361,44 @@ class Figure:
                     self.logger.warning(f"sortby failed for expr={expr}: {e}")
                 return df
 
-
+        def addcolumn(df, adds):
+            try: 
+                name = adds.get("name", False)
+                expr = adds.get("expr", False)
+                if not (name and expr):
+                    self.logger.error("Error in loading add_column -> {}".format(adds))
+                from ..inner_func import update_funcs
+                import math
+                allowed_globals = update_funcs({"np": np, "math": math})
+                local_vars = df.to_dict("series") 
+                value = eval(str(expr), allowed_globals, local_vars)
+                df[name] = value 
+                return df
+            except Exception as e: 
+                self.logger.error("Errors when add new column -> {}:\n\t{}".format(adds, json.dumps(e)))   
+                return df               
+            
+        
         if transform is None:
             return df 
         elif not isinstance(transform, list): 
-            print("illegal transform format, list type needed ->", transform)
+            self.logger.error("illegal transform format, list type needed ->".format(json.dump(transform)))
             return df 
         else: 
             for trans in transform:
-                print("Line 375 -> ", trans.keys())
+                self.logger.debug("Applying the transform ... ")
                 if "filter" in trans.keys():
                     df = filter(df, trans['filter'])
-                    print("Line 375 After filter -> ", df.shape)
+                    self.logger.debug("After filtering -> {}".format(df.shape))
                 elif "profile" in trans.keys(): 
                     df = profiling(df, trans['profile'])
-                    print("Line 380 After profiling -> ", df.shape)
+                    self.logger.debug("After profiling -> {}".format(df.shape))
                 elif "sortby" in trans.keys(): 
                     df = sortby(df, trans['sortby'])
-                    print("Line 382 After sortby -> ", df.shape)
+                    self.logger.debug("After sortby -> {}".format(df.shape))
+                elif "add_column" in trans.keys(): 
+                    df = addcolumn(df, trans['add_column'])
+                    self.logger.debug("After Add-column -> {}".format(df.shape))
                 
             return df 
                          
@@ -377,14 +412,19 @@ class Figure:
     def axlogo(self, kwgs):
         if "axlogo" not in self.axes.keys(): 
             self.axes['axlogo'] = self.fig.add_axes(**kwgs)
+
         self.axlogo.layers  = []
-        jhlogo = self.load_path("&JP/src/cards/icons/jarvisHEP.png")
+        jhlogo = self.load_path(self.frame['axlogo']['file'])
         from PIL import Image
         with Image.open(jhlogo) as image:
             arr = np.asarray(image.convert("RGBA"))
             self.axlogo.imshow(arr)
-            self.axlogo.text(1., 0., "Jarvis-HEP", ha="left", va='bottom', color="black", fontfamily="Fira code", fontsize="x-small", fontstyle="normal", fontweight="bold", transform=self.axlogo.transAxes)
-            self.axlogo.text(1., 0.9, "  Powered by", ha="left", va='top', color="black", fontfamily="Fira code", fontsize="xx-small", fontstyle="normal", fontweight="normal", transform=self.axlogo.transAxes)
+            if self.frame['axlogo'].get("text"):
+                for txt in self.frame['axlogo']['text']:
+                    self.axlogo.text(**txt,  transform=self.axlogo.transAxes)
+            else: 
+                self.axlogo.text(1., 0., "Jarvis-HEP", ha="left", va='bottom', color="black", fontfamily="Fira code", fontsize="x-small", fontstyle="normal", fontweight="bold", transform=self.axlogo.transAxes)
+                self.axlogo.text(1., 0.9, "  Powered by", ha="left", va='top', color="black", fontfamily="Fira code", fontsize="xx-small", fontstyle="normal", fontweight="normal", transform=self.axlogo.transAxes)
 
     @property
     def axtri(self):
@@ -406,6 +446,7 @@ class Figure:
                 clip_path=Path(vertices, codes)  # 用 path 做 clip，transform 使用 ax.transData 已在适配器里处理
             )
             adapter._type = 'tri'
+            adapter._legend = False
             adapter.layers = []
             self.axes["axtri"] = adapter
         
@@ -590,7 +631,84 @@ class Figure:
             self.axc.tick_params(**self.frame['axc']['ticks'].get('minor', {}))
 
             self.axc.set_ylabel(**self.frame['axc'].get('label', {}))
-        print("Loaded axc")
+        self.logger.debug("Loaded colorbar axes -> axc")
+
+
+    @property
+    def ax(self): 
+        return self.axes['ax']
+
+    @ax.setter
+    def ax(self, kwgs):
+        if "ax" not in self.axes.keys():
+            raw_ax = self.fig.add_axes(**kwgs)
+            adapter = StdAxesAdapter(raw_ax)
+            adapter._type = "rect"
+            adapter.layers = []
+            adapter._legend = self.frame['ax'].get("legend", False)
+            self.axes['ax'] = adapter 
+            
+
+        if self.frame['ax'].get("yscale", "").lower() == 'log':
+            self.ax.set_yscale("log")
+            from matplotlib.ticker import LogLocator
+            self.ax.yaxis.set_minor_locator(LogLocator(subs='auto'))
+        else:
+            from matplotlib.ticker import AutoMinorLocator
+            self.ax.yaxis.set_minor_locator(AutoMinorLocator())
+        
+        if self.frame['ax'].get("xscale", "").lower() == 'log':
+            self.ax.set_xscale("log")
+            from matplotlib.ticker import LogLocator
+            self.ax.xaxis.set_minor_locator(LogLocator(subs='auto'))
+        else:
+            from matplotlib.ticker import AutoMinorLocator
+            self.ax.xaxis.set_minor_locator(AutoMinorLocator())
+        
+        def _safe_cast(v):
+            try:
+                return float(v)
+            except Exception:
+                return v
+
+
+        xlim = self.frame["ax"].get("xlim")
+        if xlim:
+            xlim = list(map(_safe_cast, xlim))
+            self.ax.set_xlim(xlim)
+
+        ylim = self.frame["ax"].get("ylim")
+        if ylim:
+            ylim = list(map(_safe_cast, ylim))
+            self.ax.set_ylim(ylim)
+
+
+        self.ax.tick_params(**self.frame['ax']['ticks'].get("both", {}))
+        self.ax.tick_params(**self.frame['ax']['ticks'].get("major", {}))
+        self.ax.tick_params(**self.frame['ax']['ticks'].get("minor", {}))
+        
+        if self.frame['ax']['labels'].get("x"): 
+            self.ax.set_xlabel(self.frame['ax']['labels']['x'], **self.frame['ax']['labels']['xlabel'])
+        if self.frame['ax']['labels'].get("y"): 
+            self.ax.set_ylabel(self.frame['ax']['labels']['y'], **self.frame['ax']['labels']['ylabel'])
+
+        self.logger.debug("Loaded main rectangle axes -> ax")
+
+    def _apply_legend_on_axes(self, ax_name: str, ax_obj, leg_cfg: dict):
+        """Apply a legend on a specific axes using a YAML dict stored under frame['axes'][ax_name]['legend'].
+        Supports an optional 'enabled' key (default True). Any 'axes' key will be ignored here."""
+        if not isinstance(leg_cfg, dict):
+            return
+        if leg_cfg.get("enabled", True) is False:
+            return
+        kw = dict(leg_cfg)
+        kw.pop("axes", None)  # per-axes legend doesn't need this
+        try:
+            (ax_obj.ax if hasattr(ax_obj, "ax") else ax_obj).legend(**kw)
+        except Exception as e:
+            if self.logger:
+                self.logger.warning(f"Legend apply failed on '{ax_name}': {e}")
+
 
     def _install_tri_auto_clip(self, ax):
         """
@@ -637,24 +755,25 @@ class Figure:
         # self.ax.tight_layout()
         for fmt in self.fmts: 
             spf = os.path.join(self.dir, "{}.{}".format(self.name, fmt))
+            self.logger.warning("JarvisPlot Save {} into -> {}".format(self.name, spf))
             self.fig.savefig(spf, dpi=self.dpi)
 
     def load_axes(self):
         for ax, kws in self.frame['axes'].items():
-            print("Loading ->", ax)
+            self.logger.debug("Loading axes -> {}".format(ax))
             if ax == "axlogo": 
                 self.axlogo = kws
             elif ax == "axtri":
                 self.axtri  = kws  
             elif ax == "axc":
                 self.axc    = kws    
+            elif ax == "ax": 
+                self.ax     = kws
+        
     
     def plot(self):
         self.render()
-
-        # for layer in self.layers: 
-            
-
+        # for layer in self.layers:
         if self.debug: 
             if "axtri" in self.axes.keys():
                 # Demo of Scatter Clip
@@ -665,9 +784,6 @@ class Figure:
 
                 # Demo of Plot Clip 
                 self.axtri.plot(x=[-1, 0.5, 0.5, 2], y=[-1.1, 0.6, 0.3, 1.8], linestyle="-", color="#0277BA")
-
-
-
         self.savefig()      
         
     def render(self):
@@ -679,8 +795,23 @@ class Figure:
             ly_list = getattr(ax, "layers", [])
             for ly in ly_list:
                 self.render_layer(ax, ly)
+
+        # for ax_name, ax in self.axes.items(): 
+        # # Apply per-axes legend if configured under frame['axes'][name]['legend']
+        # axes_cfg = self.frame.get('axes', {}) if isinstance(self.frame, dict) else {}
+        for name, ax in self.axes.items():
+            try:
+                if hasattr(ax, "_legend") and ax._legend:
+                    target_ax = ax.ax if hasattr(ax, "ax") else ax
+                    target_ax.legend(**ax._legend)
+            except Exception as e:
+                if self.logger:
+                    self.logger.warning(f"Legend draw failed on axes '{name}': {e}")
+
+
         # finalize colorbar lazily (only if any colored layer appeared)
-        self.axc = True 
+        if "axc" in self.axes:
+            self.axc = True 
         # if axx is self.axtri:  
             
     # --- config ingestion ---
@@ -693,8 +824,6 @@ class Figure:
         
         try: 
 
-            if "debug" in info: 
-                self.debug = info['debug']
 
             changed = True
             if "name" in info:
@@ -702,14 +831,24 @@ class Figure:
             else:
                 changed = False
 
+            if "debug" in info: 
+                self.debug = info['debug']
+                self.logger.debug("Loading plot -> {} in debug mode".format(self.name))
+                
+            self._enable = info.get("enable", True) 
+            if not self._enable: 
+                self.logger.warning("Skip plot -> {}".format(self.name))
+                return False
+            
             if "style" in info: 
                 self.style = info['style']
             else: 
                 self.style = ["a4paper_2x1", "default"]
-            
+            self.logger.debug("Figure style loaded")
 
             if "frame" in info:
                 self.frame = info['frame']
+
 
             import matplotlib.pyplot as plt 
             plt.rcParams['mathtext.fontset'] = 'stix'
@@ -750,7 +889,8 @@ class Figure:
         "hist": "hist",
         "hexbin": "hexbin",
         "tricontour": "tricontour",
-        "tricontourf": "tricontourf"
+        "tricontourf": "tricontourf",
+        "hist": "hist"
     }
 
     def _eval_series(self, df: pd.DataFrame, set: dict):
@@ -759,6 +899,7 @@ class Figure:
         - If expr is a direct column name, returns that series.
         - If expr is a python expression, eval with df columns in scope.
         """
+        self.logger.debug("Loading variable expression -> {}".format(set['expr'])) 
         if not "expr" in set.keys():
             raise ValueError(f"expr need for axes {set}.")
         if set["expr"] in df.columns:
@@ -802,14 +943,12 @@ class Figure:
         
         if not uses_color:
             return style
-        # print(">>> Line 826 -> ", uses_color)
         self.axc._cb["cmap"] = s.get("cmap")
 
         # ---- 1) records vmin and vmax ----
         z = None
         if self.axc._cb["vmin"] is None:
             if ("vmin" in s and isinstance(s['vmin'], float)):
-                # print("Line 735 -> ", s['vmin'])
                 self.axc._cb['vmin'] = s['vmin']
             else: 
                 if z is None: 
@@ -824,7 +963,6 @@ class Figure:
 
         if self.axc._cb["vmax"] is None:
             if ("vmax" in s and isinstance(s['vmax'], float)):
-                # print("Line 735 -> ", s['vmax'])
                 self.axc._cb['vmax'] = s['vmax']
             else: 
                 if z is None: 
@@ -876,7 +1014,7 @@ class Figure:
           - rectangular axes (ax._type == 'rect'): methods expect (x,y, ...)
         """
         # 1) Resolve method
-        # print("Line 900 ->", layer_info)
+        self.logger.debug(f"Drawing layer -> {layer_info['name']}")
         method_key = str(layer_info.get("method", "scatter")).lower()
         method_name = self.METHOD_DISPATCH.get(method_key)
         if not method_name or not hasattr(ax, method_name):
@@ -888,39 +1026,56 @@ class Figure:
         if layer_info.get("style", {}) is not None: 
             style.update(layer_info.get("style", {}))
 
-        # 3) DataFrame and coordinates spec
-        df = layer_info["data"]
-        coor = layer_info.get("coor", {})
-
-        # Apply per-figure shared colorbar (lazy) if an axc exists
-        try:
-            style = self._cb_collect_and_attach(style, coor, method_key, df)
-            self.logger.debug("Successful loading colorbar style")
-        except Exception as _e:
-            self._logger.debug(f"colorbar lazy-attach failed: {_e}")
-
-
-        # 5) Dispatch by axes type
         if getattr(ax, "_type", None) == "tri":
+            df = layer_info["data"]
+            coor = layer_info.get("coor", {})
+
+            # Apply per-figure shared colorbar (lazy) if an axc exists
+            try:
+                style = self._cb_collect_and_attach(style, coor, method_key, df)
+                self.logger.debug("Successful loading colorbar style")
+            except Exception as _e:
+                self._logger.debug(f"colorbar lazy-attach failed: {_e}")
             # Ternary coordinates required: left/right/bottom
             requiredlbr = {"left", "right", "bottom"}
             requiredxy  = {"x", "y"}
             if not ((requiredlbr <= set(coor.keys())) or (requiredxy <= set(coor.keys()))):
                 raise ValueError("Ternary layer must define coordinates: {left, right, bottom} or {x, y} with exprs.")
-            # print("Line 935 -> ", coor)
             for kk, vv in coor.items(): 
-                # print("Line 947 -> ", kk, vv)
                 style[kk] = self._eval_series(df, vv)
-            # print("Line 949 -> ", method_name, style.keys())
             return method(**style)
 
         elif getattr(ax, "_type", None) == "rect":
+            df = layer_info["data"]
+            coor = layer_info.get("coor", {})
+            try:
+                style = self._cb_collect_and_attach(style, coor, method_key, df)
+                self.logger.debug("Successful loading colorbar style")
+            except Exception as _e:
+                self._logger.debug(f"colorbar lazy-attach failed: {_e}")
+                
+            if layer_info['method'] == "hist":
+                if isinstance(layer_info['data'], dict): 
+                    if "label" not in style.keys():
+                        style['label'] = []
+                    for kk, vv in coor.items():
+                        style[kk] = []
+                    for dn, ddf in df.items(): 
+                        style['label'].append(dn)
+                        for kk, vv in coor.items():
+                            style[kk].append( self._eval_series(ddf, vv) )
+                else: 
+                    for kk, vv in coor.items(): 
+                        style[kk] = self._eval_series(df, vv)
+                        
+                return method(**style)
             # Generic x/y coordinates required
-            if not ({"x", "y"} <= set(coor.keys())):
-                raise ValueError("Rectangular layer must define coordinates: {x,y} with exprs.")
-            x = self._eval_series(df, coor["x"])  # type: ignore[index]
-            y = self._eval_series(df, coor["y"])  # type: ignore[index]
-            return method(x, y, **style)
+            else:
+                if not ({"x", "y"} <= set(coor.keys())):
+                    raise ValueError("Rectangular layer must define coordinates: {x,y} with exprs.")
+                x = self._eval_series(df, coor["x"])  # type: ignore[index]
+                y = self._eval_series(df, coor["y"])  # type: ignore[index]
+                return method(x, y, **style)
 
         else:
             # Unknown axes adapter type

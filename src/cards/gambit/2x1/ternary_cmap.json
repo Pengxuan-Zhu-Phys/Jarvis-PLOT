@@ -10,8 +10,8 @@
             "axlogo": {
                 "rect": [
                     0.01,
-                    0.01,
-                    0.06,
+                    0.05,
+                    0.12,
                     0.072
                 ],
                 "frameon": false,
@@ -22,7 +22,7 @@
                     1024
                 ],
                 "ylim": [
-                    1024,
+                    512,
                     0
                 ]
             },
@@ -173,7 +173,21 @@
             }
         },
         "axlogo":{
-            "file": "&JP/src/cards/icons/jarvisHEP.png"
+            "file": "&JP/src/cards/icons/gambit_small.png",
+            "text": [
+                {
+                    "x": 0.0,
+                    "y": -0.5,
+                    "s": "GAMBIT 2.7",
+                    "ha": "left",
+                    "va": "bottom",
+                    "color": "black",
+                    "fontfamily": "Fira code",
+                    "fontsize": 5.0,
+                    "fontstyle": "normal",
+                    "fontweight": "normal"
+                }
+            ]
         }
     },
     "Style": {

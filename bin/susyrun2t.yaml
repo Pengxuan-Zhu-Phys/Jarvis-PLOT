@@ -13,25 +13,25 @@ DataSet:
     - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::Au_3
       new_name: Var2@h5
     - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::M1
-      new_name: pM1
+      new_name: Var3@h5
     - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::M2
-      new_name: pM2
+      new_name: Var4@h5
     - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::M3
-      new_name: pM3
+      new_name: Var5@h5
     - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::Qin
-      new_name: pQin
+      new_name: Var6@h5
     - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::TanBeta
-      new_name: pTanBeta
+      new_name: Var7@h5
     - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::mA
       new_name: Var8@h5
     - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::mG
-      new_name: pMG
+      new_name: Var9@h5
     - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::ml2
       new_name: Var10@h5
     - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::mq2
       new_name: Var11@h5
     - source_name: data/#MSSM11atQ_mA_mG_parameters @MSSM11atQ_mA_mG::primary_parameters::mu
-      new_name: pMu
+      new_name: Var12@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::A0 Pole_Mass
       new_name: Var13@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::A0_(1,1)
@@ -615,10 +615,10 @@ DataSet:
       new_name: Var230@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi+_1
         Pole_Mass
-      new_name: mC1
+      new_name: Var231@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi+_2
         Pole_Mass
-      new_name: mC2
+      new_name: Var232@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi-_(1,1)
         Pole_Mixing
       new_name: Var233@h5
@@ -633,64 +633,64 @@ DataSet:
       new_name: Var236@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(1,1)
         Pole_Mixing
-      new_name: N11
+      new_name: Var237@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(1,2)
         Pole_Mixing
-      new_name: N12
+      new_name: Var238@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(1,3)
         Pole_Mixing
-      new_name: N13
+      new_name: Var239@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(1,4)
         Pole_Mixing
-      new_name: N14
+      new_name: Var240@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(2,1)
         Pole_Mixing
-      new_name: N21
+      new_name: Var241@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(2,2)
         Pole_Mixing
-      new_name: N22
+      new_name: Var242@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(2,3)
         Pole_Mixing
-      new_name: N23
+      new_name: Var243@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(2,4)
         Pole_Mixing
-      new_name: N24
+      new_name: Var244@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(3,1)
         Pole_Mixing
-      new_name: N31
+      new_name: Var245@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(3,2)
         Pole_Mixing
-      new_name: N32
+      new_name: Var246@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(3,3)
         Pole_Mixing
-      new_name: N33
+      new_name: Var247@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(3,4)
         Pole_Mixing
-      new_name: N34
+      new_name: Var248@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(4,1)
         Pole_Mixing
-      new_name: N41
+      new_name: Var249@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(4,2)
         Pole_Mixing
-      new_name: N42
+      new_name: Var250@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(4,3)
         Pole_Mixing
-      new_name: N43
+      new_name: Var251@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(4,4)
         Pole_Mixing
-      new_name: N44
+      new_name: Var252@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_1
         Pole_Mass
-      new_name: mN1
+      new_name: Var253@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_2
         Pole_Mass
-      new_name: mN2
+      new_name: Var254@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_3
         Pole_Mass
-      new_name: mN3
+      new_name: Var255@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_4
         Pole_Mass
-      new_name: mN4
+      new_name: Var256@h5
     - source_name: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~d_(1,1)
         Pole_Mixing
       new_name: Var257@h5
@@ -1320,28 +1320,28 @@ DataSet:
       new_name: Var497@h5
     - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi+_1
         Width
-      new_name: wC1p 
+      new_name: Var498@h5
     - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi+_2
         Width
-      new_name: wC2p
+      new_name: Var499@h5
     - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi-_1
         Width
-      new_name: wC1m 
+      new_name: Var500@h5
     - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi-_2
         Width
-      new_name: wC2m
+      new_name: Var501@h5
     - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi0_1
         Width
-      new_name: wN1
+      new_name: Var502@h5
     - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi0_2
         Width
-      new_name: wN2
+      new_name: Var503@h5
     - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi0_3
         Width
-      new_name: wN3
+      new_name: Var504@h5
     - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi0_4
         Width
-      new_name: wN4
+      new_name: Var505@h5
     - source_name: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~d_1
         Width
       new_name: Var506@h5
@@ -1472,7 +1472,7 @@ DataSet:
         Width
       new_name: Var548@h5
     - source_name: data/LogLike
-      new_name: LogL
+      new_name: Var549@h5
     - source_name: data/MPIrank
       new_name: Var550@h5
     - source_name: data/input_dataset_index
@@ -1481,158 +1481,143 @@ DataSet:
       new_name: Var552@h5
     - source_name: data/scanID
       new_name: Var553@h5
-
-Figures: 
-# - name: N1_comps
-#   # debug:  true
-#   style: ["gambit_2x1", "TernaryCmap"]
-#   frame: 
-#     axtri: 
-#       labels: {left: "$|N_{11}|^2$", bottom: "$|N_{12}|^2$", right: "$|N_{13}|^2 + |N_{14}|^2$"}
-#     axc: 
-#       label:  {ylabel: "$m_{\\tilde{\\chi}_1^0}~[{\\rm TeV}]$"}
-#   legend: 
-#     loc: 1 
-#   layers:
-#     - name: triscatter
-#       data: 
-#         - source: h5
-#           transform:
-#             - filter: LogL > -3.09
-#             - sortby: LogL
-#       axes: axtri 
-#       method: scatter
-#       coordinates: 
-#         left:   {expr: np.abs(N11)**2, label: "a"}
-#         right:  {expr: np.abs(N12)**2, label: "b"}
-#         bottom: {expr: np.abs(N13)**2 + np.abs(N14)**2, label: "c"}
-#         c:      {expr: np.abs(mN1) / 1000}
-#       style: 
-#         s:  1.5
-#         cmap:  "rainbow"
-#         vmin:   0.
-#         vmax:   1.5
-
-#     - name: triscatters
-#       data: 
-#         - source: h5
-#           transform:
-#             - filter: LogL < -3.09
-#             - sortby: LogL
-#       axes: axtri 
-#       method: scatter
-#       coordinates: 
-#         left:   {expr: np.abs(N11)**2, label: "a"}
-#         right:  {expr: np.abs(N12)**2, label: "b"}
-#         bottom: {expr: np.abs(N13)**2 + np.abs(N14)**2, label: "c"}
-#       style: 
-#         s:  1.5
-#         facecolor:  "black"
-#         edgecolor:  "none"
-#         zorder: 20
-
+      
+Figures:
 - name: N1_comps_LogL
-  # debug:  true
-  style: ["gambit_2x1", "TernaryCmap"]
-  frame: 
-    axtri: 
-      labels: {left: "$|N_{11}|^2$", bottom: "$|N_{12}|^2$", right: "$|N_{13}|^2 + |N_{14}|^2$"}
-    axc: 
-      label:  {ylabel: "$\\ln{\\mathcal{L}}$"}
-  legend: 
-    loc: 1 
+  style:
+  - gambit_2x1
+  - TernaryCmap
+  frame:
+    axtri:
+      labels:
+        left: $|N_{11}|^2$
+        bottom: $|N_{12}|^2$
+        right: $|N_{13}|^2 + |N_{14}|^2$
+    axc:
+      label:
+        ylabel: $\ln{\mathcal{L}}$
+  legend:
+    loc: 1
   layers:
-    - name: triscatter
-      data: 
-        - source: h5
-          transform: 
-            - filter: LogL > -3.09
-            - sortby: LogL
-      axes: axtri 
-      method: scatter
-      coordinates: 
-        left:   {expr: np.abs(N11)**2, label: "a"}
-        right:  {expr: np.abs(N12)**2, label: "b"}
-        bottom: {expr: np.abs(N13)**2 + np.abs(N14)**2, label: "c"}
-        c:      {expr: LogL}
-      style: 
-        s:  1.
-        cmap:  "seismic_r"
-        vmin:   -3.09
-        vmax:   3.09
-    - name: exc
-      data: 
-        - source: h5
-          transform: 
-            - filter: LogL <= -3.09
-      axes: axtri 
-      method: scatter
-      coordinates: 
-        left:   {expr: np.abs(N11)**2, label: "a"}
-        right:  {expr: np.abs(N12)**2, label: "b"}
-        bottom: {expr: np.abs(N13)**2 + np.abs(N14)**2, label: "c"}
-      style: 
-        s:  1.
-        marker: '.'        
-        facecolor:  "black"
-        edgecolor:  "none"
-        alpha: 0.1
-        zorder: 20
-
+  - name: triscatter
+    data:
+    - source: h5
+      transform:
+      - filter: LogL > -3.09
+      - sortby: LogL
+    axes: axtri
+    method: scatter
+    coordinates:
+      left:
+        expr: np.abs(N11)**2
+        label: a
+      right:
+        expr: np.abs(N12)**2
+        label: b
+      bottom:
+        expr: np.abs(N13)**2 + np.abs(N14)**2
+        label: c
+      c:
+        expr: LogL
+    style:
+      s: 1.0
+      cmap: seismic_r
+      vmin: -3.09
+      vmax: 3.09
+  - name: exc
+    data:
+    - source: h5
+      transform:
+      - filter: LogL <= -3.09
+    axes: axtri
+    method: scatter
+    coordinates:
+      left:
+        expr: np.abs(N11)**2
+        label: a
+      right:
+        expr: np.abs(N12)**2
+        label: b
+      bottom:
+        expr: np.abs(N13)**2 + np.abs(N14)**2
+        label: c
+    style:
+      s: 1.0
+      marker: .
+      facecolor: black
+      edgecolor: none
+      alpha: 0.1
+      zorder: 20
 - name: N1_comps_prof
-  # debug:  true
-  style: ["gambit_2x1", "TernaryCmap"]
-  frame: 
-    axtri: 
-      labels: {left: "$|N_{11}|^2$", bottom: "$|N_{12}|^2$", right: "$|N_{13}|^2 + |N_{14}|^2$"}
-    axc: 
-      label:  {ylabel: "$\\ln{\\mathcal{L}}$"}
-  legend: 
-    loc: 1 
+  style:
+  - gambit_2x1
+  - TernaryCmap
+  frame:
+    axtri:
+      labels:
+        left: $|N_{11}|^2$
+        bottom: $|N_{12}|^2$
+        right: $|N_{13}|^2 + |N_{14}|^2$
+    axc:
+      label:
+        ylabel: $\ln{\mathcal{L}}$
+  legend:
+    loc: 1
   layers:
-    - name: triscatter 
-      data: 
-        - source: h5 
-          transform:
-          - filter: LogL > -3.09 
-          - sortby: "LogL"
-          - profile: 
-              bin: 100
-              coordinates:
-                x: { expr: 0.5 * (np.abs(N13)**2 + np.abs(N14)**2) + np.abs(N12)**2,  name: "xx" }
-                y: { expr: np.abs(N13)**2 + np.abs(N14)**2,                         name: "yy"}
-                z: { expr: -np.max(LogL) + LogL,                                    name: "DNLL" }
-              objective: max 
-              grid_points: "ternary" 
-      share_data: tri_N1comp_prof 
-      axes: axtri 
-      method: scatter 
-      coordinates: 
-        x:      {expr: xx}
-        y:      {expr: yy}
-      style: 
-        s:  1.0
-        c:  "#FF42A1"
-        marker: '.'
-        alpha: 0.9
-        zorder: 10
-    - name: tric 
-      data: 
-        - source: tri_N1comp_prof 
-      axes: axtri 
-      method: tricontourf 
-      coordinates:
-        x:      {expr: xx}
-        y:      {expr: yy}
-        z:      {expr: LogL, fillna: -3.5 }
-      style: 
-        cmap: "seismic_r"
-        vmin: -3.09
-        vmax: 3.09
-        levels: 50
-        zorder: 8
-        extend: "min"
-
+  - name: triscatter
+    data:
+    - source: h5
+      transform:
+      - filter: LogL > -3.09
+      - sortby: LogL
+      - profile:
+          bin: 100
+          coordinates:
+            x:
+              expr: 0.5 * (np.abs(N13)**2 + np.abs(N14)**2) + np.abs(N12)**2
+              name: xx
+            y:
+              expr: np.abs(N13)**2 + np.abs(N14)**2
+              name: yy
+            z:
+              expr: -np.max(LogL) + LogL
+              name: DNLL
+          objective: max
+          grid_points: ternary
+    share_data: tri_N1comp_prof
+    axes: axtri
+    method: scatter
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+    style:
+      s: 1.0
+      c: '#FF42A1'
+      marker: .
+      alpha: 0.9
+      zorder: 10
+  - name: tric
+    data:
+    - source: tri_N1comp_prof
+    axes: axtri
+    method: tricontourf
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: LogL
+        fillna: -3.5
+    style:
+      cmap: seismic_r
+      vmin: -3.09
+      vmax: 3.09
+      levels: 50
+      zorder: 8
+      extend: min
 output:
   dir: ./Workshop/SUSYRun2
   dpi: 600
