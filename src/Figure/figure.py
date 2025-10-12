@@ -4,6 +4,7 @@ from typing import Optional, Mapping
 import numpy as np 
 import os, sys 
 from ..core import jppwd
+import matplotlib.ticker as mticker
 import pandas as pd 
 import matplotlib as mpl
 from types import MethodType
@@ -12,6 +13,71 @@ import json
 
 
 class Figure:
+    def _has_manual_ticks(self, ax_key: str, which: str) -> bool:
+        """Return True if YAML provides manual tick positions for given axis."""
+        try:
+            if ax_key == 'ax':
+                ticks_cfg = self.frame.get('ax', {}).get('ticks', {})
+            elif ax_key == 'axc':
+                ticks_cfg = self.frame.get('axc', {}).get('ticks', {})
+            else:
+                return False
+            node = ticks_cfg.get(which, {})
+            return isinstance(node, dict) and ((node.get('positions') is not None) or (node.get('pos') is not None))
+        except Exception:
+            return False
+
+    def _apply_auto_ticks(self, ax_obj, which: str):
+        """Lightweight auto-tick post-processing at finalize stage.
+        For x: rotate long labels. For y: use ScalarFormatter sci notation.
+        """
+        target = ax_obj.ax if hasattr(ax_obj, "ax") else ax_obj
+        axis = target.xaxis if which == 'x' else target.yaxis
+        try:
+            labels = axis.get_ticklabels()
+            if which == 'x':
+                long = any(len(l.get_text()) > 6 for l in labels if l.get_text())
+                if long:
+                    target.tick_params(axis='x', labelrotation=35)
+            elif which == 'y':
+                # Use the standard Matplotlib scientific notation (ScalarFormatter)
+                try:
+                    vmin, vmax = axis.get_view_interval()
+                    rng = abs(vmax - vmin)
+                    if rng > 0:
+                        import math as _math
+                        exp = int(_math.floor(_math.log10(rng))) if rng != 0 else 0
+                        # Standard scientific notation with mathtext ×10^N
+                        fmt = mticker.ScalarFormatter(useMathText=True)
+                        # Trigger sci notation when |exponent| > 4 (configurable by powerlimits)
+                        fmt.set_powerlimits((0, 4))
+                        axis.set_major_formatter(fmt)
+                        # Also set via ticklabel_format for clarity/consistency
+                        target.ticklabel_format(style='sci', axis='y', scilimits=(0, 4))
+                        # Put offset on the left for y-axis
+                        axis.set_offset_position('left')
+                        # Ensure offset mechanism is enabled
+                        mpl.rcParams['axes.formatter.useoffset'] = True
+                        # Redraw so offset text shows up
+                        target.figure.canvas.draw_idle()
+                        try:
+                            axis.offsetText.set_fontsize(axis.get_ticklabels()[0].get_size() * 0.8)
+                        except Exception:
+                            pass
+                        
+                    else:
+                        # Zero range; do nothing
+                        pass
+                except Exception:
+                    # Fallback: if labels are too long, shorten to 3 chars + ellipsis
+                    for label in labels:
+                        txt = label.get_text()
+                        if txt and len(txt) > 4:
+                            label.set_text(txt[:3] + '…')
+                    target.figure.canvas.draw_idle()
+        except Exception:
+            pass
+        
     def __init__(self, info: Optional[Mapping] = None):
         # internal state
         self._name: Optional[str]       = None
@@ -412,6 +478,8 @@ class Figure:
     def axlogo(self, kwgs):
         if "axlogo" not in self.axes.keys(): 
             self.axes['axlogo'] = self.fig.add_axes(**kwgs)
+            self.axes['axlogo'].needs_finalize = False
+            self.axes['axlogo'].status = 'finalized'
 
         self.axlogo.layers  = []
         jhlogo = self.load_path(self.frame['axlogo']['file'])
@@ -448,6 +516,7 @@ class Figure:
             adapter._type = 'tri'
             adapter._legend = False
             adapter.layers = []
+            adapter.status = 'configured'
             self.axes["axtri"] = adapter
         
         self.axtri.plot(
@@ -622,7 +691,7 @@ class Figure:
                 from matplotlib.ticker import AutoMinorLocator
                 self.axc.yaxis.set_minor_locator(AutoMinorLocator())
 
-            self.axc.yaxis.set_ticks_position("left")
+            self.axc.yaxis.set_ticks_position(self.frame['axc']['ticks']['ticks_position'])
             self.axc.yaxis.set_label_position("right")
 
             # Apply tick params (major/minor) as provided in frame config
@@ -631,6 +700,9 @@ class Figure:
             self.axc.tick_params(**self.frame['axc']['ticks'].get('minor', {}))
 
             self.axc.set_ylabel(**self.frame['axc'].get('label', {}))
+            # Apply manual ticks for colorbar (y-axis) at initialization if provided
+            cbar_ticks_cfg = self.frame.get('axc', {}).get('ticks', {}).get('y', {})
+            self._apply_manual_ticks(self.axc, 'y', cbar_ticks_cfg)
         self.logger.debug("Loaded colorbar axes -> axc")
 
 
@@ -647,7 +719,7 @@ class Figure:
             adapter.layers = []
             adapter._legend = self.frame['ax'].get("legend", False)
             self.axes['ax'] = adapter 
-            
+            adapter.status = 'configured'
 
         if self.frame['ax'].get("yscale", "").lower() == 'log':
             self.ax.set_yscale("log")
@@ -671,7 +743,6 @@ class Figure:
             except Exception:
                 return v
 
-
         xlim = self.frame["ax"].get("xlim")
         if xlim:
             xlim = list(map(_safe_cast, xlim))
@@ -682,7 +753,6 @@ class Figure:
             ylim = list(map(_safe_cast, ylim))
             self.ax.set_ylim(ylim)
 
-
         self.ax.tick_params(**self.frame['ax']['ticks'].get("both", {}))
         self.ax.tick_params(**self.frame['ax']['ticks'].get("major", {}))
         self.ax.tick_params(**self.frame['ax']['ticks'].get("minor", {}))
@@ -691,6 +761,32 @@ class Figure:
             self.ax.set_xlabel(self.frame['ax']['labels']['x'], **self.frame['ax']['labels']['xlabel'])
         if self.frame['ax']['labels'].get("y"): 
             self.ax.set_ylabel(self.frame['ax']['labels']['y'], **self.frame['ax']['labels']['ylabel'])
+            self.ax.yaxis.set_label_coords(self.frame['ax']['labels']['ylabel_coords']['x'], self.frame['ax']['labels']['ylabel_coords']['y'])
+            
+        # Apply manual ticks here at initialization if provided in YAML
+        ax_ticks_cfg = self.frame.get('ax', {}).get('ticks', {})
+        self._apply_manual_ticks(self.ax, "x", ax_ticks_cfg.get('x', {}))
+        self._apply_manual_ticks(self.ax, "y", ax_ticks_cfg.get('y', {}))
+
+        # ---- Finalize logic with auto-ticks injection ----
+        if getattr(self.ax, 'needs_finalize', True) and hasattr(self.ax, 'finalize'):
+            orig_finalize = self.ax.finalize
+            def wrapped_finalize():
+                try:
+                    if not self._has_manual_ticks('ax', 'x'):
+                        self._apply_auto_ticks(self.ax, 'x')
+                    if not self._has_manual_ticks('ax', 'y'):
+                        self._apply_auto_ticks(self.ax, 'y')
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"Auto ticks failed on ax: {e}")
+                try:
+                    orig_finalize()
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"Finalize failed on axes 'ax': {e}")
+            self.ax.finalize = wrapped_finalize
+            self.ax.finalize()
 
         self.logger.debug("Loaded main rectangle axes -> ax")
 
@@ -791,14 +887,13 @@ class Figure:
         Render all layers attached to each axes (we appended them in axtri/axlogo setters).
         """
         for ax_name, ax in self.axes.items():
-            # Only axes that collected layers
             ly_list = getattr(ax, "layers", [])
             for ly in ly_list:
                 self.render_layer(ax, ly)
+            # mark drawn after all layers on this axes
+            if hasattr(ax, 'status'):
+                ax.status = 'drawn'
 
-        # for ax_name, ax in self.axes.items(): 
-        # # Apply per-axes legend if configured under frame['axes'][name]['legend']
-        # axes_cfg = self.frame.get('axes', {}) if isinstance(self.frame, dict) else {}
         for name, ax in self.axes.items():
             try:
                 if hasattr(ax, "_legend") and ax._legend:
@@ -808,11 +903,53 @@ class Figure:
                 if self.logger:
                     self.logger.warning(f"Legend draw failed on axes '{name}': {e}")
 
-
         # finalize colorbar lazily (only if any colored layer appeared)
         if "axc" in self.axes:
             self.axc = True 
-        # if axx is self.axtri:  
+
+        # ---- Finalize axes that want it ----
+        for name, ax in self.axes.items():
+            # Auto ticks only if user did not provide manual ticks for this axis
+            if name == 'ax':
+                if not self._has_manual_ticks('ax', 'x'):
+                    self._apply_auto_ticks(ax, 'x')
+                if not self._has_manual_ticks('ax', 'y'):
+                    self._apply_auto_ticks(ax, 'y')
+            elif name == 'axc':
+                if not self._has_manual_ticks('axc', 'y'):
+                    self._apply_auto_ticks(ax, 'y')
+            if getattr(ax, 'needs_finalize', True) and hasattr(ax, 'finalize'):
+                try:
+                    ax.finalize()
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"Finalize failed on axes '{name}': {e}")
+    def _apply_manual_ticks(self, ax_obj, which: str, ticks_cfg: dict):
+        """Apply manual ticks if YAML provides them; otherwise keep auto.
+        YAML:
+          frame.ax.ticks.x: { positions: [...], labels: [...] }
+          frame.ax.ticks.y: { positions: [...], labels: [...] }
+          frame.axc.ticks.y: { positions: [...], labels: [...] }
+        """
+        if not isinstance(ticks_cfg, dict):
+            return
+        pos = ticks_cfg.get("positions") or ticks_cfg.get("pos")
+        labs = ticks_cfg.get("labels")
+        if pos is None:
+            return
+        target = ax_obj.ax if hasattr(ax_obj, "ax") else ax_obj
+        try:
+            if which == "x":
+                target.set_xticks(pos)
+                if labs is not None:
+                    target.set_xticklabels(labs)
+            elif which == "y":
+                target.set_yticks(pos)
+                if labs is not None:
+                    target.set_yticklabels(labs)
+        except Exception as e:
+            if self.logger:
+                self.logger.warning(f"Manual ticks apply failed on {which}-axis: {e}")
             
     # --- config ingestion ---
     def from_dict(self, info: Mapping) -> bool:
@@ -1073,9 +1210,12 @@ class Figure:
             else:
                 if not ({"x", "y"} <= set(coor.keys())):
                     raise ValueError("Rectangular layer must define coordinates: {x,y} with exprs.")
-                x = self._eval_series(df, coor["x"])  # type: ignore[index]
-                y = self._eval_series(df, coor["y"])  # type: ignore[index]
-                return method(x, y, **style)
+                style['x'] = self._eval_series(df, coor["x"])  # type: ignore[index]
+                style['y'] = self._eval_series(df, coor["y"])  # type: ignore[index]
+                if "c" in coor.keys():
+                    style['c'] = self._eval_series(df, coor["c"])
+                
+                return method(**style)
 
         else:
             # Unknown axes adapter type

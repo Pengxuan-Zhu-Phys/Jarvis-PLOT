@@ -83,7 +83,7 @@ def _auto_clip(artists, ax: Axes, clip_path):
                     _apply_one(ln)
         return artists
 
-# —— 基础适配器：转发到底层 Axes，合并默认参数，做自动裁剪 ——
+# —— Basic Adapter: Forward to the underlying Axes, merge default parameters, perform automatic clipping ——
 class StdAxesAdapter:
     def __init__(self, ax: Axes, defaults: Optional[Dict[str, Dict[str, Any]]] = None,
                  clip_path=None):
@@ -94,9 +94,16 @@ class StdAxesAdapter:
         """
         self.ax = ax
         self._defaults = defaults or {}
-        self._clip_path = clip_path  # None 表示不用裁剪
+        self._clip_path = clip_path  # None means no cropping
         self.config = self._load_internal_config()
-        self._legend = False 
+        self._legend = False
+        self.status = "init"           # lifecycle: init -> configured -> drawn -> finalized
+        self.needs_finalize = True      # allow some axes (e.g., logo) to opt out
+    def finalize(self):
+        """Finalize axes after all layers/legends/colorbars applied.
+        Override in specialized adapters if needed. Here we just mark status.
+        """
+        self.status = "finalized"
 
     def _load_internal_config(self):
         default_path = os.path.join(os.path.dirname(__file__), "cards", "std_axes_adapter_config.json")
@@ -104,19 +111,18 @@ class StdAxesAdapter:
             with open(default_path, "r") as f:
                 return json.load(f)
         except FileNotFoundError:
-            # 可选：返回默认空配置或 raise
+            # Optional: return default empty configuration or raise
             return {}
 
-    # 参数合并：用户优先，默认兜底
+    # Parameter merging: user preference takes priority, default as fallback
     def _merge(self, method: str, kwargs: Dict[str, Any]) -> Dict[str, Any]:
         base = dict(self._defaults.get(method, {}))
         base.update(kwargs or {})
         return base
 
-    # —— 常用方法转发（需要的就加） ——
+    # —— Common method forwarding (add as needed) ——
     def scatter(self, **kwargs):
         x, y = kwargs.pop("x"), kwargs.pop("y")
-        print(x, kwargs)
         kw = self._merge("scatter", kwargs)
         artists = self.ax.scatter(x, y, **kw)
         return _auto_clip(artists, self.ax, self._clip_path)
@@ -125,7 +131,6 @@ class StdAxesAdapter:
         x, y = kwargs.pop("x"), kwargs.pop("y")
         kw = self._merge("plot", kwargs)
         artists = self.ax.plot(x, y, **kw)        
-        print("Plot method succesful")
         return _auto_clip(artists, self.ax, self._clip_path)
 
     def contour(self, *args, **kwargs):
@@ -206,11 +211,11 @@ class StdAxesAdapter:
         stacked = kwargs.get('stacked', False)
         colors = kwargs.get('color', None) or kwargs.get('colors', None)
 
-        # 获取数据分组数：支持 x 作为 args[0] 或 kwargs['x']
+        # Get the number of data groups: supports x as args[0] or kwargs['x']
         x = kwargs.get('x', args[0] if args else None)
         n_groups = None
         if stacked and colors is None and x is not None:
-            # 只有当x为二维数据时，len(x)为分组数（多数组堆叠情况）
+            # Only when x is two-dimensional data, len(x) is the number of groups (in the case of multiple arrays stacked)
             try:
                 n_groups = len(x) if hasattr(x, '__len__') and not isinstance(x, (str, bytes)) else 1
             except Exception:
@@ -237,6 +242,7 @@ class TernaryAxesAdapter(StdAxesAdapter):
     def __init__(self, ax: Axes, defaults: Optional[Dict[str, Dict[str, Any]]] = None,
                  clip_path=None):
         super().__init__(ax, defaults=defaults, clip_path=clip_path)
+        self.status = "init"
 
     @staticmethod
     def _lbr_to_xy(a, b, c):

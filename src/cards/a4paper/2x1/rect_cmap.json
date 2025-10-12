@@ -1,0 +1,152 @@
+{
+    "Frame": {
+        "figure": {
+            "figsize": [
+                3.3,
+                2.75
+            ]
+        },
+        "axes": {
+            "axlogo": {
+                "rect": [
+                    0.01,
+                    0.01,
+                    0.06,
+                    0.072
+                ],
+                "frameon": false,
+                "yticks": [],
+                "xticks": [],
+                "xlim": [
+                    0,
+                    1024
+                ],
+                "ylim": [
+                    1024,
+                    0
+                ]
+            },
+            "ax": {
+                "rect": [
+                    0.140,
+                    0.168,
+                    0.680,
+                    0.775
+                ]
+            },
+            "axc": {
+                "rect": [
+                    0.825,
+                    0.182,
+                    0.036,
+                    0.746
+                ],
+                "xticks": []
+            }
+        },
+        "ax": {
+            "frame": {
+                "linewidth": 0.8,
+                "solid_capstyle": "projecting",
+                "solid_joinstyle": "miter",
+                "clip_on": false,
+                "c": "#21171A",
+                "zorder": 100
+            },
+            "grid": {
+                "sep": 0.1,
+                "style": {
+                    "color": "#C2C2C269",
+                    "linewidth": 0.3,
+                    "linestyle": "--"
+                }
+            },
+            "ticks": {
+                "both": {
+                    "labelsize": 6,
+                    "direction": "in",
+                    "labelfontfamily": "sans",
+                    "top": true,
+                    "left": true,
+                    "right": true,
+                    "bottom": true,
+                    "which": "both"
+                },
+                "major": {
+                    "which": "major",
+                    "length": 4,
+                    "width": 0.4,
+                    "color": "black"
+                },
+                "minor": {
+                    "which": "minor",
+                    "length": 2,
+                    "width": 0.4,
+                    "color": "black"
+                }
+            },
+            "labels": {
+                "xlabel": {
+                    "loc": "right",
+                    "fontsize": 12,
+                    "fontfamily": "STIXGeneral"
+                },
+                "ylabel": {
+                    "loc": "top",
+                    "fontsize": 12,
+                    "fontfamily": "STIXGeneral"
+                },
+                "ylabel_coords": {
+                    "x": -0.12, 
+                    "y": 1.0
+                }
+            }
+        },
+        "axlogo": {
+            "file": "&JP/src/cards/icons/JarvisHEP.png"
+        },
+        "axc": {
+            "label": {
+                "ylabel": "",
+                "loc": "top",
+                "fontsize": 12,
+                "fontfamily": "STIXGeneral"
+            },
+            "ticks": {
+                "ticks_position":   "right", 
+                "both": {
+                    "labelsize": 6,
+                    "direction": "in",
+                    "labelfontfamily": "sans",
+                    "top": false,
+                    "left": false,
+                    "right": true,
+                    "bottom": false,
+                    "which": "both"
+                },
+                "major": {
+                    "which": "major",
+                    "length": 4,
+                    "width": 0.4,
+                    "color": "black"
+                },
+                "minor": {
+                    "which": "minor",
+                    "length": 2,
+                    "width": 0.4,
+                    "color": "black"
+                }
+            }
+        }
+    },
+    "Style": {
+        "scatter": {
+            "s": 1.0,
+            "marker": ",",
+            "linewidths": 0.02,
+            "alpha": 1.0,
+            "zorder": 30,
+            "edgecolor": "None"
+        }
+    }
+}
