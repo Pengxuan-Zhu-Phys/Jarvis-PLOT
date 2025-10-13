@@ -2029,7 +2029,7 @@ DataSet:
 
 Figures:
 - name: sm1m2_ProfLogL
-  enable: true 
+  enable: false
   style:
   - a4paper_2x1 
   - rectcmap
@@ -2085,7 +2085,7 @@ Figures:
       zorder: 10
 
 - name: pm1m2_ProfLogL
-  enable: false 
+  enable: true
   style:
   - a4paper_2x1 
   - rectcmap
@@ -2109,37 +2109,44 @@ Figures:
           expr: LogL_01 + LogL_02 + LogL_03 + LogL_04 + LogL_05 + LogL_06 + LogL_07 + LogL_08 + LogL_09 + LogL_10 + LogL_11 + LogL_12 + LogL_13 + LogL_14 + LogL_15 + LogL_16 + LogL_17 + LogL_18 + LogL_19 + LogL_20 + LogL_21 + LogL_22 + LogL_23 + LogL_24 + LogL_25 + LogL_26 + LogL_27 + LogL_28 + LogL_29 + LogL_30 + LogL_31 + LogL_32 + LogL_33 + LogL_34 + LogL_35 + LogL_36 + LogL_37 + LogL_38 + LogL_39 + LogL_40 + LogL_41 + LogL_42 + LogL_43 + LogL_measure - LogL_measure_01 - LogL_measure_02 - LogL_measure_03
       - sortby: LogLike_total
       - filter: LogLike_total > -3.09
-      - 
-    axes: ax 
-    method: scatter 
+      - profile:
+          bin: 50
+          coordinates:
+            x: { expr: "pM1/1000",      scale: "linear" , name: xx }
+            y: { expr: "pMu/1000",      scale: "linear" , name: yy }
+            z: { expr: "np.exp(LogLike_total)", scale: "linear"    , name: "z0"}
+          objective: max
+          grid_points: "rect"
+    share_data: tri_profile
+    axes: ax
+    method: scatter
     coordinates:
-      x: {expr: pM1 / 1000}
-      y: {expr: pMu / 1000}
-      c: {expr: LogLike_total}
+      x: { expr: xx }
+      y: { expr: yy }
+      c: { expr: LogLike_total, fillna: -10.0}
     style:
       marker: '.'
+#      c: "#FF42A1"
+      zorder: 12
       cmap: seismic_r
       vmin: -3.09
       vmax: 3.09
-      zorder: 11
-  - name: scatter_exc
-    data: 
-    - source: h5
-      transform:
-      - add_column:
-          name: LogLike_total
-          expr: LogL_01 + LogL_02 + LogL_03 + LogL_04 + LogL_05 + LogL_06 + LogL_07 + LogL_08 + LogL_09 + LogL_10 + LogL_11 + LogL_12 + LogL_13 + LogL_14 + LogL_15 + LogL_16 + LogL_17 + LogL_18 + LogL_19 + LogL_20 + LogL_21 + LogL_22 + LogL_23 + LogL_24 + LogL_25 + LogL_26 + LogL_27 + LogL_28 + LogL_29 + LogL_30 + LogL_31 + LogL_32 + LogL_33 + LogL_34 + LogL_35 + LogL_36 + LogL_37 + LogL_38 + LogL_39 + LogL_40 + LogL_41 + LogL_42 + LogL_43 + LogL_measure - LogL_measure_01 - LogL_measure_02 - LogL_measure_03
-      - sortby: LogLike_total
-      - filter: LogLike_total <= -3.09
-    axes: ax 
-    method: scatter 
-    coordinates:
-      x: {expr: pM1}
-      y: {expr: pMu}
-    style:
-      marker: '.'
-      c: "black"
-      zorder: 10
+#      levels: 50
+#      zorder: 8
+#      extend: min
+#
+#  - name: scatter_exc
+#    data:
+#    - source: tri_profile
+#    axes: ax
+#    method: scatter
+#    coordinates:
+#      x: {expr: "pM1/1000"}
+#      y: {expr: "pMu/1000"}
+#    style:
+#      marker: '.'
+#      c: "#FF42A1"
+#      zorder: 12
 
 
 

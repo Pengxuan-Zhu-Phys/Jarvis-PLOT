@@ -311,6 +311,8 @@ class Figure:
                 return pd.DataFrame(index=df.index).iloc[0:0].copy()
 
         def profiling(df, prof):
+            global zscale
+
             def profile_bridson_sorted(idx, xx, yy, zz, radius, msk):
                 for i in range(len(idx)):
                     if not msk[i]:
@@ -346,40 +348,62 @@ class Figure:
                 z = self._eval_series(df, coors['z'])
             else: 
                 z = df['z']
-            
-            xlim = coors['x'].get("lim", [0, 1])
-            ylim = coors['y'].get("lim", [0, 1])
-            zlim = coors['y'].get("lim", [np.min(z), np.max(z)])
-            xscale = coors['x'].get("scale", "linear")
-            yscale = coors['y'].get("scale", "linear")
-            zscale = coors['z'].get("scale", "linear")
-            zind   = coors['z'].get("name", "z")
-            xind   = coors['x'].get("name", "x")
-            yind   = coors['y'].get("name", "y")
-            
+
+            self.logger.debug("After loading profiling x, y, z. ")
+
+            if grid == "ternary":
+                xlim = coors['x'].get("lim", [0, 1])
+                ylim = coors['y'].get("lim", [0, 1])
+                zlim = coors['z'].get("lim", [np.min(z), np.max(z)])
+                xscale = coors['x'].get("scale", "linear")
+                yscale = coors['y'].get("scale", "linear")
+                zscale = coors['z'].get("scale", "linear")
+                zind   = coors['z'].get("name", "z")
+                xind   = coors['x'].get("name", "x")
+                yind   = coors['y'].get("name", "y")
+            elif grid == "rect":
+                xlim = coors['x'].get("lim", [np.min(x), np.max(x)])
+                ylim = coors['y'].get("lim", [np.min(y), np.max(y)])
+                zlim = coors['z'].get("lim", [np.min(z), np.max(z)])
+
+                xscale = coors['x'].get("scale", "linear")
+                yscale = coors['y'].get("scale", "linear")
+                zscale = coors['z'].get("scale", "linear")
+
+                zind = coors['z'].get("name", "z")
+                xind = coors['x'].get("name", "x")
+                yind = coors['y'].get("name", "y") 
+
+            print("Line 377 -> before mapping")
+            print(xlim, ylim, zlim, xscale, yscale, zscale)
             # mapping x, y, z to range [0, 1]
             if "lim" in coors['x'].keys():
                 if xscale == "log":
                     x = (np.log(x) - np.log(xlim[0])) / (np.log(xlim[1]) - np.log(xlim[0])) 
                 else:   # linear scale 
-                    x = (x - xlim[0]) / (xlim[1] - xlim[0]) 
+                    x = (x - xlim[0]) / (xlim[1] - xlim[0])
+
+            print(np.min(x), np.max(x))
             
             if "lim" in coors['y'].keys():
                 if yscale == "log":
                     y = (np.log(y) - np.log(ylim[0])) / (np.log(ylim[1]) - np.log(ylim[0])) 
                 else:   # linear scale 
                     y = (y - ylim[1]) / (ylim[0] - ylim[1])             
-            
+                                       
             if zscale == "log":
                 z = (np.log(z) - np.log(zlim[0])) / (np.log(zlim[1]) - np.log(zlim[0])) 
             else:   # linear scale 
                 z = (z - zlim[0]) / (zlim[1] - zlim[0])      
-              
+
+            print("Line 377 -> after mapping")
             # profiling will add new columns into dataframe, so that can be used in the next step   
             df[xind] = x 
             df[yind] = y
             df[zind] = z    
 
+            print("Line 401 -> Before add empty")
+            
             if grid == "ternary":
                 bb = np.linspace(0, 1, bin + 1)
                 rr = np.linspace(0, 1, bin + 1)
@@ -400,6 +424,22 @@ class Figure:
                     zind: np.ones(xxg.shape) * (np.min(z) - 0.1)
                 })
 
+            elif grid == "rect":
+                print("Line 424 -> Before add empty")
+                xx = np.linspace(xlim[0], xlim[1], 2*bin+1)
+                yy = np.linspace(ylim[0], ylim[1], 2*bin+1)
+                xg, yg = np.meshgrid(xx, yy)
+                print("Line 428 -> after mashgrid", xg.shape, yg.shape)
+
+                gdata = pd.DataFrame({
+                    xind: xg.ravel(),
+                    yind: yg.ravel(),
+                    zind: np.ones(xg.ravel().shape) * (np.min(z) - 0.1)
+                })
+                print("Line 433 -> After add empty")
+
+            print("Line 413")
+
             if obj == "max":    
                 df = df.sort_values(zind, ascending=False).reset_index(drop=True)
             elif obj == "min":
@@ -408,6 +448,7 @@ class Figure:
                 df = df.sort_values(zind, ascending=False).reset_index(drop=True)
                 self.logger.error("Sort dataset method: objective: {} not support, using default value -> 'max'".format(obj))
             df = pd.concat([df, gdata], ignore_index=True)
+            print("Line 421 ->", df)
             idx = np.array(df.index)
             xx  = np.array(df[xind])
             yy  = np.array(df[yind])
@@ -415,6 +456,7 @@ class Figure:
             msk = np.full(idx.shape, True)
             msk = profile_bridson_sorted(idx, xx, yy, zz, radius, msk)
             df = df.iloc[idx[msk]]
+            self.logger.debug("Successfully sorted profile_bridson_sorted()")
 
             return df 
 
@@ -924,6 +966,7 @@ class Figure:
                 except Exception as e:
                     if self.logger:
                         self.logger.warning(f"Finalize failed on axes '{name}': {e}")
+
     def _apply_manual_ticks(self, ax_obj, which: str, ticks_cfg: dict):
         """Apply manual ticks if YAML provides them; otherwise keep auto.
         YAML:
@@ -1005,6 +1048,7 @@ class Figure:
 
 
     # Backward-compatible alias if other code still calls `set(info)`
+
     def set(self, info: Mapping) -> bool:
         return self.from_dict(info)
     
@@ -1026,8 +1070,7 @@ class Figure:
         "hist": "hist",
         "hexbin": "hexbin",
         "tricontour": "tricontour",
-        "tricontourf": "tricontourf",
-        "hist": "hist"
+        "tricontourf": "tricontourf"
     }
 
     def _eval_series(self, df: pd.DataFrame, set: dict):
@@ -1041,7 +1084,7 @@ class Figure:
             raise ValueError(f"expr need for axes {set}.")
         if set["expr"] in df.columns:
             arr = df[set["expr"]].values
-            if (np.isnan(arr).sum() and "fillna" in set.keys()):
+            if np.isnan(arr).sum() and "fillna" in set.keys():
                 arr = np.where(np.isnan(arr), float(set['fillna']), arr)
         else: 
             # safe-ish eval with only df columns in locals
@@ -1050,24 +1093,9 @@ class Figure:
             from ..inner_func import update_funcs
             allowed_globals = update_funcs({"np": np, "math": math})
             arr = eval(set["expr"], allowed_globals, local_vars)
-            if (np.isnan(arr).sum() and "fillna" in set.keys()):
+            if np.isnan(arr).sum() and "fillna" in set.keys():
                 arr = np.where(np.isnan(arr), float(set['fillna']), arr)
         return np.asarray(arr)
-
-    def _ternary_to_xy(self, a, b, c):
-        """
-        Project ternary (a,b,c) (with a+b+c~=1) to 2D coords used by your axtri.
-        Using the same basis as your grid:
-            x = b + 0.5*c
-            y = c
-        We normalize (a,b,c) by their sum to be robust.
-        """
-        s = (a + b + c)
-        s = np.where(s == 0.0, 1.0, s)
-        aa, bb, cc = a/s, b/s, c/s
-        x = bb + 0.5*cc
-        y = cc
-        return x, y
 
     def _cb_collect_and_attach(self, style: dict, coor: dict, method_key: str, df: pd.DataFrame) -> dict:
         import matplotlib.colors as mcolors
