@@ -70,22 +70,26 @@
                     "left": true,
                     "right": true,
                     "bottom": true,
-                    "which": "both"
+                    "which": "both",
+                    "zorder": 1000
                 },
                 "major": {
                     "which": "major",
                     "length": 4,
                     "width": 0.4,
-                    "color": "black"
+                    "color": "black",
+                    "zorder": 1000
                 },
                 "minor": {
                     "which": "minor",
                     "length": 2,
                     "width": 0.4,
-                    "color": "black"
+                    "color": "black",
+                    "zorder": 1000
                 }
             },
             "labels": {
+                "zorder": 1000,
                 "xlabel": {
                     "loc": "right",
                     "fontsize": 12,

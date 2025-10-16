@@ -374,8 +374,6 @@ class Figure:
                 xind = coors['x'].get("name", "x")
                 yind = coors['y'].get("name", "y") 
 
-            print("Line 377 -> before mapping")
-            print(xlim, ylim, zlim, xscale, yscale, zscale)
             # mapping x, y, z to range [0, 1]
             if "lim" in coors['x'].keys():
                 if xscale == "log":
@@ -383,8 +381,6 @@ class Figure:
                 else:   # linear scale 
                     x = (x - xlim[0]) / (xlim[1] - xlim[0])
 
-            print(np.min(x), np.max(x))
-            
             if "lim" in coors['y'].keys():
                 if yscale == "log":
                     y = (np.log(y) - np.log(ylim[0])) / (np.log(ylim[1]) - np.log(ylim[0])) 
@@ -396,14 +392,12 @@ class Figure:
             else:   # linear scale 
                 z = (z - zlim[0]) / (zlim[1] - zlim[0])      
 
-            print("Line 377 -> after mapping")
-            # profiling will add new columns into dataframe, so that can be used in the next step   
+            # profiling will add new columns into dataframe, so that can be used in the next step
             df[xind] = x 
             df[yind] = y
             df[zind] = z    
 
-            print("Line 401 -> Before add empty")
-            
+
             if grid == "ternary":
                 bb = np.linspace(0, 1, bin + 1)
                 rr = np.linspace(0, 1, bin + 1)
@@ -425,20 +419,15 @@ class Figure:
                 })
 
             elif grid == "rect":
-                print("Line 424 -> Before add empty")
                 xx = np.linspace(xlim[0], xlim[1], 2*bin+1)
                 yy = np.linspace(ylim[0], ylim[1], 2*bin+1)
                 xg, yg = np.meshgrid(xx, yy)
-                print("Line 428 -> after mashgrid", xg.shape, yg.shape)
 
                 gdata = pd.DataFrame({
                     xind: xg.ravel(),
                     yind: yg.ravel(),
                     zind: np.ones(xg.ravel().shape) * (np.min(z) - 0.1)
                 })
-                print("Line 433 -> After add empty")
-
-            print("Line 413")
 
             if obj == "max":    
                 df = df.sort_values(zind, ascending=False).reset_index(drop=True)
@@ -448,7 +437,6 @@ class Figure:
                 df = df.sort_values(zind, ascending=False).reset_index(drop=True)
                 self.logger.error("Sort dataset method: objective: {} not support, using default value -> 'max'".format(obj))
             df = pd.concat([df, gdata], ignore_index=True)
-            print("Line 421 ->", df)
             idx = np.array(df.index)
             xx  = np.array(df[xind])
             yy  = np.array(df[yind])
@@ -456,7 +444,6 @@ class Figure:
             msk = np.full(idx.shape, True)
             msk = profile_bridson_sorted(idx, xx, yy, zz, radius, msk)
             df = df.iloc[idx[msk]]
-            self.logger.debug("Successfully sorted profile_bridson_sorted()")
 
             return df 
 
@@ -795,21 +782,25 @@ class Figure:
             ylim = list(map(_safe_cast, ylim))
             self.ax.set_ylim(ylim)
 
-        self.ax.tick_params(**self.frame['ax']['ticks'].get("both", {}))
-        self.ax.tick_params(**self.frame['ax']['ticks'].get("major", {}))
-        self.ax.tick_params(**self.frame['ax']['ticks'].get("minor", {}))
-        
-        if self.frame['ax']['labels'].get("x"): 
+        if self.frame['ax']['labels'].get("x"):
             self.ax.set_xlabel(self.frame['ax']['labels']['x'], **self.frame['ax']['labels']['xlabel'])
-        if self.frame['ax']['labels'].get("y"): 
+        if self.frame['ax']['labels'].get("y"):
             self.ax.set_ylabel(self.frame['ax']['labels']['y'], **self.frame['ax']['labels']['ylabel'])
             self.ax.yaxis.set_label_coords(self.frame['ax']['labels']['ylabel_coords']['x'], self.frame['ax']['labels']['ylabel_coords']['y'])
-            
+
+        if self.frame['ax']['labels'].get("zorder"):
+            for spine in self.ax.spines.values():
+                spine.set_zorder(self.frame['ax']['labels']['zorder'])
+
         # Apply manual ticks here at initialization if provided in YAML
         ax_ticks_cfg = self.frame.get('ax', {}).get('ticks', {})
         self._apply_manual_ticks(self.ax, "x", ax_ticks_cfg.get('x', {}))
         self._apply_manual_ticks(self.ax, "y", ax_ticks_cfg.get('y', {}))
 
+        self.ax.tick_params(**self.frame['ax']['ticks'].get("both", {}))
+        self.ax.tick_params(**self.frame['ax']['ticks'].get("major", {}))
+        self.ax.tick_params(**self.frame['ax']['ticks'].get("minor", {}))
+        
         # ---- Finalize logic with auto-ticks injection ----
         if getattr(self.ax, 'needs_finalize', True) and hasattr(self.ax, 'finalize'):
             orig_finalize = self.ax.finalize
@@ -1003,35 +994,42 @@ class Figure:
             raise TypeError("from_dict expects a mapping/dict")
         
         try: 
-
-
             changed = True
             if "name" in info:
                 self.name = info["name"]  # use the property setter correctly
             else:
                 changed = False
 
-            if "debug" in info: 
+            if "debug" in info:
                 self.debug = info['debug']
                 self.logger.debug("Loading plot -> {} in debug mode".format(self.name))
-                
-            self._enable = info.get("enable", True) 
-            if not self._enable: 
+
+            self._enable = info.get("enable", True)
+            if not self._enable:
                 self.logger.warning("Skip plot -> {}".format(self.name))
                 return False
-            
-            if "style" in info: 
+
+            if "style" in info:
                 self.style = info['style']
-            else: 
+            else:
                 self.style = ["a4paper_2x1", "default"]
             self.logger.debug("Figure style loaded")
 
             if "frame" in info:
                 self.frame = info['frame']
 
-
-            import matplotlib.pyplot as plt 
+            import matplotlib.pyplot as plt
             plt.rcParams['mathtext.fontset'] = 'stix'
+            # --- Ensure JarvisPLOT colormaps are registered globally before plotting ---
+            try:
+                from ..utils import cmaps as _jp_cmaps
+                _cmaps_summary = _jp_cmaps.setup(force=True)
+                if self.logger:
+                    self.logger.debug(f"JarvisPLOT: colormaps registered (builtin/external): {_cmaps_summary}")
+                    self.logger.debug(f"JarvisPLOT: available cmaps sample: {_jp_cmaps.list_available()[:10]} ...")
+            except Exception as _e:
+                if self.logger:
+                    self.logger.warning(f"JarvisPLOT: failed to register colormaps: {_e}")
             # plt.rcParams['font.family'] = 'STIXGeneral'
             self.fig = plt.figure(**self.frame['figure'])
             self.load_axes()
@@ -1070,7 +1068,8 @@ class Figure:
         "hist": "hist",
         "hexbin": "hexbin",
         "tricontour": "tricontour",
-        "tricontourf": "tricontourf"
+        "tricontourf": "tricontourf",
+        "voronoi": "voronoi"
     }
 
     def _eval_series(self, df: pd.DataFrame, set: dict):
@@ -1238,11 +1237,10 @@ class Figure:
             else:
                 if not ({"x", "y"} <= set(coor.keys())):
                     raise ValueError("Rectangular layer must define coordinates: {x,y} with exprs.")
-                style['x'] = self._eval_series(df, coor["x"])  # type: ignore[index]
-                style['y'] = self._eval_series(df, coor["y"])  # type: ignore[index]
-                if "c" in coor.keys():
-                    style['c'] = self._eval_series(df, coor["c"])
-                
+
+                for kk, vv in coor.items():
+                    style[kk] = self._eval_series(df, vv)
+
                 return method(**style)
 
         else:
