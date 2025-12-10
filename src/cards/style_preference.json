@@ -13,6 +13,7 @@
     },
     "gambit_2x1": {
         "Ternary": "&JP/src/cards/gambit/2x1/ternary.json",
-        "TernaryCmap": "&JP/src/cards/gambit/2x1/ternary_cmap.json"
+        "TernaryCmap": "&JP/src/cards/gambit/2x1/ternary_cmap.json",
+        "rectcmap": "&JP/src/cards/gambit/2x1/rect_cmap.json"
     }
 }

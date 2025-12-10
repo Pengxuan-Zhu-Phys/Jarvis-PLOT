@@ -1663,15 +1663,15 @@ DataSet:
     - source_name: data/#TotalCrossSectionAsMap @ColliderBit::getTotalCrossSectionAsMap::LHC_13TeV__xsec_err_fb
       new_name: Var683@h5
     - source_name: data/#TotalCrossSectionAsMap @ColliderBit::getTotalCrossSectionAsMap::LHC_13TeV__xsec_fb
-      new_name: Var684@h5
+      new_name: XSectinFB
     - source_name: data/#TotalCrossSectionAsMap @ColliderBit::getTotalCrossSectionAsMap::LHC_13TeV__xsec_relerr
       new_name: Var685@h5
     - source_name: data/#TotalCrossSection_LogLike @ColliderBit::calc_TotalCrossSection_LogLike
       new_name: Var686@h5
     - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi+_1->W++~G
-      new_name: Var687@h5
+      new_name: BRC12WG
     - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi+_1->W++~chi0_1
-      new_name: Var688@h5
+      new_name: BRC12WN1
     - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi+_1->W++~chi0_2
       new_name: Var689@h5
     - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi+_1->W++~chi0_3
@@ -1693,13 +1693,13 @@ DataSet:
     - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi+_2->h0_1+~chi+_1
       new_name: Var698@h5
     - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_1->W++~chi-_1
-      new_name: Var699@h5
+      new_name: BRN12WC1
     - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_1->Z0+~G
-      new_name: Var700@h5
+      new_name: BRN12ZG
     - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_1->gamma+~G
-      new_name: Var701@h5
+      new_name: BRN12aG
     - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_1->h0_1+~G
-      new_name: Var702@h5
+      new_name: BRN12HG
     - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_2->W++~chi-_1
       new_name: Var703@h5
     - source_name: data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_2->W++~chi-_2
@@ -2028,18 +2028,30 @@ DataSet:
 
 
 Figures:
+# Scatter M1-M2
 - name: sm1m2_ProfLogL
-  enable: true
+  enable: false
   style:
-  - a4paper_2x1 
+  - gambit_2x1 
   - rectcmap
   frame:
     ax: 
       labels:
-        x: "$M_1~[{\\rm TeV}]$"
-        y: "$\\mu~[{\\rm TeV}]$"
+        x: "$M_1~({\\rm TeV})$"
+        y: "$\\mu~({\\rm TeV})$"
       xlim: [-1.500, 1.500]
       ylim: [-1.500, 1.500]
+      text: [
+        {
+          x: 0.75, 
+          y: 1.002,
+          s: "$\\tilde{G}$-EWMSSM.",
+          ha: "right",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+          fontsize: "x-small"
+        }
+      ]
     axc: 
       label:
         ylabel: $\ln{\mathcal{L}}$
@@ -2061,10 +2073,9 @@ Figures:
       c: {expr: LogLike_total}
     style:
       marker: '.'
-      cmap: qual22
+      cmap: gambit_cmap
       vmin: -3.09
       vmax: 3.09
-#      zorder: 11
   - name: scatter_exc
     data: 
     - source: h5
@@ -2082,20 +2093,31 @@ Figures:
     style:
       marker: '.'
       c: "black"
-#      zorder: 10
 
+# Profile Likelihood M1-M2
 - name: pm1m2_ProfLogL
   enable: false
   style:
-  - a4paper_2x1 
+  - gambit_2x1 
   - rectcmap
   frame:
     ax: 
       labels:
-        x: "$M_1~[{\\rm TeV}]$"
-        y: "$\\mu~[{\\rm TeV}]$"
+        x: "$M_1~({\\rm TeV})$"
+        y: "$M_2~({\\rm TeV})$"
       xlim: [-1.5, 1.500]
-      ylim: [-1.500, 1.500]
+      ylim: [-1.5, 1.500]
+      text: [
+        {
+          x: 0.75, 
+          y: 1.0016,
+          s: "$\\tilde{G}$-EWMSSM.",
+          ha: "right",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+          fontsize: "x-small"
+        }
+      ]
     axc: 
       label:
         ylabel: $\ln{\mathcal{L}}$
@@ -2110,14 +2132,14 @@ Figures:
       - sortby: LogLike_total
 #      - filter: LogLike_total > -3.99
       - profile:
-          bin: 75
+          bin: 150
           coordinates:
-            x: { expr: "pM1/1000",      scale: "linear" , name: xx }
-            y: { expr: "pMu/1000",      scale: "linear" , name: yy }
+            x: { expr: "pM1/1000",      scale: "linear" , name: xx , lim: [-1.5, 1.5]}
+            y: { expr: "pM2/1000",      scale: "linear" , name: yy , lim: [-1.5, 1.5]}
             z: { expr: "np.exp(LogLike_total)", scale: "linear"    , name: "z0"}
           objective: max
           grid_points: "rect"
-    share_data: tri_profile
+    share_data: pm1m2_profile
     axes: ax
     method: voronoi
     coordinates:
@@ -2125,26 +2147,965 @@ Figures:
       y: { expr: yy }
       z: { expr: LogLike_total}
     style:
-      cmap: seismic_r
+      cmap: chrisB
+      vmin: -3.09
+      vmax: 3.09
+  - name: lines 
+    axes: ax 
+    method: plot 
+    coordinates:
+      x: [-1.5, 1.5]
+      y: [[-1.5, 1.5], [1.5, -1.5]]
+    style:
+      linewidth: 1.0 
+      linestyle: ":"
+      color: "white"
+      zorder: 1.5
+
+# Profile Likelihood M1-Mu
+- name: pm1mu_ProfLogL
+  enable: false
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$M_1~({\\rm TeV})$"
+        y: "$\\mu~({\\rm TeV})$"
+      xlim: [-1.5, 1.500]
+      ylim: [-1.500, 1.500]
+      text: [
+        {
+          x: 0.75, 
+          y: 1.0016,
+          s: "$\\tilde{G}$-EWMSSM.",
+          ha: "right",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+          fontsize: "x-small"
+        }
+      ]
+    axc:
+      label:
+        ylabel: $\ln{\mathcal{L}}$
+  layers:
+  - name: prof
+    data:
+    - source: h5
+      transform:
+      - add_column:
+          name: LogLike_total
+          expr: LogL_01 + LogL_02 + LogL_03 + LogL_04 + LogL_05 + LogL_06 + LogL_07 + LogL_08 + LogL_09 + LogL_10 + LogL_11 + LogL_12 + LogL_13 + LogL_14 + LogL_15 + LogL_16 + LogL_17 + LogL_18 + LogL_19 + LogL_20 + LogL_21 + LogL_22 + LogL_23 + LogL_24 + LogL_25 + LogL_26 + LogL_27 + LogL_28 + LogL_29 + LogL_30 + LogL_31 + LogL_32 + LogL_33 + LogL_34 + LogL_35 + LogL_36 + LogL_37 + LogL_38 + LogL_39 + LogL_40 + LogL_41 + LogL_42 + LogL_43 + LogL_measure - LogL_measure_01 - LogL_measure_02 - LogL_measure_03
+      - sortby: LogLike_total
+#      - filter: LogLike_total > -3.99
+      - profile:
+          bin: 150
+          coordinates:
+            x: { expr: "pM1/1000",      scale: "linear" , name: xx , lim: [-1.5, 1.5]}
+            y: { expr: "pMu/1000",      scale: "linear" , name: yy , lim: [-1.5, 1.5]}
+            z: { expr: "np.exp(LogLike_total)", scale: "linear"    , name: "z0"}
+          objective: max
+          grid_points: "rect"
+    share_data: pm1mu_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x: { expr: xx }
+      y: { expr: yy }
+      z: { expr: LogLike_total}
+    style:
+      cmap: chrisB
+      vmin: -3.09
+      vmax: 3.09
+  - name: lines 
+    axes: ax 
+    method: plot 
+    coordinates:
+      x: [-1.5, 1.5]
+      y: [[-1.5, 1.5], [1.5, -1.5]]
+    style:
+      linewidth: 1.0 
+      linestyle: ":"
+      color: "white"
+      zorder: 1.5
+
+# Profile Likelihood M2-Mu
+- name: pm2mu_ProfLogL
+  enable: false
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$M_2~({\\rm TeV})$"
+        y: "$\\mu~({\\rm TeV})$"
+      xlim: [-1.500, 1.500]
+      ylim: [-1.500, 1.500]
+      text: [
+        {
+          x: 0.75, 
+          y: 1.0016,
+          s: "$\\tilde{G}$-EWMSSM.",
+          ha: "right",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+          fontsize: "x-small"
+        }
+      ]
+    axc:
+      label:
+        ylabel: $\ln{\mathcal{L}}$
+  layers:
+  - name: prof
+    data:
+    - source: h5
+      transform:
+      - add_column:
+          name: LogLike_total
+          expr: LogL_01 + LogL_02 + LogL_03 + LogL_04 + LogL_05 + LogL_06 + LogL_07 + LogL_08 + LogL_09 + LogL_10 + LogL_11 + LogL_12 + LogL_13 + LogL_14 + LogL_15 + LogL_16 + LogL_17 + LogL_18 + LogL_19 + LogL_20 + LogL_21 + LogL_22 + LogL_23 + LogL_24 + LogL_25 + LogL_26 + LogL_27 + LogL_28 + LogL_29 + LogL_30 + LogL_31 + LogL_32 + LogL_33 + LogL_34 + LogL_35 + LogL_36 + LogL_37 + LogL_38 + LogL_39 + LogL_40 + LogL_41 + LogL_42 + LogL_43 + LogL_measure - LogL_measure_01 - LogL_measure_02 - LogL_measure_03
+      - sortby: LogLike_total
+#      - filter: LogLike_total > -3.99
+      - profile:
+          bin: 150
+          coordinates:
+            x: { expr: "pM2/1000",      scale: "linear" , name: xx , lim: [-1.5, 1.5]}
+            y: { expr: "pMu/1000",      scale: "linear" , name: yy , lim: [-1.5, 1.5]}
+            z: { expr: "np.exp(LogLike_total)", scale: "linear"    , name: "z0"}
+          objective: max
+          grid_points: "rect"
+    share_data: pm1mu_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x: { expr: xx }
+      y: { expr: yy }
+      z: { expr: LogLike_total}
+    style:
+      cmap: chrisB
+      vmin: -3.09
+      vmax: 3.09
+  - name: lines 
+    axes: ax 
+    method: plot 
+    coordinates:
+      x: [-1.5, 1.5]
+      y: [[-1.5, 1.5], [1.5, -1.5]]
+    style:
+      linewidth: 1.0 
+      linestyle: ":"
+      color: "white"
+      zorder: 1.5
+     
+# Profile Likelihood Mu-Tanbeta
+- name: pmutb_ProfLogL
+  enable: false
+  style:
+  - gambit_2x1 
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$\\tan{\\beta}$"
+        y: "$\\mu~({\\rm TeV})$"
+      xlim: [1, 70]
+      ylim: [-1.500, 1.500]
+      # xscale: "log"
+      text: [
+        {
+          x: 0.75, 
+          y: 1.0016,
+          s: "$\\tilde{G}$-EWMSSM.",
+          ha: "right",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+          fontsize: "x-small"
+        }
+      ]    
+    axc:
+      label:
+        ylabel: $\ln{\mathcal{L}}$
+        fontsize: 13
+  layers:
+  - name: prof
+    data:
+    - source: h5
+      transform:
+      - add_column:
+          name: LogLike_total
+          expr: LogL_01 + LogL_02 + LogL_03 + LogL_04 + LogL_05 + LogL_06 + LogL_07 + LogL_08 + LogL_09 + LogL_10 + LogL_11 + LogL_12 + LogL_13 + LogL_14 + LogL_15 + LogL_16 + LogL_17 + LogL_18 + LogL_19 + LogL_20 + LogL_21 + LogL_22 + LogL_23 + LogL_24 + LogL_25 + LogL_26 + LogL_27 + LogL_28 + LogL_29 + LogL_30 + LogL_31 + LogL_32 + LogL_33 + LogL_34 + LogL_35 + LogL_36 + LogL_37 + LogL_38 + LogL_39 + LogL_40 + LogL_41 + LogL_42 + LogL_43 + LogL_measure - LogL_measure_01 - LogL_measure_02 - LogL_measure_03
+      - sortby: LogLike_total
+      - profile:
+          bin: 150
+          coordinates:
+            x: { expr: "pTanBeta",      scale: "linear" , name: xx , lim: [1, 70]}
+            y: { expr: "pMu/1000",      scale: "linear" , name: yy , lim: [-1.5, 1.5]}
+            z: { expr: "np.exp(LogLike_total)", scale: "linear"    , name: "z0"}
+          objective: max
+          grid_points: "rect"
+    share_data: ptbmu_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x: { expr: xx }
+      y: { expr: yy }
+      z: { expr: LogLike_total}
+    style:
+      cmap: chrisB
       vmin: -3.09
       vmax: 3.09
 
-  - name: scatter_exc1
+# Profile Likelihood mN1-mN2
+- name: mN2mN1_ProfLogL
+  enable: false
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$m_{\\tilde{\\chi}_2^0}~({\\rm TeV})$"
+        y: "$m_{\\tilde{\\chi}_1^0}~({\\rm TeV})$"
+      xlim: [0, 1.4]
+      ylim: [0, 1.4]
+      text: [
+        {
+          x: 0.75, 
+          y: 1.0018,
+          s: "$\\tilde{G}$-EWMSSM.",
+          ha: "right",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+          fontsize: "x-small"
+        },
+        {
+          x: 0.05, 
+          y: 0.85,
+          s: "All searches and measurement",
+          c: "white",
+          ha: "left",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+        }
+      ]
+    axc:
+      label:
+        ylabel: $\ln{\mathcal{L}}$
+  layers:
+  - name: prof
     data:
-    - source: tri_profile
+    - source: h5
+      transform:
+      - add_column:
+          name: LogLike_total
+          expr: LogL_01 + LogL_02 + LogL_03 + LogL_04 + LogL_05 + LogL_06 + LogL_07 + LogL_08 + LogL_09 + LogL_10 + LogL_11 + LogL_12 + LogL_13 + LogL_14 + LogL_15 + LogL_16 + LogL_17 + LogL_18 + LogL_19 + LogL_20 + LogL_21 + LogL_22 + LogL_23 + LogL_24 + LogL_25 + LogL_26 + LogL_27 + LogL_28 + LogL_29 + LogL_30 + LogL_31 + LogL_32 + LogL_33 + LogL_34 + LogL_35 + LogL_36 + LogL_37 + LogL_38 + LogL_39 + LogL_40 + LogL_41 + LogL_42 + LogL_43 + LogL_measure - LogL_measure_01 - LogL_measure_02 - LogL_measure_03
+      - sortby: LogLike_total
+      - profile:
+          bin: 150
+          coordinates:
+            x: { expr: "abs(mN2)/1000",      scale: "linear" , name: xx, lim:[0, 1.4] }
+            y: { expr: "abs(mN1)/1000",      scale: "linear" , name: yy, lim:[0, 1.4] }
+            z: { expr: "np.exp(LogLike_total)", scale: "linear"    , name: "z0"}
+          objective: max
+          grid_points: "rect"
+    share_data: mN2mN1_profile
     axes: ax
-    method: scatter
+    method: voronoi
     coordinates:
-      x: {expr: xx}
-      y: {expr: yy}
+      x: { expr: xx }
+      y: { expr: yy }
+      z: { expr: LogLike_total}
     style:
-      s: 0.1
-      alpha: 0.2
-      marker: '.'
-      c: "#FF42A1"
+      cmap: chrisB
+      vmin: -3.09
+      vmax: 3.09
+  - name: fillbounds
+    axes: ax 
+    method: fill 
+    coordinates:
+      x: [0., 1.4, 0.0, 0.]
+      y: [0., 1.4, 1.4, 0.]
+    style:
+      facecolor: "#808080"
+      edgecolor:  "none"
+      zorder: 1.2
+
+# Profile Likelihood mN1-mN2, color coded with Total XSection
+- name: mN2mN1_XSect
+  enable: false
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$m_{\\tilde{\\chi}_2^0}~({\\rm TeV})$"
+        y: "$m_{\\tilde{\\chi}_1^0}~({\\rm TeV})$"
+      xlim: [0, 1.4]
+      ylim: [0, 1.4]
+      text: [
+        {
+          x: 0.75, 
+          y: 1.0018,
+          s: "$\\tilde{G}$-EWMSSM.",
+          ha: "right",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+          fontsize: "x-small"
+        }
+      ]
+    axc:
+      label:
+        ylabel: Total production $\sigma~({\rm fb})$
+      yscale: log
+  layers:
+  - name: prof
+    data:
+    - source: mN2mN1_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x: { expr: xx }
+      y: { expr: yy }
+      z: { expr: np.abs(XSectinFB)}
+    style:
+      cmap: viridis
+      norm: LogNorm
+      vmin: 1
+      vmax: 100000
+  - name: fillbounds
+    axes: ax 
+    method: fill 
+    coordinates:
+      x: [0., 1.4, 0.0, 0.]
+      y: [0., 1.4, 1.4, 0.]
+    style:
+      facecolor: "#808080"
+      edgecolor:  "none"
+      zorder: 1.2
+
+# Profile Likelihood mN1-mN2, color coded with BR(C1+ -> W+ G)
+- name: mN2mN1_BRC12WGra
+  enable: false
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$m_{\\tilde{\\chi}_2^0}~({\\rm TeV})$"
+        y: "$m_{\\tilde{\\chi}_1^0}~({\\rm TeV})$"
+      xlim: [0, 1.4]
+      ylim: [0, 1.4]
+      text: [
+        {
+          x: 0.75, 
+          y: 1.0018,
+          s: "$\\tilde{G}$-EWMSSM.",
+          ha: "right",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+          fontsize: "x-small"
+        }
+      ]
+    axc:
+      label:
+        ylabel: ${\rm BR}(\tilde{\chi}_1^\pm \to W^\pm \tilde{G})$
+  layers:
+  - name: prof
+    data:
+    - source: mN2mN1_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x: { expr: xx }
+      y: { expr: yy }
+      z: { expr: np.abs(BRC12WG)}
+    style:
+      cmap: viridis
+      vmin: 0
+      vmax: 1
+  - name: fillbounds
+    axes: ax 
+    method: fill 
+    coordinates:
+      x: [0., 1.4, 0.0, 0.]
+      y: [0., 1.4, 1.4, 0.]
+    style:
+      facecolor: "#808080"
+      edgecolor:  "none"
+      zorder: 1.2
+
+# Profile Likelihood mN1-mN2, color coded with BR(N1 -> a G)
+- name: mN2mN1_BRN12aGra
+  enable: false
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$m_{\\tilde{\\chi}_2^0}~({\\rm TeV})$"
+        y: "$m_{\\tilde{\\chi}_1^0}~({\\rm TeV})$"
+      xlim: [0, 1.4]
+      ylim: [0, 1.4]
+      text: [
+        {
+          x: 0.75, 
+          y: 1.0018,
+          s: "$\\tilde{G}$-EWMSSM.",
+          ha: "right",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+          fontsize: "x-small"
+        }
+      ]
+    axc:
+      label:
+        ylabel: ${\rm BR}(\tilde{\chi}_1^0 \to \gamma \tilde{G})$
+  layers:
+  - name: prof
+    data:
+    - source: mN2mN1_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x: { expr: xx }
+      y: { expr: yy }
+      z: { expr: np.abs(BRN12aG)}
+    style:
+      cmap: viridis
+      vmin: 0
+      vmax: 1
+  - name: fillbounds
+    axes: ax 
+    method: fill 
+    coordinates:
+      x: [0., 1.4, 0.0, 0.]
+      y: [0., 1.4, 1.4, 0.]
+    style:
+      facecolor: "#808080"
+      edgecolor:  "none"
+      zorder: 1.2
+
+# Profile Likelihood mN1-mN2, color coded with BR(N1 -> Z G)
+- name: mN2mN1_BRN12ZGra
+  enable: false
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$m_{\\tilde{\\chi}_2^0}~({\\rm TeV})$"
+        y: "$m_{\\tilde{\\chi}_1^0}~({\\rm TeV})$"
+      xlim: [0, 1.4]
+      ylim: [0, 1.4]
+      text: [
+        {
+          x: 0.75, 
+          y: 1.0018,
+          s: "$\\tilde{G}$-EWMSSM.",
+          ha: "right",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+          fontsize: "x-small"
+        }
+      ]    
+    axc:
+      label:
+        ylabel: ${\rm BR}(\tilde{\chi}_1^0 \to Z \tilde{G})$
+  layers:
+  - name: prof
+    data:
+    - source: mN2mN1_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x: { expr: xx }
+      y: { expr: yy }
+      z: { expr: np.abs(BRN12ZG)}
+    style:
+      cmap: viridis
+      vmin: 0
+      vmax: 1
+  - name: fillbounds
+    axes: ax 
+    method: fill 
+    coordinates:
+      x: [0., 1.4, 0.0, 0.]
+      y: [0., 1.4, 1.4, 0.]
+    style:
+      facecolor: "#808080"
+      edgecolor:  "none"
+      zorder: 1.2
+
+# Profile Likelihood mN1-mN2, color coded with BR(N1 -> H G)
+- name: mN2mN1_BRN12HGra
+  enable: false
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$m_{\\tilde{\\chi}_2^0}~({\\rm TeV})$"
+        y: "$m_{\\tilde{\\chi}_1^0}~({\\rm TeV})$"
+      xlim: [0, 1.4]
+      ylim: [0, 1.4]
+      text: [
+        {
+          x: 0.75, 
+          y: 1.0018,
+          s: "$\\tilde{G}$-EWMSSM.",
+          ha: "right",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+          fontsize: "x-small"
+        }
+      ]
+    axc:
+      label:
+        ylabel: ${\rm BR}(\tilde{\chi}_1^0 \to h \tilde{G})$
+  layers:
+  - name: prof
+    data:
+    - source: mN2mN1_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x: { expr: xx }
+      y: { expr: yy }
+      z: { expr: np.abs(BRN12HG)}
+    style:
+      cmap: viridis
+      vmin: 0
+      vmax: 1
+  - name: fillbounds
+    axes: ax 
+    method: fill 
+    coordinates:
+      x: [0., 1.4, 0.0, 0.]
+      y: [0., 1.4, 1.4, 0.]
+    style:
+      facecolor: "#808080"
+      edgecolor:  "none"
+      zorder: 1.2
+
+# Profile Likelihood mN1-mN2, color coded with Bino Component
+- name: mN2mN1_binoComp
+  enable: false
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$m_{\\tilde{\\chi}_2^0}~({\\rm TeV})$"
+        y: "$m_{\\tilde{\\chi}_1^0}~({\\rm TeV})$"
+      xlim: [0, 1.4]
+      ylim: [0, 1.4]
+      text: [
+        {
+          x: 0.75, 
+          y: 1.0018,
+          s: "$\\tilde{G}$-EWMSSM.",
+          ha: "right",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+          fontsize: "x-small"
+        }
+      ]    
+    axc:
+      label:
+        ylabel: $|N_{11}|^2$
+  layers:
+  - name: prof
+    data:
+    - source: mN2mN1_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x: { expr: xx }
+      y: { expr: yy }
+      z: { expr: np.abs(N11)**2}
+    style:
+      cmap: viridis
+      vmin: 0
+      vmax: 1
+  - name: fillbounds
+    axes: ax 
+    method: fill 
+    coordinates:
+      x: [0., 1.4, 0.0, 0.]
+      y: [0., 1.4, 1.4, 0.]
+    style:
+      facecolor: "#808080"
+      edgecolor:  "none"
+      zorder: 1.2
+
+# Profile Likelihood mN1-mN2, color coded with Wino Component
+- name: mN2mN1_winoComp
+  enable: false
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$m_{\\tilde{\\chi}_2^0}~({\\rm TeV})$"
+        y: "$m_{\\tilde{\\chi}_1^0}~({\\rm TeV})$"
+      xlim: [0, 1.4]
+      ylim: [0, 1.4]
+      text: [
+        {
+          x: 0.75, 
+          y: 1.0018,
+          s: "$\\tilde{G}$-EWMSSM.",
+          ha: "right",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+          fontsize: "x-small"
+        }
+      ]
+    axc:
+      label:
+        ylabel: $|N_{12}|^2$
+  layers:
+  - name: prof
+    data:
+    - source: mN2mN1_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x: { expr: xx }
+      y: { expr: yy }
+      z: { expr: np.abs(N12)**2}
+    style:
+      cmap: viridis
+      vmin: 0
+      vmax: 1
+  - name: fillbounds
+    axes: ax 
+    method: fill 
+    coordinates:
+      x: [0., 1.4, 0.0, 0.]
+      y: [0., 1.4, 1.4, 0.]
+    style:
+      facecolor: "#808080"
+      edgecolor:  "none"
+      zorder: 1.2
+
+# Profile Likelihood mN1-mN2, color coded with Higgsino Component
+- name: mN2mN1_hinoComp
+  enable: false
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$m_{\\tilde{\\chi}_2^0}~({\\rm TeV})$"
+        y: "$m_{\\tilde{\\chi}_1^0}~({\\rm TeV})$"
+      xlim: [0, 1.4]
+      ylim: [0, 1.4]
+      text: [
+        {
+          x: 0.75, 
+          y: 1.0018,
+          s: "$\\tilde{G}$-EWMSSM.",
+          ha: "right",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+          fontsize: "x-small"
+        }
+      ]    
+    axc:
+      label:
+        ylabel: $|N_{13}|^2 + |N_{14}|^2$
+  layers:
+  - name: prof
+    data:
+    - source: mN2mN1_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x: { expr: xx }
+      y: { expr: yy }
+      z: { expr: np.abs(N13)**2 + np.abs(N14)**2}
+    style:
+      cmap: viridis
+      vmin: 0
+      vmax: 1
+  - name: fillbounds
+    axes: ax 
+    method: fill 
+    coordinates:
+      x: [0., 1.4, 0.0, 0.]
+      y: [0., 1.4, 1.4, 0.]
+    style:
+      facecolor: "#808080"
+      edgecolor:  "none"
+      zorder: 1.2
 
 
+- name: mN2mN1_BinoN1_ProfLogL
+  enable: true
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$m_{\\tilde{\\chi}_2^0}~({\\rm TeV})$"
+        y: "$m_{\\tilde{\\chi}_1^0}~({\\rm TeV})$"
+      xlim: [0, 1.4]
+      ylim: [0, 1.4]
+      text: [
+        {
+          x: 0.75, 
+          y: 1.0018,
+          s: "$\\tilde{G}$-EWMSSM.",
+          ha: "right",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+          fontsize: "x-small"
+        },
+        {
+          x: 0.05, 
+          y: 0.85,
+          s: "All searches and measurement",
+          c: "white",
+          ha: "left",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+        },
+        {
+          x: 0.05, 
+          y: 0.75,
+          s: "Bino-dominated $\\tilde{\\chi}_1^0$",
+          c: "white",
+          ha: "left",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+        }
+      ]
+    axc:
+      label:
+        ylabel: $\ln{\mathcal{L}}$
+  layers:
+  - name: prof
+    data:
+    - source: h5
+      transform:
+      - add_column:
+          name: LogLike_total
+          expr: LogL_01 + LogL_02 + LogL_03 + LogL_04 + LogL_05 + LogL_06 + LogL_07 + LogL_08 + LogL_09 + LogL_10 + LogL_11 + LogL_12 + LogL_13 + LogL_14 + LogL_15 + LogL_16 + LogL_17 + LogL_18 + LogL_19 + LogL_20 + LogL_21 + LogL_22 + LogL_23 + LogL_24 + LogL_25 + LogL_26 + LogL_27 + LogL_28 + LogL_29 + LogL_30 + LogL_31 + LogL_32 + LogL_33 + LogL_34 + LogL_35 + LogL_36 + LogL_37 + LogL_38 + LogL_39 + LogL_40 + LogL_41 + LogL_42 + LogL_43 + LogL_measure - LogL_measure_01 - LogL_measure_02 - LogL_measure_03
+      - filter: (np.abs(N11)**2 > np.abs(N12)**2) & (np.abs(N11)**2 > np.abs(N13)**2 + np.abs(N14)**2)
+      - sortby: LogLike_total
+      - profile:
+          bin: 150
+          coordinates:
+            x: { expr: "abs(mN2)/1000",      scale: "linear" , name: xx, lim:[0, 1.4] }
+            y: { expr: "abs(mN1)/1000",      scale: "linear" , name: yy, lim:[0, 1.4] }
+            z: { expr: "np.exp(LogLike_total)", scale: "linear"    , name: "z0"}
+          objective: max
+          grid_points: "rect"
+    share_data: mN2mN1_BinoN1_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x: { expr: xx }
+      y: { expr: yy }
+      z: { expr: LogLike_total}
+    style:
+      cmap: chrisB
+      vmin: -3.09
+      vmax: 3.09
+  - name: fillbounds
+    axes: ax 
+    method: fill 
+    coordinates:
+      x: [0., 1.4, 0.0, 0.]
+      y: [0., 1.4, 1.4, 0.]
+    style:
+      facecolor: "#808080"
+      edgecolor:  "none"
+      zorder: 1.2
+      
 
+- name: mN2mN1_WinoN1_ProfLogL
+  enable: true
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$m_{\\tilde{\\chi}_2^0}~({\\rm TeV})$"
+        y: "$m_{\\tilde{\\chi}_1^0}~({\\rm TeV})$"
+      xlim: [0, 1.4]
+      ylim: [0, 1.4]
+      text: [
+        {
+          x: 0.75, 
+          y: 1.0018,
+          s: "$\\tilde{G}$-EWMSSM.",
+          ha: "right",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+          fontsize: "x-small"
+        },
+        {
+          x: 0.05, 
+          y: 0.85,
+          s: "All searches and measurement",
+          c: "white",
+          ha: "left",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+        },
+        {
+          x: 0.05, 
+          y: 0.75,
+          s: "Wino-dominated $\\tilde{\\chi}_1^0$",
+          c: "white",
+          ha: "left",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+        }
+      ]
+    axc:
+      label:
+        ylabel: $\ln{\mathcal{L}}$
+  layers:
+  - name: prof
+    data:
+    - source: h5
+      transform:
+      - add_column:
+          name: LogLike_total
+          expr: LogL_01 + LogL_02 + LogL_03 + LogL_04 + LogL_05 + LogL_06 + LogL_07 + LogL_08 + LogL_09 + LogL_10 + LogL_11 + LogL_12 + LogL_13 + LogL_14 + LogL_15 + LogL_16 + LogL_17 + LogL_18 + LogL_19 + LogL_20 + LogL_21 + LogL_22 + LogL_23 + LogL_24 + LogL_25 + LogL_26 + LogL_27 + LogL_28 + LogL_29 + LogL_30 + LogL_31 + LogL_32 + LogL_33 + LogL_34 + LogL_35 + LogL_36 + LogL_37 + LogL_38 + LogL_39 + LogL_40 + LogL_41 + LogL_42 + LogL_43 + LogL_measure - LogL_measure_01 - LogL_measure_02 - LogL_measure_03
+      - filter: (np.abs(N12)**2 > np.abs(N11)**2) & (np.abs(N12)**2 > np.abs(N13)**2 + np.abs(N14)**2)
+      - sortby: LogLike_total
+      - profile:
+          bin: 150
+          coordinates:
+            x: { expr: "abs(mN2)/1000",      scale: "linear" , name: xx, lim:[0, 1.4] }
+            y: { expr: "abs(mN1)/1000",      scale: "linear" , name: yy, lim:[0, 1.4] }
+            z: { expr: "np.exp(LogLike_total)", scale: "linear"    , name: "z0"}
+          objective: max
+          grid_points: "rect"
+    share_data: mN2mN1_WinoN1_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x: { expr: xx }
+      y: { expr: yy }
+      z: { expr: LogLike_total}
+    style:
+      cmap: chrisB
+      vmin: -3.09
+      vmax: 3.09
+  - name: fillbounds
+    axes: ax 
+    method: fill 
+    coordinates:
+      x: [0., 1.4, 0.0, 0.]
+      y: [0., 1.4, 1.4, 0.]
+    style:
+      facecolor: "#808080"
+      edgecolor:  "none"
+      zorder: 1.2
+      
+- name: mN2mN1_HinoN1_ProfLogL
+  enable: true
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$m_{\\tilde{\\chi}_2^0}~({\\rm TeV})$"
+        y: "$m_{\\tilde{\\chi}_1^0}~({\\rm TeV})$"
+      xlim: [0, 1.4]
+      ylim: [0, 1.4]
+      text: [
+        {
+          x: 0.75, 
+          y: 1.0018,
+          s: "$\\tilde{G}$-EWMSSM.",
+          ha: "right",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+          fontsize: "x-small"
+        },
+        {
+          x: 0.05, 
+          y: 0.85,
+          s: "All searches and measurement",
+          c: "white",
+          ha: "left",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+        },
+        {
+          x: 0.05, 
+          y: 0.75,
+          s: "Higgsino-dominated $\\tilde{\\chi}_1^0$",
+          c: "white",
+          ha: "left",
+          va: "bottom",
+          fontfamily: "STIXGeneral",
+        }
+      ]
+    axc:
+      label:
+        ylabel: $\ln{\mathcal{L}}$
+  layers:
+  - name: prof
+    data:
+    - source: h5
+      transform:
+      - add_column:
+          name: LogLike_total
+          expr: LogL_01 + LogL_02 + LogL_03 + LogL_04 + LogL_05 + LogL_06 + LogL_07 + LogL_08 + LogL_09 + LogL_10 + LogL_11 + LogL_12 + LogL_13 + LogL_14 + LogL_15 + LogL_16 + LogL_17 + LogL_18 + LogL_19 + LogL_20 + LogL_21 + LogL_22 + LogL_23 + LogL_24 + LogL_25 + LogL_26 + LogL_27 + LogL_28 + LogL_29 + LogL_30 + LogL_31 + LogL_32 + LogL_33 + LogL_34 + LogL_35 + LogL_36 + LogL_37 + LogL_38 + LogL_39 + LogL_40 + LogL_41 + LogL_42 + LogL_43 + LogL_measure - LogL_measure_01 - LogL_measure_02 - LogL_measure_03
+      - filter: (np.abs(N13)**2 + np.abs(N14)**2 > np.abs(N11)**2) & (np.abs(N13)**2 + np.abs(N14)**2 > np.abs(N11)**2)
+      - sortby: LogLike_total
+      - profile:
+          bin: 150
+          coordinates:
+            x: { expr: "abs(mN2)/1000",      scale: "linear" , name: xx, lim:[0, 1.4] }
+            y: { expr: "abs(mN1)/1000",      scale: "linear" , name: yy, lim:[0, 1.4] }
+            z: { expr: "np.exp(LogLike_total)", scale: "linear"    , name: "z0"}
+          objective: max
+          grid_points: "rect"
+    share_data: mN2mN1_HinoN1_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x: { expr: xx }
+      y: { expr: yy }
+      z: { expr: LogLike_total}
+    style:
+      cmap: chrisB
+      vmin: -3.09
+      vmax: 3.09
+  - name: fillbounds
+    axes: ax 
+    method: fill 
+    coordinates:
+      x: [0., 1.4, 0.0, 0.]
+      y: [0., 1.4, 1.4, 0.]
+    style:
+      facecolor: "#808080"
+      edgecolor:  "none"
+      zorder: 1.2
+      
+
+
+# Profile Likelihood Ternary Plot N1-component
 - name: N1_comps_LogL
   enable: false
   style:
@@ -2172,7 +3133,7 @@ Figures:
       - sortby: LogLike_total
     share_data: GEWMSSM_LogL
     axes: axtri
-    method: scatter
+    method: voronoi
     coordinates:
       left:
         expr: np.abs(N11)**2
@@ -2190,32 +3151,8 @@ Figures:
       cmap: seismic_r
       vmin: -3.09
       vmax: 3.09
-  # - name: exc
-  #   data:
-  #   - source: h5
-  #     transform:
-  #     - filter: LogLike_total <= -3.09
-  #   axes: axtri
-  #   method: scatter
-  #   coordinates:
-  #     left:
-  #       expr: np.abs(N11)**2
-  #       label: a
-  #     right:
-  #       expr: np.abs(N12)**2
-  #       label: b
-  #     bottom:
-  #       expr: np.abs(N13)**2 + np.abs(N14)**2
-  #       label: c
-  #   style:
-  #     s: 1.0
-  #     marker: .
-  #     facecolor: black
-  #     edgecolor: none
-  #     alpha: 0.1
-  #     zorder: 20
 
-
+# Profile Likelihood Ternary Plot N1-component
 - name: N1_comps_prof
   enable: false
   style:
@@ -2235,12 +3172,14 @@ Figures:
   layers:
   - name: triscatter
     data:
-    - source: GEWMSSM_LogL
+    - source: h5
       transform:
-      - filter: LogLike_total > -3.09
+      - add_column:
+          name: LogLike_total
+          expr: LogL_01 + LogL_02 + LogL_03 + LogL_04 + LogL_05 + LogL_06 + LogL_07 + LogL_08 + LogL_09 + LogL_10 + LogL_11 + LogL_12 + LogL_13 + LogL_14 + LogL_15 + LogL_16 + LogL_17 + LogL_18 + LogL_19 + LogL_20 + LogL_21 + LogL_22 + LogL_23 + LogL_24 + LogL_25 + LogL_26 + LogL_27 + LogL_28 + LogL_29 + LogL_30 + LogL_31 + LogL_32 + LogL_33 + LogL_34 + LogL_35 + LogL_36 + LogL_37 + LogL_38 + LogL_39 + LogL_40 + LogL_41 + LogL_42 + LogL_43 + LogL_measure - LogL_measure_01 - LogL_measure_02 - LogL_measure_03
       - sortby: LogLike_total
       - profile:
-          bin: 120
+          bin: 150
           coordinates:
             x:
               expr: 0.5 * (np.abs(N13)**2 + np.abs(N14)**2) + np.abs(N12)**2
@@ -2253,25 +3192,8 @@ Figures:
               name: DNLL
           objective: max
           grid_points: ternary
-    share_data: tri_N1comp_prof
     axes: axtri
-    method: scatter
-    coordinates:
-      x:
-        expr: xx
-      y:
-        expr: yy
-    style:
-      s: 1.0
-      c: '#FF42A1'
-      marker: .
-      alpha: 0.1
-      zorder: 10
-  - name: tric
-    data:
-    - source: tri_N1comp_prof
-    axes: axtri
-    method: tricontourf
+    method: voronoi
     coordinates:
       x:
         expr: xx
@@ -2279,21 +3201,194 @@ Figures:
         expr: yy
       z:
         expr: LogLike_total
-        fillna: -10.0
     style:
-      cmap: seismic_r
+      cmap: chrisB
       vmin: -3.09
       vmax: 3.09
-      levels: 50
-      zorder: 8
-      extend: min
+
+# Profile Likelihood Ternary Plot N2-component
+- name: N2_comps_prof
+  enable: false
+  style:
+  - gambit_2x1
+  - TernaryCmap
+  frame:
+    axtri:
+      labels:
+        left: $|N_{21}|^2$
+        bottom: $|N_{22}|^2$
+        right: $|N_{23}|^2 + |N_{24}|^2$
+    axc:
+      label:
+        ylabel: $\ln{\mathcal{L}}$
+  legend:
+    loc: 1
+  layers:
+  - name: triscatter
+    data:
+    - source: h5
+      transform:
+      - add_column:
+          name: LogLike_total
+          expr: LogL_01 + LogL_02 + LogL_03 + LogL_04 + LogL_05 + LogL_06 + LogL_07 + LogL_08 + LogL_09 + LogL_10 + LogL_11 + LogL_12 + LogL_13 + LogL_14 + LogL_15 + LogL_16 + LogL_17 + LogL_18 + LogL_19 + LogL_20 + LogL_21 + LogL_22 + LogL_23 + LogL_24 + LogL_25 + LogL_26 + LogL_27 + LogL_28 + LogL_29 + LogL_30 + LogL_31 + LogL_32 + LogL_33 + LogL_34 + LogL_35 + LogL_36 + LogL_37 + LogL_38 + LogL_39 + LogL_40 + LogL_41 + LogL_42 + LogL_43 + LogL_measure - LogL_measure_01 - LogL_measure_02 - LogL_measure_03
+      - sortby: LogLike_total
+      - profile:
+          bin: 150
+          coordinates:
+            x:
+              expr: 0.5 * (np.abs(N23)**2 + np.abs(N24)**2) + np.abs(N22)**2
+              name: xx
+            y:
+              expr: np.abs(N23)**2 + np.abs(N24)**2
+              name: yy
+            z:
+              expr: LogLike_total
+              name: DNLL
+          objective: max
+          grid_points: ternary
+    axes: axtri
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: LogLike_total
+    style:
+      cmap: chrisB
+      vmin: -3.09
+      vmax: 3.09
+
+# Profile Likelihood Ternary Plot N3-component
+- name: N3_comps_prof
+  enable: false
+  style:
+  - gambit_2x1
+  - TernaryCmap
+  frame:
+    axtri:
+      labels:
+        left: $|N_{31}|^2$
+        bottom: $|N_{32}|^2$
+        right: $|N_{33}|^2 + |N_{34}|^2$
+    axc:
+      label:
+        ylabel: $\ln{\mathcal{L}}$
+  legend:
+    loc: 1
+  layers:
+  - name: triscatter
+    data:
+    - source: h5
+      transform:
+      - add_column:
+          name: LogLike_total
+          expr: LogL_01 + LogL_02 + LogL_03 + LogL_04 + LogL_05 + LogL_06 + LogL_07 + LogL_08 + LogL_09 + LogL_10 + LogL_11 + LogL_12 + LogL_13 + LogL_14 + LogL_15 + LogL_16 + LogL_17 + LogL_18 + LogL_19 + LogL_20 + LogL_21 + LogL_22 + LogL_23 + LogL_24 + LogL_25 + LogL_26 + LogL_27 + LogL_28 + LogL_29 + LogL_30 + LogL_31 + LogL_32 + LogL_33 + LogL_34 + LogL_35 + LogL_36 + LogL_37 + LogL_38 + LogL_39 + LogL_40 + LogL_41 + LogL_42 + LogL_43 + LogL_measure - LogL_measure_01 - LogL_measure_02 - LogL_measure_03
+      - sortby: LogLike_total
+      - profile:
+          bin: 150
+          coordinates:
+            x:
+              expr: 0.5 * (np.abs(N33)**2 + np.abs(N34)**2) + np.abs(N32)**2
+              name: xx
+            y:
+              expr: np.abs(N33)**2 + np.abs(N34)**2
+              name: yy
+            z:
+              expr: LogLike_total
+              name: DNLL
+          objective: max
+          grid_points: ternary
+    axes: axtri
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: LogLike_total
+    style:
+      cmap: chrisB
+      vmin: -3.09
+      vmax: 3.09
+
+# Profile Likelihood Ternary Plot N4-component
+- name: N4_comps_prof
+  enable: false
+  style:
+  - gambit_2x1
+  - TernaryCmap
+  frame:
+    axtri:
+      labels:
+        left: $|N_{41}|^2$
+        bottom: $|N_{42}|^2$
+        right: $|N_{43}|^2 + |N_{44}|^2$
+    axc:
+      label:
+        ylabel: $\ln{\mathcal{L}}$
+  legend:
+    loc: 1
+  layers:
+  - name: triscatter
+    data:
+    - source: h5
+      transform:
+      - add_column:
+          name: LogLike_total
+          expr: LogL_01 + LogL_02 + LogL_03 + LogL_04 + LogL_05 + LogL_06 + LogL_07 + LogL_08 + LogL_09 + LogL_10 + LogL_11 + LogL_12 + LogL_13 + LogL_14 + LogL_15 + LogL_16 + LogL_17 + LogL_18 + LogL_19 + LogL_20 + LogL_21 + LogL_22 + LogL_23 + LogL_24 + LogL_25 + LogL_26 + LogL_27 + LogL_28 + LogL_29 + LogL_30 + LogL_31 + LogL_32 + LogL_33 + LogL_34 + LogL_35 + LogL_36 + LogL_37 + LogL_38 + LogL_39 + LogL_40 + LogL_41 + LogL_42 + LogL_43 + LogL_measure - LogL_measure_01 - LogL_measure_02 - LogL_measure_03
+      - sortby: LogLike_total
+      - profile:
+          bin: 150
+          coordinates:
+            x:
+              expr: 0.5 * (np.abs(N43)**2 + np.abs(N44)**2) + np.abs(N42)**2
+              name: xx
+            y:
+              expr: np.abs(N43)**2 + np.abs(N44)**2
+              name: yy
+            z:
+              expr: LogLike_total
+              name: DNLL
+          objective: max
+          grid_points: ternary
+    axes: axtri
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: LogLike_total
+    style:
+      cmap: chrisB
+      vmin: -3.09
+      vmax: 3.09
+
+
+#  - name: scatter_exc1
+#    data:
+#    - source: tri_profile
+#    axes: ax
+#    method: scatter
+#    coordinates:
+#      x: {expr: xx}
+#      y: {expr: yy}
+#    style:
+#      s: 0.1
+#      alpha: 0.2
+#      marker: '.'
+#      c: "#FF42A1"
 
 
 output:
-  dir: ./Workshop/SUSYRun2
+  dir: ./Workshop/SUSYRun2_GAMBIT
   dpi: 600
   formats:
   - png
 project:
   name: JarvisPLOT Demo (minimal)
-version: 0.3
+version: 0.4

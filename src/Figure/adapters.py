@@ -7,7 +7,7 @@ import os
 import json
 
 from matplotlib.axes import Axes
-from matplotlib.collections import PolyCollection
+from matplotlib.collections import PolyCollection, LineCollection
 #
 from .helper import _auto_clip, _mask_by_extend, voronoi_finite_polygons_2d, _clip_poly_to_rect
 
@@ -59,8 +59,19 @@ class StdAxesAdapter:
 
     def plot(self, *args, **kwargs):
         x, y = kwargs.pop("x"), kwargs.pop("y")
+        # print("x:", x, "y:", y)
         kw = self._merge("plot", kwargs)
-        artists = self.ax.plot(x, y, **kw)
+        fmt = kw.pop("fmt", None)
+        if fmt is not None: 
+            artists = self.ax.plot(x, y, fmt, **kw)
+        else: 
+            artists = self.ax.plot(x, y, **kw)
+        return _auto_clip(artists, self.ax, self._clip_path)
+
+    def fill(self, **kwargs):
+        x, y = kwargs.pop("x"), kwargs.pop("y")
+        kw = self._merge("fill", kwargs)
+        artists = self.ax.fill(x, y, **kw)
         return _auto_clip(artists, self.ax, self._clip_path)
 
     def contour(self, *args, **kwargs):
@@ -154,10 +165,14 @@ class StdAxesAdapter:
         x = _np.asarray(x)
         y = _np.asarray(y)
         z = _np.asarray(z)
+        # print(x, y, z)
+        # self.ax.scatter(x, y, s=0.3, marker='.', c="#FF42A1", zorder=10, edgecolors="none")
         vmin = kwargs.pop("vmin", None)
         vmax = kwargs.pop("vmax", None)
         edgecolor = kwargs.pop("edgecolor", 'none')
-        lw = kwargs.pop("linewidth", kwargs.pop("linewidths", 0.0))
+        draw_edges = kwargs.pop("draw_edges", True)
+        antialiased = kwargs.pop("antialiased", False)
+        orig_lw = kwargs.pop("linewidth", kwargs.pop("linewidths", 0.0))
         extent = kwargs.pop("extent", None)   # data-space
         radius = kwargs.pop("radius", None)
         nan_color = kwargs.pop("nan_color", None)
@@ -166,6 +181,7 @@ class StdAxesAdapter:
         # ---- derive view box & transforms from axes ----
         xlim = self.ax.get_xlim()
         ylim = self.ax.get_ylim()
+        # print(xlim, ylim)
         if extent is None:
             extent = (min(xlim), max(xlim), min(ylim), max(ylim))
         xmin, xmax, ymin, ymax = extent
@@ -228,10 +244,17 @@ class StdAxesAdapter:
 
         from matplotlib.collections import PolyCollection
         artists = []
-        if polys_bg:
-            pc_bg = PolyCollection(polys_bg, facecolor=(nan_color if nan_color is not None else self.ax.get_facecolor()),
-                                   edgecolor=edgecolor, linewidth=lw)
-            artists.append(self.ax.add_collection(pc_bg))
+        # if polys_bg:
+        #     pc_bg = PolyCollection(
+        #         polys_bg,
+        #         facecolor=(nan_color if nan_color is not None else self.ax.get_facecolor()),
+        #         edgecolor='none',
+        #         linewidth=0.0,
+        #         antialiased=antialiased,
+        #     )
+        #     if zorder is not None:
+        #         pc_bg.set_zorder(zorder)
+        #     artists.append(self.ax.add_collection(pc_bg))
 
         from matplotlib import colors as mcolors
         norm = kwargs.pop("norm", None)
@@ -242,16 +265,28 @@ class StdAxesAdapter:
             polys_valid,
             array=_np.asarray(zvals_valid),
             cmap=cmap,
-            edgecolor=edgecolor,
-            linewidth=lw,
+            edgecolor='none',
+            linewidth=0.0,
             norm=norm,
+            antialiased=antialiased,
         )
         if zorder is not None:
             pc.set_zorder(zorder)
-        if norm is None and (vmin is not None or vmax is not None):
-            pc.set_clim(vmin=vmin, vmax=vmax )
 
         artists.append(self.ax.add_collection(pc))
+
+        # from matplotlib.collections import LineCollection
+        # if draw_edges and orig_lw > 0.0 and edgecolor not in (None, 'none'):
+        #     lc = LineCollection(
+        #         polys_valid,
+        #         colors=edgecolor,
+        #         linewidths=orig_lw,
+        #         antialiased=antialiased,
+        #     )
+        #     if zorder is not None:
+        #         lc.set_zorder(zorder + 0.1 if isinstance(zorder, (int, float)) else zorder)
+        #     artists.append(self.ax.add_collection(lc))
+
         return _auto_clip(artists, self.ax, self._clip_path)
 
     # 为了兼容现有框架，暴露底层的方法/属性

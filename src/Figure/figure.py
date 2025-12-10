@@ -1,5 +1,5 @@
-#!/usr/bin/env python3 
-
+#!/usr/bin/env python3
+from copy import deepcopy
 from typing import Optional, Mapping
 import numpy as np 
 import os, sys 
@@ -27,6 +27,63 @@ class Figure:
         except Exception:
             return False
 
+    def _apply_axis_endpoints(self, ax_obj, axis_cfg: dict, which: str):
+        """
+        which: 'x' or 'y'
+        axis_cfg: self.frame['ax'].get('xaxis', {}) / 'yaxis'
+        """
+        if not isinstance(axis_cfg, dict):
+            return
+
+        # Resolve underlying Matplotlib Axes (StdAxesAdapter or plain Axes)
+        target = ax_obj.ax if hasattr(ax_obj, "ax") else ax_obj
+
+        if which == 'x':
+            ticks = target.xaxis.get_major_ticks()
+            locs  = target.xaxis.get_majorticklocs()
+        else:
+            ticks = target.yaxis.get_major_ticks()
+            locs  = target.yaxis.get_majorticklocs()
+        if not ticks:
+            return
+
+        # Get axis limits for boundary check
+        if which == 'x':
+            lim0, lim1 = target.get_xlim()
+        else:
+            lim0, lim1 = target.get_ylim()
+
+        min_cfg = axis_cfg.get("min_endpoints", {})
+        max_cfg = axis_cfg.get("max_endpoints", {})
+        width   = abs(lim0 - lim1)
+
+        # print(ticks)
+        # 第一个 tick = min 端点
+        t0 = ticks[0]
+        # Check whether first tick is at the lower boundary
+        t0_loc = locs[0]
+
+        if abs(t0_loc - lim0) < 1e-3 * width:
+            if min_cfg.get("tick") is False:
+                t0.tick1line.set_visible(False)
+                t0.tick2line.set_visible(False)
+            if min_cfg.get("label") is False:
+                t0.label1.set_visible(False)
+                t0.label2.set_visible(False)
+
+        # 最后一个 tick = max 端点
+        t1 = ticks[-1]
+        # Check whether last tick is at the upper boundary
+        t1_loc = locs[-1]
+
+        if abs(t1_loc - lim1) < 1e-3 * width:
+            if max_cfg.get("tick") is False:
+                t1.tick1line.set_visible(False)
+                t1.tick2line.set_visible(False)
+            if max_cfg.get("label") is False:
+                t1.label1.set_visible(False)
+                t1.label2.set_visible(False)
+                
     def _apply_auto_ticks(self, ax_obj, which: str):
         """Lightweight auto-tick post-processing at finalize stage.
         For x: rotate long labels. For y: use ScalarFormatter sci notation.
@@ -333,7 +390,7 @@ class Figure:
             grid    = prof.get("grid_points", "rect")
             gdata   = None 
 
-            radius  = 1.0 / bin 
+            radius  = 1 / bin 
             if "expr" in coors['x'].keys():
                 x = self._eval_series(df, coors['x'])
             else: 
@@ -375,27 +432,28 @@ class Figure:
                 yind = coors['y'].get("name", "y") 
 
             # mapping x, y, z to range [0, 1]
-            if "lim" in coors['x'].keys():
-                if xscale == "log":
-                    x = (np.log(x) - np.log(xlim[0])) / (np.log(xlim[1]) - np.log(xlim[0])) 
-                else:   # linear scale 
-                    x = (x - xlim[0]) / (xlim[1] - xlim[0])
+            # if "lim" in coors['x'].keys():
+            #     if xscale == "log":
+            #         x = (np.log(x) - np.log(xlim[0])) / (np.log(xlim[1]) - np.log(xlim[0]))
+            #     else:   # linear scale
+            #         x = (x - xlim[0]) / (xlim[1] - xlim[0])
 
-            if "lim" in coors['y'].keys():
-                if yscale == "log":
-                    y = (np.log(y) - np.log(ylim[0])) / (np.log(ylim[1]) - np.log(ylim[0])) 
-                else:   # linear scale 
-                    y = (y - ylim[1]) / (ylim[0] - ylim[1])             
+            # if "lim" in coors['y'].keys():
+            #     if yscale == "log":
+            #         y = (np.log(y) - np.log(ylim[0])) / (np.log(ylim[1]) - np.log(ylim[0]))
+            #     else:   # linear scale
+            #         y = (y - ylim[1]) / (ylim[0] - ylim[1])
                                        
-            if zscale == "log":
-                z = (np.log(z) - np.log(zlim[0])) / (np.log(zlim[1]) - np.log(zlim[0])) 
-            else:   # linear scale 
-                z = (z - zlim[0]) / (zlim[1] - zlim[0])      
+            # if zscale == "log":
+            #     z = (np.log(z) - np.log(zlim[0])) / (np.log(zlim[1]) - np.log(zlim[0])) 
+            # else:   # linear scale 
+            #     z = (z - zlim[0]) / (zlim[1] - zlim[0])      
 
             # profiling will add new columns into dataframe, so that can be used in the next step
             df[xind] = x 
             df[yind] = y
-            df[zind] = z    
+            df[zind] = z
+            # print(x.min(), x.max(), y.min(), y.max(), z.min(), z.max())
 
 
             if grid == "ternary":
@@ -419,8 +477,8 @@ class Figure:
                 })
 
             elif grid == "rect":
-                xx = np.linspace(xlim[0], xlim[1], 2*bin+1)
-                yy = np.linspace(ylim[0], ylim[1], 2*bin+1)
+                xx = np.linspace(xlim[0], xlim[1], bin+1)
+                yy = np.linspace(ylim[0], ylim[1], bin+1)
                 xg, yg = np.meshgrid(xx, yy)
 
                 gdata = pd.DataFrame({
@@ -437,10 +495,28 @@ class Figure:
                 df = df.sort_values(zind, ascending=False).reset_index(drop=True)
                 self.logger.error("Sort dataset method: objective: {} not support, using default value -> 'max'".format(obj))
             df = pd.concat([df, gdata], ignore_index=True)
-            idx = np.array(df.index)
-            xx  = np.array(df[xind])
-            yy  = np.array(df[yind])
-            zz  = np.array(df[zind])
+                        
+            idx = deepcopy(np.array(df.index))
+            xx  = deepcopy(np.array(df[xind]))
+            yy  = deepcopy(np.array(df[yind]))
+            zz  = deepcopy(np.array(df[zind]))
+            # mapping xx, yy, zz to range [0, 1]
+            if xscale == "log":
+                xx = (np.log(xx) - np.log(xlim[0])) / (np.log(xlim[1]) - np.log(xlim[0]))
+            else:  # linear scale
+                xx = (xx - xlim[0]) / (xlim[1] - xlim[0])
+
+            if yscale == "log":
+                yy = (np.log(yy) - np.log(ylim[0])) / (np.log(ylim[1]) - np.log(ylim[0]))
+            else:  # linear scale
+                yy = (yy - ylim[0]) / (ylim[1] - ylim[0])
+
+            if zscale == "log":
+                zz = (np.log(zz) - np.log(zlim[0])) / (np.log(zlim[1]) - np.log(zlim[0]))
+            else:  # linear scale
+                zz = (zz - zlim[0]) / (zlim[1] - zlim[0])
+
+            # print(radius)
             msk = np.full(idx.shape, True)
             msk = profile_bridson_sorted(idx, xx, yy, zz, radius, msk)
             df = df.iloc[idx[msk]]
@@ -505,8 +581,12 @@ class Figure:
     
     @axlogo.setter
     def axlogo(self, kwgs):
-        if "axlogo" not in self.axes.keys(): 
-            self.axes['axlogo'] = self.fig.add_axes(**kwgs)
+        if "axlogo" not in self.axes.keys():
+            axtp = self.fig.add_axes(**kwgs)
+            axtp.set_zorder(200)
+            axtp.patch.set_alpha(0) 
+            
+            self.axes['axlogo'] = axtp
             self.axes['axlogo'].needs_finalize = False
             self.axes['axlogo'].status = 'finalized'
 
@@ -519,9 +599,9 @@ class Figure:
             if self.frame['axlogo'].get("text"):
                 for txt in self.frame['axlogo']['text']:
                     self.axlogo.text(**txt,  transform=self.axlogo.transAxes)
-            else: 
-                self.axlogo.text(1., 0., "Jarvis-HEP", ha="left", va='bottom', color="black", fontfamily="Fira code", fontsize="x-small", fontstyle="normal", fontweight="bold", transform=self.axlogo.transAxes)
-                self.axlogo.text(1., 0.9, "  Powered by", ha="left", va='top', color="black", fontfamily="Fira code", fontsize="xx-small", fontstyle="normal", fontweight="normal", transform=self.axlogo.transAxes)
+            # else: 
+                # self.axlogo.text(1., 0., "Jarvis-HEP", ha="left", va='bottom', color="black", fontfamily="Fira code", fontsize="x-small", fontstyle="normal", fontweight="bold", transform=self.axlogo.transAxes)
+                # self.axlogo.text(1., 0.9, "  Powered by", ha="left", va='top', color="black", fontfamily="Fira code", fontsize="xx-small", fontstyle="normal", fontweight="normal", transform=self.axlogo.transAxes)
 
     @property
     def axtri(self):
@@ -729,6 +809,8 @@ class Figure:
             self.axc.tick_params(**self.frame['axc']['ticks'].get('minor', {}))
 
             self.axc.set_ylabel(**self.frame['axc'].get('label', {}))
+            if self.frame['axc'].get('ylabel_coords'): 
+                self.axc.yaxis.set_label_coords(self.frame['axc']['ylabel_coords']['x'], self.frame['axc']['ylabel_coords']['y'])
             # Apply manual ticks for colorbar (y-axis) at initialization if provided
             cbar_ticks_cfg = self.frame.get('axc', {}).get('ticks', {}).get('y', {})
             self._apply_manual_ticks(self.axc, 'y', cbar_ticks_cfg)
@@ -743,13 +825,20 @@ class Figure:
     def ax(self, kwgs):
         if "ax" not in self.axes.keys():
             raw_ax = self.fig.add_axes(**kwgs)
+            if "facecolor" in kwgs.keys():
+                raw_ax.set_facecolor(kwgs['facecolor'])
             adapter = StdAxesAdapter(raw_ax)
             adapter._type = "rect"
             adapter.layers = []
             adapter._legend = self.frame['ax'].get("legend", False)
             self.axes['ax'] = adapter 
             adapter.status = 'configured'
-
+        
+        if self.frame['ax'].get("spines"): 
+            if "color" in self.frame['ax']['spines']:
+                for s in self.axes['ax'].spines.values():
+                    s.set_color(self.frame['ax']['spines']['color'])
+                    
         if self.frame['ax'].get("yscale", "").lower() == 'log':
             self.ax.set_yscale("log")
             from matplotlib.ticker import LogLocator
@@ -771,6 +860,10 @@ class Figure:
                 return float(v)
             except Exception:
                 return v
+
+        if self.frame["ax"].get("text"): 
+            for txt in self.frame["ax"]["text"]:
+                self.ax.text(**txt, transform=self.ax.transAxes)
 
         xlim = self.frame["ax"].get("xlim")
         if xlim:
@@ -797,10 +890,14 @@ class Figure:
         self._apply_manual_ticks(self.ax, "x", ax_ticks_cfg.get('x', {}))
         self._apply_manual_ticks(self.ax, "y", ax_ticks_cfg.get('y', {}))
 
+
         self.ax.tick_params(**self.frame['ax']['ticks'].get("both", {}))
         self.ax.tick_params(**self.frame['ax']['ticks'].get("major", {}))
         self.ax.tick_params(**self.frame['ax']['ticks'].get("minor", {}))
         
+        self._apply_axis_endpoints(self.axes['ax'], self.frame['ax'].get('xaxis', {}), "x")
+        self._apply_axis_endpoints(self.axes['ax'], self.frame['ax'].get('yaxis', {}), "y")
+
         # ---- Finalize logic with auto-ticks injection ----
         if getattr(self.ax, 'needs_finalize', True) and hasattr(self.ax, 'finalize'):
             orig_finalize = self.ax.finalize
@@ -948,9 +1045,9 @@ class Figure:
                     self._apply_auto_ticks(ax, 'x')
                 if not self._has_manual_ticks('ax', 'y'):
                     self._apply_auto_ticks(ax, 'y')
-            elif name == 'axc':
-                if not self._has_manual_ticks('axc', 'y'):
-                    self._apply_auto_ticks(ax, 'y')
+            # elif name == 'axc':
+            #     if not self._has_manual_ticks('axc', 'y'):
+                    # self._apply_auto_ticks(ax, 'y')
             if getattr(ax, 'needs_finalize', True) and hasattr(ax, 'finalize'):
                 try:
                     ax.finalize()
@@ -1062,6 +1159,7 @@ class Figure:
     METHOD_DISPATCH = {
         "scatter": "scatter",
         "plot": "plot",
+        "fill": "fill",
         "contour": "contour",
         "contourf": "contourf",
         "imshow": "imshow",
@@ -1102,9 +1200,8 @@ class Figure:
         if axc is None or not hasattr(axc, "_cb"):
             return style
 
-        s = dict(style)  
-        uses_color = bool(style.get("cmap")) or ("c" in coor)  
-        
+        s = dict(style)
+        uses_color = bool(style.get("cmap")) or ("c" in coor)
         if not uses_color:
             return style
         self.axc._cb["cmap"] = s.get("cmap")
@@ -1112,10 +1209,10 @@ class Figure:
         # ---- 1) records vmin and vmax ----
         z = None
         if self.axc._cb["vmin"] is None:
-            if ("vmin" in s and isinstance(s['vmin'], float)):
+            if ("vmin" in s and isinstance(s['vmin'], (int, float))):
                 self.axc._cb['vmin'] = s['vmin']
-            else: 
-                if z is None: 
+            else:
+                if z is None:
                     if "z" in coor and isinstance(coor["z"], dict) and "expr" in coor["z"]:
                         z = self._eval_series(df, {"expr": coor["z"]["expr"]})
                     elif "c" in coor and isinstance(coor["c"], dict) and "expr" in coor["c"]:
@@ -1126,10 +1223,10 @@ class Figure:
                         self.axc._cb["vmin"] = float(np.min(z))
 
         if self.axc._cb["vmax"] is None:
-            if ("vmax" in s and isinstance(s['vmax'], float)):
+            if ("vmax" in s and isinstance(s['vmax'], (int, float))):
                 self.axc._cb['vmax'] = s['vmax']
-            else: 
-                if z is None: 
+            else:
+                if z is None:
                     if "z" in coor and isinstance(coor["z"], dict) and "expr" in coor["z"]:
                         z = self._eval_series(df, {"expr": coor["z"]["expr"]})
                     elif "c" in coor and isinstance(coor["c"], dict) and "expr" in coor["c"]:
@@ -1139,20 +1236,75 @@ class Figure:
                     if z.size:
                         self.axc._cb["vmax"] = float(np.max(z))
 
-        # ---- 2) Lazy creating norm ----
-        if self.axc._cb["norm"] is None and (self.axc._cb["vmin"] is not None) and (self.axc._cb["vmax"] is not None):
+        # ---- 2) Resolve/attach norm (priority: explicit 'norm' in style) ----
+        if (self.axc._cb["vmin"] is not None) and (self.axc._cb["vmax"] is not None):
             vmin, vmax = self.axc._cb["vmin"], self.axc._cb["vmax"]
-            mode = (self.axc._cb["mode"] or "auto").lower()
-            if mode == "log":
-                # eps = 1e-12
-                # vmin = max(eps, vmin)
-                self.axc._cb["norm"] = mcolors.LogNorm(vmin=vmin, vmax=vmax)
-                self.axc._cb['mode'] = "log"
-            elif mode == "diverging" and (vmin < 0 < vmax):
-                self.axc._cb["norm"] = mcolors.TwoSlopeNorm(vcenter=0.0, vmin=vmin, vmax=vmax)
-                self.axc._cb['mode'] = "diverging"
+
+            def _resolve_norm(nv, *, vmin=None, vmax=None):
+                """Turn user-specified 'norm' into a matplotlib.colors.Normalize instance."""
+                if nv is None:
+                    return None
+                # Already a Normalize subclass
+                if isinstance(nv, mcolors.Normalize):
+                    return nv
+                # String shorthand, e.g. "LogNorm", "TwoSlopeNorm", "Normalize"
+                if isinstance(nv, str):
+                    key = nv.strip().lower()
+                    if key in {"log", "lognorm"}:
+                        return mcolors.LogNorm(vmin=vmin, vmax=vmax)
+                    if key in {"twoslopenorm", "diverging"}:
+                        # default vcenter=0 for diverging data; user can override via dict form
+                        return mcolors.TwoSlopeNorm(vcenter=0.0, vmin=vmin, vmax=vmax)
+                    if key in {"norm", "normalize", "linear"}:
+                        return mcolors.Normalize(vmin=vmin, vmax=vmax)
+                    # Fallback: unknown string → default linear
+                    return mcolors.Normalize(vmin=vmin, vmax=vmax)
+                # Dict form: {"type": "LogNorm", "vmin": ..., "vmax": ..., ...}
+                if isinstance(nv, dict):
+                    t = str(nv.get("type", "Normalize")).strip().lower()
+                    # Prefer explicit vmin/vmax in dict; otherwise use inferred values
+                    _vmin = nv.get("vmin", vmin)
+                    _vmax = nv.get("vmax", vmax)
+                    if t in {"log", "lognorm"}:
+                        return mcolors.LogNorm(vmin=_vmin, vmax=_vmax)
+                    if t in {"twoslopenorm", "diverging"}:
+                        vcenter = nv.get("vcenter", 0.0)
+                        return mcolors.TwoSlopeNorm(vcenter=vcenter, vmin=_vmin, vmax=_vmax)
+                    if t in {"symlog", "symlognorm"}:
+                        # Optional parameters for SymLogNorm
+                        linthresh = nv.get("linthresh", 1.0)
+                        linscale = nv.get("linscale", 1.0)
+                        base = nv.get("base", 10)
+                        return mcolors.SymLogNorm(linthresh=linthresh, linscale=linscale, base=base, vmin=_vmin, vmax=_vmax)
+                    # Default linear
+                    return mcolors.Normalize(vmin=_vmin, vmax=_vmax)
+                # Anything else → default linear
+                return mcolors.Normalize(vmin=vmin, vmax=vmax)
+
+            # Priority 1: explicit norm in style
+            user_norm = style.get("norm", None)
+            resolved = _resolve_norm(user_norm, vmin=vmin, vmax=vmax)
+
+            # If no explicit norm provided, keep existing (if any) or use linear as default
+            if resolved is None:
+                if self.axc._cb["norm"] is None:
+                    self.axc._cb["norm"] = mcolors.Normalize(vmin=vmin, vmax=vmax)
             else:
-                self.axc._cb["norm"] = mcolors.Normalize(vmin=vmin, vmax=vmax)
+                self.axc._cb["norm"] = resolved
+
+            # Also store the resolved norm back into the outgoing style so that plotting receives a proper Normalize
+            if self.axc._cb["norm"] is not None:
+                s["norm"] = self.axc._cb["norm"]
+
+            # Set a backward-compatible 'mode' tag based on the resolved norm
+            if isinstance(self.axc._cb["norm"], mcolors.LogNorm):
+                self.axc._cb['mode'] = "log"
+            elif isinstance(self.axc._cb["norm"], mcolors.TwoSlopeNorm):
+                self.axc._cb['mode'] = "diverging"
+            elif isinstance(self.axc._cb["norm"], mcolors.SymLogNorm):
+                # Mark as 'log' to trigger log-style minor locators on colorbar if needed
+                self.axc._cb['mode'] = "log"
+            else:
                 self.axc._cb['mode'] = "norm"
 
         if method_key in ("contour","contourf","tricontour","tricontourf") and self.axc._cb["levels"] is None:
@@ -1161,7 +1313,7 @@ class Figure:
                 self.axc._cb["levels"] = np.linspace(self.axc._cb["vmin"], self.axc._cb["vmax"], lv)
             elif hasattr(lv, "__len__"):
                 self.axc._cb["levels"] = lv
-        self.axc._cb["used"] = uses_color 
+        self.axc._cb["used"] = uses_color
         return s
 
 
@@ -1214,6 +1366,7 @@ class Figure:
             coor = layer_info.get("coor", {})
             try:
                 style = self._cb_collect_and_attach(style, coor, method_key, df)
+                # print(style)
                 self.logger.debug("Successful loading colorbar style")
             except Exception as _e:
                 self._logger.debug(f"colorbar lazy-attach failed: {_e}")
@@ -1239,8 +1392,21 @@ class Figure:
                     raise ValueError("Rectangular layer must define coordinates: {x,y} with exprs.")
 
                 for kk, vv in coor.items():
-                    style[kk] = self._eval_series(df, vv)
-
+                    # style[kk] = self._eval_series(df, vv)
+                    # Mode 1：expr → DataFrame evaluation
+                    if isinstance(vv, dict) and "expr" in vv:
+                        if df is None:
+                            raise ValueError(
+                                f"Layer '{layer_info.get('name', '')}' defines expression-based "
+                                f"coordinate for '{kk}' but has no data source."
+                            )
+                        style[kk] = self._eval_series(df, vv)
+                    else:
+                        # Mode 2：(list/tuple/ndarray/scalar) 
+                        style[kk] = vv
+                # if "norm" in style.keys():
+                #     style = self.load_norm(style)
+                # print("Line 1262 -> ", style)
                 return method(**style)
 
         else:

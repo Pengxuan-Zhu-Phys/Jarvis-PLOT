@@ -63,7 +63,7 @@
                 "solid_joinstyle": "miter",
                 "clip_on": false,
                 "c": "#21171A",
-                "zorder": 5
+                "zorder": 0
             },
             "grid": {
                 "sep": 0.1,
@@ -148,6 +148,7 @@
                 "fontfamily": "STIXGeneral"
             },
             "ticks": {
+                "ticks_position":   "left",
                 "both": {
                     "labelsize": 6,
                     "direction": "in",
