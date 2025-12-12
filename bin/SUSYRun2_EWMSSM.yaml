@@ -4305,6 +4305,130 @@ Figures:
       edgecolor: none
       zorder: 1.2
 
+- name: mC1mN1_BinoN1_HinoN2_pure_ProfLogL
+  enable: false
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: $m_{\tilde{\chi}_1^\pm}~({\rm TeV})$
+        y: $m_{\tilde{\chi}_1^0}~({\rm TeV})$
+      xlim:
+      - 0
+      - 1.4
+      ylim:
+      - 0
+      - 1.4
+      text:
+      - x: 0.75
+        y: 1.0018
+        s: EWMSSM.
+        ha: right
+        va: bottom
+        fontfamily: STIXGeneral
+        fontsize: x-small
+      - x: 0.05
+        y: 0.85
+        s: All searches and measurement
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+      - x: 0.05
+        y: 0.75
+        s: Higgsino-dominated $\tilde{\chi}_2^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+      - x: 0.05
+        y: 0.65
+        s: Bino-dominated $\tilde{\chi}_1^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral        
+    axc:
+      label:
+        ylabel: $\ln{\mathcal{L}}$
+  layers:
+  - name: prof
+    data:
+    - source: h5
+      transform:
+      - add_column:
+          name: LogLike_total
+          expr: LogL_01 + LogL_02 + LogL_03 + LogL_04 + LogL_05 + LogL_06 + LogL_07
+            + LogL_08 + LogL_09 + LogL_10 + LogL_11 + LogL_12 + LogL_13 + LogL_14
+            + LogL_15 + LogL_16 + LogL_17 + LogL_18 + LogL_19 + LogL_20 + LogL_21
+            + LogL_22 + LogL_23 + LogL_24 + LogL_25 + LogL_26 + LogL_27 + LogL_28
+            + LogL_29 + LogL_30 + LogL_31 + LogL_32 + LogL_33 + LogL_34 + LogL_35
+            + LogL_36 + LogL_37 + LogL_38 + LogL_39 + LogL_40 + LogL_41 + LogL_42
+            + LogL_measure - LogL_measure_01 - LogL_measure_02 - LogL_measure_03
+      - filter: (np.abs(N11)**2 > np.abs(N12)**2) & (np.abs(N11)**2 > np.abs(N13)**2 + np.abs(N14)**2) 
+      - filter: (np.abs(N23)**2 + np.abs(N24)**2 > 0.9) 
+      - filter: wC1p > 1.97e-14
+      - sortby: LogLike_total
+      - profile:
+          bin: 150
+          coordinates:
+            x:
+              expr: abs(mC1)/1000
+              scale: linear
+              name: xx
+              lim:
+              - 0
+              - 1.4
+            y:
+              expr: abs(mN1)/1000
+              scale: linear
+              name: yy
+              lim:
+              - 0
+              - 1.4
+            z:
+              expr: np.exp(LogLike_total)
+              scale: linear
+              name: z0
+          objective: max
+          grid_points: rect
+    share_data: mC1mN1_BinoN1_HinoN2_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: LogLike_total
+    style:
+      cmap: chrisB
+      vmin: -3.09
+      vmax: 3.09
+  - name: fillbounds
+    axes: ax
+    method: fill
+    coordinates:
+      x:
+      - 0.0
+      - 1.4
+      - 0.0
+      - 0.0
+      y:
+      - 0.0
+      - 1.4
+      - 1.4
+      - 0.0
+    style:
+      facecolor: '#808080'
+      edgecolor: none
+      zorder: 1.2
+
+
+
 - name: mC1mN1_BinoN1_WinoN2_ProfLogL
   enable: false
   style:
@@ -4395,6 +4519,128 @@ Figures:
           objective: max
           grid_points: rect
     share_data: mC1mN1_BinoN1_WinoN2_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: LogLike_total
+    style:
+      cmap: chrisB
+      vmin: -3.09
+      vmax: 3.09
+  - name: fillbounds
+    axes: ax
+    method: fill
+    coordinates:
+      x:
+      - 0.0
+      - 1.4
+      - 0.0
+      - 0.0
+      y:
+      - 0.0
+      - 1.4
+      - 1.4
+      - 0.0
+    style:
+      facecolor: '#808080'
+      edgecolor: none
+      zorder: 1.2
+
+- name: mN2mN1_BinoN1_HinoN2_pure_ProfLogL
+  enable: true
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: $m_{\tilde{\chi}_2^0}~({\rm TeV})$
+        y: $m_{\tilde{\chi}_1^0}~({\rm TeV})$
+      xlim:
+      - 0
+      - 1.4
+      ylim:
+      - 0
+      - 1.4
+      text:
+      - x: 0.75
+        y: 1.0018
+        s: EWMSSM.
+        ha: right
+        va: bottom
+        fontfamily: STIXGeneral
+        fontsize: x-small
+      - x: 0.05
+        y: 0.85
+        s: All searches and measurement
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+      - x: 0.05
+        y: 0.75
+        s: Higgsino-dominated $\tilde{\chi}_2^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+      - x: 0.05
+        y: 0.65
+        s: Bino-dominated $\tilde{\chi}_1^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral        
+    axc:
+      label:
+        ylabel: $\ln{\mathcal{L}}$
+  layers:
+  - name: prof
+    data:
+    - source: h5
+      transform:
+      - add_column:
+          name: LogLike_total
+          expr: LogL_01 + LogL_02 + LogL_03 + LogL_04 + LogL_05 + LogL_06 + LogL_07
+            + LogL_08 + LogL_09 + LogL_10 + LogL_11 + LogL_12 + LogL_13 + LogL_14
+            + LogL_15 + LogL_16 + LogL_17 + LogL_18 + LogL_19 + LogL_20 + LogL_21
+            + LogL_22 + LogL_23 + LogL_24 + LogL_25 + LogL_26 + LogL_27 + LogL_28
+            + LogL_29 + LogL_30 + LogL_31 + LogL_32 + LogL_33 + LogL_34 + LogL_35
+            + LogL_36 + LogL_37 + LogL_38 + LogL_39 + LogL_40 + LogL_41 + LogL_42
+            + LogL_measure - LogL_measure_01 - LogL_measure_02 - LogL_measure_03
+      - filter: (np.abs(N11)**2 > np.abs(N12)**2) & (np.abs(N11)**2 > np.abs(N13)**2 + np.abs(N14)**2) 
+      - filter: (np.abs(N23)**2 + np.abs(N24)**2 > 0.9) 
+      - filter: wC1p > 1.97e-14
+      - sortby: LogLike_total
+      - profile:
+          bin: 150
+          coordinates:
+            x:
+              expr: abs(mN2)/1000
+              scale: linear
+              name: xx
+              lim:
+              - 0
+              - 1.4
+            y:
+              expr: abs(mN1)/1000
+              scale: linear
+              name: yy
+              lim:
+              - 0
+              - 1.4
+            z:
+              expr: np.exp(LogLike_total)
+              scale: linear
+              name: z0
+          objective: max
+          grid_points: rect
+    share_data: mN2mN1_BinoN1_HinoN2_profile
     axes: ax
     method: voronoi
     coordinates:
@@ -4548,6 +4794,7 @@ Figures:
       facecolor: '#808080'
       edgecolor: none
       zorder: 1.2
+
 
 - name: mN2mN1_BinoN1_WinoN2_ProfLogL
   enable: false
