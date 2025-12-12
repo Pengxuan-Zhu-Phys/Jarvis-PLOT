@@ -327,10 +327,27 @@ class StdAxesAdapter:
 
 # —— Ternary 适配器：在 Std 基础上增加 (a,b,c)->(x,y) 投影 ——
 class TernaryAxesAdapter(StdAxesAdapter):
-    def __init__(self, ax: Axes, defaults: Optional[Dict[str, Dict[str, Any]]] = None,
+    def __init__(self, ax: Axes, defaults: Optional[Dict[str, Any]] = None,
                  clip_path=None):
-        super().__init__(ax, defaults=defaults, clip_path=clip_path)
+        # Allow a flat defaults dict like {"facecolor": "..."} and keep it internal.
+        d = dict(defaults) if isinstance(defaults, dict) else {}
+        facecolor = d.pop("facecolor", None)
+
+        super().__init__(ax, defaults=d or None, clip_path=clip_path)
+
+        if facecolor is not None:
+            self.set_facecolor(facecolor)
+
         self.status = "init"
+
+    def set_facecolor(self, color, zorder=-100):
+        self.ax.fill(
+            [0.0, 1.0, 0.5],
+            [0.0, 0.0, 1.0],
+            facecolor=color,
+            edgecolor="none",
+            zorder=zorder
+        )
 
     @staticmethod
     def _lbr_to_xy(a, b, c):

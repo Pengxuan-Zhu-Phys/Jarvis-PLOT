@@ -516,7 +516,7 @@ class Figure:
             else:  # linear scale
                 zz = (zz - zlim[0]) / (zlim[1] - zlim[0])
 
-            # print(radius)
+            # (removed print(radius))
             msk = np.full(idx.shape, True)
             msk = profile_bridson_sorted(idx, xx, yy, zz, radius, msk)
             df = df.iloc[idx[msk]]
@@ -610,6 +610,7 @@ class Figure:
     @axtri.setter
     def axtri(self, kwgs):
         if "axtri" not in self.axes.keys():
+            facecolor = kwgs.pop("facecolor", None)
             raw_ax = self.fig.add_axes(**kwgs) 
             # Booking Ternary Plot Clip_path 
             from matplotlib.path import Path
@@ -618,8 +619,12 @@ class Figure:
             raw_ax._clip_path = Path(vertices, codes)
             self._install_tri_auto_clip(raw_ax)
 
+            # Keep rect axes patch transparent; ternary background is handled by adapter.
+            raw_ax.patch.set_alpha(0)
+
             adapter = TernaryAxesAdapter(
                 raw_ax,
+                defaults={"facecolor": facecolor} if facecolor is not None else None,
                 clip_path=Path(vertices, codes)  # 用 path 做 clip，transform 使用 ax.transData 已在适配器里处理
             )
             adapter._type = 'tri'
@@ -1011,6 +1016,8 @@ class Figure:
                 # Demo of Plot Clip 
                 self.axtri.plot(x=[-1, 0.5, 0.5, 2], y=[-1.1, 0.6, 0.3, 1.8], linestyle="-", color="#0277BA")
         self.savefig()      
+        import matplotlib.pyplot as plt
+        plt.close(self.fig)
         
     def render(self):
         """

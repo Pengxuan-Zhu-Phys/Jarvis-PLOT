@@ -44,7 +44,8 @@
                 "clip_on": false,
                 "frameon": false,
                 "yticks": [],
-                "xticks": []
+                "xticks": [],
+                "facecolor": "#808080"
             },
             "axc": {
                 "rect": [
