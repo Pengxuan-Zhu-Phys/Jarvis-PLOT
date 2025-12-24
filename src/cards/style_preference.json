@@ -8,6 +8,9 @@
         "TernaryCmap": "&JP/src/cards/a4paper/2x1/ternary_cmap.json",
         "rectcmap": "&JP/src/cards/a4paper/2x1/rect_cmap.json"
     },
+    "a4paper_4x1": {
+        "rectcmap": "&JP/src/cards/a4paper/4x1/rect_cmap.json"
+    },
     "gambit_1x1": {
         "Ternary": "&JP/src/cards/gambit/1x1/ternary.json"
     },

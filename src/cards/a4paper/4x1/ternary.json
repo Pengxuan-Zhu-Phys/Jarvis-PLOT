@@ -1,0 +1,139 @@
+{
+    "Frame": {
+        "figure": {
+            "figsize": [
+                3.3,
+                2.75
+            ]
+        },
+        "axes": {
+            "axlogo": {
+                "rect": [
+                    0.01,
+                    0.01,
+                    0.06,
+                    0.072
+                ], 
+                "frameon": false,
+                "yticks":   [],
+                "xticks":   [], 
+                "xlim": [0, 1024],
+                "ylim": [1024, 0]
+            },
+            "axtri": {
+                "rect": [
+                    0.127,
+                    0.168,
+                    0.745,
+                    0.775
+                ],
+                "xlim": [
+                    0.0,
+                    1.0
+                ],
+                "ylim": [
+                    0.0,
+                    1.0
+                ],
+                "clip_on": false,
+                "frameon": false,
+                "yticks":   [],
+                "xticks":   []
+            }
+        },
+        "axtri":{
+            "frame":    {
+                "linewidth":    0.8, 
+                "solid_capstyle":   "projecting",
+                "solid_joinstyle":  "miter",
+                "clip_on": false,
+                "c":    "#21171A",
+                "zorder":   100
+            },
+            "grid": {
+                "sep":  0.1, 
+                "style":    {
+                    "color": "#C2C2C269",
+                    "linewidth": 0.3,
+                    "linestyle":    "--"
+                }
+            },
+            "ticks": {
+                "majorsep":  0.1,
+                "minorsep": 0.025,
+                "majorlength":   0.02, 
+                "minorlength":  0.008, 
+                "majorstyle":    {
+                    "color": "#21171A", 
+                    "linestyle": "-", 
+                    "linewidth": 0.6,
+                    "clip_on":false,
+                    "zorder": 99
+                },
+                "bottomticklables":  {
+                    "ha":   "center",
+                    "va":   "top",
+                    "fontsize": 6,
+                    "fontfamily":   "Fira code"
+                },
+                "leftticklables":  {
+                    "ha":   "center",
+                    "va":   "center",
+                    "fontsize": 6,
+                    "fontfamily":   "Fira code"
+                },
+                "rightticklables":  {
+                    "ha":   "left",
+                    "va":   "center",
+                    "fontsize": 6,
+                    "fontfamily":   "Fira code"
+                },
+                "minorstyle":    {
+                    "color": "grey", 
+                    "linestyle": "-", 
+                    "linewidth": 0.4,
+                    "clip_on":false,
+                    "zorder": 98
+                }
+            },
+            "labels":   {
+                "leftstyle":    {
+                    "x":    0.16,
+                    "y":    0.56, 
+                    "rotation": 60, 
+                    "fontsize": 12,
+                    "fontfamily": "STIXGeneral",
+                    "ha":"center",
+                    "va":"center"
+                },
+                "bottomstyle":  {
+                    "x":    0.5,
+                    "y":    -0.12,
+                    "fontsize": 12,
+                    "fontfamily": "STIXGeneral",
+                    "ha":"center",
+                    "va":"center"
+                },
+                "rightstyle":   {
+                    "x":    0.84,
+                    "y":    0.56,
+                    "rotation": -60, 
+                    "fontsize": 12,
+                    "fontfamily": "STIXGeneral",
+                    "ha":"center",
+                    "va":"center"
+                }
+            }
+        }
+    },
+    "Style": {
+        "scatter": {
+            "s":    1.0,
+            "marker":   "^",
+            "linewidths": 0.02,
+            "alpha":    1.0,
+            "zorder":   30,
+            "edgecolor":    "white"
+        }
+    }
+}

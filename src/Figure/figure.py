@@ -86,60 +86,108 @@ class Figure:
                 
     def _apply_auto_ticks(self, ax_obj, which: str):
         """Lightweight auto-tick post-processing at finalize stage.
-        For x: rotate long labels. For y: use ScalarFormatter sci notation.
+
+        Goals:
+        - Never print/debug here.
+        - X: rotate long labels a bit.
+        - Y: if log-like scale -> keep log spacing and use compact decimals for decades in [1e-2, 1e2],
+             otherwise defer to Matplotlib's LogFormatter.
+             if linear scale -> use ScalarFormatter with sci notation, but never touch log formatters.
         """
         target = ax_obj.ax if hasattr(ax_obj, "ax") else ax_obj
         axis = target.xaxis if which == 'x' else target.yaxis
+
         try:
+            # Ensure ticks/labels exist
             labels = axis.get_ticklabels()
+
+            # --- X axis: rotate long labels
             if which == 'x':
-                long = any(len(l.get_text()) > 6 for l in labels if l.get_text())
+                try:
+                    long = any((t is not None) and (len(t) > 6) for t in (l.get_text() for l in labels))
+                except Exception:
+                    long = False
                 if long:
                     target.tick_params(axis='x', labelrotation=35)
-            elif which == 'y':
-                # Use the standard Matplotlib scientific notation (ScalarFormatter)
+                return
+
+            # --- Y axis formatting
+            if which != 'y':
+                return
+
+            # Detect scale
+            try:
+                yscale = target.get_yscale()
+            except Exception:
+                yscale = None
+
+            # 1) Log-like y-axis: compact decimals in range, otherwise default log formatter
+            if yscale in ('log', 'symlog', 'logit'):
+                from matplotlib.ticker import LogFormatterMathtext, FuncFormatter
+
+                base = LogFormatterMathtext()
+                lo, hi = 1e-2, 1e2  # compact decimal range
+
+                def _fmt(val, pos=None):
+                    if val is None or val <= 0:
+                        return ""
+                    try:
+                        exp = np.log10(val)
+                    except Exception:
+                        return ""
+                    # Only label exact decades
+                    if (not np.isfinite(exp)) or (not np.isclose(exp, round(exp))):
+                        return ""
+
+                    if lo <= val <= hi:
+                        e = int(round(exp))
+                        if e >= 0:
+                            return f"{int(10**e)}"
+                        # e=-1 -> 0.1 (1 dp), e=-2 -> 0.01 (2 dp)
+                        return f"{10**e:.{abs(e)}f}"
+
+                    # outside compact range: defer to Matplotlib
+                    return base(val, pos)
+
+                axis.set_major_formatter(FuncFormatter(_fmt))
+                return
+
+            # 2) Linear y-axis: ScalarFormatter sci notation
+            fmt = mticker.ScalarFormatter(useMathText=True)
+            fmt.set_powerlimits((0, 4))
+            axis.set_major_formatter(fmt)
+            try:
+                target.ticklabel_format(style='sci', axis='y', scilimits=(0, 4))
+            except Exception:
+                pass
+            try:
+                axis.set_offset_position('left')
+            except Exception:
+                pass
+            mpl.rcParams['axes.formatter.useoffset'] = True
+            try:
+                target.figure.canvas.draw_idle()
+                # shrink offset text a bit
                 try:
-                    vmin, vmax = axis.get_view_interval()
-                    rng = abs(vmax - vmin)
-                    if rng > 0:
-                        import math as _math
-                        exp = int(_math.floor(_math.log10(rng))) if rng != 0 else 0
-                        # Standard scientific notation with mathtext ×10^N
-                        fmt = mticker.ScalarFormatter(useMathText=True)
-                        # Trigger sci notation when |exponent| > 4 (configurable by powerlimits)
-                        fmt.set_powerlimits((0, 4))
-                        axis.set_major_formatter(fmt)
-                        # Also set via ticklabel_format for clarity/consistency
-                        target.ticklabel_format(style='sci', axis='y', scilimits=(0, 4))
-                        # Put offset on the left for y-axis
-                        axis.set_offset_position('left')
-                        # Ensure offset mechanism is enabled
-                        mpl.rcParams['axes.formatter.useoffset'] = True
-                        # Redraw so offset text shows up
-                        target.figure.canvas.draw_idle()
-                        try:
-                            axis.offsetText.set_fontsize(axis.get_ticklabels()[0].get_size() * 0.8)
-                        except Exception:
-                            pass
-                        
-                    else:
-                        # Zero range; do nothing
-                        pass
+                    tl = axis.get_ticklabels()
+                    if tl:
+                        axis.offsetText.set_fontsize(tl[0].get_size() * 0.8)
                 except Exception:
-                    # Fallback: if labels are too long, shorten to 3 chars + ellipsis
-                    for label in labels:
-                        txt = label.get_text()
-                        if txt and len(txt) > 4:
-                            label.set_text(txt[:3] + '…')
-                    target.figure.canvas.draw_idle()
+                    pass
+            except Exception:
+                pass
+
         except Exception:
-            pass
+            # Always fail silently here; tick post-processing must never crash plotting.
+            return
         
     def __init__(self, info: Optional[Mapping] = None):
         # internal state
         self._name: Optional[str]       = None
         self._jpstyles: Optional[dict]  = None
         self._style: Optional[dict]     = {}
+        self.print      = False
+        self.mode       = "Jarvis"
         # self._jpdatas:  Optional[list]  =   []
         self._logger    = None
         self._frame     = {}
@@ -793,33 +841,82 @@ class Figure:
                 norm=self.axc._cb.get("norm")
             )
             mappable.set_array([])
-            cbar = self.fig.colorbar(mappable, cax=self.axc)
-            cbar.minorticks_on()
-            self.axc.set_ylim(self.axc._cb['vmin'], self.axc._cb['vmax'])
+            if self.frame['axc'].get('orientation') != "horizontal":
+                cbar = self.fig.colorbar(mappable, cax=self.axc)
+                cbar.minorticks_on()
+                self.axc.set_ylim(self.axc._cb['vmin'], self.axc._cb['vmax'])
 
-            if str(self.axc._cb.get('mode', 'auto')).lower() == 'log':
-                from matplotlib.ticker import LogLocator
-                # Use default subs for log scale minor ticks
-                self.axc.yaxis.set_minor_locator(LogLocator(subs='auto'))
+                if str(self.axc._cb.get('mode', 'auto')).lower() == 'log':
+                    from matplotlib.ticker import LogLocator
+                    # Use default subs for log scale minor ticks
+                    self.axc.yaxis.set_minor_locator(LogLocator(subs='auto'))
+                else:
+                    from matplotlib.ticker import AutoMinorLocator
+                    self.axc.yaxis.set_minor_locator(AutoMinorLocator())
+
+                self.axc.yaxis.set_ticks_position(self.frame['axc']['ticks']['ticks_position'])
+                self.axc.yaxis.set_label_position("right")
+
+                # Apply tick params (major/minor) as provided in frame config
+                self.axc.tick_params(**self.frame['axc']['ticks'].get('both', {}))
+                self.axc.tick_params(**self.frame['axc']['ticks'].get('major', {}))
+                self.axc.tick_params(**self.frame['axc']['ticks'].get('minor', {}))
+
+                self.axc.yaxis.set_ticks_position(self.frame['axc']['ticks']['ticks_position'])
+                self.axc.yaxis.set_label_position("right")
+
+                # Apply tick params (major/minor) as provided in frame config
+                self.axc.tick_params(**self.frame['axc']['ticks'].get('both', {}))
+                self.axc.tick_params(**self.frame['axc']['ticks'].get('major', {}))
+                self.axc.tick_params(**self.frame['axc']['ticks'].get('minor', {}))
+                self.axc.set_ylabel(**self.frame['axc'].get('label', {}))
+                if self.frame['axc'].get('ylabel_coords'): 
+                    self.axc.yaxis.set_label_coords(self.frame['axc']['ylabel_coords']['x'], self.frame['axc']['ylabel_coords']['y'])
+                                    # Apply manual ticks for colorbar (y-axis) at initialization if provided
+                cbar_ticks_cfg = self.frame.get('axc', {}).get('ticks', {}).get('y', {})
+                # self._apply_manual_ticks(self.axc, 'y', cbar_ticks_cfg)
+                self.logger.debug("Loaded colorbar axes -> axc")
+            # else:
+            #     cbar = self.fig.colorbar(mappable, cax=self.axc, orientation="horizontal")
+            #     cbar.minorticks_on()
+            #     self.axc.xaxis.set_ticks_position(self.frame['axc']['ticks']['ticks_position'])
+            #     self.axc.xaxis.set_label_position("top")    
+            #     self.axc.set_xlim(self.axc._cb['vmin'], self.axc._cb['vmax'])
+
+            #     self.axc.set_xlabel(**self.frame['axc'].get("label", {}))
+                
             else:
-                from matplotlib.ticker import AutoMinorLocator
-                self.axc.yaxis.set_minor_locator(AutoMinorLocator())
+                # Horizontal colorbar: drive everything from x-axis
+                cbar = self.fig.colorbar(mappable, cax=self.axc, orientation="horizontal")
+                cbar.minorticks_on()
 
-            self.axc.yaxis.set_ticks_position(self.frame['axc']['ticks']['ticks_position'])
-            self.axc.yaxis.set_label_position("right")
+                # Limits use xlim for horizontal bars
+                self.axc.set_xlim(self.axc._cb['vmin'], self.axc._cb['vmax'])
 
-            # Apply tick params (major/minor) as provided in frame config
-            self.axc.tick_params(**self.frame['axc']['ticks'].get('both', {}))
-            self.axc.tick_params(**self.frame['axc']['ticks'].get('major', {}))
-            self.axc.tick_params(**self.frame['axc']['ticks'].get('minor', {}))
+                # Minor locator depends on mode
+                if str(self.axc._cb.get('mode', 'auto')).lower() == 'log':
+                    from matplotlib.ticker import LogLocator
+                    self.axc.xaxis.set_minor_locator(LogLocator(subs='auto'))
+                else:
+                    from matplotlib.ticker import AutoMinorLocator
+                    self.axc.xaxis.set_minor_locator(AutoMinorLocator())
 
-            self.axc.set_ylabel(**self.frame['axc'].get('label', {}))
-            if self.frame['axc'].get('ylabel_coords'): 
-                self.axc.yaxis.set_label_coords(self.frame['axc']['ylabel_coords']['x'], self.frame['axc']['ylabel_coords']['y'])
-            # Apply manual ticks for colorbar (y-axis) at initialization if provided
-            cbar_ticks_cfg = self.frame.get('axc', {}).get('ticks', {}).get('y', {})
-            self._apply_manual_ticks(self.axc, 'y', cbar_ticks_cfg)
-        self.logger.debug("Loaded colorbar axes -> axc")
+                # Ticks/label positions (top/bottom for horizontal)
+                _tp = self.frame.get('axc', {}).get('ticks', {}).get('ticks_position', 'top')
+                self.axc.xaxis.set_ticks_position(_tp)
+                self.axc.xaxis.set_label_position('top' if _tp == 'top' else 'bottom')
+
+                # Apply tick params (both/major/minor)
+                self.axc.tick_params(**self.frame.get('axc', {}).get('ticks', {}).get('both', {}))
+                self.axc.tick_params(**self.frame.get('axc', {}).get('ticks', {}).get('major', {}))
+                self.axc.tick_params(**self.frame.get('axc', {}).get('ticks', {}).get('minor', {}))
+                # Apply label if configured
+                if self.frame.get('axc', {}).get('isxlabel'):
+                    self.axc.set_xlabel(**self.frame.get('axc', {}).get('label', {}))
+
+
+
+
 
 
     @property
@@ -868,7 +965,12 @@ class Figure:
 
         if self.frame["ax"].get("text"): 
             for txt in self.frame["ax"]["text"]:
-                self.ax.text(**txt, transform=self.ax.transAxes)
+                if txt.get("transform", False):
+                    txt.pop("transform")
+                    self.ax.text(**txt, transform=self.ax.transAxes)
+                else:
+                    self.ax.text(**txt)
+
 
         xlim = self.frame["ax"].get("xlim")
         if xlim:
@@ -892,8 +994,8 @@ class Figure:
 
         # Apply manual ticks here at initialization if provided in YAML
         ax_ticks_cfg = self.frame.get('ax', {}).get('ticks', {})
-        self._apply_manual_ticks(self.ax, "x", ax_ticks_cfg.get('x', {}))
-        self._apply_manual_ticks(self.ax, "y", ax_ticks_cfg.get('y', {}))
+        # self._apply_manual_ticks(self.ax, "x", ax_ticks_cfg.get('x', {}))
+        # self._apply_manual_ticks(self.ax, "y", ax_ticks_cfg.get('y', {}))
 
 
         self.ax.tick_params(**self.frame['ax']['ticks'].get("both", {}))
@@ -907,14 +1009,14 @@ class Figure:
         if getattr(self.ax, 'needs_finalize', True) and hasattr(self.ax, 'finalize'):
             orig_finalize = self.ax.finalize
             def wrapped_finalize():
-                try:
-                    if not self._has_manual_ticks('ax', 'x'):
-                        self._apply_auto_ticks(self.ax, 'x')
-                    if not self._has_manual_ticks('ax', 'y'):
-                        self._apply_auto_ticks(self.ax, 'y')
-                except Exception as e:
-                    if self.logger:
-                        self.logger.warning(f"Auto ticks failed on ax: {e}")
+                # try:
+                #     if not self._has_manual_ticks('ax', 'x'):
+                #         self._apply_auto_ticks(self.ax, 'x')
+                #     if not self._has_manual_ticks('ax', 'y'):
+                #         self._apply_auto_ticks(self.ax, 'y')
+                # except Exception as e:
+                #     if self.logger:
+                #         self.logger.warning(f"Auto ticks failed on ax: {e}")
                 try:
                     orig_finalize()
                 except Exception as e:
@@ -986,12 +1088,18 @@ class Figure:
         # self.ax.tight_layout()
         for fmt in self.fmts: 
             spf = os.path.join(self.dir, "{}.{}".format(self.name, fmt))
-            self.logger.warning("JarvisPlot Save {} into -> {}".format(self.name, spf))
+            try: 
+                self.logger.warning("JarvisPlot Save {} into -> {}".format(self.name, spf))
+            except: 
+                pass 
             self.fig.savefig(spf, dpi=self.dpi)
 
     def load_axes(self):
         for ax, kws in self.frame['axes'].items():
-            self.logger.debug("Loading axes -> {}".format(ax))
+            try:
+                self.logger.debug("Loading axes -> {}".format(ax))
+            except: 
+                pass
             if ax == "axlogo": 
                 self.axlogo = kws
             elif ax == "axtri":
@@ -1052,9 +1160,9 @@ class Figure:
                     self._apply_auto_ticks(ax, 'x')
                 if not self._has_manual_ticks('ax', 'y'):
                     self._apply_auto_ticks(ax, 'y')
-            # elif name == 'axc':
-            #     if not self._has_manual_ticks('axc', 'y'):
-                    # self._apply_auto_ticks(ax, 'y')
+            elif name == 'axc':
+                if not self._has_manual_ticks('axc', 'y'):
+                    self._apply_auto_ticks(ax, 'y')
             if getattr(ax, 'needs_finalize', True) and hasattr(ax, 'finalize'):
                 try:
                     ax.finalize()
@@ -1106,8 +1214,10 @@ class Figure:
 
             if "debug" in info:
                 self.debug = info['debug']
-                self.logger.debug("Loading plot -> {} in debug mode".format(self.name))
-
+                try:
+                    self.logger.debug("Loading plot -> {} in debug mode".format(self.name))
+                except:
+                    pass 
             self._enable = info.get("enable", True)
             if not self._enable:
                 self.logger.warning("Skip plot -> {}".format(self.name))
@@ -1118,6 +1228,9 @@ class Figure:
             else:
                 self.style = ["a4paper_2x1", "default"]
             self.logger.debug("Figure style loaded")
+            if "gambit" in info['style'][0]:
+                self.mode = "gambit"
+
 
             if "frame" in info:
                 self.frame = info['frame']
@@ -1129,13 +1242,25 @@ class Figure:
                 from ..utils import cmaps as _jp_cmaps
                 _cmaps_summary = _jp_cmaps.setup(force=True)
                 if self.logger:
-                    self.logger.debug(f"JarvisPLOT: colormaps registered (builtin/external): {_cmaps_summary}")
-                    self.logger.debug(f"JarvisPLOT: available cmaps sample: {_jp_cmaps.list_available()[:10]} ...")
+                    try: 
+                        self.logger.debug(f"JarvisPLOT: colormaps registered (builtin/external): {_cmaps_summary}")
+                        self.logger.debug(f"JarvisPLOT: available cmaps sample: {_jp_cmaps.list_available()[:10]} ...")
+                    except: 
+                        pass 
             except Exception as _e:
                 if self.logger:
                     self.logger.warning(f"JarvisPLOT: failed to register colormaps: {_e}")
             # plt.rcParams['font.family'] = 'STIXGeneral'
             self.fig = plt.figure(**self.frame['figure'])
+            # CLI override: disable logo panel
+            if self.print:
+                try:
+                    if self.mode == "Jarvis": 
+                        if isinstance(self.frame.get("axes"), dict):
+                            self.frame["axes"].pop("axlogo", None)
+                        self.frame.pop("axlogo", None)  # optional: drop logo content too
+                except Exception:
+                    pass
             self.load_axes()
             
             if "layers" in info: 
@@ -1183,7 +1308,10 @@ class Figure:
         - If expr is a direct column name, returns that series.
         - If expr is a python expression, eval with df columns in scope.
         """
-        self.logger.debug("Loading variable expression -> {}".format(set['expr'])) 
+        try: 
+            self.logger.debug("Loading variable expression -> {}".format(set['expr'])) 
+        except: 
+            pass 
         if not "expr" in set.keys():
             raise ValueError(f"expr need for axes {set}.")
         if set["expr"] in df.columns:
@@ -1320,6 +1448,10 @@ class Figure:
                 self.axc._cb["levels"] = np.linspace(self.axc._cb["vmin"], self.axc._cb["vmax"], lv)
             elif hasattr(lv, "__len__"):
                 self.axc._cb["levels"] = lv
+        if 'norm' in s and s['norm'] is not None:
+            s.pop('vmin', None)
+            s.pop('vmax', None)
+            s.pop('mode', None)
         self.axc._cb["used"] = uses_color
         return s
 
@@ -1337,7 +1469,10 @@ class Figure:
           - rectangular axes (ax._type == 'rect'): methods expect (x,y, ...)
         """
         # 1) Resolve method
-        self.logger.debug(f"Drawing layer -> {layer_info['name']}")
+        try: 
+            self.logger.debug(f"Drawing layer -> {layer_info['name']}")
+        except: 
+            pass 
         method_key = str(layer_info.get("method", "scatter")).lower()
         method_name = self.METHOD_DISPATCH.get(method_key)
         if not method_name or not hasattr(ax, method_name):

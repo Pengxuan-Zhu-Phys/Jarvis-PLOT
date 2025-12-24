@@ -2,17 +2,17 @@
     "Frame": {
         "figure": {
             "figsize": [
-                3.3,
-                2.75
+                1.70,
+                1.93
             ]
         },
         "axes": {
             "axlogo": {
                 "rect": [
-                    0.67,
-                    0.168,
-                    0.15,
-                    0.09
+                    0.01,
+                    0.01,
+                    0.06,
+                    0.072
                 ],
                 "frameon": false,
                 "yticks": [],
@@ -22,27 +22,26 @@
                     1024
                 ],
                 "ylim": [
-                    512,
+                    1024,
                     0
                 ]
             },
             "ax": {
                 "rect": [
-                    0.140,
-                    0.168,
-                    0.680,
-                    0.775
-                ],
-                "facecolor": "#808080"
+                    0.214,
+                    0.150,
+                    0.742,
+                    0.653
+                ]
             },
             "axc": {
                 "rect": [
-                    0.835,
-                    0.193,
-                    0.042,
-                    0.725
+                    0.224,
+                    0.816,
+                    0.722,
+                    0.036
                 ],
-                "xticks": []
+                "yticks": []
             }
         },
         "ax": {
@@ -54,26 +53,6 @@
                 "c": "#21171A",
                 "zorder": 100
             },
-            "xaxis": {
-                "min_endpoints":    {
-                    "tick": false, 
-                    "label": true
-                }, 
-                "max_endpoints":    {
-                    "tick": false, 
-                    "label": true
-                }
-            },
-            "yaxis": {
-                "min_endpoints":    {
-                    "tick": false, 
-                    "label": false
-                }, 
-                "max_endpoints":    {
-                    "tick": false, 
-                    "label": true
-                }
-            },
             "grid": {
                 "sep": 0.1,
                 "style": {
@@ -84,7 +63,8 @@
             },
             "ticks": {
                 "both": {
-                    "labelsize": 7,
+                    "pad": 2,
+                    "labelsize": 5,
                     "direction": "in",
                     "labelfontfamily": "sans",
                     "top": true,
@@ -96,16 +76,16 @@
                 },
                 "major": {
                     "which": "major",
-                    "length": 8,
-                    "width": 0.8,
-                    "color": "white",
+                    "length": 4,
+                    "width": 0.4,
+                    "color": "black",
                     "zorder": 1000
                 },
                 "minor": {
                     "which": "minor",
-                    "length": 4,
-                    "width": 0.8,
-                    "color": "white",
+                    "length": 2,
+                    "width": 0.4,
+                    "color": "black",
                     "zorder": 1000
                 }
             },
@@ -113,75 +93,69 @@
                 "zorder": 1000,
                 "xlabel": {
                     "loc": "center",
-                    "fontsize": 13,
+                    "fontsize": 10,
                     "fontfamily": "STIXGeneral"
                 },
                 "ylabel": {
                     "loc": "center",
-                    "fontsize": 13,
+                    "fontsize": 10,
                     "fontfamily": "STIXGeneral"
                 },
                 "ylabel_coords": {
-                    "x": -0.1,
+                    "x": -0.16, 
                     "y": 0.5
                 }
-            },
-            "text": [
-                {
-                    "x": 1.0, 
-                    "y": 1.002, 
-                    "s": "GAMBIT 2.7",
-                    "ha":   "right",
-                    "va":   "bottom", 
-                    "color":    "black",
-                    "fontfamily":   "Fira Code",
-                    "fontsize":     "xx-small",
-                    "fontstyle":    "normal",
-                    "fontweight":   "normal",
-                    "transform":    true
-                }
-            ],
-            "spines": {
-                "color": "none"
             }
         },
         "axlogo": {
-            "file": "&JP/src/cards/icons/gambit_small.png",
-            "text": []
+            "file": "&JP/src/cards/icons/JarvisHEP.png",
+            "text": [
+                {
+                    "x": 1.0, 
+                    "y": 0.0, 
+                    "s": "Jarvis-HEP",
+                    "ha":   "left",
+                    "va":   "bottom", 
+                    "fontfamily":   "Fira code",
+                    "fontsize":     5,
+                    "fontstyle":    "normal",
+                    "fontweight":   "bold"
+                }
+            ]
         },
         "axc": {
+            "orientation": "horizontal",
+            "isylabel": false, 
+            "isxlabel": true, 
             "label": {
-                "ylabel": "",
+                "xlabel": "",
                 "loc": "center",
-                "fontsize": 12,
+                "fontsize": 10,
                 "fontfamily": "STIXGeneral"
             },
-            "ylabel_coords": {
-                    "x": 2.4,
-                    "y": 0.5
-            },
             "ticks": {
-                "ticks_position": "right",
+                "ticks_position":   "top", 
                 "both": {
-                    "labelsize": 7,
+                    "pad": 1,
+                    "labelsize": 5,
                     "direction": "in",
                     "labelfontfamily": "sans",
-                    "top": false,
+                    "top": true,
                     "left": false,
-                    "right": true,
+                    "right": false,
                     "bottom": false,
                     "which": "both"
                 },
                 "major": {
                     "which": "major",
-                    "length": 8,
-                    "width": 0.8,
+                    "length": 4,
+                    "width": 0.4,
                     "color": "black"
                 },
                 "minor": {
                     "which": "minor",
-                    "length": 4,
-                    "width": 0.8,
+                    "length": 2,
+                    "width": 0.4,
                     "color": "black"
                 }
             }

@@ -108,6 +108,8 @@ class JarvisPLOT():
             figobj.logger = self.logger
             figobj.jpstyles = self.style
             figobj.context = self.ctx
+            if getattr(self.args, "no_logo", False):
+                figobj.print = True
 
             try:
                 if figobj.set(fig):

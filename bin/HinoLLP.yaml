@@ -1,0 +1,387 @@
+DataSet:
+- name: dfm02
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/samples.M02.csv
+  type: csv
+- name: dfm03
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/samples.M03.csv
+  type: csv
+- name: dfm05
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/samples.M05.csv
+  type: csv
+- name: dfm07
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/samples.M07.csv
+  type: csv
+- name: dfm10
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/samples.M10.csv
+  type: csv
+- name: dfm20
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/samples.M20.csv
+  type: csv
+- name: dfm30
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/samples.M30.csv
+  type: csv
+- name: dfm50
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/samples.M50.csv
+  type: csv
+- name: dfp02
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/samples.P02.csv
+  type: csv
+- name: dfp03
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/samples.P03.csv
+  type: csv
+- name: dfp05
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/samples.P05.csv
+  type: csv
+- name: dfp07
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/samples.P07.csv
+  type: csv
+- name: dfp10
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/samples.P10.csv
+  type: csv
+- name: dfp20
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/samples.P20.csv
+  type: csv
+- name: dfp30
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/samples.P30.csv
+  type: csv
+- name: dfp50
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/samples.P50.csv
+  type: csv
+
+
+Figures:
+- name: s_m1dm_gamma
+  enable: true
+  style:
+  - a4paper_4x1
+  - rectcmap
+  frame:
+    ax: 
+      labels:
+        x: "$|M_1|~({\\rm GeV})$"
+        y: "$\\Delta m^0~({\\rm GeV})$"
+      xlim: [550, 850]
+      ylim: [2.5e-4, 25]
+      yscale: "log"
+      text: [
+        {
+          y:  1,
+          x:  806.88,
+          s:  "$\\tan{\\beta} = 2$",
+          ha: "center",
+          va: "bottom",
+          rotation: 90,
+          fontsize: 3.6 
+        },
+        {
+          y:  1,
+          x:  741,
+          s:  "$\\tan{\\beta} = 7$",
+          ha: "center",
+          va: "bottom",
+          rotation: 90,
+          fontsize: 3.6 
+        },
+        {
+          y:  1,
+          x:  709.98,
+          s:  "$\\tan{\\beta} = 50$",
+          ha: "center",
+          va: "bottom",
+          rotation: 90,
+          fontsize: 3.6 
+        },
+        {
+          y:  1,
+          x:  578,
+          s:  "$\\tan{\\beta} = 2$",
+          ha: "center",
+          va: "bottom",
+          rotation: 90,
+          fontsize: 3.6 
+        },
+        {
+          y:  1,
+          x:  662,
+          s:  "$\\tan{\\beta} = 7$",
+          ha: "center",
+          va: "bottom",
+          rotation: 90,
+          fontsize: 3.6 
+        },
+        {
+          y:  1,
+          x:  695.28,
+          s:  "$\\tan{\\beta} = 50$",
+          ha: "center",
+          va: "bottom",
+          rotation: 90,
+          fontsize: 3.6 
+        },
+        {
+          x: 0.05,
+          y: 0.24,
+          s: "$M_2 = 2~{\\rm TeV}$", 
+          ha: "left",
+          va: "bottom",
+          color: "darkblue",
+          fontsize: 6,
+          zorder: 10,
+          bbox: {facecolor: "white", alpha: 0.75, edgecolor: "none", boxstyle: "round,pad=0.2"},
+          transform: true         
+        },
+        {
+          x: 0.95,
+          y: 0.24,
+          s: "$M_2 = -2~{\\rm TeV}$", 
+          ha: "right",
+          color: "darkblue",
+          va: "bottom",
+          fontsize: 6,
+          zorder: 10,
+          bbox: {facecolor: "white", alpha: 0.75, edgecolor: "none", boxstyle: "round,pad=0.2"},
+          transform: true         
+        },     
+        {
+          x: 0.5,
+          y: 0.95,
+          s: "$\\mu = 100~{\\rm GeV},~{\\rm sign}(M_1 \\cdot M_2) < 0$", 
+          ha: "center",
+          va: "top",
+          fontsize: 6,
+          zorder: 10,
+          transform: true         
+        },    
+      ]
+    axc:
+      label:
+        xlabel: "$\\Gamma(\\tilde{\\chi}_2^0)~({\\rm GeV})$"
+      xscale: "log"
+  layers:
+  - name: scatter 
+    data: 
+    - source: dfm02
+      transform:
+      - filter: np.abs(mC1) > np.abs(mN1)
+    - source: dfm07 
+      transform:
+      - filter: np.abs(mC1) > np.abs(mN1)
+    - source: dfm50 
+      transform:
+      - filter: np.abs(mC1) > np.abs(mN1)
+    - source: dfp02
+      transform:
+      - filter: np.abs(mC1) > np.abs(mN1)
+    - source: dfp07 
+      transform:
+      - filter: np.abs(mC1) > np.abs(mN1)
+    - source: dfp50 
+      transform:
+      - filter: np.abs(mC1) > np.abs(mN1)
+    axes: ax 
+    method: scatter 
+    coordinates:
+      x: {expr: np.abs(M1)}
+      y: {expr: np.abs(mN2) - np.abs(mN1)}
+      c: {expr: WN2}
+    style:
+      marker: .
+      s: 2
+      cmap: jarvis_rainbow2
+      vmin: 1.e-20
+      vmax: 1.e-12
+      norm: "log"
+      zorder: 2
+  - name: scatter_exc1 
+    data: 
+    - source: dfm02
+      transform:
+      - filter: np.abs(mC1) <= np.abs(mN1)
+    - source: dfm07 
+      transform:
+      - filter: np.abs(mC1) <= np.abs(mN1)
+    - source: dfm50 
+      transform:
+      - filter: np.abs(mC1) <= np.abs(mN1)
+    - source: dfp02
+      transform:
+      - filter: np.abs(mC1) <= np.abs(mN1)
+    - source: dfp07 
+      transform:
+      - filter: np.abs(mC1) <= np.abs(mN1)
+    - source: dfp50 
+      transform:
+      - filter: np.abs(mC1) <= np.abs(mN1)
+    axes: ax 
+    method: scatter 
+    coordinates:
+      x: {expr: np.abs(M1)}
+      y: {expr: np.abs(mN2) - np.abs(mN1)}
+    style:
+      marker: .
+      zorder: 1.5
+      s: 2
+      c: grey
+  - name: lines 
+    axes: ax 
+    method: plot 
+    coordinates:
+      x: [[806.88, 741.1, 707.98, 578, 662, 697.28], [806.88, 741.1, 707.98, 578, 662, 697.28]]
+      y: [[5.e-3, 5.e-3, 5.e-3, 5.e-3, 5.e-3, 5.e-3], [0.8, 0.8, 0.8, 0.8, 0.8, 0.8]]
+    style:
+      linewidth: 0.4 
+      linestyle: "-"
+      color: "gray"
+      zorder: 1.5
+  - name: line
+    axes: ax 
+    method: plot 
+    coordinates:
+      x: [702.63, 702.63]
+      y: [[1.e-4, 0.6], [1.e-2, 6.0]]
+    style:
+      linewidth: 0.8 
+      linestyle: "--"
+      color: "darkblue"
+      zorder: 1.5
+
+- name: s_dmNdmC_tanbeta
+  enable: true
+  style:
+  - a4paper_4x1
+  - rectcmap
+  frame:
+    ax: 
+      labels:
+        x: "$\\Delta m^\\pm~({\\rm GeV})$"
+        y: "$\\Delta m^0~({\\rm GeV})$"
+      xlim: [0, 2.5]
+      ylim: [0, 1.6]
+      text: [
+        {
+          x: 0.05,
+          y: 0.85,
+          s: "$M_2 = 2~{\\rm TeV}$", 
+          ha: "left",
+          va: "top",
+          fontsize: 5.5,
+          zorder: 10,
+          bbox: {facecolor: "white", alpha: 0.75, edgecolor: "none", boxstyle: "round,pad=0.2"},
+          transform: true         
+        },
+        {
+          x: 0.95,
+          y: 0.85,
+          s: "$M_2 = -2~{\\rm TeV}$", 
+          ha: "right",
+          va: "top",
+          fontsize: 5.5,
+          zorder: 10,
+          bbox: {facecolor: "white", alpha: 0.75, edgecolor: "none", boxstyle: "round,pad=0.2"},
+          transform: true         
+        },     
+        {
+          x: 0.5,
+          y: 0.95,
+          s: "$\\mu = 100~{\\rm GeV},~{\\rm sign}(M_1 \\cdot M_2) < 0$", 
+          ha: "center",
+          va: "top",
+          fontsize: 6,
+          zorder: 10,
+          transform: true         
+        },   
+        {
+          x: 0.15,
+          y: 0.6,
+          s: "$\\Delta m^0 = 2 \\Delta m^\\pm$",
+          ha: "left",
+          va: "bottom",
+          color: "darkblue",
+          fontsize: 5.5,
+          rotation: 73,
+          bbox: {facecolor: "white", alpha: 0.75, edgecolor: "none", boxstyle: "round,pad=0.2"},
+          zorder: 10
+        },            
+      ]
+    axc:
+      label:
+        xlabel: "$\\tan{\\beta}$"
+  layers:
+  - name: scatter 
+    data: 
+    - source: dfm02
+    - source: dfm03
+    - source: dfm05
+    - source: dfm07 
+    - source: dfm10 
+    - source: dfm20 
+    - source: dfm30 
+    - source: dfm50 
+    - source: dfp02
+    - source: dfp03
+    - source: dfp05
+    - source: dfp07 
+    - source: dfp10 
+    - source: dfp20 
+    - source: dfp30 
+    - source: dfp50 
+
+    axes: ax 
+    method: scatter 
+    coordinates:
+      x: {expr: np.abs(mC1) - np.abs(mN1)}
+      y: {expr: np.abs(mN2) - np.abs(mN1)}
+      c: {expr: TanBeta}
+    style:
+      marker: .
+      s: 2
+      cmap: jarvis_rainbow2
+      vmin: 1
+      vmax: 50
+      zorder: 2
+  - name: line
+    axes: ax 
+    method: plot 
+    coordinates:
+      x: [0.34, 1.0]
+      y: [0.4, 1.4]
+    style:
+      linewidth: 0.8 
+      linestyle: ":"
+      color: "grey"
+      zorder: 0.7
+  - name: line2 
+    axes: ax 
+    method: plot 
+    coordinates:
+      x: [0., 0.6]
+      y: [0., 1.2]
+    style:
+      linewidth: 1.0 
+      linestyle: "--"
+      color: "darkblue"
+      zorder: 15
+
+
+output:
+  dir: ./Workshop/HinoLLP/Plots
+  dpi: 600
+  formats:
+  - png
+project:
+  name: JarvisPLOT Demo (minimal)
+version: 0.3
+
+
+
+
+
+
+
+
+
+
+
+
+
+

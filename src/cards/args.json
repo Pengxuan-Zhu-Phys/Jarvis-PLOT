@@ -39,6 +39,12 @@
             "dest": "inplace",
             "help": "Modify the input YAML file in place (used with --parse-data)",
             "action": "store_true"
+        },
+        {
+            "long": "--print",
+            "dest": "no_logo",
+            "help": "Disable the Jarvis-HEP logo panel (axlogo)",
+            "action": "store_true"
         }
     ]
 }

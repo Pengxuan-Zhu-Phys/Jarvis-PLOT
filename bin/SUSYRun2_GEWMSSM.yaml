@@ -2049,7 +2049,8 @@ Figures:
           ha: "right",
           va: "bottom",
           fontfamily: "STIXGeneral",
-          fontsize: "x-small"
+          fontsize: "x-small",
+          transform: true
         }
       ]
     axc: 
