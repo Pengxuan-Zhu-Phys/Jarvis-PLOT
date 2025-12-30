@@ -28,6 +28,7 @@ class JarvisPLOT():
         self.dataset:   Optional[Dict[DataSet]]    = []
         self.shared     =   None
         self.ctx        =   None
+        self.interpolators = None
 
     def init(self):
         self.args = self.cli.args.parse_args()
@@ -57,24 +58,50 @@ class JarvisPLOT():
             self.ctx = DataContext(self.shared)
             for dts in self.dataset:
                 self.ctx.update(dts.name, dts.data)
+
+            # Register external functions (e.g. lazy-loaded interpolators) into the expression runtime.
+            self.load_interpolators()
+
             self.load_styles()
             self.plot()
 
-
     def load_cmaps(self):
-        # --- Load and register JarvisPLOT colormaps from JSON if available ---
+        """Load and register JarvisPLOT colormaps from the internal JSON bundle."""
         try:
-            import os
+            # Prefer the project's colormap setup helper
             from .utils import cmaps
+
             json_path = "&JP/src/cards/colors/colormaps.json"
             cmap_summary = cmaps.setup(self.load_path(json_path), force=True)
+
             if self.logger:
                 self.logger.debug(f"JarvisPLOT: colormaps registered: {cmap_summary}")
-                self.logger.debug(f"JarvisPLOT: available colormaps sample: {cmaps.list_available()}")
+                try:
+                    self.logger.debug(
+                        f"JarvisPLOT: available colormaps sample: {cmaps.list_available()}"
+                    )
+                except Exception:
+                    pass
         except Exception as e:
             if self.logger:
-                self.logger.warning(f"JarvisPLOT: failed to initialize colormaps: {e}")
+                self.logger.warning(f"JarvisPLOT: failed to initialize colormaps: {e}")        
 
+    def load_interpolators(self):
+        """Parse YAML interpolator specs and register them for lazy use in expressions."""
+        cfg = self.yaml.config.get("Functions", None)
+        if cfg is not None: 
+            from .inner_func import set_external_funcs_getter
+            from .utils.interpolator import InterpolatorManager
+            mgr = InterpolatorManager.from_yaml(
+                cfg,
+                yaml_dir=self.yaml.dir,
+                shared=self.shared,
+                logger=self.logger,
+            )
+            self.interpolators = mgr
+            set_external_funcs_getter(lambda: (mgr.as_eval_funcs() or {}))
+            if self.interpolators:
+                self.logger.debug(f"JarvisPLOT: Functions registered: {mgr.summary()}")
 
     def load_styles(self):
         spp = "&JP/src/cards/style_preference.json"
@@ -104,6 +131,7 @@ class JarvisPLOT():
         for fig in self.yaml.config["Figures"]:
             from .Figure.figure import Figure
             figobj = Figure()
+            figobj._yaml_dir = self.yaml.dir
             figobj.config = self.yaml.config
             figobj.logger = self.logger
             figobj.jpstyles = self.style

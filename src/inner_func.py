@@ -76,6 +76,44 @@ _Constant = {
     "Inf":  np.inf
 }
 
+# External function hooks (e.g. user-defined / lazy-loaded interpolators)
+# These are injected into the expression runtime via `update_funcs`.
+#
+# Usage:
+# - core/context code can call `set_external_funcs({...})` once after building ctx.
+# - or provide a getter with `set_external_funcs_getter(lambda: {...})` if the set may change.
+# - values must be callables (LazyCallable is OK).
+_EXTERNAL_FCS = {}
+_EXTERNAL_FCS_GETTER = None
+
+
+def set_external_funcs(funcs: dict) -> None:
+    """Register external functions to be injected by `update_funcs`.
+
+    Parameters
+    ----------
+    funcs:
+        Mapping of name -> callable (LazyCallable is acceptable).
+    """
+    global _EXTERNAL_FCS
+    _EXTERNAL_FCS = dict(funcs) if funcs is not None else {}
+
+
+def set_external_funcs_getter(getter) -> None:
+    """Register a callable that returns a dict of external functions.
+
+    The getter should return a `dict[str, callable]`.
+    """
+    global _EXTERNAL_FCS_GETTER
+    _EXTERNAL_FCS_GETTER = getter
+
+
+def clear_external_funcs() -> None:
+    """Clear any registered external functions/getter."""
+    global _EXTERNAL_FCS, _EXTERNAL_FCS_GETTER
+    _EXTERNAL_FCS = {}
+    _EXTERNAL_FCS_GETTER = None
+
 def Gauss(xx, mean, err):
     prob = sympy.exp(-0.5 * ((xx - mean) / err)**2)
     return prob 
@@ -102,7 +140,21 @@ def update_funcs(funcs):
     funcs['LogGauss'] = LogGauss
     funcs['Normal'] = Normal
     funcs['Heaviside'] = sympy.Heaviside
+
+    # Built-in functions
     funcs.update(_Inner_FCs)
+
+    # External functions (e.g. lazy-loaded interpolators). External takes priority.
+    try:
+        if _EXTERNAL_FCS_GETTER is not None:
+            ext = _EXTERNAL_FCS_GETTER() or {}
+            funcs.update(ext)
+        elif _EXTERNAL_FCS:
+            funcs.update(_EXTERNAL_FCS)
+    except Exception:
+        # Never fail expression evaluation because external injection failed.
+        pass
+
     return funcs
 
 def update_const(vars):

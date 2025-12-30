@@ -47,7 +47,21 @@ DataSet:
 - name: dfp50
   path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/samples.P50.csv
   type: csv
-
+- name: dfmuTB01
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/samples.muTBr01.csv
+  type: csv 
+- name: dfmuTB02
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/samples.muTBr02.csv
+  type: csv 
+- name: dfmuTB03
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/samples.muTBr03.csv
+  type: csv 
+- name: dfmuTB04
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/samples.muTBr04.csv
+  type: csv 
+- name: dfTB02
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/HinoLLP/datas/sample.TB02m1m2.csv
+  type: csv 
 
 Figures:
 - name: s_m1dm_gamma
@@ -187,7 +201,7 @@ Figures:
     style:
       marker: .
       s: 2
-      cmap: jarvis_rainbow2
+      cmap: jarvis_rainbow2_r
       vmin: 1.e-20
       vmax: 1.e-12
       norm: "log"
@@ -335,7 +349,7 @@ Figures:
     style:
       marker: .
       s: 2
-      cmap: jarvis_rainbow2
+      cmap: jarvis_rainbow2_r
       vmin: 1
       vmax: 50
       zorder: 2
@@ -362,26 +376,555 @@ Figures:
       color: "darkblue"
       zorder: 15
 
+- name: s_muTB_ratio
+  enable: false 
+  style:
+  - a4paper_4x1
+  - rectcmap
+  frame:
+    ax: 
+      labels:
+        x: "$\\mu~({\\rm GeV})$"
+        y: "$\\tan{\\beta}$"
+      xlim: [100, 150]
+      ylim: [1, 50]
+      yscale: "log"
+      text: [
+        {
+          x: 0.95,
+          y: 0.85,
+          s: "$M_1 = 1.5~{\\rm TeV}$", 
+          ha: "right",
+          va: "top",
+          fontsize: 5.5,
+          zorder: 10,
+          bbox: {facecolor: "white", alpha: 0.75, edgecolor: "none", boxstyle: "round,pad=0.2"},
+          transform: true         
+        }         
+      ]
+    axc:
+      label:
+        xlabel: "$M_2 / M_1$"
+  layers:
+  - name: scatter 
+    data: 
+    - source: dfmuTBv1
+      transform:
+      - filter: mN1 < 0
+    axes: ax 
+    method: scatter 
+    coordinates:
+      x: {expr: Mu}
+      y: {expr: TanBeta}
+      c: {expr: ratio}
+    style:
+      marker: .
+      s: 0.3
+      cmap: jarvis_rainbow2
+      vmin: -3
+      vmax: -2.5
+      zorder: 1
+
+- name: s_muTB_ratiot
+  enable: false 
+  style:
+  - a4paper_4x1
+  - rectcmap
+  frame:
+    ax: 
+      labels:
+        x: "$\\mu~({\\rm GeV})$"
+        y: "$\\tan{\\beta}$"
+      xlim: [100, 150]
+      ylim: [1, 50]
+      yscale: "log"
+      text: [
+        {
+          x: 0.95,
+          y: 0.95,
+          s: "$M_1 = 1.5~{\\rm TeV}$", 
+          ha: "right",
+          va: "top",
+          fontsize: 5.5,
+          zorder: 10,
+          bbox: {facecolor: "white", alpha: 0.75, edgecolor: "none", boxstyle: "round,pad=0.2"},
+          transform: true         
+        }         
+      ]
+    axc:
+      label:
+        xlabel: "$M_2 / M_1$"
+  layers:
+  - name: scatter 
+    data: 
+    - source: dfmuTB01
+      transform:
+      - filter: Mu < 119.8
+    - source: dfmuTB02
+      transform:
+      - filter: ((TanBeta < 4) & (Mu > 119.8) & (Mu < 120.0)) | ((Mu > 119.8) & (TanBeta > 4) )
+    - source: dfmuTB03
+      transform:
+      - filter: TanBeta > 4
+    - source: dfmuTB04
+
+    axes: ax 
+    method: scatter 
+    coordinates:
+      x: {expr: Mu}
+      y: {expr: TanBeta}
+      c: {expr: ratio}
+    style:
+      marker: .
+      s: 0.8
+      cmap: jarvis_rainbow2
+      vmin: -3
+      vmax: -2.5
+      zorder: 1
+
+- name: muTB_ratiot
+  enable: true
+  style:
+  - a4paper_4x1
+  - rectcmap
+  frame:
+    ax: 
+      labels:
+        x: "$\\mu~({\\rm GeV})$"
+        y: "$\\tan{\\beta}$"
+      xlim: [100, 150]
+      ylim: [1, 50]
+      yscale: "log"
+      text: [
+        {
+          x: 0.05,
+          y: 0.95,
+          s: "$M_1 = 1.5~{\\rm TeV}$", 
+          ha: "left",
+          va: "top",
+          fontsize: 5.5,
+          zorder: 10,
+          bbox: {facecolor: "white", alpha: 0.75, edgecolor: "none", boxstyle: "round,pad=0.2"},
+          transform: true         
+        },
+        {
+          x: 0.60,
+          y: 0.31,
+          s: "displaced vertex", 
+          ha: "left",
+          va: "bottom",
+          fontsize: 5.0,
+          fontweight: "bold",
+          fontfamily: "STIXGeneral",
+          color: "#5C940D",
+          rotation: 5.8,
+          zorder: 10,
+          transform: true        
+        },
+        {
+          x: 0.53,
+          y: 0.61,
+          s: "Disappearing track", 
+          ha: "left",
+          va: "bottom",
+          fontsize: 5.0,
+          fontweight: "bold",
+          fontfamily: "STIXGeneral",
+          color: "#AD3516",
+          rotation: 7.8,
+          zorder: 10,
+          transform: true        
+        },
+        {
+          x: 0.20,
+          y: 0.10,
+          s: "FASER 2", 
+          ha: "left",
+          va: "bottom",
+          fontsize: 5.0,
+          fontweight: "bold",
+          fontfamily: "STIXGeneral",
+          color: "black",
+          zorder: 10,
+          transform: true        
+        },
+      ]
+    axc:
+      label:
+        xlabel: "$M_2 / M_1$"
+  layers:
+  - name: scatter 
+    data: 
+    - source: dfmuTB01
+      transform:
+      - filter: Mu < 119.8
+    - source: dfmuTB02
+      transform:
+      - filter: ((TanBeta < 4) & (Mu > 119.8) & (Mu < 120.0)) | ((Mu > 119.8) & (TanBeta > 4) )
+    - source: dfmuTB03
+      transform:
+      - filter: TanBeta > 4
+    - source: dfmuTB04
+    share_data: dfmu 
+    axes: ax 
+    method: voronoi 
+    coordinates:
+      x: {expr: Mu}
+      y: {expr: TanBeta}
+      z: {expr: ratio}
+    style:
+      cmap: jarvis_rainbow2
+      vmin: -3
+      vmax: -2.5
+      zorder: 0.1
+  - name: inFASER2 
+    data: 
+    - source: dfmu
+    axes: ax 
+    method: voronoi 
+    coordinates:
+      x: {expr: Mu}
+      y: {expr: TanBeta}
+      where:  {expr: "FASER2(np.log(WN2)) > np.abs(mN2)"}
+    style:
+      edgecolor: "#015B98"
+      linewidth:  0.5
+      facecolor: "#01A9F4"
+      alpha: 0.75
+      zorder: 1
+  - name: CMSDisplacedTR 
+    data: 
+    - source: dfmu
+    axes: ax 
+    method: voronoif
+    coordinates:
+      x: {expr: Mu}
+      y: {expr: TanBeta}
+      where:  {expr: "CMSDpTR(np.abs(mC1) - np.abs(mN1)) > np.abs(mC1)"}
+    style:
+      facecolor:  "None"
+      edgecolor:  "#5C940D"
+      linewidth:  0.5
+      hatch_linewidth: 1.0
+      hatch: '||||'
+      alpha: 0.85
+      zorder: 0.8
+  # - name: ATLASDisplacedTR
+  #   data: 
+  #   - source: dfmu
+  #   axes: ax 
+  #   method: voronoif
+  #   coordinates:
+  #     x: {expr: Mu}
+  #     y: {expr: TanBeta}
+  #     where:  {expr: "ATLASDpTR(np.abs(mC1) - np.abs(mN1)) > np.abs(mC1)"}
+  #   style:
+  #     facecolor:  "None"
+  #     edgecolor:  "#5C940D"
+  #     linewidth:  0.5
+  #     hatch_linewidth: 1.0
+  #     hatch: '\\\\\\'
+  #     alpha: 0.85
+  #     zorder: 1.8
+  - name: CMSDisappTR 
+    data: 
+    - source: dfmu
+    axes: ax 
+    method: voronoif
+    coordinates:
+      x: {expr: Mu}
+      y: {expr: TanBeta}
+      where:  {expr: "CMSDaTR(np.abs(mC1)) > np.abs(mC1) - np.abs(mN1)"}
+    style:
+      facecolor:  "None"
+      edgecolor:  "#D9480F"
+      linewidth:  0.5
+      hatch_linewidth: 1.0
+      hatch: '\\\\\\'
+      alpha: 0.85
+      zorder: 0.8
+  # - name: ATLASDisappTR
+  #   data: 
+  #   - source: dfmu
+  #   axes: ax 
+  #   method: voronoif
+  #   coordinates:
+  #     x: {expr: Mu}
+  #     y: {expr: TanBeta}
+  #     where:  {expr: "ATLASDaTR(np.abs(mC1)) > np.abs(mC1) - np.abs(mN1)"}
+  #   style:
+  #     facecolor:  "None"
+  #     edgecolor:  "#D9480F"
+  #     linewidth:  0.5
+  #     hatch_linewidth: 1.0
+  #     hatch: '\\\\\\'
+  #     alpha: 0.85
+  #     zorder: 1.8
+
+
+- name: M1M2_ctau
+  enable: true 
+  style:
+  - a4paper_4x1
+  - rectcmap
+  frame:
+    ax: 
+      labels:
+        x: $\left| M_1 \right|~({\rm TeV})$
+        y: $\left| M_2 \right|~({\rm TeV})$
+      xlim: [0.3, 3]
+      ylim: [0.6, 8]
+      text: [
+        {
+          x: 0.5,
+          y: 0.97,
+          s: "sign$(M_1) > 0$, sign$(M_2) < 0$, $\\mu = 110~{\\rm GeV}$, $\\tan{\\beta} = 2$", 
+          ha: "center",
+          va: "top",
+          fontsize: 4.0,
+          zorder: 10,
+          bbox: {facecolor: "white", alpha: 0.75, edgecolor: "none", boxstyle: "round,pad=0.2"},
+          transform: true         
+        },
+        {
+          x: 0.60,
+          y: 0.49,
+          s: "displaced vertex", 
+          ha: "left",
+          va: "bottom",
+          fontsize: 5.0,
+          fontweight: "bold",
+          fontfamily: "STIXGeneral",
+          color: "#5C940D",
+          rotation: 3.8,
+          zorder: 10,
+          transform: true        
+        },
+        {
+          x: 0.70,
+          y: 0.68,
+          s: "FASER 2", 
+          ha: "left",
+          va: "bottom",
+          fontsize: 5.0,
+          fontweight: "bold",
+          fontfamily: "STIXGeneral",
+          color: "black",
+          rotation: 43,
+          zorder: 10,
+          transform: true        
+        },
+        {
+          x: 0.54,
+          y: 0.27,
+          s: "compressed EWino", 
+          ha: "left",
+          va: "bottom",
+          fontsize: 5.0,
+          fontweight: "bold",
+          fontfamily: "STIXGeneral",
+          # color: "#986D29",
+          color: "#004DB9",
+          rotation: 10,
+          zorder: 10,
+          transform: true         
+        },
+        {
+          x: 0.6,
+          y: 0.11,
+          s: "$3\\ell$ or soft $2\\ell$", 
+          ha: "left",
+          va: "bottom",
+          fontsize: 5.0,
+          fontweight: "bold",
+          fontfamily: "STIXGeneral",
+          color: "#5A29EF",
+          rotation: 3,
+          zorder: 10,
+          transform: true         
+        } 
+      ]
+    axc:
+      label:
+        xlabel: $c\tau\left( \tilde{\chi}_2^0 \right)~(\rm cm)$
+      # xscale: "log"
+  layers:
+  - name: outFASER2 
+    data: 
+    - source: dfTB02
+    axes: ax 
+    method: voronoi 
+    coordinates:
+      x:      {expr: "np.abs(M1)/1000"}
+      y:      {expr: "np.abs(M2)/1000"}
+      z:      {expr: "1.0 / WN2 * 0.179e-15 * 100"}
+      where:  {expr: "FASER2(np.log(WN2)) < np.abs(mN2)"}
+    style:
+      cmap: jarvis_rainbow2_r
+      vmin: 1.e-6
+      vmax: 1.e+4
+      norm: "log"
+      zorder: 1
+  - name: inFASER2 
+    data: 
+    - source: dfTB02
+    axes: ax 
+    method: voronoi 
+    coordinates:
+      x:      {expr: "np.abs(M1)/1000"}
+      y:      {expr: "np.abs(M2)/1000"}
+      where:  {expr: "FASER2(np.log(WN2)) > np.abs(mN2)"}
+    style:
+      edgecolor: "#015B98"
+      linewidth:  0.1
+      facecolor: "#01A9F4"
+      zorder: 1.9
+  - name: DisplacedTR 
+    data: 
+    - source: dfTB02
+    axes: ax 
+    method: voronoif
+    coordinates:
+      x:      {expr: "np.abs(M1)/1000"}
+      y:      {expr: "np.abs(M2)/1000"}
+      where:  {expr: "CMSDpTR(np.abs(mC1) - np.abs(mN1)) > np.abs(mC1)"}
+    style:
+      facecolor:  "None"
+      edgecolor:  "#5C940D"
+      linewidth:  0.5
+      hatch_linewidth: 1.0
+      hatch: '\\\\\\'
+      alpha: 0.85
+      zorder: 1.8
+  - name: CompEWino 
+    data: 
+    - source: dfTB02
+    axes: ax 
+    method: voronoif
+    coordinates:
+      x:      {expr: "np.abs(M1)/1000"}
+      y:      {expr: "np.abs(M2)/1000"}
+      where:  {expr: (CompEWino(2.0*(np.abs(mC1) - np.abs(mN1))) > np.abs(mC1)) & (CompEWino(np.abs(mN2) - np.abs(mN1)) > np.abs(mN2))}
+    style:
+      facecolor:  "None"
+      edgecolor:  "#00C3DC"
+      linewidth:  0.5
+      hatch_linewidth: 1.0
+      hatch: '\\\\\\'
+      alpha: 0.85
+      zorder: 1.8
+  - name: 3L2L 
+    data: 
+    - source: dfTB02
+    axes: ax 
+    method: voronoif
+    coordinates:
+      x:      {expr: "np.abs(M1)/1000"}
+      y:      {expr: "np.abs(M2)/1000"}
+      where:  {expr: (np.abs(mC1) - np.abs(mN1) > 1.5) & (np.abs(mN2) - np.abs(mN1) > 3.0)}
+    style:
+      facecolor:  "None"
+      edgecolor:  "#7950F2"
+      linewidth:  0.5
+      hatch_linewidth: 1.0
+      hatch: '\\\\\\'
+      alpha: 0.85
+      zorder: 1.8
+
 
 output:
-  dir: ./Workshop/HinoLLP/Plots
+  dir: ../Workshop/HinoLLP/Plots
   dpi: 600
   formats:
   - png
+  - pdf
 project:
   name: JarvisPLOT Demo (minimal)
 version: 0.3
 
+Functions: 
+  - name: FASER2
+    source:
+      type: csv
+      path: ../Workshop/HinoLLP/Fns/FASER2_620.csv
+      x: "np.log(y)"
+      y: "x"
+      sort_by: "y"
+      drop_duplicates: "y"
+    method: interp1d
+    options:
+      kind: linear
+      bounds: clamp  
+  - name: CMSDpTR
+    source:
+      type: csv
+      path: ../Workshop/HinoLLP/Fns/CMS_SUS_24_012.csv
+      x: "y"
+      y: "x"
+      sort_by: "y"
+    method: interp1d
+    options:
+      kind: linear
+      bounds: clamp  
+  - name: ATLASDpTR
+    source:
+      type: csv
+      path: ../Workshop/HinoLLP/Fns/ATLAS_2401_14046.csv
+      x: "y"
+      y: "x"
+      sort_by: "y"
+    method: interp1d
+    options:
+      kind: linear
+      bounds: clamp  
+  - name: CMSDaTR
+    source:
+      type: csv
+      path: ../Workshop/HinoLLP/Fns/CMS_2309_16823.csv
+      x: "x"
+      y: "y"
+      sort_by: "x"
+    method: interp1d
+    options:
+      kind: linear
+      bounds: clamp  
+  - name: ATLASDaTR
+    source:
+      type: csv
+      path: ../Workshop/HinoLLP/Fns/ATLAS_2201_02472.csv
+      x: "x"
+      y: "y"
+      sort_by: "x"
+    method: interp1d
+    options:
+      kind: linear
+      bounds: clamp  
+  - name: CompEWino
+    source:
+      type: csv
+      path: ../Workshop/HinoLLP/Fns/CMS_EXO_23_017.csv
+      x: "y"
+      y: "x"
+      sort_by: "y"
+    method: interp1d
+    options:
+      kind: linear
+      bounds: clamp  
 
 
 
 
 
 
+# # https://arxiv.org/pdf/2401.14046
+# # ATLAS isolated track. 
+# df7 = pd.read_csv("./data/ATLAS_2401_14046.csv")
 
+# # https://arxiv.org/pdf/2201.02472
+# # ATLAS Disappearing track 
+# df9 = pd.read_csv("./data/ATLAS_2201_02472.csv")
 
-
-
-
-
+# # https://arxiv.org/pdf/2309.16823
+# # CMS Disappearing track 
+# df10 = pd.read_csv("./data/CMS_2309_16823.csv")
 

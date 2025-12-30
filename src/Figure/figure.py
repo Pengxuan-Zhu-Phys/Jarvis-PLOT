@@ -192,6 +192,7 @@ class Figure:
         self._logger    = None
         self._frame     = {}
         self._outinfo   = {}
+        self._yaml_dir  = None  # directory of the active YAML file (used to resolve relative paths)
         self.axes       = {}
         self.debug      = False
         # self._axtri     = None
@@ -222,7 +223,7 @@ class Figure:
     
     @config.setter
     def config(self, infos):
-        self.dir = self.load_path(infos['output'].get("dir", "."))
+        self.dir = self.load_path(infos['output'].get("dir", "."), base_dir=self._yaml_dir)
         if not os.path.exists(self.dir):
             os.makedirs(self.dir)
         self.fmts   = infos['output'].get("formats", ['png'])
@@ -348,256 +349,9 @@ class Figure:
                 return dts 
         # Unsupported lyinfo shape -> no data
         return None
-         
-    def _sort_df_by_expr(self, df: pd.DataFrame, expr: str) -> pd.DataFrame:
-        """
-        Sort the dataframe by evaluating the given expression.
-        The expression can be a column name or a valid expression understood by _eval_series.
-        Returns a new DataFrame sorted ascending by the evaluated values.
-        """
-        if df is None or expr is None:
-            return df
-        try:
-            # Try evaluate as expression (could be column or expression)
-            values = self._eval_series(df, {"expr": expr})
-            df = df.assign(__sortkey__=values)
-            df = df.sort_values(by="__sortkey__", ascending=True)
-            df = df.drop(columns=["__sortkey__"])
-            return df
-        except Exception as e:
-            if hasattr(self, "logger") and self.logger:
-                self.logger.warning(f"LB: sortby failed for expr={expr}: {e}")
-            return df         
+               
          
     def load_bool_df(self, df, transform):
-        def filter(df, condition):
-            try:
-                # 0) Bool 
-                if isinstance(condition, bool):
-                    return df.copy() if condition else df.iloc[0:0].copy()
-                if isinstance(condition, (int, float)) and condition in (0, 1):
-                    return df.copy() if int(condition) == 1 else df.iloc[0:0].copy()
-
-                # 1) Standard str
-                if isinstance(condition, str):
-                    s = condition.strip()
-                    low = s.lower()
-                    if low in {"true", "t", "yes", "y"}:
-                        return df.copy()
-                    if low in {"false", "f", "no", "n"}:
-                        return df.iloc[0:0].copy()
-
-                    # Support C-style logical operators
-                    s = s.replace("&&", " & ").replace("||", " | ")
-
-                    condition = s
-                else:
-                    raise TypeError(f"Unsupported condition type: {type(condition)}")
-
-                # 2) safe env + eval
-                from ..inner_func import update_funcs
-                import math
-                allowed_globals = update_funcs({"np": np, "math": math})
-                local_vars = df.to_dict("series")
-
-                mask = eval(condition, allowed_globals, local_vars)
-
-                # 3) Normalized to a boolean Series aligned with df
-                if isinstance(mask, (bool, np.bool_, int, float)):
-                    return df.copy() if bool(mask) else df.iloc[0:0].copy()
-                if not isinstance(mask, pd.Series):
-                    mask = pd.Series(mask, index=df.index)
-
-                mask = mask.astype(bool)
-                return df[mask]
-
-            except Exception as e:
-                self.logger.error(f"Errors when evaluating condition -> {condition}:\n\t{e}")
-                return pd.DataFrame(index=df.index).iloc[0:0].copy()
-
-        def profiling(df, prof):
-            global zscale
-
-            def profile_bridson_sorted(idx, xx, yy, zz, radius, msk):
-                for i in range(len(idx)):
-                    if not msk[i]:
-                        continue
-                    dx = xx[idx > idx[i]] - xx[i]
-                    dy = yy[idx > idx[i]] - yy[i]
-                    dz = zz[idx > idx[i]] - zz[i]
-                    dist0 = (dx**2 + dy**2)**0.5
-                    dist1 = (dx**2 + dy**2 + dz**2)**0.5
-                    near0 = (dist0 < 0.707 * radius) | (dist0 < radius) & (dist1 > radius)
-                    sel = (idx > idx[i])
-                    msk[sel] &= ~near0                     
-                return msk
-            
-            bin     = prof.get("bin", 100)
-            coors   = prof.get("coordinates", {})
-            obj     = prof.get("objective", "max")
-            grid    = prof.get("grid_points", "rect")
-            gdata   = None 
-
-            radius  = 1 / bin 
-            if "expr" in coors['x'].keys():
-                x = self._eval_series(df, coors['x'])
-            else: 
-                x = df['x']
-            
-            if "expr" in coors['y'].keys():
-                y = self._eval_series(df, coors['y'])
-            else: 
-                y = df['y']
-                
-            if "expr" in coors['z'].keys():
-                z = self._eval_series(df, coors['z'])
-            else: 
-                z = df['z']
-
-            self.logger.debug("After loading profiling x, y, z. ")
-
-            if grid == "ternary":
-                xlim = coors['x'].get("lim", [0, 1])
-                ylim = coors['y'].get("lim", [0, 1])
-                zlim = coors['z'].get("lim", [np.min(z), np.max(z)])
-                xscale = coors['x'].get("scale", "linear")
-                yscale = coors['y'].get("scale", "linear")
-                zscale = coors['z'].get("scale", "linear")
-                zind   = coors['z'].get("name", "z")
-                xind   = coors['x'].get("name", "x")
-                yind   = coors['y'].get("name", "y")
-            elif grid == "rect":
-                xlim = coors['x'].get("lim", [np.min(x), np.max(x)])
-                ylim = coors['y'].get("lim", [np.min(y), np.max(y)])
-                zlim = coors['z'].get("lim", [np.min(z), np.max(z)])
-
-                xscale = coors['x'].get("scale", "linear")
-                yscale = coors['y'].get("scale", "linear")
-                zscale = coors['z'].get("scale", "linear")
-
-                zind = coors['z'].get("name", "z")
-                xind = coors['x'].get("name", "x")
-                yind = coors['y'].get("name", "y") 
-
-            # mapping x, y, z to range [0, 1]
-            # if "lim" in coors['x'].keys():
-            #     if xscale == "log":
-            #         x = (np.log(x) - np.log(xlim[0])) / (np.log(xlim[1]) - np.log(xlim[0]))
-            #     else:   # linear scale
-            #         x = (x - xlim[0]) / (xlim[1] - xlim[0])
-
-            # if "lim" in coors['y'].keys():
-            #     if yscale == "log":
-            #         y = (np.log(y) - np.log(ylim[0])) / (np.log(ylim[1]) - np.log(ylim[0]))
-            #     else:   # linear scale
-            #         y = (y - ylim[1]) / (ylim[0] - ylim[1])
-                                       
-            # if zscale == "log":
-            #     z = (np.log(z) - np.log(zlim[0])) / (np.log(zlim[1]) - np.log(zlim[0])) 
-            # else:   # linear scale 
-            #     z = (z - zlim[0]) / (zlim[1] - zlim[0])      
-
-            # profiling will add new columns into dataframe, so that can be used in the next step
-            df[xind] = x 
-            df[yind] = y
-            df[zind] = z
-            # print(x.min(), x.max(), y.min(), y.max(), z.min(), z.max())
-
-
-            if grid == "ternary":
-                bb = np.linspace(0, 1, bin + 1)
-                rr = np.linspace(0, 1, bin + 1)
-                Bg, Rg = np.meshgrid(bb, rr)
-
-                r = Rg.ravel()
-                b = Bg.ravel() 
-                l = 1.0 - b - r
-                mask = (l >= 0) & (b >= 0) & (r >= 0)
-                x = b + 0.5 * r 
-                y = r 
-
-                xxg, yyg = x[mask], y[mask]
-                llg, bbg, rrg, = l[mask], b[mask], r[mask]
-                gdata = pd.DataFrame({
-                    xind: xxg, 
-                    yind: yyg, 
-                    zind: np.ones(xxg.shape) * (np.min(z) - 0.1)
-                })
-
-            elif grid == "rect":
-                xx = np.linspace(xlim[0], xlim[1], bin+1)
-                yy = np.linspace(ylim[0], ylim[1], bin+1)
-                xg, yg = np.meshgrid(xx, yy)
-
-                gdata = pd.DataFrame({
-                    xind: xg.ravel(),
-                    yind: yg.ravel(),
-                    zind: np.ones(xg.ravel().shape) * (np.min(z) - 0.1)
-                })
-
-            if obj == "max":    
-                df = df.sort_values(zind, ascending=False).reset_index(drop=True)
-            elif obj == "min":
-                df = df.sort_values(zind, ascending=True).reset_index(drop=True)
-            else:
-                df = df.sort_values(zind, ascending=False).reset_index(drop=True)
-                self.logger.error("Sort dataset method: objective: {} not support, using default value -> 'max'".format(obj))
-            df = pd.concat([df, gdata], ignore_index=True)
-                        
-            idx = deepcopy(np.array(df.index))
-            xx  = deepcopy(np.array(df[xind]))
-            yy  = deepcopy(np.array(df[yind]))
-            zz  = deepcopy(np.array(df[zind]))
-            # mapping xx, yy, zz to range [0, 1]
-            if xscale == "log":
-                xx = (np.log(xx) - np.log(xlim[0])) / (np.log(xlim[1]) - np.log(xlim[0]))
-            else:  # linear scale
-                xx = (xx - xlim[0]) / (xlim[1] - xlim[0])
-
-            if yscale == "log":
-                yy = (np.log(yy) - np.log(ylim[0])) / (np.log(ylim[1]) - np.log(ylim[0]))
-            else:  # linear scale
-                yy = (yy - ylim[0]) / (ylim[1] - ylim[0])
-
-            if zscale == "log":
-                zz = (np.log(zz) - np.log(zlim[0])) / (np.log(zlim[1]) - np.log(zlim[0]))
-            else:  # linear scale
-                zz = (zz - zlim[0]) / (zlim[1] - zlim[0])
-
-            # (removed print(radius))
-            msk = np.full(idx.shape, True)
-            msk = profile_bridson_sorted(idx, xx, yy, zz, radius, msk)
-            df = df.iloc[idx[msk]]
-
-            return df 
-
-        def sortby(df, expr):
-            try:
-                # Use the new helper to sort by expr
-                return self._sort_df_by_expr(df, expr)
-            except Exception as e:
-                if hasattr(self, "logger") and self.logger:
-                    self.logger.warning(f"sortby failed for expr={expr}: {e}")
-                return df
-
-        def addcolumn(df, adds):
-            try: 
-                name = adds.get("name", False)
-                expr = adds.get("expr", False)
-                if not (name and expr):
-                    self.logger.error("Error in loading add_column -> {}".format(adds))
-                from ..inner_func import update_funcs
-                import math
-                allowed_globals = update_funcs({"np": np, "math": math})
-                local_vars = df.to_dict("series") 
-                value = eval(str(expr), allowed_globals, local_vars)
-                df[name] = value 
-                return df
-            except Exception as e: 
-                self.logger.error("Errors when add new column -> {}:\n\t{}".format(adds, json.dumps(e)))   
-                return df               
-            
-        
         if transform is None:
             return df 
         elif not isinstance(transform, list): 
@@ -607,16 +361,21 @@ class Figure:
             for trans in transform:
                 self.logger.debug("Applying the transform ... ")
                 if "filter" in trans.keys():
-                    df = filter(df, trans['filter'])
+                    self.logger.debug("Before filtering -> {}".format(df.shape))
+                    from .load_data import filter
+                    df = filter(df, trans['filter'], self.logger)
                     self.logger.debug("After filtering -> {}".format(df.shape))
                 elif "profile" in trans.keys(): 
-                    df = profiling(df, trans['profile'])
+                    from .load_data import profiling
+                    df = profiling(df, trans['profile'], self.logger)
                     self.logger.debug("After profiling -> {}".format(df.shape))
                 elif "sortby" in trans.keys(): 
-                    df = sortby(df, trans['sortby'])
+                    from .load_data import sortby
+                    df = sortby(df, trans['sortby'], self.logger)
                     self.logger.debug("After sortby -> {}".format(df.shape))
                 elif "add_column" in trans.keys(): 
-                    df = addcolumn(df, trans['add_column'])
+                    from .load_data import addcolumn
+                    df = addcolumn(df, trans['add_column'], self.logger)
                     self.logger.debug("After Add-column -> {}".format(df.shape))
                 
             return df 
@@ -1212,6 +971,19 @@ class Figure:
             else:
                 changed = False
 
+            # Base directory for resolving relative paths (e.g. output.dir, resources, etc.)
+            # Core should pass one of these keys.
+            if "yaml_dir" in info:
+                self._yaml_dir = info.get("yaml_dir")
+            elif "_yaml_dir" in info:
+                self._yaml_dir = info.get("_yaml_dir")
+            elif "yaml_path" in info:
+                try:
+                    from pathlib import Path
+                    self._yaml_dir = str(Path(info.get("yaml_path")).expanduser().resolve().parent)
+                except Exception:
+                    pass
+
             if "debug" in info:
                 self.debug = info['debug']
                 try:
@@ -1279,13 +1051,31 @@ class Figure:
     def set(self, info: Mapping) -> bool:
         return self.from_dict(info)
     
-    def load_path(self, path):
-        if "&JP/" == path[0:4]:
-            path = os.path.abspath( os.path.join(jppwd, path[4:]) )
-        else:
-            from pathlib import Path
-            path = Path(path).expanduser().resolve()
-        return path
+    def load_path(self, path, base_dir=None):
+        """Resolve a path string.
+
+        Rules:
+          - "&JP/..." is resolved relative to JarvisPLOT project root (jppwd).
+          - Absolute paths are kept.
+          - Relative paths are resolved relative to `base_dir` if provided, otherwise CWD.
+        """
+        path = str(path)
+        if path.startswith("&JP/"):
+            return os.path.abspath(os.path.join(jppwd, path[4:]))
+
+        from pathlib import Path
+        p = Path(path).expanduser()
+        if p.is_absolute():
+            return str(p.resolve())
+
+        if base_dir:
+            try:
+                bd = Path(str(base_dir)).expanduser().resolve()
+                return str((bd / p).resolve())
+            except Exception:
+                pass
+
+        return str(p.resolve())
     
     # --- unified method dispatch ---
     METHOD_DISPATCH = {
@@ -1299,7 +1089,8 @@ class Figure:
         "hexbin": "hexbin",
         "tricontour": "tricontour",
         "tricontourf": "tricontourf",
-        "voronoi": "voronoi"
+        "voronoi": "voronoi",
+        "voronoif": "voronoif"
     }
 
     def _eval_series(self, df: pd.DataFrame, set: dict):
@@ -1613,4 +1404,3 @@ def auto_clip(artists, ax):
 
     _apply(artists)
     return artists
-

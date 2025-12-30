@@ -8,6 +8,8 @@ import json
 
 from matplotlib.axes import Axes
 from matplotlib.collections import PolyCollection, LineCollection
+from matplotlib.path import Path
+from matplotlib.patches import PathPatch
 #
 from .helper import _auto_clip, _mask_by_extend, voronoi_finite_polygons_2d, _clip_poly_to_rect
 
@@ -141,14 +143,157 @@ class StdAxesAdapter:
         artists = self.ax.tricontourf(tri_refi, z_for_plot, **kw)
         return _auto_clip(artists, self.ax, self._clip_path)
 
+    
+
     def voronoi(self, **kwargs):
-        """Fill regions by Voronoi cells colored by z at each site."""
+        if {"x", "y", "z"}.issubset(kwargs.keys()):
+            return self.voronoi_cmapfill(**kwargs)
+        elif {"x", "y"}.issubset(kwargs.keys()): 
+            return self.voronoi_colorfill(**kwargs)
+
+    def voronoi_colorfill(self, **kwargs):
+        """Fill selected Voronoi cells with a single facecolor (no z / no colorbar).
+
+        Required:
+          - x, y
+        Optional:
+          - where: boolean mask (same shape as x/y). If provided, only True cells are filled.
+          - facecolor, edgecolor, linewidth/linewidths, draw_edges, antialiased, extent, radius, zorder
+        """
+        import numpy as _np
+        try:
+            from scipy.spatial import Voronoi
+        except Exception as e:
+            raise ImportError("voronoi requires scipy.spatial.Voronoi. Please install scipy.") from e
+
+        x = kwargs.pop("x")
+        y = kwargs.pop("y")
+        where = kwargs.pop("where", None)
+
+        # Keep matplotlib fill kwargs intact (facecolor/edgecolor/linewidth/alpha/etc.).
+        # Only consume voronoi-specific options here.
+        extent = kwargs.pop("extent", None)   # data-space
+        radius = kwargs.pop("radius", None)
+
+        if x.size == 0:
+            return []
+
+        # ---- derive view box & transforms from axes ----
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+        if extent is None:
+            extent = (min(xlim), max(xlim), min(ylim), max(ylim))
+        xmin, xmax, ymin, ymax = extent
+
+        t_data_to_disp = self.ax.transData
+        t_disp_to_data = t_data_to_disp.inverted()
+
+        disp_ll = t_data_to_disp.transform((xmin, ymin))
+        disp_ur = t_data_to_disp.transform((xmax, ymax))
+        disp_x0, disp_y0 = disp_ll
+        disp_x1, disp_y1 = disp_ur
+
+        # robust ordering / non-zero spans
+        if disp_x1 == disp_x0:
+            disp_x1 = disp_x0 + 1.0
+        if disp_y1 == disp_y0:
+            disp_y1 = disp_y0 + 1.0
+        if disp_x1 < disp_x0:
+            disp_x0, disp_x1 = disp_x1, disp_x0
+        if disp_y1 < disp_y0:
+            disp_y0, disp_y1 = disp_y1, disp_y0
+
+        disp_w = (disp_x1 - disp_x0)
+        disp_h = (disp_y1 - disp_y0)
+
+        pts_disp = t_data_to_disp.transform(_np.c_[x, y])
+        pts_norm = _np.c_[
+            (pts_disp[:, 0] - disp_x0) / disp_w,
+            (pts_disp[:, 1] - disp_y0) / disp_h,
+        ]
+
+        if not _np.all(_np.isfinite(pts_norm)):
+            pts_norm = _np.nan_to_num(pts_norm, nan=0.5, posinf=1.0, neginf=0.0)
+
+        vor = Voronoi(pts_norm)
+
+        regions, vertices = voronoi_finite_polygons_2d(vor, radius=radius)
+        unit_rect = (0.0, 1.0, 0.0, 1.0)
+
+        polys_fill = []
+        for i_pt, region in enumerate(regions):
+            if not region:
+                continue
+            if where is not None and (not bool(where[i_pt])):
+                continue
+
+            poly = vertices[region]
+            poly = [(float(px), float(py)) for px, py in poly]
+            poly = _clip_poly_to_rect(poly, unit_rect)
+            if len(poly) < 3:
+                continue
+
+            # norm -> display -> data
+            poly_disp = _np.c_[
+                _np.array([p[0] for p in poly]) * disp_w + disp_x0,
+                _np.array([p[1] for p in poly]) * disp_h + disp_y0,
+            ]
+            poly_data = [tuple(p) for p in t_disp_to_data.transform(poly_disp)]
+            polys_fill.append(poly_data)
+
+        if len(polys_fill) == 0:
+            return []
+
+        # Merge selected Voronoi cells into one (possibly multi-) polygon, then fill using ax.fill
+        try:
+            from shapely.geometry import Polygon as _SHPPolygon
+            from shapely.ops import unary_union as _shp_unary_union
+        except Exception as e:
+            raise ImportError("voronoi_colorfill merge requires shapely. Please install shapely.") from e
+
+        shp_polys = []
+        for poly in polys_fill:
+            try:
+                g = _SHPPolygon(poly)
+                if not g.is_valid:
+                    g = g.buffer(0)
+                if (not g.is_empty) and g.area > 0:
+                    shp_polys.append(g)
+            except Exception:
+                continue
+
+        if not shp_polys:
+            return []
+
+        merged = _shp_unary_union(shp_polys)
+        if merged.is_empty:
+            return []
+
+        # Inherit matplotlib fill kwargs (plus any defaults for 'fill')
+        kw = self._merge("fill", kwargs)
+
+        artists = []
+        if merged.geom_type == "Polygon":
+            parts = [merged]
+        else:
+            parts = list(getattr(merged, "geoms", []))
+
+        for g in parts:
+            if g.is_empty:
+                continue
+            xs, ys = g.exterior.coords.xy
+            artists.extend(self.ax.fill(list(xs), list(ys), **kw))
+
+        return _auto_clip(artists, self.ax, self._clip_path)
+
+
+    def voronoi_cmapfill(self, **kwargs): 
         import matplotlib as mpl
         x = kwargs.pop("x")
         y = kwargs.pop("y")
         z = kwargs.pop("z")
+        where = kwargs.pop("where", None)
         cmap = kwargs.pop("cmap", None)
-        # Matplotlib colormap resolution for string names
         if isinstance(cmap, str):
             try:
                 cmap = mpl.colormaps.get(cmap)
@@ -165,6 +310,10 @@ class StdAxesAdapter:
         x = _np.asarray(x)
         y = _np.asarray(y)
         z = _np.asarray(z)
+        if where is not None:
+            where = _np.asarray(where, dtype=bool)
+            if where.shape != x.shape:
+                raise ValueError("voronoi: 'where' must have the same shape as x/y")
         # print(x, y, z)
         # self.ax.scatter(x, y, s=0.3, marker='.', c="#FF42A1", zorder=10, edgecolors="none")
         vmin = kwargs.pop("vmin", None)
@@ -227,6 +376,8 @@ class StdAxesAdapter:
         for i_pt, region in enumerate(regions):
             if not region:
                 continue
+            if where is not None and (not bool(where[i_pt])):
+                continue
             poly = vertices[region]
             poly = [(float(px), float(py)) for px, py in poly]
             poly = _clip_poly_to_rect(poly, unit_rect)
@@ -244,18 +395,6 @@ class StdAxesAdapter:
 
         from matplotlib.collections import PolyCollection
         artists = []
-        # if polys_bg:
-        #     pc_bg = PolyCollection(
-        #         polys_bg,
-        #         facecolor=(nan_color if nan_color is not None else self.ax.get_facecolor()),
-        #         edgecolor='none',
-        #         linewidth=0.0,
-        #         antialiased=antialiased,
-        #     )
-        #     if zorder is not None:
-        #         pc_bg.set_zorder(zorder)
-        #     artists.append(self.ax.add_collection(pc_bg))
-
         from matplotlib import colors as mcolors
         norm = kwargs.pop("norm", None)
         if norm is None and (vmin is not None or vmax is not None):
@@ -275,19 +414,260 @@ class StdAxesAdapter:
 
         artists.append(self.ax.add_collection(pc))
 
-        # from matplotlib.collections import LineCollection
-        # if draw_edges and orig_lw > 0.0 and edgecolor not in (None, 'none'):
-        #     lc = LineCollection(
-        #         polys_valid,
-        #         colors=edgecolor,
-        #         linewidths=orig_lw,
-        #         antialiased=antialiased,
-        #     )
-        #     if zorder is not None:
-        #         lc.set_zorder(zorder + 0.1 if isinstance(zorder, (int, float)) else zorder)
-        #     artists.append(self.ax.add_collection(lc))
+        return _auto_clip(artists, self.ax, self._clip_path)
+
+    def voronoif(self, **kwargs):
+        """Hatched fill for a boundary layer of a where-selected Voronoi region.
+
+        Algorithm:
+          1) Use `where` to select Voronoi cells and union them into region A.
+          2) For each selected cell, keep it only if the site point (core) is within
+             `core_dist` (in axes-intrinsic unit-square coords) of the *boundary of A*.
+             The kept cells form region B.
+          3) Hatch-fill the union of B.
+
+        Inputs:
+          - x, y: 1D arrays of site positions (data coordinates)
+          - where: optional 1D boolean array; True selects the corresponding Voronoi cell for region A
+
+        Keyword options:
+          - core_dist: float, core-to-boundary(A) distance threshold in unit-square coords (default 0.05)
+          - hatch: str (default '///')
+          - extent: (xmin, xmax, ymin, ymax) in data coords (default: current view)
+          - radius: passed to voronoi_finite_polygons_2d
+          - frame_strip: float, exclude hatch within this strip near axes frame (unit-square, default 0.0)
+          - All standard `fill` kwargs are inherited (facecolor/edgecolor/linewidth/alpha/...) via adapter defaults.
+        """
+        import numpy as _np
+
+        x = kwargs.pop("x")
+        y = kwargs.pop("y")
+        where = kwargs.pop("where", None)
+
+        core_dist = 0.025
+        frame_strip = 0.0
+
+        kw_all = self._merge("fill", kwargs)
+        from .helper import split_fill_kwargs
+        kw_edge, kw_face, kw_rest = split_fill_kwargs(kw_all)
+        kw_edge.update(kw_rest)
+        kw_face.update(kw_rest)
+        # ---- inputs ----
+        x = _np.asarray(x)
+        y = _np.asarray(y)
+        if x.shape != y.shape:
+            raise ValueError("voronoif: x and y must have the same shape")
+        if x.size == 0:
+            return []
+
+        if where is None:
+            where = _np.ones_like(x, dtype=bool)
+
+        try:
+            from scipy.spatial import Voronoi
+        except Exception as e:
+            raise ImportError("voronoif requires scipy.spatial.Voronoi. Please install scipy.") from e
+
+        try:
+            from shapely.geometry import Polygon as _SHPPolygon, Point as _SHPPoint, box as _SHPBox
+            from shapely.ops import unary_union as _shp_unary_union
+        except Exception as e:
+            raise ImportError("voronoif requires shapely. Please install shapely.") from e
+
+        # ---- derive view box & transforms from axes ----
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+        extent = (min(xlim), max(xlim), min(ylim), max(ylim))
+        xmin, xmax, ymin, ymax = extent
+
+        t_data_to_disp = self.ax.transData
+
+        disp_ll = t_data_to_disp.transform((xmin, ymin))
+        disp_ur = t_data_to_disp.transform((xmax, ymax))
+        disp_x0, disp_y0 = disp_ll
+        disp_x1, disp_y1 = disp_ur
+
+        # robust ordering / non-zero spans
+        if disp_x1 == disp_x0:
+            disp_x1 = disp_x0 + 1.0
+        if disp_y1 == disp_y0:
+            disp_y1 = disp_y0 + 1.0
+        if disp_x1 < disp_x0:
+            disp_x0, disp_x1 = disp_x1, disp_x0
+        if disp_y1 < disp_y0:
+            disp_y0, disp_y1 = disp_y1, disp_y0
+
+        disp_w = (disp_x1 - disp_x0)
+        disp_h = (disp_y1 - disp_y0)
+
+        # ---- sites in axes-intrinsic unit-square coords ----
+        pts_disp = t_data_to_disp.transform(_np.c_[x, y])
+        pts_norm = _np.c_[
+            (pts_disp[:, 0] - disp_x0) / disp_w,
+            (pts_disp[:, 1] - disp_y0) / disp_h,
+        ]
+        if not _np.all(_np.isfinite(pts_norm)):
+            pts_norm = _np.nan_to_num(pts_norm, nan=0.5, posinf=1.0, neginf=0.0)
+
+        vor = Voronoi(pts_norm)
+        regions, vertices = voronoi_finite_polygons_2d(vor)
+        unit_rect = (0.0, 1.0, 0.0, 1.0)
+
+        # ---- collect A: where-selected cell polygons (unit-square) ----
+        polys_A_unit = []
+        idx_A = []
+        poly_by_idx = {}
+        for i_pt, region in enumerate(regions):
+            if (not where[i_pt]) or (not region):
+                continue
+            poly = vertices[region]
+            poly = [(float(px), float(py)) for px, py in poly]
+            poly = _clip_poly_to_rect(poly, unit_rect)
+            if len(poly) < 3:
+                continue
+            try:
+                g = _SHPPolygon(poly)
+                if not g.is_valid:
+                    g = g.buffer(0)
+                if g.is_empty or g.area <= 0:
+                    continue
+                polys_A_unit.append(g)
+                idx_A.append(i_pt)
+                poly_by_idx[i_pt] = g
+            except Exception:
+                continue
+
+        if not polys_A_unit:
+            return []
+
+        A = _shp_unary_union(polys_A_unit)
+        if A.is_empty:
+            return []
+
+        # ---- filter cells in A by core distance to boundary(A) ----
+        B_polys = []
+        bnd = A.boundary
+
+        # Exclude boundary segments that coincide with the axes frame (unit-square edges).
+        # We do this by intersecting with a slightly shrunken unit box, removing edges at u/v=0/1.
+        eps = 1.e-9
+        inner = _SHPBox(eps, eps, 1.0 - eps, 1.0 - eps)
+        bnd = bnd.intersection(inner)
+        # bnd: shapely LineString/MultiLineString in unit-square coords
+        if not (bnd is None or bnd.is_empty):
+            lines = []
+            gt = bnd.geom_type
+            if gt == "LineString":
+                lines = [bnd]
+            elif gt == "MultiLineString":
+                lines = list(bnd.geoms)
+            elif gt == "GeometryCollection":
+                for g in bnd.geoms:
+                    if g.geom_type == "LineString":
+                        lines.append(g)
+                    elif g.geom_type == "MultiLineString":
+                        lines.extend(list(g.geoms))
+            for line in lines: 
+                lind = line.buffer(0.001, cap_style=2, join_style=2)
+                xs, ys = lind.exterior.coords.xy 
+                self.ax.fill(list(xs), list(ys), **kw_edge, transform=self.ax.transAxes)
+
+        
+        for i_pt in idx_A:
+            u, v = float(pts_norm[i_pt, 0]), float(pts_norm[i_pt, 1])
+            try:
+                d = _SHPPoint(u, v).distance(bnd)
+            except Exception:
+                continue
+            if d < core_dist:
+                B_polys.append(poly_by_idx[i_pt])
+
+        if not B_polys:
+            return []
+
+        B = _shp_unary_union(B_polys)
+        if B.is_empty:
+            return []
+
+        # Inherit matplotlib fill kwargs (plus any defaults for 'fill')
+        kw_face = self._merge("fill", kw_face)
+        kw_face['linewidth'] = 0.
+
+        artists = []
+        if B.geom_type == "Polygon":
+            parts = [B]
+        else:
+            parts = list(getattr(B, "geoms", []))
+
+        for g in parts:
+            if g.is_empty:
+                continue
+            xs, ys = g.exterior.coords.xy
+            artists.extend(self.ax.fill(list(xs), list(ys), **kw_face, transform=self.ax.transAxes))
 
         return _auto_clip(artists, self.ax, self._clip_path)
+
+
+
+
+        # ---- optionally exclude hatch near the axes frame ----
+        if frame_strip > 0:
+            F = _SHPBox(0.0, 0.0, 1.0, 1.0)
+            Fin = F.buffer(-frame_strip)
+            strip = F.difference(Fin) if not Fin.is_empty else F
+            B = B.difference(strip.intersection(B))
+            if B.is_empty:
+                return []
+
+        # ---- draw hatch fill (HOLE-AWARE) ----
+        # NOTE: ax.fill cannot represent holes; use a PathPatch so removed interior cells stay unhatched.
+        kw = self._merge("fill", kw_face)
+        # kw.setdefault("facecolor", "none")
+        kw["linewidth"]= 0.
+        print(kw)
+        
+        # kw.setdefault("hatch", hatch)
+
+        # Build a compound Path from shapely geometry (Polygon/MultiPolygon) with holes.
+        def _geom_to_path(geom):
+            if geom.is_empty:
+                return None
+            polys = [geom] if geom.geom_type == "Polygon" else list(getattr(geom, "geoms", []))
+            verts = []
+            codes = []
+
+            def _add_ring(coords):
+                ring = list(coords)
+                if len(ring) < 3:
+                    return
+                # Matplotlib expects the last vertex for CLOSEPOLY; shapely rings already repeat the first.
+                # Ensure we have at least 4 points including the closing point.
+                if ring[0] != ring[-1]:
+                    ring.append(ring[0])
+                verts.extend(ring)
+                codes.extend([Path.MOVETO] + [Path.LINETO] * (len(ring) - 2) + [Path.CLOSEPOLY])
+
+            for p in polys:
+                if p.is_empty:
+                    continue
+                _add_ring(p.exterior.coords)
+                for hole in p.interiors:
+                    _add_ring(hole.coords)
+
+            if not verts:
+                return None
+            return Path(verts, codes)
+
+        path = _geom_to_path(B)
+        if path is None:
+            return []
+
+        patch = PathPatch(path, transform=self.ax.transAxes, **kw)
+        if zorder is not None:
+            patch.set_zorder(zorder)
+
+        artist = self.ax.add_patch(patch)
+        return _auto_clip([artist], self.ax, self._clip_path)
 
     # 为了兼容现有框架，暴露底层的方法/属性
     def __getattr__(self, name: str):

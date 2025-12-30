@@ -4,6 +4,62 @@
 from matplotlib.axes import Axes
 import numpy as np
 
+def split_fill_kwargs(kw_all):
+    edge_kws = {
+        "edgecolor", "ec",
+        "linewidth", "lw",
+        "linestyle", "ls",
+        "joinstyle", "capstyle",
+        "alpha"
+    }
+    face_kws = {
+        "facecolor", "fc",
+        "hatch",
+        "hatch_linewidth",
+        "alpha", "edgecolor"
+    }
+    kw_edge = {}
+    kw_face = {}
+    kw_rest = {}
+    for k, v in kw_all.items():
+        if k in edge_kws:
+            kw_edge[k] = v
+        if k in face_kws:
+            kw_face[k] = v
+        else:
+            kw_rest[k] = v
+    return kw_edge, kw_face, kw_rest
+
+def plot_shapely_boundary(ax, geom, *, transform=None, **plot_kw):
+    if geom is None or geom.is_empty:
+        return []
+
+    lines = []
+    gt = geom.geom_type
+    if gt == "LineString":
+        lines = [geom]
+    elif gt == "MultiLineString":
+        lines = list(geom.geoms)
+    elif gt == "GeometryCollection":
+        for g in geom.geoms:
+            if g.geom_type == "LineString":
+                lines.append(g)
+            elif g.geom_type == "MultiLineString":
+                lines.extend(list(g.geoms))
+    else:
+        # 兜底：有时 boundary 可能给出别的类型
+        try:
+            b = geom.boundary
+            return _plot_shapely_boundary(ax, b, transform=transform, **plot_kw)
+        except Exception:
+            return []
+
+    artists = []
+    for ln in lines:
+        xs, ys = ln.coords.xy
+        artists += ax.plot(list(xs), list(ys), transform=transform, **plot_kw)
+    return artists
+
 
 # helper: convert infinite regions to finite polygons (public-domain recipe)
 # Clip polygon to rectangle extent (Sutherland-Hodgman for convex quad)
