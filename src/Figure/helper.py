@@ -70,7 +70,7 @@ def voronoi_finite_polygons_2d(vor, radius=None):
     new_vertices = vor.vertices.tolist()
     center = vor.points.mean(axis=0)
     if radius is None:
-        radius = vor.points.ptp().max() * 2
+        radius = np.ptp(vor.points).max() * 2
     # Construct a map ridge_vertices -> points (pairs)
     all_ridges = {}
     for (p1, p2), (v1, v2) in zip(vor.ridge_points, vor.ridge_vertices):

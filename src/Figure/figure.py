@@ -9,10 +9,116 @@ import pandas as pd
 import matplotlib as mpl
 from types import MethodType
 from .adapters import StdAxesAdapter, TernaryAxesAdapter
+
 import json
+import time
+import re
 
 
 class Figure:
+    def _is_numbered_ax(self, name: str) -> bool:
+        """Return True iff name matches ax<NUMBER>, e.g. ax1, ax2, ax10."""
+        return isinstance(name, str) and re.fullmatch(r"ax\d+", name) is not None
+
+    def _ensure_numbered_rect_axes(self, ax_name: str, kwgs: dict):
+        """Create/configure a numbered rectangular axes (ax1, ax2, ...) using ax-style logic."""
+        if not self._is_numbered_ax(ax_name):
+            raise ValueError(f"Illegal dynamic axes name '{ax_name}'. Only ax<NUMBER> is allowed.")
+
+        # Reuse ax-style construction, but read frame config from frame[ax_name]
+        if ax_name not in self.axes.keys():
+            raw_ax = self.fig.add_axes(**kwgs)
+            if isinstance(kwgs, dict) and ("facecolor" in kwgs):
+                raw_ax.set_facecolor(kwgs['facecolor'])
+            adapter = StdAxesAdapter(raw_ax)
+            adapter._type = "rect"
+            adapter.layers = []
+            adapter._legend = self.frame.get(ax_name, {}).get("legend", False)
+            self.axes[ax_name] = adapter
+            adapter.status = 'configured'
+
+        ax_obj = self.axes[ax_name]
+
+        # ---- identical configuration path as ax, but keyed by ax_name ----
+        if self.frame.get(ax_name, {}).get("spines"):
+            if "color" in self.frame[ax_name]["spines"]:
+                for s in ax_obj.spines.values():
+                    s.set_color(self.frame[ax_name]['spines']['color'])
+
+        # y scale
+        if self.frame.get(ax_name, {}).get("yscale", "").lower() == 'log':
+            ax_obj.set_yscale("log")
+            from matplotlib.ticker import LogLocator
+            ax_obj.yaxis.set_minor_locator(LogLocator(subs='auto'))
+        else:
+            from matplotlib.ticker import AutoMinorLocator
+            ax_obj.yaxis.set_minor_locator(AutoMinorLocator())
+
+        # x scale
+        if self.frame.get(ax_name, {}).get("xscale", "").lower() == 'log':
+            ax_obj.set_xscale("log")
+            from matplotlib.ticker import LogLocator
+            ax_obj.xaxis.set_minor_locator(LogLocator(subs='auto'))
+        else:
+            from matplotlib.ticker import AutoMinorLocator
+            ax_obj.xaxis.set_minor_locator(AutoMinorLocator())
+
+        def _safe_cast(v):
+            try:
+                return float(v)
+            except Exception:
+                return v
+
+        # text
+        if self.frame.get(ax_name, {}).get("text"):
+            for txt in self.frame[ax_name]["text"]:
+                if txt.get("transform", False):
+                    txt.pop("transform")
+                    ax_obj.text(**txt, transform=ax_obj.transAxes)
+                else:
+                    ax_obj.text(**txt)
+
+        # limits
+        xlim = self.frame.get(ax_name, {}).get("xlim")
+        if xlim:
+            ax_obj.set_xlim(list(map(_safe_cast, xlim)))
+
+        ylim = self.frame.get(ax_name, {}).get("ylim")
+        if ylim:
+            ax_obj.set_ylim(list(map(_safe_cast, ylim)))
+
+        # labels
+        if self.frame.get(ax_name, {}).get('labels', {}).get("x"):
+            ax_obj.set_xlabel(self.frame[ax_name]['labels']['x'], **self.frame[ax_name]['labels']['xlabel'])
+        if self.frame.get(ax_name, {}).get('labels', {}).get("y"):
+            ax_obj.set_ylabel(self.frame[ax_name]['labels']['y'], **self.frame[ax_name]['labels']['ylabel'])
+            # ax_obj.yaxis.set_label_coords(
+            #     self.frame[ax_name]['labels']['ylabel_coords']['x'],
+            #     self.frame[ax_name]['labels']['ylabel_coords']['y']
+            # )
+
+        # ticks
+        ax_obj.tick_params(**self.frame.get(ax_name, {}).get('ticks', {}).get("both", {}))
+        ax_obj.tick_params(**self.frame.get(ax_name, {}).get('ticks', {}).get("major", {}))
+        ax_obj.tick_params(**self.frame.get(ax_name, {}).get('ticks', {}).get("minor", {}))
+
+        self._apply_axis_endpoints(ax_obj, self.frame.get(ax_name, {}).get('xaxis', {}), "x")
+        self._apply_axis_endpoints(ax_obj, self.frame.get(ax_name, {}).get('yaxis', {}), "y")
+
+        # finalize
+        if getattr(ax_obj, 'needs_finalize', True) and hasattr(ax_obj, 'finalize'):
+            try:
+                ax_obj.finalize()
+            except Exception as e:
+                if self.logger:
+                    self.logger.warning(f"Finalize failed on axes '{ax_name}': {e}")
+
+        try:
+            self.logger.debug(f"Loaded numbered rectangle axes -> {ax_name}")
+        except Exception:
+            pass
+
+        return ax_obj
     def _has_manual_ticks(self, ax_key: str, which: str) -> bool:
         """Return True if YAML provides manual tick positions for given axis."""
         try:
@@ -57,7 +163,6 @@ class Figure:
         max_cfg = axis_cfg.get("max_endpoints", {})
         width   = abs(lim0 - lim1)
 
-        # print(ticks)
         # 第一个 tick = min 端点
         t0 = ticks[0]
         # Check whether first tick is at the lower boundary
@@ -101,14 +206,52 @@ class Figure:
             # Ensure ticks/labels exist
             labels = axis.get_ticklabels()
 
-            # --- X axis: rotate long labels
+            # --- X axis formatting (match Y axis behavior)
             if which == 'x':
+                try:
+                    xscale = target.get_xscale()
+                except Exception:
+                    xscale = None
+
+                # only touch linear x-axis
+                if xscale not in ('log', 'symlog', 'logit'):
+                    fmt = mticker.ScalarFormatter(useMathText=True)
+                    # Do not use sci/offset for small exponents like 10^-1; reserve for <=1e-2 or >=1e4
+                    fmt.set_powerlimits((-2, 4))
+                    axis.set_major_formatter(fmt)
+                    try:
+                        target.ticklabel_format(style='sci', axis='x', scilimits=(-2, 4))
+                    except Exception:
+                        pass
+                    try:
+                        axis.set_offset_position('bottom')
+                    except Exception:
+                        pass
+                    mpl.rcParams['axes.formatter.useoffset'] = True
+
+                    # Ensure offset text is rendered and sized like tick labels (avoid huge ×10^n)
+                    try:
+                        target.figure.canvas.draw_idle()
+                        tl = axis.get_ticklabels()
+                        if tl:
+                            axis.offsetText.set_fontsize(tl[0].get_size() * 0.8)
+                        # Place the offset near the left of the x-axis (like y-axis), and nudge up/right
+                        axis.offsetText.set_horizontalalignment('left')
+                        # axis.offsetText.set_verticalalignment('top')
+                        axis.offsetText.set_x(1.02)   # axes fraction
+                        # axis.offsetText.set_y(1.08)   # small upward nudge (axes fraction)
+
+                    except Exception:
+                        pass
+
+                # optional: rotate long labels
                 try:
                     long = any((t is not None) and (len(t) > 6) for t in (l.get_text() for l in labels))
                 except Exception:
                     long = False
-                if long:
-                    target.tick_params(axis='x', labelrotation=35)
+                # if long:
+                #     target.tick_params(axis='x', labelrotation=35)
+
                 return
 
             # --- Y axis formatting
@@ -154,10 +297,11 @@ class Figure:
 
             # 2) Linear y-axis: ScalarFormatter sci notation
             fmt = mticker.ScalarFormatter(useMathText=True)
-            fmt.set_powerlimits((0, 4))
+            # Do not use sci/offset for small exponents like 10^-1; reserve for <=1e-2 or >=1e4
+            fmt.set_powerlimits((-2, 4))
             axis.set_major_formatter(fmt)
             try:
-                target.ticklabel_format(style='sci', axis='y', scilimits=(0, 4))
+                target.ticklabel_format(style='sci', axis='y', scilimits=(-2, 4))
             except Exception:
                 pass
             try:
@@ -182,6 +326,8 @@ class Figure:
             return
         
     def __init__(self, info: Optional[Mapping] = None):
+        self.t0 = time.perf_counter()
+
         # internal state
         self._name: Optional[str]       = None
         self._jpstyles: Optional[dict]  = None
@@ -297,7 +443,7 @@ class Figure:
     def layers(self, infos):
         for layer in infos: 
             info = {}
-            ax  = getattr(self, layer['axes'])
+            ax  = self.axes[layer['axes']]
             info['name'] = layer.get("name", "")
             info['data'] = self.load_layer_data(layer)
             info['combine'] = layer.get("combine", "concat")
@@ -308,6 +454,7 @@ class Figure:
             info['method'] = layer.get("method", "scatter")
             info['style'] = layer.get("style", {})
             ax.layers.append(info)
+            self.logger.debug("Successfully loaded layer -> {}".format(info["name"]))
                         
     def load_layer_data(self, layer):
         lyinfo = layer.get("data", False)
@@ -318,11 +465,22 @@ class Figure:
                 for ds in lyinfo:
                     src = ds.get('source')
                     self.logger.debug("Loading layer data source -> {}".format(src))
-                    if src and self.context and self.context.get(src) is not None:
+                    if src and self.context:
                         from copy import deepcopy
-                        dt = deepcopy(self.context.get(src))
-                        dt = self.load_bool_df(dt, ds.get("transform", None))
-                        dts.append(dt)
+                        if isinstance(src, (list, tuple)):
+                            self.logger.debug("loading datasets in list mode")
+                            dsrc = []
+                            for srcitem in src: 
+                                self.logger.debug("loading layer data source item -> {}".format(srcitem))
+                                dt = deepcopy(self.context.get(srcitem))
+                                dsrc.append(dt)
+                            dfsrcs = pd.concat(dsrc, ignore_index=False)
+                            dt = self.load_bool_df(dfsrcs, ds.get("transform", None))
+                            dts.append(dt)
+                        elif self.context.get(src) is not None:
+                            dt = deepcopy(self.context.get(src))
+                            dt = self.load_bool_df(dt, ds.get("transform", None))
+                            dts.append(dt)
                     else:
                         self.logger.error("DataSet -> {} not specified".format(src))
                 if len(dts) == 0:
@@ -847,9 +1005,11 @@ class Figure:
         # self.ax.tight_layout()
         for fmt in self.fmts: 
             spf = os.path.join(self.dir, "{}.{}".format(self.name, fmt))
-            try: 
-                self.logger.warning("JarvisPlot Save {} into -> {}".format(self.name, spf))
-            except: 
+            try:
+                self.logger.warning(
+                        "JarvisPlot successfully draw {}\t in {:.3f}s sec\n\t-> {}".format(self.name, float(time.perf_counter() - self.t0), spf)
+                    )
+            except:
                 pass 
             self.fig.savefig(spf, dpi=self.dpi)
 
@@ -857,17 +1017,27 @@ class Figure:
         for ax, kws in self.frame['axes'].items():
             try:
                 self.logger.debug("Loading axes -> {}".format(ax))
-            except: 
+            except Exception:
                 pass
-            if ax == "axlogo": 
+
+            if ax == "axlogo":
                 self.axlogo = kws
             elif ax == "axtri":
-                self.axtri  = kws  
+                self.axtri  = kws
             elif ax == "axc":
-                self.axc    = kws    
-            elif ax == "ax": 
+                self.axc    = kws
+            elif ax == "ax":
                 self.ax     = kws
+            elif self._is_numbered_ax(ax):
+                self._ensure_numbered_rect_axes(ax, kws)
+            else:
+                try:
+                    self.logger.warning(f"Unsupported axes key '{ax}'. Only 'ax' or 'ax<NUMBER>' are allowed.")
+                except Exception:
+                    pass
         
+        # import matplotlib.pyplot as plt
+        # plt.show()
     
     def plot(self):
         self.render()
@@ -882,7 +1052,7 @@ class Figure:
 
                 # Demo of Plot Clip 
                 self.axtri.plot(x=[-1, 0.5, 0.5, 2], y=[-1.1, 0.6, 0.3, 1.8], linestyle="-", color="#0277BA")
-        self.savefig()      
+        self.savefig()
         import matplotlib.pyplot as plt
         plt.close(self.fig)
         
@@ -1034,14 +1204,13 @@ class Figure:
                 except Exception:
                     pass
             self.load_axes()
-            
+
             if "layers" in info: 
                 self.layers = info['layers']
             else: 
                 changed = False 
                 
             return changed
-        
         except: 
             return False 
 
@@ -1299,7 +1468,6 @@ class Figure:
             coor = layer_info.get("coor", {})
             try:
                 style = self._cb_collect_and_attach(style, coor, method_key, df)
-                # print(style)
                 self.logger.debug("Successful loading colorbar style")
             except Exception as _e:
                 self._logger.debug(f"colorbar lazy-attach failed: {_e}")
@@ -1339,7 +1507,6 @@ class Figure:
                         style[kk] = vv
                 # if "norm" in style.keys():
                 #     style = self.load_norm(style)
-                # print("Line 1262 -> ", style)
                 return method(**style)
 
         else:

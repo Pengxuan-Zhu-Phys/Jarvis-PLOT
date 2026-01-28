@@ -91,18 +91,18 @@
             "labels": {
                 "zorder": 1000,
                 "xlabel": {
-                    "loc": "right",
+                    "loc": "center",
                     "fontsize": 12,
                     "fontfamily": "STIXGeneral"
                 },
                 "ylabel": {
-                    "loc": "top",
+                    "loc": "center",
                     "fontsize": 12,
                     "fontfamily": "STIXGeneral"
                 },
                 "ylabel_coords": {
                     "x": -0.12, 
-                    "y": 1.0
+                    "y": 0.5
                 }
             }
         },
@@ -137,7 +137,7 @@
         "axc": {
             "label": {
                 "ylabel": "",
-                "loc": "top",
+                "loc": "center",
                 "fontsize": 12,
                 "fontfamily": "STIXGeneral"
             },

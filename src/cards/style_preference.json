@@ -5,6 +5,7 @@
     "a4paper_2x1": {
         "Ternary": "&JP/src/cards/a4paper/2x1/ternary.json",
         "rect": "&JP/src/cards/a4paper/2x1/rect.json",
+        "rect_5x1": "&JP/src/cards/a4paper/2x1/rect5x1.json",
         "TernaryCmap": "&JP/src/cards/a4paper/2x1/ternary_cmap.json",
         "rectcmap": "&JP/src/cards/a4paper/2x1/rect_cmap.json"
     },
