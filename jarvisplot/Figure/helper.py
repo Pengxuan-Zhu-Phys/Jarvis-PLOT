@@ -1,4 +1,4 @@
-# src/Figure/helper.py
+# jarvisplot/Figure/helper.py
 #!/usr/bin/env python3
 
 from matplotlib.axes import Axes

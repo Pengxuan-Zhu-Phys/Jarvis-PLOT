@@ -12,20 +12,20 @@ It provides a simple command-line interface (CLI) to generate publication-qualit
 Display help information:
 
 ```bash
-./jarvisplot -h
+jplot -h
 ```
 
 Run JarvisPLOT with one or more YAML configuration files:
 
 ```bash
-./jarvisplot path/to/config.yaml
+jplot path/to/config.yaml
 ```
 
 ### Example: SUSYRun2 Ternary Plots
 
 ```bash
-./jarvisplot ./bin/SUSYRun2_EWMSSM.yaml
-./jarvisplot ./bin/SUSYRun2_GEWMSSM.yaml
+jplot ./bin/SUSYRun2_EWMSSM.yaml
+jplot ./bin/SUSYRun2_GEWMSSM.yaml
 ```
 
 > **Note:** The data file paths inside the YAML files must be updated to match your local setup.
@@ -54,24 +54,11 @@ Run JarvisPLOT with one or more YAML configuration files:
 - `scipy` — numerical utilities
 - `h5py` — required for loading HDF5 data files
 
-### Relationship to Jarvis-HEP
-- JarvisPLOT is **fully decoupled** from Jarvis-HEP/GAMBIT
+### Github Page
+[https://github.com/Pengxuan-Zhu-Phys/Jarvis-PLOT](https://github.com/Pengxuan-Zhu-Phys/Jarvis-PLOT)
 
----
-
-## Installation
-
-Editable install for development:
-
-```bash
-pip install -e .
-```
-
-Or install minimal dependencies manually:
-
-```bash
-pip install numpy pandas matplotlib pyyaml jsonschema scipy h5py 
-```
+### Documentation
+[https://pengxuan-zhu-phys.github.io/Jarvis-Docs/](https://pengxuan-zhu-phys.github.io/Jarvis-Docs/)
 
 ---
 

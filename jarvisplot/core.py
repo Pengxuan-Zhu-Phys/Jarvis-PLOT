@@ -11,9 +11,7 @@ from .data_loader import DataSet
 import io
 from contextlib import redirect_stdout
 jppwd = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-from pathlib import Path
 import json 
-from .utils.cmaps import setup as setup_cmaps
 from .Figure.data_pipelines import SharedContent, DataContext
 
 class JarvisPLOT():
@@ -71,7 +69,7 @@ class JarvisPLOT():
             # Prefer the project's colormap setup helper
             from .utils import cmaps
 
-            json_path = "&JP/src/cards/colors/colormaps.json"
+            json_path = "&JP/jarvisplot/cards/colors/colormaps.json"
             cmap_summary = cmaps.setup(self.load_path(json_path), force=True)
 
             if self.logger:
@@ -104,7 +102,7 @@ class JarvisPLOT():
                 self.logger.debug(f"JarvisPLOT: Functions registered: {mgr.summary()}")
 
     def load_styles(self):
-        spp = "&JP/src/cards/style_preference.json"
+        spp = "&JP/jarvisplot/cards/style_preference.json"
         self.logger.debug("Loading internal Format set -> {}".format(self.load_path(spp)))
         with open(self.load_path(spp), 'r') as f1:
             stl = json.load(f1)

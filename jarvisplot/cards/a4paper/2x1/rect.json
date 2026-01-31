@@ -90,7 +90,7 @@
             }
         },
         "axlogo": {
-            "file": "&JP/src/cards/icons/JarvisHEP.png"
+            "file": "&JP/jarvisplot/cards/icons/JarvisHEP.png"
         }
     },
     "Style": {

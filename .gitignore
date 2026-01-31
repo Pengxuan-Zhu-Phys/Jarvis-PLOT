@@ -30,3 +30,11 @@ Workshop/
 
 # Logs
 *.log
+
+# Untracking files 
+test.py 
+test02.py 
+
+# PyPI release files 
+pyproject.toml 
+jarvisplot.egg-info/

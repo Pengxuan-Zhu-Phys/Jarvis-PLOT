@@ -1,0 +1,492 @@
+DataSet:
+- name: df
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/95@GM/datas/prepared_filterHS.csv
+  type: csv
+
+Figures:
+- name: pL2L4_ProfLogL
+  enable: false
+  style:
+  - a4paper_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$\\lambda_2$"
+        y: "$\\lambda_4$"
+      xlim: [-1.5, 1.5]
+      ylim: [-1.5, 1.5]
+    axc:
+      label:
+        ylabel: $-2 \ln{\mathcal{L}}$
+  layers:
+  - name: prof
+    data:
+    - source: df
+      transform:
+      - profile:
+          bin: 100
+          coordinates:
+            x:
+              expr: Lambda4
+              scale: linear
+              name: xx
+              lim:
+              - -1.5
+              - 1.5
+            y:
+              expr: Lambda2
+              scale: linear
+              name: yy
+              lim:
+              - -1.5
+              - 1.5
+            z:
+              expr: X2tot
+              scale: linear
+              name: z0
+          objective: min
+          grid_points: rect
+    share_data: pL2L4
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: np.exp(-2.0 * (X2tot - np.min(X2tot)))
+    style:
+      cmap: gambit_cmap
+      vmin: 0
+      vmax: 1
+
+- name: pL3L5_ProfLogL
+  enable: false
+  style:
+  - a4paper_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$\\lambda_3$"
+        y: "$\\lambda_5$"
+      xlim: [-2, 2]
+      ylim: [-4, 4]
+    axc:
+      label:
+        ylabel: $-2 \ln{\mathcal{L}}$
+  layers:
+  - name: prof
+    data:
+    - source: df
+      transform:
+      - profile:
+          bin: 100
+          coordinates:
+            x:
+              expr: Lambda3
+              scale: linear
+              name: xx
+              lim: [-2, 2]
+            y:
+              expr: Lambda5
+              scale: linear
+              name: yy
+              lim: [-4, 4]
+            z:
+              expr: X2tot
+              scale: linear
+              name: z0
+          objective: min
+          grid_points: rect
+    share_data: pL2L4
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: np.exp(-2.0 * (X2tot - np.min(X2tot)))
+    style:
+      cmap: gambit_cmap
+      vmin: 0
+      vmax: 1
+
+- name: pAlphaMHin_ProfLogL
+  enable: true
+  style:
+  - a4paper_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$\\alpha$"
+        y: "$M_{H}^{\\rm In}$"
+      xlim: [-1.57, 1.57]
+      ylim: [90, 102]
+    axc:
+      label:
+        ylabel: $-2 \ln{\mathcal{L}}$
+  layers:
+  - name: prof
+    data:
+    - source: df
+      transform:
+      - profile:
+          bin: 100
+          coordinates:
+            x:
+              expr: Alpha
+              scale: linear
+              name: xx
+              lim: [-1.57, 1.57]
+            y:
+              expr:  MHin
+              scale: linear
+              name: yy
+              lim: [90, 102]
+            z:
+              expr: X2tot
+              scale: linear
+              name: z0
+          objective: min
+          grid_points: rect
+    share_data: pL2L4
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: np.exp(-2.0 * (X2tot - np.min(X2tot)))
+    style:
+      cmap: gambit_cmap
+      vmin: 0
+      vmax: 1
+
+
+
+- name: pmHmh_ProfLogL
+  enable: false
+  style:
+  - a4paper_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$M_{H}^{\\rm In}~{\\rm GeV}$"
+        y: "$M_{h}^{\\rm In}~{\\rm GeV}$"
+      xlim: [90, 100]
+      ylim: [120, 130]
+    axc:
+      label:
+        ylabel: profile likelihood ratio $\mathcal{L}/ \mathcal{L}_{\rm max}$
+  layers:
+  - name: prof
+    data:
+    - source: df
+      transform:
+      - profile:
+          bin: 100
+          coordinates:
+            x:
+              expr: MHin 
+              scale: linear
+              name: xx
+              lim:
+              - 90
+              - 100
+            y:
+              expr: Mhin 
+              scale: linear
+              name: yy
+              lim:
+              - 120
+              - 130
+            z:
+              # expr: X2Higgs - 5.826394113621367
+              # expr: X2tot X2Higgs X295 X2kappa X2B X2EW
+              expr: X2tot
+              scale: linear
+              name: z0
+          objective: min
+          grid_points: rect
+    share_data: pL2L4
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: np.exp(-0.5 * (X2tot - np.min(X2tot)))
+    style:
+      cmap: gambit_cmap
+      vmin: 0.0
+      vmax: 1.0
+
+- name: Excess_ProfLogL
+  enable: false
+  style:
+  - a4paper_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$\\mu_{\\gamma \\gamma}$"
+        y: "$\\mu_{\\tau \\tau}$"
+      xlim: [0, 0.5]
+      ylim: [0, 0.75]
+    axc:
+      label:
+        ylabel: profile likelihood ratio $\mathcal{L}/ \mathcal{L}_{\rm max}$
+  layers:
+  - name: prof
+    data:
+    - source: df
+      transform:
+      - profile:
+          bin: 200
+          coordinates:
+            x:
+              expr: muGammaGamma 
+              scale: linear
+              name: xx
+              lim:
+              - 0
+              - 0.5
+            y:
+              expr: muTauTau
+              scale: linear
+              name: yy
+              lim:
+              - 0
+              - 0.75
+            z:
+              # expr: X2Higgs - 5.826394113621367
+              # expr: X2tot X2Higgs X295 X2kappa X2B X2EW
+              expr: X2tot
+              scale: linear
+              name: z0
+          objective: min
+          grid_points: rect
+    share_data: pL2L4
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: np.exp(-0.5 * (X2tot - np.min(X2tot)))
+    style:
+      cmap: gambit_cmap
+      vmin: 0.0
+      vmax: 1.0
+
+- name: Kappa_ProfLogL
+  enable: false
+  style:
+  - a4paper_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        y: "$\\kappa_{V}$"
+        x: "$\\kappa_{F}$"
+      ylim: [0.9, 1.05]
+      xlim: [0.85, 1.05]
+    axc:
+      label:
+        ylabel: profile likelihood ratio $\mathcal{L}/ \mathcal{L}_{\rm max}$
+  layers:
+  - name: prof
+    data:
+    - source: df
+      transform:
+      - profile:
+          bin: 150
+          coordinates:
+            y:
+              expr: np.sqrt(kappaWW) 
+              scale: linear
+              name: yy
+              lim: [0.9, 1.05]
+            x:
+              expr: np.sqrt(kappabb)
+              scale: linear
+              name: xx
+              lim: [0.85, 1.05]
+            z:
+              # expr: X2Higgs - 5.826394113621367
+              # expr: X2tot X2Higgs X295 X2kappa X2B X2EW
+              expr: X2tot
+              scale: linear
+              name: z0
+          objective: min
+          grid_points: rect
+    share_data: pL2L4
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: np.exp(-0.5 * (X2tot - np.min(X2tot)))
+    style:
+      cmap: gambit_cmap
+      vmin: 0.0
+      vmax: 1.0
+
+- name: mHmh_ProfLogL
+  enable: false
+  style:
+  - a4paper_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$m_{h}~{\\rm GeV}$"
+        y: "$m_{H}~{\\rm GeV}$"
+      xlim: [90, 100]
+      ylim: [120, 130]
+    axc:
+      label:
+        ylabel: profile likelihood ratio $\mathcal{L}/ \mathcal{L}_{\rm max}$
+  layers:
+  - name: prof
+    data:
+    - source: df
+      transform:
+      - profile:
+          bin: 100
+          coordinates:
+            x:
+              expr: mH 
+              scale: linear
+              name: xx
+              lim:
+              - 90
+              - 100
+            y:
+              expr: mh
+              scale: linear
+              name: yy
+              lim:
+              - 120
+              - 130
+            z:
+              # expr: X2Higgs - 5.826394113621367
+              # expr: X2tot X2Higgs X295 X2kappa X2B X2EW
+              expr: X2tot
+              scale: linear
+              name: z0
+          objective: min
+          grid_points: rect
+    share_data: pL2L4
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: np.exp(-0.5 * (X2tot - np.min(X2tot)))
+    style:
+      cmap: gambit_cmap
+      vmin: 0.0
+      vmax: 1.0
+
+- name: BRB0BRBXGamma_ProfLogL
+  enable: false
+  style:
+  - a4paper_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$\\mathcal{B}(B_s^0 \\to \\mu^+ \\mu^-)$"
+        y: "$\\mathcal{B}(B \\to X_s \\gamma)$"
+      xlim: [3.e-9,  3.5e-9]
+      ylim: [2.8e-4, 3.2e-4]
+    axc:
+      label:
+        ylabel: profile likelihood ratio $\mathcal{L}/ \mathcal{L}_{\rm max}$
+  layers:
+  - name: prof
+    data:
+    - source: df
+      transform:
+      - profile:
+          bin: 150
+          coordinates:
+            x:
+              expr: BRB0s2MuMu 
+              scale: linear
+              name: xx
+              lim: [3.e-9,  3.5e-9]
+            y:
+              expr: BRB2XsGamma
+              scale: linear
+              name: yy
+              lim: [2.8e-4, 3.2e-4]
+            z:
+              # expr: X2Higgs - 5.826394113621367
+              # expr: X2tot X2Higgs X295 X2kappa X2B X2EW
+              expr: X2tot
+              scale: linear
+              name: z0
+          objective: min
+          grid_points: rect
+    share_data: pL2L4
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: np.exp(-0.5 * (X2tot - np.min(X2tot)))
+    style:
+      cmap: gambit_cmap
+      vmin: 0.0
+      vmax: 1.0
+
+
+
+# Lambda1,Lambda2,Lambda3,Lambda4,Lambda5,MHin,Mhin,Alpha,sinTH,VDeta,
+# mH,mh,mh3,ma2,mCh2,mCh3,mW,mZ,mCCh,T,S,U,mug2,deltaRho,
+# BRB2XsGamma,BRB2TauTau,BRB0s2MuMu,mu,ZH11,ZH12,ZH13,ZH21,ZH22,ZH23,ZH31,ZH32,ZH33,
+# HBRs,HSChi2,HSPValue,kappaHbb,kappaHtt,kappaHTauTau,kappaHZZ,kappaHWW,
+# kappabb,kappatt,kappaTauTau,kappaZZ,kappaWW,BRH2GammaGamma,BRH2bb,BRH2TauTau,
+# muGammaGamma,mubb,muTauTau,
+# lambda1High,lambda2High,lambda3High,lambda4High,lambda5High,dmW,unitarityHigh,vevHigh,unitaritylow,vevlow,MHigh
+
+
+# np.linalg.matmul( np.linalg.matmul( np.matrix_transpose([[1, 2]]), np.array([[1, 2], [3, 4]])), [[2, 1]] )
+
+
+
+output:
+  dir: ../Workshop/95@GM/Plots
+  dpi: 600
+  formats:
+  - png
+  - pdf
+project:
+  name: JarvisPLOT Demo (minimal)
+version: 0.3
+
+Functions: 
