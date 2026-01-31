@@ -6,7 +6,8 @@ import os, sys
 
 # --- version import fallback ---
 try:
-    from .version import __version__ as JPLOT_VERSION
+    from importlib.metadata import version as _pkg_version
+    JPLOT_VERSION = _pkg_version("jarvisplot")
 except Exception:
     JPLOT_VERSION = "0.0.0"
 

@@ -163,6 +163,7 @@ class JarvisPLOT():
                     self.cli.args.print_help()
                 help_text = buf.getvalue()
                 self.logger.warning("JarvisPLOT " + help_text)
+                sys.exit(2)
             except Exception:
                 pass
             return
