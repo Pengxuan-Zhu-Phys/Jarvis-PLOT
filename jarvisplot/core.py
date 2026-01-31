@@ -16,14 +16,13 @@ from .Figure.data_pipelines import SharedContent, DataContext
 
 class JarvisPLOT():
     def __init__(self) -> None:
-        self.dataset    =  {}
         self.variables  =   {}
         self.yaml       =   ConfigLoader()
         self.style      =   {}
         self.profiles   =   {}
         self.cli        =   CLI()
         self.logger     =   None
-        self.dataset:   Optional[Dict[DataSet]]    = []
+        self.dataset: list[DataSet] = []
         self.shared     =   None
         self.ctx        =   None
         self.interpolators = None
