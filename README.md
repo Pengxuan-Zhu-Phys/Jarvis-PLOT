@@ -7,6 +7,12 @@ It provides a simple command-line interface (CLI) to generate publication-qualit
 
 ---
 
+## Installation 
+
+```bash 
+pip install jarvisplot
+```
+
 ## Command-Line Usage
 
 Display help information:
