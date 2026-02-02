@@ -217,10 +217,10 @@ class Figure:
                 if xscale not in ('log', 'symlog', 'logit'):
                     fmt = mticker.ScalarFormatter(useMathText=True)
                     # Do not use sci/offset for small exponents like 10^-1; reserve for <=1e-2 or >=1e4
-                    fmt.set_powerlimits((-2, 4))
+                    fmt.set_powerlimits((-3, 4))
                     axis.set_major_formatter(fmt)
                     try:
-                        target.ticklabel_format(style='sci', axis='x', scilimits=(-2, 4))
+                        target.ticklabel_format(style='sci', axis='x', scilimits=(-3, 4))
                     except Exception:
                         pass
                     try:
@@ -255,71 +255,70 @@ class Figure:
                 return
 
             # --- Y axis formatting
-            if which != 'y':
-                return
+            if which == 'y':
 
-            # Detect scale
-            try:
-                yscale = target.get_yscale()
-            except Exception:
-                yscale = None
-
-            # 1) Log-like y-axis: compact decimals in range, otherwise default log formatter
-            if yscale in ('log', 'symlog', 'logit'):
-                from matplotlib.ticker import LogFormatterMathtext, FuncFormatter
-
-                base = LogFormatterMathtext()
-                lo, hi = 1e-2, 1e2  # compact decimal range
-
-                def _fmt(val, pos=None):
-                    if val is None or val <= 0:
-                        return ""
-                    try:
-                        exp = np.log10(val)
-                    except Exception:
-                        return ""
-                    # Only label exact decades
-                    if (not np.isfinite(exp)) or (not np.isclose(exp, round(exp))):
-                        return ""
-
-                    if lo <= val <= hi:
-                        e = int(round(exp))
-                        if e >= 0:
-                            return f"{int(10**e)}"
-                        # e=-1 -> 0.1 (1 dp), e=-2 -> 0.01 (2 dp)
-                        return f"{10**e:.{abs(e)}f}"
-
-                    # outside compact range: defer to Matplotlib
-                    return base(val, pos)
-
-                axis.set_major_formatter(FuncFormatter(_fmt))
-                return
-
-            # 2) Linear y-axis: ScalarFormatter sci notation
-            fmt = mticker.ScalarFormatter(useMathText=True)
-            # Do not use sci/offset for small exponents like 10^-1; reserve for <=1e-2 or >=1e4
-            fmt.set_powerlimits((-2, 4))
-            axis.set_major_formatter(fmt)
-            try:
-                target.ticklabel_format(style='sci', axis='y', scilimits=(-2, 4))
-            except Exception:
-                pass
-            try:
-                axis.set_offset_position('left')
-            except Exception:
-                pass
-            mpl.rcParams['axes.formatter.useoffset'] = True
-            try:
-                target.figure.canvas.draw_idle()
-                # shrink offset text a bit
+                # Detect scale
                 try:
-                    tl = axis.get_ticklabels()
-                    if tl:
-                        axis.offsetText.set_fontsize(tl[0].get_size() * 0.8)
+                    yscale = target.get_yscale()
+                except Exception:
+                    yscale = None
+
+                # 1) Log-like y-axis: compact decimals in range, otherwise default log formatter
+                if yscale in ('log', 'symlog', 'logit'):
+                    from matplotlib.ticker import LogFormatterMathtext, FuncFormatter
+
+                    base = LogFormatterMathtext()
+                    lo, hi = 1e-2, 1e2  # compact decimal range
+
+                    def _fmt(val, pos=None):
+                        if val is None or val <= 0:
+                            return ""
+                        try:
+                            exp = np.log10(val)
+                        except Exception:
+                            return ""
+                        # Only label exact decades
+                        if (not np.isfinite(exp)) or (not np.isclose(exp, round(exp))):
+                            return ""
+
+                        if lo <= val <= hi:
+                            e = int(round(exp))
+                            if e >= 0:
+                                return f"{int(10**e)}"
+                            # e=-1 -> 0.1 (1 dp), e=-2 -> 0.01 (2 dp)
+                            return f"{10**e:.{abs(e)}f}"
+
+                        # outside compact range: defer to Matplotlib
+                        return base(val, pos)
+
+                    axis.set_major_formatter(FuncFormatter(_fmt))
+                    return
+
+                # 2) Linear y-axis: ScalarFormatter sci notation
+                fmt = mticker.ScalarFormatter(useMathText=True)
+                # Do not use sci/offset for small exponents like 10^-1; reserve for <=1e-2 or >=1e4
+                fmt.set_powerlimits((-3, 4))
+                axis.set_major_formatter(fmt)
+                try:
+                    target.ticklabel_format(style='sci', axis='y', scilimits=(-3, 4))
                 except Exception:
                     pass
-            except Exception:
-                pass
+                try:
+                    axis.set_offset_position('left')
+                except Exception:
+                    pass
+                mpl.rcParams['axes.formatter.useoffset'] = True
+                try:
+                    target.figure.canvas.draw_idle()
+                    # shrink offset text a bit
+                    try:
+                        tl = axis.get_ticklabels()
+                        if tl:
+                            axis.offsetText.set_fontsize(tl[0].get_size() * 0.8)
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
 
         except Exception:
             # Always fail silently here; tick post-processing must never crash plotting.
@@ -857,13 +856,31 @@ class Figure:
             if "color" in self.frame['ax']['spines']:
                 for s in self.axes['ax'].spines.values():
                     s.set_color(self.frame['ax']['spines']['color'])
+             
+        def _safe_cast(v):
+            try:
+                return float(v)
+            except Exception:
+                return v
                     
+        xlim = self.frame["ax"].get("xlim")
+        if xlim:
+            xlim = list(map(_safe_cast, xlim))
+            self.ax.set_xlim(xlim)
+
+        ylim = self.frame["ax"].get("ylim")
+        if ylim:
+            ylim = list(map(_safe_cast, ylim))
+            self.ax.set_ylim(ylim)
+
+                    
+        from matplotlib.ticker import AutoMinorLocator, MaxNLocator, AutoLocator
         if self.frame['ax'].get("yscale", "").lower() == 'log':
             self.ax.set_yscale("log")
             from matplotlib.ticker import LogLocator
             self.ax.yaxis.set_minor_locator(LogLocator(subs='auto'))
         else:
-            from matplotlib.ticker import AutoMinorLocator
+            self.ax.yaxis.set_major_locator(MaxNLocator(nbins=5, min_n_ticks=4))
             self.ax.yaxis.set_minor_locator(AutoMinorLocator())
         
         if self.frame['ax'].get("xscale", "").lower() == 'log':
@@ -871,14 +888,10 @@ class Figure:
             from matplotlib.ticker import LogLocator
             self.ax.xaxis.set_minor_locator(LogLocator(subs='auto'))
         else:
-            from matplotlib.ticker import AutoMinorLocator
+            self.ax.xaxis.set_major_locator(MaxNLocator(nbins=5, min_n_ticks=4))
             self.ax.xaxis.set_minor_locator(AutoMinorLocator())
         
-        def _safe_cast(v):
-            try:
-                return float(v)
-            except Exception:
-                return v
+
 
         if self.frame["ax"].get("text"): 
             for txt in self.frame["ax"]["text"]:
@@ -889,15 +902,6 @@ class Figure:
                     self.ax.text(**txt)
 
 
-        xlim = self.frame["ax"].get("xlim")
-        if xlim:
-            xlim = list(map(_safe_cast, xlim))
-            self.ax.set_xlim(xlim)
-
-        ylim = self.frame["ax"].get("ylim")
-        if ylim:
-            ylim = list(map(_safe_cast, ylim))
-            self.ax.set_ylim(ylim)
 
         if self.frame['ax']['labels'].get("x"):
             self.ax.set_xlabel(self.frame['ax']['labels']['x'], **self.frame['ax']['labels']['xlabel'])

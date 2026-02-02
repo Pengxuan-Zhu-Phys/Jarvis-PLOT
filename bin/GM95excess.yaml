@@ -1,7 +1,20 @@
+output:
+  dir: ../Workshop/95@GM/Plots
+  dpi: 300
+  formats:
+  - png
+  # - pdf
+project:
+  name: 95@GM JarvisPLOT
+version: 1.0.3
+
 DataSet:
 - name: df
   path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/95@GM/datas/prepared_filterHS.csv
   type: csv
+- name: atlas_2312 
+  path: /Users/p.zhu/Workshop/JarvisPLOT/Workshop/95@GM/Fns/ATLAS_2312.00420.csv
+  type: csv 
 
 Figures:
 - name: pL2L4_ProfLogL
@@ -117,20 +130,20 @@ Figures:
       vmax: 1
 
 - name: pAlphaMHin_ProfLogL
-  enable: true
+  enable: false
   style:
   - a4paper_2x1
   - rectcmap
   frame:
     ax:
       labels:
-        x: "$\\alpha$"
-        y: "$M_{H}^{\\rm In}$"
-      xlim: [-1.57, 1.57]
-      ylim: [90, 102]
+        y: "$\\alpha$"
+        x: "$M_{H}^{\\rm In}~({\\rm GeV})$"
+      ylim: [-1.57, 1.57]
+      xlim: [90, 100]
     axc:
       label:
-        ylabel: $-2 \ln{\mathcal{L}}$
+        ylabel: profile likelihood ratio $\mathcal{L}/ \mathcal{L}_{\rm max}$
   layers:
   - name: prof
     data:
@@ -140,7 +153,7 @@ Figures:
           bin: 100
           coordinates:
             x:
-              expr: Alpha
+              expr: (Alpha < 90.) * (Alpha / 180. * np.pi) + (Alpha >= 90.) * ((Alpha / 180. - 1) * np.pi )
               scale: linear
               name: xx
               lim: [-1.57, 1.57]
@@ -148,14 +161,67 @@ Figures:
               expr:  MHin
               scale: linear
               name: yy
-              lim: [90, 102]
+              lim: [90, 100]
             z:
               expr: X2tot
               scale: linear
               name: z0
           objective: min
           grid_points: rect
-    share_data: pL2L4
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: yy
+      y:
+        expr: xx
+      z:
+        expr: np.exp(-2.0 * (X2tot - np.min(X2tot)))
+    style:
+      cmap: gambit_cmap
+      vmin: 0
+      vmax: 1
+
+- name: pSinTHMhin_ProfLogL
+  enable: false
+  style:
+  - a4paper_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        y: "$\\sin{\\theta}$"
+        x: "$M_{h}^{\\rm In}~({\\rm GeV})$"
+      xlim: [120, 130]
+      ylim: [0, 0.4]
+    axc:
+      label:
+        ylabel: profile likelihood ratio $\mathcal{L}/ \mathcal{L}_{\rm max}$
+  layers:
+  - name: prof
+    data:
+    - source: df
+      transform:
+      - profile:
+          bin: 100
+          coordinates:
+            x:
+              expr: Mhin 
+              scale: linear
+              name: xx
+              lim: [120, 130]
+            y:
+              expr:  sinTH
+              scale: linear
+              name: yy
+              lim: [0., 0.4]
+            z:
+              expr: X2tot
+              scale: linear
+              name: z0
+          objective: min
+          grid_points: rect
+    share_data: pMhinsinTH
     axes: ax
     method: voronoi
     coordinates:
@@ -170,8 +236,6 @@ Figures:
       vmin: 0
       vmax: 1
 
-
-
 - name: pmHmh_ProfLogL
   enable: false
   style:
@@ -180,8 +244,8 @@ Figures:
   frame:
     ax:
       labels:
-        x: "$M_{H}^{\\rm In}~{\\rm GeV}$"
-        y: "$M_{h}^{\\rm In}~{\\rm GeV}$"
+        x: "$M_{H}^{\\rm In}~({\\rm GeV})$"
+        y: "$M_{h}^{\\rm In}~({\\rm GeV})$"
       xlim: [90, 100]
       ylim: [120, 130]
     axc:
@@ -218,6 +282,61 @@ Figures:
           objective: min
           grid_points: rect
     share_data: pL2L4
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: np.exp(-0.5 * (X2tot - np.min(X2tot)))
+    style:
+      cmap: gambit_cmap
+      vmin: 0.0
+      vmax: 1.0
+
+- name: mH5mh3_ProfLogL
+  enable: false
+  style:
+  - a4paper_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$M_{H_5}~({\\rm GeV})$"
+        y: "$M_{H_3}~({\\rm GeV})$"
+      xlim: [100, 1000]
+      ylim: [80, 1000]
+    axc:
+      label:
+        ylabel: profile likelihood ratio $\mathcal{L}/ \mathcal{L}_{\rm max}$
+  layers:
+  - name: prof
+    data:
+    - source: df
+      transform:
+      - profile:
+          bin: 100
+          coordinates:
+            x:
+              expr: mCCh
+              scale: linear
+              name: xx
+              lim: [100, 1000]
+            y:
+              expr: mh3 
+              scale: linear
+              name: yy
+              lim: [80, 1000]
+            z:
+              # expr: X2Higgs - 5.826394113621367
+              # expr: X2tot X2Higgs X295 X2kappa X2B X2EW
+              expr: X2tot
+              scale: linear
+              name: z0
+          objective: min
+          grid_points: rect
     axes: ax
     method: voronoi
     coordinates:
@@ -277,7 +396,6 @@ Figures:
               name: z0
           objective: min
           grid_points: rect
-    share_data: pL2L4
     axes: ax
     method: voronoi
     coordinates:
@@ -356,8 +474,8 @@ Figures:
   frame:
     ax:
       labels:
-        x: "$m_{h}~{\\rm GeV}$"
-        y: "$m_{H}~{\\rm GeV}$"
+        x: "$m_{h}~({\\rm GeV})$"
+        y: "$m_{H}~({\\rm GeV})$"
       xlim: [90, 100]
       ylim: [120, 130]
     axc:
@@ -464,7 +582,142 @@ Figures:
       vmin: 0.0
       vmax: 1.0
 
+- name: ST_ProfLogL
+  enable: false
+  style:
+  - a4paper_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$T$"
+        y: "$S$"
+      xlim: [-0.04, 0.]
+      ylim: [-0.12, 0.]
+    axc:
+      label:
+        ylabel: profile likelihood ratio $\mathcal{L}/ \mathcal{L}_{\rm max}$
+  layers:
+  - name: prof
+    data:
+    - source: df
+      transform:
+      - profile:
+          bin: 150
+          coordinates:
+            x:
+              expr: T
+              scale: linear
+              name: xx
+              lim: [-0.05, 0.]
+            y:
+              expr: S
+              scale: linear
+              name: yy
+              lim: [-0.12, 0.02]
+            z:
+              # expr: X2Higgs - 5.826394113621367
+              # expr: X2tot X2Higgs X295 X2kappa X2B X2EW
+              expr: X2tot
+              scale: linear
+              name: z0
+          objective: min
+          grid_points: rect
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: np.exp(-0.5 * (X2tot - np.min(X2tot)))
+    style:
+      cmap: gambit_cmap
+      vmin: 0.0
+      vmax: 1.0
 
+- name: mH5sinHxBR_ProfLogL
+  enable: true
+  style:
+  - a4paper_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: "$M_{H_5^{\\pm\\pm}}~({\\rm GeV})$"
+        y: "$\\sin{\\theta} \\times \\sqrt{\\mathcal{B}(H_5^{\\pm\\pm} \\to W^\\pm W^\\pm)}$"
+      xlim: [100, 1000]
+      ylim: [0, 0.4]
+      text: [         
+        {
+          y:  0.305,
+          x:  990,
+          s:  "$\\rm ATLAS(2024)$",
+          color: "red",
+          ha: "right",
+          va: "bottom",
+          rotation: 10,
+          fontsize: 6. 
+        }
+      ]
+    axc:
+      label:
+        ylabel: profile likelihood ratio $\mathcal{L}/ \mathcal{L}_{\rm max}$
+  layers:
+  - name: prof
+    data:
+    - source: df
+      transform:
+      - profile:
+          bin: 100
+          coordinates:
+            x:
+              expr: mCCh 
+              scale: linear
+              name: xx
+              lim: [100, 1000]
+            y:
+              # expr: sinTH * np.sqrt()
+              expr: sinTH * 0.35
+              scale: linear
+              name: yy
+              lim: [0, 0.4]
+            z:
+              # expr: X2Higgs - 5.826394113621367
+              # expr: X2tot X2Higgs X295 X2kappa X2B X2EW
+              expr: X2tot
+              scale: linear
+              name: z0
+          objective: min
+          grid_points: rect
+    share_data: mCCh_SinTH
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: np.exp(-0.5 * (X2tot - np.min(X2tot)))
+    style:
+      cmap: gambit_cmap
+      vmin: 0.0
+      vmax: 1.0
+  - name: line2 
+    axes: ax 
+    data:
+    - source: atlas_2312
+    method: plot 
+    coordinates:
+      x: {expr: "x"}
+      y: {expr: "y"}
+    style:
+      linewidth: 1.3 
+      linestyle: "-"
+      color: "red"
+      zorder: 15
 
 # Lambda1,Lambda2,Lambda3,Lambda4,Lambda5,MHin,Mhin,Alpha,sinTH,VDeta,
 # mH,mh,mh3,ma2,mCh2,mCh3,mW,mZ,mCCh,T,S,U,mug2,deltaRho,
@@ -475,18 +728,3 @@ Figures:
 # lambda1High,lambda2High,lambda3High,lambda4High,lambda5High,dmW,unitarityHigh,vevHigh,unitaritylow,vevlow,MHigh
 
 
-# np.linalg.matmul( np.linalg.matmul( np.matrix_transpose([[1, 2]]), np.array([[1, 2], [3, 4]])), [[2, 1]] )
-
-
-
-output:
-  dir: ../Workshop/95@GM/Plots
-  dpi: 600
-  formats:
-  - png
-  - pdf
-project:
-  name: JarvisPLOT Demo (minimal)
-version: 0.3
-
-Functions: 

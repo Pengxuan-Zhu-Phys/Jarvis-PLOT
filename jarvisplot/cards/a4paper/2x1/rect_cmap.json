@@ -92,16 +92,16 @@
                 "zorder": 1000,
                 "xlabel": {
                     "loc": "center",
-                    "fontsize": 12,
+                    "fontsize": 11,
                     "fontfamily": "STIXGeneral"
                 },
                 "ylabel": {
                     "loc": "center",
-                    "fontsize": 12,
+                    "fontsize": 11,
                     "fontfamily": "STIXGeneral"
                 },
                 "ylabel_coords": {
-                    "x": -0.12, 
+                    "x": -0.11, 
                     "y": 0.5
                 }
             }
@@ -138,7 +138,7 @@
             "label": {
                 "ylabel": "",
                 "loc": "center",
-                "fontsize": 12,
+                "fontsize": 11,
                 "fontfamily": "STIXGeneral"
             },
             "ticks": {

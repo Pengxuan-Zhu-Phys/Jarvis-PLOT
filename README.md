@@ -49,7 +49,7 @@ jplot ./bin/SUSYRun2_GEWMSSM.yaml
 ## Requirements
 
 ### Python
-- **Python ≥ 3.9** (tested on 3.9–3.12)
+- **Python ≥ 3.10** (tested on 3.10–3.13)
 
 ### Required Packages
 - `numpy`
@@ -59,6 +59,9 @@ jplot ./bin/SUSYRun2_GEWMSSM.yaml
 - `jsonschema`
 - `scipy` — numerical utilities
 - `h5py` — required for loading HDF5 data files
+- `shapely`
+- `scipy`
+- `sympy`
 
 ### Github Page
 [https://github.com/Pengxuan-Zhu-Phys/Jarvis-PLOT](https://github.com/Pengxuan-Zhu-Phys/Jarvis-PLOT)
