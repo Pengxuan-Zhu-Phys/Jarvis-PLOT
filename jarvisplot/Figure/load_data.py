@@ -227,12 +227,12 @@ def addcolumn(df, adds, logger):
         
 def sortby(df, expr, logger):
     try:
-        return sort_df_by_expr(df, expr)
+        return sort_df_by_expr(df, expr, logger=logger)
     except Exception as e:
         logger.warning(f"sortby failed for expr={expr}: {e}")
         return df
 
-def sort_df_by_expr(self, df: pd.DataFrame, expr: str, logger) -> pd.DataFrame:
+def sort_df_by_expr(df: pd.DataFrame, expr: str, logger) -> pd.DataFrame:
     """
     Sort the dataframe by evaluating the given expression.
     The expression can be a column name or a valid expression understood by _eval_series.

@@ -8,7 +8,9 @@ import matplotlib.ticker as mticker
 import pandas as pd 
 import matplotlib as mpl
 from types import MethodType
+
 from .adapters import StdAxesAdapter, TernaryAxesAdapter
+from .method_registry import resolve_callable
 
 import json
 import time
@@ -1168,7 +1170,6 @@ class Figure:
             if not self._enable:
                 self.logger.warning("Skip plot -> {}".format(self.name))
                 return False
-
             if "style" in info:
                 self.style = info['style']
             else:
@@ -1177,12 +1178,13 @@ class Figure:
             if "gambit" in info['style'][0]:
                 self.mode = "gambit"
 
-
             if "frame" in info:
                 self.frame = info['frame']
+            self.logger.debug("Figure frame information loaded")
 
             import matplotlib.pyplot as plt
             plt.rcParams['mathtext.fontset'] = 'stix'
+
             # --- Ensure JarvisPLOT colormaps are registered globally before plotting ---
             try:
                 from ..utils import cmaps as _jp_cmaps
@@ -1196,8 +1198,11 @@ class Figure:
             except Exception as _e:
                 if self.logger:
                     self.logger.warning(f"JarvisPLOT: failed to register colormaps: {_e}")
+
+            
             # plt.rcParams['font.family'] = 'STIXGeneral'
             self.fig = plt.figure(**self.frame['figure'])
+
             # CLI override: disable logo panel
             if self.print:
                 try:
@@ -1207,13 +1212,14 @@ class Figure:
                         self.frame.pop("axlogo", None)  # optional: drop logo content too
                 except Exception:
                     pass
+
             self.load_axes()
 
             if "layers" in info: 
                 self.layers = info['layers']
             else: 
                 changed = False 
-                
+
             return changed
         except: 
             return False 
@@ -1250,21 +1256,6 @@ class Figure:
 
         return str(p.resolve())
     
-    # --- unified method dispatch ---
-    METHOD_DISPATCH = {
-        "scatter": "scatter",
-        "plot": "plot",
-        "fill": "fill",
-        "contour": "contour",
-        "contourf": "contourf",
-        "imshow": "imshow",
-        "hist": "hist",
-        "hexbin": "hexbin",
-        "tricontour": "tricontour",
-        "tricontourf": "tricontourf",
-        "voronoi": "voronoi",
-        "voronoif": "voronoif"
-    }
 
     def _eval_series(self, df: pd.DataFrame, set: dict):
         """
@@ -1438,14 +1429,28 @@ class Figure:
         except: 
             pass 
         method_key = str(layer_info.get("method", "scatter")).lower()
-        method_name = self.METHOD_DISPATCH.get(method_key)
-        if not method_name or not hasattr(ax, method_name):
-            raise ValueError(f"Unknown/unsupported method '{method_key}' for axes {ax}.")
-        method = getattr(ax, method_name)
+        axes_type = getattr(ax, "_type", "any")
+
+        # Resolve YAML method key -> adapter callable (supports aliases / deprecations)
+        method, warn = resolve_callable(ax, method_key, axes_type=axes_type, strict=True)
+        if warn and self.logger:
+            try:
+                self.logger.warning(warn)
+            except Exception:
+                pass
 
         # 2) Merge style (bundle default -> layer override)
+        # Style lookup uses the user-facing key; if alias used and no style found,
+        # fall back to the resolved matplotlib method name.
         style = dict(self.style.get(method_key, {}))
-        if layer_info.get("style", {}) is not None: 
+        if not style:
+            try:
+                # resolve_callable already mapped key -> mpl method name via registry
+                # so use the attribute name as a secondary lookup.
+                style = dict(self.style.get(getattr(method, "__name__", ""), {}))
+            except Exception:
+                pass
+        if layer_info.get("style", {}) is not None:
             style.update(layer_info.get("style", {}))
 
         if getattr(ax, "_type", None) == "tri":
