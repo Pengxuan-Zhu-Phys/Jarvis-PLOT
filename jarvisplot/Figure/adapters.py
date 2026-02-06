@@ -286,6 +286,99 @@ class StdAxesAdapter:
 
         return _auto_clip(artists, self.ax, self._clip_path)
 
+    def tripcolor(self, **kwargs):
+        """Triangulated pseudocolor in axes coordinates.
+
+        We map the input (x, y) from data coordinates to Axes coordinates (0..1)
+        using the current axis scale and limits via Matplotlib transforms:
+            (x, y)_data -> display -> axes
+
+        Then we call `ax.tripcolor` with `transform=ax.transAxes` so the triangles
+        are drawn in the Axes coordinate system. This makes the rendering robust
+        and consistent with other "axes-space" primitives (e.g. Voronoi fills).
+
+        Required:
+          - x, y, z
+
+        Common options:
+          - shading (default: 'gouraud'), cmap, norm, vmin, vmax, alpha, zorder, etc.
+          - extend/levels (optional): used to mask out-of-range z values consistently.
+        """
+        x = np.asarray(kwargs.pop("x"))
+        y = np.asarray(kwargs.pop("y"))
+        z = np.asarray(kwargs.pop("z"))
+
+        kw = self._merge("tripcolor", kwargs)
+        kw.setdefault("shading", "gouraud")
+
+        # --- map data -> axes coords (0..1) respecting scale + limits ---
+        # Using transforms is the safest way (handles log scales, inverted axes, etc.).
+        pts = np.c_[x, y]
+        pts_disp = self.ax.transData.transform(pts)
+        pts_axes = self.ax.transAxes.inverted().transform(pts_disp)
+        xa = pts_axes[:, 0]
+        ya = pts_axes[:, 1]
+
+        # --- basic finite mask and in-axes mask ---
+        m = np.isfinite(xa) & np.isfinite(ya)
+        # Keep only points that are inside the axes box; avoids Qhull warnings
+        # and keeps visual behavior consistent with other axes-space layers.
+        m &= (xa >= 0.0) & (xa <= 1.0) & (ya >= 0.0) & (ya <= 1.0)
+
+        if m.sum() < 3:
+            return []
+
+        xa = xa[m]
+        ya = ya[m]
+        z = z[m]
+
+        # Non-finite z values (NaN/inf) should create holes: triangles touching those vertices are masked.
+        z_nonfinite = ~np.isfinite(z)
+
+        # --- optional: mask z by extend/vmin/vmax/levels/norm (consistent with tricontourf) ---
+        z_masked, vmin_eff, vmax_eff = _mask_by_extend(
+            z,
+            extend=kw.get("extend", "neither"),
+            vmin=kw.get("vmin"),
+            vmax=kw.get("vmax"),
+            levels=kw.get("levels"),
+            norm=kw.get("norm"),
+        )
+
+        # Union plotting mask (extend/vmin/vmax/levels) with non-finite z values.
+        try:
+            base_mask = np.ma.getmaskarray(z_masked)
+            z_masked = np.ma.array(z_masked, mask=(base_mask | z_nonfinite))
+        except Exception:
+            z_masked = np.ma.array(z, mask=z_nonfinite)
+
+        if kw.get("norm") is not None:
+            kw.pop("vmin", None)
+            kw.pop("vmax", None)
+        else:
+            kw.setdefault("vmin", vmin_eff)
+            kw.setdefault("vmax", vmax_eff)
+
+        import matplotlib.tri as tri
+
+        tri_obj = tri.Triangulation(xa, ya)
+
+        # Mask triangles if any vertex is masked (NaN/inf or out-of-range via extend).
+        mask_v = np.ma.getmaskarray(z_masked)
+        if mask_v is not False and mask_v is not None:
+            tri_mask = np.any(mask_v[tri_obj.triangles], axis=1)
+            tri_obj.set_mask(tri_mask)
+
+        # Gouraud shading requires numeric z; masked triangles are suppressed by tri_mask.
+        z_for_plot = np.asarray(np.ma.filled(z_masked, 0.0))
+
+        artists = self.ax.tripcolor(
+            tri_obj,
+            z_for_plot,
+            transform=self.ax.transAxes,
+            **kw,
+        )
+        return _auto_clip(artists, self.ax, self._clip_path)
 
     def voronoi_cmapfill(self, **kwargs): 
         import matplotlib as mpl

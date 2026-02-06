@@ -18,7 +18,7 @@ DataSet:
 
 Figures:
 - name: pL2L4_ProfLogL
-  enable: false
+  enable: true
   style:
   - a4paper_2x1
   - rectcmap
@@ -638,7 +638,7 @@ Figures:
       vmax: 1.0
 
 - name: mH5sinHxBR_ProfLogL
-  enable: true
+  enable: false
   style:
   - a4paper_2x1
   - rectcmap
