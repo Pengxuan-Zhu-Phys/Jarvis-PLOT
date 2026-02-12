@@ -7,9 +7,7 @@ import os
 import json
 
 from matplotlib.axes import Axes
-from matplotlib.collections import PolyCollection, LineCollection
-from matplotlib.path import Path
-from matplotlib.patches import PathPatch
+from matplotlib.collections import PolyCollection
 #
 from .helper import _auto_clip, _mask_by_extend, voronoi_finite_polygons_2d, _clip_poly_to_rect
 
@@ -95,10 +93,12 @@ class StdAxesAdapter:
         x, y, z = kwargs.pop("x"), kwargs.pop("y"), kwargs.pop("z")
         import matplotlib.tri as tri
         triang = tri.Triangulation(x, y)
-        refiner = tri.UniformTriRefiner(triang)
-        tri_refi, z_test_refi = refiner.refine_field(z, subdiv=3)
         kw = self._merge("tricontour", kwargs)
-        artists = self.ax.tricontour(tri_refi, z_test_refi, **kw)
+        subdiv = int(kw.pop("subdiv", 0) or 0)
+        if subdiv > 0:
+            refiner = tri.UniformTriRefiner(triang)
+            triang, z = refiner.refine_field(z, subdiv=subdiv)
+        artists = self.ax.tricontour(triang, z, **kw)
         return _auto_clip(artists, self.ax, self._clip_path)
 
     def tricontourf(self, **kwargs):
@@ -106,25 +106,25 @@ class StdAxesAdapter:
         import matplotlib.tri as tri
 
         triang = tri.Triangulation(x, y)
-        refiner = tri.UniformTriRefiner(triang)
-        tri_refi, z_refi = refiner.refine_field(z, subdiv=3)
-
         kw = self._merge("tricontourf", kwargs)
+        subdiv = int(kw.pop("subdiv", 0) or 0)
+        if subdiv > 0:
+            refiner = tri.UniformTriRefiner(triang)
+            triang, z = refiner.refine_field(z, subdiv=subdiv)
 
         z_masked, vmin_eff, vmax_eff = _mask_by_extend(
-            z_refi,
+            z,
             extend=kw.get("extend", "neither"),
             vmin=kw.get("vmin"),
             vmax=kw.get("vmax"),
             levels=kw.get("levels"),
             norm=kw.get("norm"),
         )
-        try:
-            print("Adapter 184 -> ", z_refi.max(), z_refi.min())
-            if kw.get("levels", False) and isinstance(kw.get("levels", False), int):
-                kw["levels"] = np.linspace(kw.get("vmin"), kw.get("vmax"), kw.get("levels"))
-        except TypeError:
-            pass
+        # If user provided levels as an int, let Matplotlib handle it.
+        # Only expand to an explicit array if BOTH vmin and vmax are provided.
+        if isinstance(kw.get("levels", None), int):
+            if kw.get("vmin") is not None and kw.get("vmax") is not None:
+                kw["levels"] = np.linspace(kw["vmin"], kw["vmax"], int(kw["levels"]))
         if kw.get("norm") is not None:
             kw.pop("vmin", None)
             kw.pop("vmax", None)
@@ -134,13 +134,13 @@ class StdAxesAdapter:
 
         z_mask_arr = np.ma.getmaskarray(z_masked)
         if z_mask_arr is not False and z_mask_arr is not None:
-            tri_mask = np.any(z_mask_arr[tri_refi.triangles], axis=1)
-            tri_refi.set_mask(tri_mask)
+            tri_mask = np.any(z_mask_arr[triang.triangles], axis=1)
+            triang.set_mask(tri_mask)
             z_for_plot = np.asarray(np.ma.filled(z_masked, 0.0))
         else:
             z_for_plot = np.asarray(z_masked)
 
-        artists = self.ax.tricontourf(tri_refi, z_for_plot, **kw)
+        artists = self.ax.tricontourf(triang, z_for_plot, **kw)
         return _auto_clip(artists, self.ax, self._clip_path)
 
     
@@ -287,6 +287,25 @@ class StdAxesAdapter:
         return _auto_clip(artists, self.ax, self._clip_path)
 
     def tripcolor(self, **kwargs):
+        """Matplotlib-native tripcolor (data coordinates).
+
+        This preserves the original Matplotlib behavior:
+        - (x, y) interpreted in data coordinates
+        - no mapping to Axes coordinates
+        - no extra masking/triangulation preprocessing beyond Matplotlib
+
+        Required:
+          - x, y, z
+        """
+        x = np.asarray(kwargs.pop("x"))
+        y = np.asarray(kwargs.pop("y"))
+        z = np.asarray(kwargs.pop("z"))
+
+        kw = self._merge("tripcolor", kwargs)
+        artists = self.ax.tripcolor(x, y, z, **kw)
+        return _auto_clip(artists, self.ax, self._clip_path)
+
+    def tripcolor_axes(self, **kwargs):
         """Triangulated pseudocolor in axes coordinates.
 
         We map the input (x, y) from data coordinates to Axes coordinates (0..1)
@@ -407,8 +426,6 @@ class StdAxesAdapter:
             where = _np.asarray(where, dtype=bool)
             if where.shape != x.shape:
                 raise ValueError("voronoi: 'where' must have the same shape as x/y")
-        # print(x, y, z)
-        # self.ax.scatter(x, y, s=0.3, marker='.', c="#FF42A1", zorder=10, edgecolors="none")
         vmin = kwargs.pop("vmin", None)
         vmax = kwargs.pop("vmax", None)
         edgecolor = kwargs.pop("edgecolor", 'none')
@@ -423,7 +440,6 @@ class StdAxesAdapter:
         # ---- derive view box & transforms from axes ----
         xlim = self.ax.get_xlim()
         ylim = self.ax.get_ylim()
-        # print(xlim, ylim)
         if extent is None:
             extent = (min(xlim), max(xlim), min(ylim), max(ylim))
         xmin, xmax, ymin, ymax = extent
@@ -454,7 +470,6 @@ class StdAxesAdapter:
 
         vor = Voronoi(pts_norm)
 
-        from .helper import voronoi_finite_polygons_2d, _clip_poly_to_rect
         regions, vertices = voronoi_finite_polygons_2d(vor, radius=radius)
         unit_rect = (0.0, 1.0, 0.0, 1.0)
 
@@ -486,7 +501,6 @@ class StdAxesAdapter:
                 polys_valid.append(poly_data)
                 zvals_valid.append(float(val))
 
-        from matplotlib.collections import PolyCollection
         artists = []
         from matplotlib import colors as mcolors
         norm = kwargs.pop("norm", None)
@@ -700,68 +714,6 @@ class StdAxesAdapter:
 
         return _auto_clip(artists, self.ax, self._clip_path)
 
-
-
-
-        # ---- optionally exclude hatch near the axes frame ----
-        if frame_strip > 0:
-            F = _SHPBox(0.0, 0.0, 1.0, 1.0)
-            Fin = F.buffer(-frame_strip)
-            strip = F.difference(Fin) if not Fin.is_empty else F
-            B = B.difference(strip.intersection(B))
-            if B.is_empty:
-                return []
-
-        # ---- draw hatch fill (HOLE-AWARE) ----
-        # NOTE: ax.fill cannot represent holes; use a PathPatch so removed interior cells stay unhatched.
-        kw = self._merge("fill", kw_face)
-        # kw.setdefault("facecolor", "none")
-        kw["linewidth"]= 0.
-        print(kw)
-        
-        # kw.setdefault("hatch", hatch)
-
-        # Build a compound Path from shapely geometry (Polygon/MultiPolygon) with holes.
-        def _geom_to_path(geom):
-            if geom.is_empty:
-                return None
-            polys = [geom] if geom.geom_type == "Polygon" else list(getattr(geom, "geoms", []))
-            verts = []
-            codes = []
-
-            def _add_ring(coords):
-                ring = list(coords)
-                if len(ring) < 3:
-                    return
-                # Matplotlib expects the last vertex for CLOSEPOLY; shapely rings already repeat the first.
-                # Ensure we have at least 4 points including the closing point.
-                if ring[0] != ring[-1]:
-                    ring.append(ring[0])
-                verts.extend(ring)
-                codes.extend([Path.MOVETO] + [Path.LINETO] * (len(ring) - 2) + [Path.CLOSEPOLY])
-
-            for p in polys:
-                if p.is_empty:
-                    continue
-                _add_ring(p.exterior.coords)
-                for hole in p.interiors:
-                    _add_ring(hole.coords)
-
-            if not verts:
-                return None
-            return Path(verts, codes)
-
-        path = _geom_to_path(B)
-        if path is None:
-            return []
-
-        patch = PathPatch(path, transform=self.ax.transAxes, **kw)
-        if zorder is not None:
-            patch.set_zorder(zorder)
-
-        artist = self.ax.add_patch(patch)
-        return _auto_clip([artist], self.ax, self._clip_path)
-
     # 为了兼容现有框架，暴露底层的方法/属性
     def __getattr__(self, name: str):
         # 未覆写的方法透传给原始 Axes
@@ -790,12 +742,7 @@ class StdAxesAdapter:
 
     def _get_default_colors(self, n):
         import matplotlib.pyplot as plt
-        # print(getattr(self, "color_palette"))
         palette = self.config['hist']['color']
-        print(len(palette), n)
-
-        # palette = getattr(self, 'color_palette', plt.cm.tab10.colors)
-        # print(palette)
         return [palette[i % len(palette)] for i in range(n)]
 
 # —— Ternary 适配器：在 Std 基础上增加 (a,b,c)->(x,y) 投影 ——

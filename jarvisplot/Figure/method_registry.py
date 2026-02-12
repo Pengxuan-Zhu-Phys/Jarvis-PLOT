@@ -54,6 +54,7 @@ METHOD_DISPATCH: Dict[str, str] = {
 
     # tri related
     "tripcolor":    "tripcolor",
+    "tripcolor_axes": "tripcolor_axes",
     "tricontour":   "tricontour",
     "tricontourf":  "tricontourf",
     "triplot":      "triplot",
@@ -214,6 +215,15 @@ def _bootstrap_default_registry() -> None:
         "tripcolor",
         axes_types=("tri", "any"),
         aliases=("tri_field", "tri_color"),
+        overwrite=True,
+    )
+
+    # Axes-space tri field (JarvisPLOT custom adapter method)
+    REGISTRY.register(
+        "tripcolor_axes",
+        "tripcolor_axes",
+        axes_types=("tri", "any"),
+        aliases=("tri_field_axes",),
         overwrite=True,
     )
 
