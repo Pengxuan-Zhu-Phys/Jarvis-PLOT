@@ -13,6 +13,8 @@ from contextlib import redirect_stdout
 jppwd = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 import json 
 from .Figure.data_pipelines import SharedContent, DataContext
+from .cache_store import ProjectCache
+from .Figure.preprocessor import DataPreprocessor
 
 class JarvisPLOT():
     def __init__(self) -> None:
@@ -26,6 +28,10 @@ class JarvisPLOT():
         self.shared     =   None
         self.ctx        =   None
         self.interpolators = None
+        self.workdir: Optional[str] = None
+        self.cache: Optional[ProjectCache] = None
+        self.dataset_registry: Dict[str, DataSet] = {}
+        self.preprocessor: Optional[DataPreprocessor] = None
 
     def init(self):
         self.args = self.cli.args.parse_args()
@@ -36,6 +42,7 @@ class JarvisPLOT():
         self.load_cmaps()
 
         self.load_yaml()
+        self.prepare_project_layout()
 
         # sys.exit()
         if self.args.parse_data:
@@ -46,18 +53,26 @@ class JarvisPLOT():
             elif self.args.out is not None and self.args.inplace:
                 self.logger.error("Conflicting arguments: --out and --inplace. Please choose only one.")
                 sys.exit(2)
-            self.load_dataset()
+            self.load_dataset(eager=True)
             self.rename_hdf5_and_renew_yaml()
         else:
-            self.load_dataset()
+            self.load_dataset(eager=False)
             if self.shared is None:
                 self.shared = SharedContent(logger=self.logger)
             self.ctx = DataContext(self.shared)
             for dts in self.dataset:
-                self.ctx.update(dts.name, dts.data)
+                self.dataset_registry[dts.name] = dts
+                self.ctx.register(dts.name, lambda _shared, _d=dts: _d.get_data())
 
             # Register external functions (e.g. lazy-loaded interpolators) into the expression runtime.
             self.load_interpolators()
+            self.preprocessor = DataPreprocessor(
+                self.ctx,
+                cache=self.cache,
+                dataset_registry=self.dataset_registry,
+                logger=self.logger,
+            )
+            self.prebuild_profile_pipelines()
 
             self.load_styles()
             self.plot()
@@ -116,6 +131,61 @@ class JarvisPLOT():
                     else:
                         self.logger.error("Style Not Found: '{}' boudle, {} Style \n\t-> {}".format(sty, kk, vpath))
 
+    def prepare_project_layout(self):
+        """Resolve workdir/output defaults and initialize local cache."""
+        cfg = self.yaml.config or {}
+        project = cfg.get("project", {})
+        if not isinstance(project, dict):
+            project = {}
+
+        raw_workdir = project.get("workdir", self.yaml.dir or ".")
+        wp = Path(str(raw_workdir)).expanduser()
+        if not wp.is_absolute():
+            wp = (Path(self.yaml.dir) / wp).resolve()
+        self.workdir = str(wp)
+        os.makedirs(self.workdir, exist_ok=True)
+        project["workdir"] = self.workdir
+        cfg["project"] = project
+
+        output = cfg.get("output", {})
+        if not isinstance(output, dict):
+            output = {}
+        raw_outdir = output.get("dir", None)
+        if not raw_outdir:
+            outdir = (Path(self.workdir) / "plots").resolve()
+        else:
+            op = Path(str(raw_outdir)).expanduser()
+            if not op.is_absolute():
+                op = (Path(self.workdir) / op).resolve()
+            outdir = op
+        output["dir"] = str(outdir)
+        cfg["output"] = output
+        self.yaml.config = cfg
+
+        self.cache = ProjectCache(
+            self.workdir,
+            logger=self.logger,
+            rebuild=bool(getattr(self.args, "rebuild_cache", False)),
+        )
+        self.logger.debug(f"Project workdir -> {self.workdir}")
+        self.logger.debug(f"Cache dir -> {self.cache.root}")
+
+    def prebuild_profile_pipelines(self):
+        """Traverse figures once and prebuild profile pipelines."""
+        if self.preprocessor is None:
+            return
+        try:
+            stats = self.preprocessor.prebuild_profiles(self.yaml.config or {})
+            self.logger.warning(
+                "Prebuild profile pipelines finished -> tasks={tasks}, hits={hits}, miss={miss}".format(
+                    tasks=stats.get("tasks", 0),
+                    hits=stats.get("hits", 0),
+                    miss=stats.get("miss", 0),
+                )
+            )
+        except Exception as e:
+            self.logger.warning(f"Prebuild profile pipelines failed: {e}")
+
 
     def load_path(self, path):
         if "&JP/" == path[0:4]:
@@ -133,6 +203,7 @@ class JarvisPLOT():
             figobj.logger = self.logger
             figobj.jpstyles = self.style
             figobj.context = self.ctx
+            figobj.preprocessor = self.preprocessor
             if getattr(self.args, "no_logo", False):
                 figobj.print = True
 
@@ -207,12 +278,13 @@ class JarvisPLOT():
         self.yaml.load()
         self.logger.debug("Resolved YAML file -> {}".format(self.yaml.path))
 
-    def load_dataset(self):
+    def load_dataset(self, eager: bool = False):
         dts = self.yaml.config['DataSet']
+        data_root = self.workdir or self.yaml.dir
         for dt in dts:
             dataset = DataSet()
             dataset.logger = self.logger
-            dataset.setinfo(dt, self.yaml.dir)
+            dataset.setinfo(dt, data_root, eager=eager, cache=self.cache)
             self.dataset.append(dataset)
 
     def rename_hdf5_and_renew_yaml(self):

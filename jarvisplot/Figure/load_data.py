@@ -169,8 +169,119 @@ def profiling(df, prof, logger):
     return df 
 
 
-    
-        
+def _preprofiling(df, prof, logger):
+    """Lightweight pre-profiling (default 1000x1000 grid) for cache prebuild."""
+
+    def _norm(arr, lim, scale):
+        arr = np.asarray(arr, dtype=float)
+        lo, hi = float(lim[0]), float(lim[1])
+        if str(scale).lower() == "log":
+            tiny = np.finfo(float).tiny
+            lo = max(lo, tiny)
+            hi = max(hi, lo * 10.0)
+            den = np.log(hi) - np.log(lo)
+            if den == 0:
+                den = 1.0
+            arr = np.where(arr > 0, arr, np.nan)
+            return (np.log(arr) - np.log(lo)) / den
+        den = hi - lo
+        if den == 0:
+            den = 1.0
+        return (arr - lo) / den
+
+    pre_cfg = prof.get("pregrid", {})
+    if isinstance(pre_cfg, dict):
+        prebin = int(pre_cfg.get("bin", prof.get("pregrid_bin", 1000)) or 1000)
+        enabled = bool(pre_cfg.get("enable", True))
+    else:
+        prebin = int(prof.get("pregrid_bin", 1000) or 1000)
+        enabled = False if pre_cfg is False else True
+    prebin = max(prebin, 1)
+
+    if not enabled:
+        return df
+
+    coors = prof.get("coordinates", {})
+    obj = str(prof.get("objective", "max")).lower()
+    grid = str(prof.get("grid_points", "rect")).lower()
+
+    if grid == "ternary" and ("bottom" in coors) and ("right" in coors):
+        bset = coors["bottom"]
+        rset = coors["right"]
+        if isinstance(bset, dict) and "expr" in bset:
+            b = eval_series(df, bset, logger)
+        else:
+            b = np.asarray(df.get("bottom"))
+        if isinstance(rset, dict) and "expr" in rset:
+            r = eval_series(df, rset, logger)
+        else:
+            r = np.asarray(df.get("right"))
+        x = np.asarray(b, dtype=float) + 0.5 * np.asarray(r, dtype=float)
+        y = np.asarray(r, dtype=float)
+    else:
+        if "expr" in coors["x"].keys():
+            x = eval_series(df, coors["x"], logger)
+        else:
+            x = df["x"]
+
+        if "expr" in coors["y"].keys():
+            y = eval_series(df, coors["y"], logger)
+        else:
+            y = df["y"]
+
+    if "expr" in coors["z"].keys():
+        z = eval_series(df, coors["z"], logger)
+    else:
+        z = df["z"]
+
+    if grid == "ternary":
+        xlim = coors["x"].get("lim", [0, 1])
+        ylim = coors["y"].get("lim", [0, 1])
+    else:
+        xlim = coors["x"].get("lim", [np.nanmin(x), np.nanmax(x)])
+        ylim = coors["y"].get("lim", [np.nanmin(y), np.nanmax(y)])
+
+    xscale = coors["x"].get("scale", "linear")
+    yscale = coors["y"].get("scale", "linear")
+    xind = coors["x"].get("name", "x")
+    yind = coors["y"].get("name", "y")
+    zind = coors["z"].get("name", "z")
+
+    out = df.copy()
+    out[xind] = x
+    out[yind] = y
+    out[zind] = z
+
+    xnorm = _norm(out[xind].to_numpy(), xlim, xscale)
+    ynorm = _norm(out[yind].to_numpy(), ylim, yscale)
+    valid = np.isfinite(xnorm) & np.isfinite(ynorm)
+    if not np.any(valid):
+        if logger:
+            logger.warning("Preprofiling got no finite points; returning original dataframe.")
+        return out
+
+    xv = np.clip(xnorm[valid], 0.0, 1.0 - 1e-12)
+    yv = np.clip(ynorm[valid], 0.0, 1.0 - 1e-12)
+    ix = (xv * prebin).astype(np.int32)
+    iy = (yv * prebin).astype(np.int32)
+    cell = iy.astype(np.int64) * np.int64(prebin) + ix.astype(np.int64)
+
+    idx_src = np.asarray(out.index)[valid]
+    zraw = np.asarray(out[zind], dtype=float)[valid]
+    if obj == "min":
+        zkey = np.where(np.isfinite(zraw), zraw, np.inf)
+        tmp = pd.DataFrame({"__cell__": cell, "__z__": zkey, "__idx__": idx_src})
+        loc = tmp.groupby("__cell__", sort=False)["__z__"].idxmin()
+    else:
+        zkey = np.where(np.isfinite(zraw), zraw, -np.inf)
+        tmp = pd.DataFrame({"__cell__": cell, "__z__": zkey, "__idx__": idx_src})
+        loc = tmp.groupby("__cell__", sort=False)["__z__"].idxmax()
+
+    keep_idx = tmp.loc[loc, "__idx__"].to_numpy()
+    reduced = out.loc[keep_idx].copy()
+    if logger:
+        logger.debug(f"After preprofiling ({prebin}x{prebin}) -> {reduced.shape}")
+    return reduced
 
 
 def filter(df, condition, logger):

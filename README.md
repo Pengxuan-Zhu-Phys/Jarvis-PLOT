@@ -27,6 +27,20 @@ Run JarvisPLOT with one or more YAML configuration files:
 jplot path/to/config.yaml
 ```
 
+Rebuild local cache for the current project workdir:
+
+```bash
+jplot path/to/config.yaml --rebuild-cache
+```
+
+### Project Workdir and Cache
+
+- You can set `project.workdir` in YAML.
+- If `output.dir` is omitted, JarvisPLOT now defaults to `<workdir>/plots/`.
+- Data cache is stored in `<workdir>/.cache/`.
+- Profiling pipelines are prebuilt once and reused from cache when source fingerprint and profile settings are unchanged.
+- Profiling uses a fast two-stage grid reduction (`pregrid` + render `bin`) for large datasets.
+
 ### Example: SUSYRun2 Ternary Plots
 
 ```bash

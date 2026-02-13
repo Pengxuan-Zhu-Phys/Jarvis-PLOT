@@ -1,0 +1,318 @@
+DataSet:
+- name: dynesty
+  path: ../DATABASE/dynesty_result.csv
+  type: csv
+- name: df_samples_0
+  path: ../DATABASE/samples.0.csv
+  type: csv
+- name: df_samples_1
+  path: ../DATABASE/samples.1.csv
+  type: csv
+- name: df_samples_2
+  path: ../DATABASE/samples.2.csv
+  type: csv
+- name: df_samples_3
+  path: ../DATABASE/samples.3.csv
+  type: csv
+- name: df_samples_4
+  path: ../DATABASE/samples.4.csv
+  type: csv
+
+Figures:
+- name: Scatter_XY
+  enable: false
+  style:
+  - a4paper_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: $x$
+        y: $y$
+      xlim: [0.1, 5]
+      ylim: [0, 5]
+      xscale: log
+      yscale: linear
+    axc:
+      label:
+        ylabel: $\log{\mathcal{L}}$
+  layers:
+  - name: scatter
+    data:
+    - source: [df_samples_0, df_samples_1, df_samples_2, df_samples_3, df_samples_4 ]
+      transform:
+      - sortby: LogL
+    axes: ax
+    method: scatter
+    coordinates:
+      x:
+        expr: x
+      y:
+        expr: y
+      c:
+        expr: LogL
+    style:
+      marker: .
+      s: 2
+      cmap: jarvis_rainbow2_r
+      vmin: -50
+      vmax: 0
+      norm: linear
+      zorder: 1
+
+- name: XY_profL
+  enable: false
+  style:
+  - a4paper_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: $x$
+        y: $y$
+      xlim: [0.1, 5]
+      ylim: [0, 5]
+      xscale: log
+      yscale: linear
+    axc:
+      label:
+        ylabel: $\log{\mathcal{L}}$
+  layers:
+  - name: scatter
+    data:
+    - source: [df_samples_0, df_samples_1, df_samples_2, df_samples_3, df_samples_4 ]
+      transform: 
+      - profile: 
+          bin: 160 
+          coordinates: 
+            x: 
+              expr: x 
+              name: xx
+              scale: log 
+              lim: [0.1, 5]
+            y:
+              expr:  y
+              scale: linear
+              name: yy
+              lim: [0, 5]
+            z:
+              expr: LogL
+              scale: linear
+              name: z0
+          objective: max
+          grid_points: rect
+    share_data: porfXY 
+    axes: ax
+    method: scatter
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+    style:
+      marker: .
+      s: 2
+      color: 'None'
+      # cmap: jarvis_rainbow2_r
+      # vmin: -50
+      # vmax: 0
+      # norm: linear
+      zorder: 0
+  - name: voronoi
+    data:
+    - source: porfXY 
+    axes: ax 
+    method: voronoi 
+    coordinates:
+      x: {expr: xx}
+      y: {expr: yy}
+      z: {expr: LogL}
+    style:
+      cmap: jarvis_rainbow2_r
+      vmin: -50
+      vmax: 0 
+
+- name: XY_triprofL
+  enable: true
+  style:
+  - a4paper_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: $x$
+        y: $y$
+      xlim: [0.1, 5]
+      ylim: [0, 5]
+      xscale: log
+      yscale: linear
+    axc:
+      label:
+        ylabel: $\log{\mathcal{L}}$
+  layers:
+  - name: scatter
+    data:
+    - source: [df_samples_0, df_samples_1, df_samples_2, df_samples_3, df_samples_4 ]
+      transform: 
+      - profile: 
+          bin: 160 
+          coordinates: 
+            x: 
+              expr: x 
+              name: xx
+              scale: log 
+              lim: [0.1, 5]
+            y:
+              expr:  y
+              scale: linear
+              name: yy
+              lim: [0, 5]
+            z:
+              expr: LogL
+              scale: linear
+              name: z0
+          objective: max
+          grid_points: rect
+    share_data: porfXY 
+    axes: ax
+    method: scatter
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+    style:
+      marker: .
+      s: 1
+      # color: 'pink'
+      color: 'none'
+      zorder: 10
+  - name: voronoi
+    data:
+    - source: porfXY 
+    axes: ax 
+    method: tripcolor 
+    coordinates:
+      x: {expr: xx}
+      y: {expr: yy}
+      z: {expr: LogL}
+    style:
+      # cmap: gambit_cmap
+      shading: gouraud
+      cmap: jarvis_rainbow2_r
+      vmin: -50
+      vmax: 0 
+
+
+
+
+- name: dynesty_logL_vs_logX
+  enable: false
+  style:
+  - a4paper_2x1
+  - rect_5x1
+  frame:
+    ax0:
+      labels:
+        x: $-\ln(X)$
+        y: $N_{\mathrm{live}}$
+    ax1:
+      labels:
+        x: $-\ln(X)$
+        y: Likelihood
+    ax2:
+      labels:
+        x: $-\ln(X)$
+        y: 'Importance
+
+          weight PDF'
+    ax3:
+      labels:
+        x: $-\ln(X)$
+        y: Evidence
+    ax4:
+      labels:
+        x: $-\ln(X)$
+        y: Iters
+  layers:
+  - name: nlive
+    data:
+    - source: dynesty
+    axes: ax0
+    method: scatter
+    coordinates:
+      x:
+        expr: -log_PriorVolume
+      y:
+        expr: samples_nlive
+    style:
+      alpha: 0.7
+      zorder: 1
+  - name: loglike
+    data:
+    - source: dynesty
+    axes: ax1
+    method: scatter
+    coordinates:
+      x:
+        expr: -log_PriorVolume
+      y:
+        expr: np.exp(log_Like) / np.exp(np.max(log_Like))
+    style:
+      alpha: 0.7
+      zorder: 1
+  - name: 'Importance
+
+      weight PDF'
+    data:
+    - source: dynesty
+    axes: ax2
+    method: scatter
+    coordinates:
+      x:
+        expr: -log_PriorVolume
+      y:
+        expr: np.exp(log_weight) / np.exp(np.max(log_weight))
+    style:
+      alpha: 0.7
+      zorder: 1
+  - name: logevidence
+    data:
+    - source: dynesty
+    axes: ax3
+    method: scatter
+    coordinates:
+      x:
+        expr: -log_PriorVolume
+      y:
+        expr: np.exp(log_Evidence)
+    style:
+      alpha: 0.7
+      zorder: 1
+  - name: iters
+    data:
+    - source: dynesty
+    axes: ax4
+    method: scatter
+    coordinates:
+      x:
+        expr: -log_PriorVolume
+      y:
+        expr: samples_it
+    style:
+      alpha: 0.7
+      zorder: 1
+
+output:
+  dir: .
+  dpi: 400
+  formats:
+  - png
+
+project:
+  name: Example_Dynesty
+  workdir: /Users/p.zhu/Workshop/Jarvis-HEP/Results/EggBox_Dynesty_06/IMAGE
+
+version: 0.3
+
+Functions: []

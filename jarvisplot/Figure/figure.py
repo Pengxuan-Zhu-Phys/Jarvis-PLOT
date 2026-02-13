@@ -345,6 +345,7 @@ class Figure:
         # self._axtri     = None
         self._layers    = {}
         self._ctx       = None
+        self._preprocessor = None
         # allow optional initialization from a dict
         if info:
             self.from_dict(info)
@@ -433,6 +434,14 @@ class Figure:
     def context(self, value):
         self._ctx = value  # 期望是 DataContext
 
+    @property
+    def preprocessor(self):
+        return self._preprocessor
+
+    @preprocessor.setter
+    def preprocessor(self, value):
+        self._preprocessor = value
+
 
     
     
@@ -451,6 +460,11 @@ class Figure:
             if layer.get("share_data") and info['data'] is not None:
                 from copy import deepcopy
                 self.context.update(layer["share_data"], deepcopy(info['data']))
+                if self.preprocessor is not None:
+                    try:
+                        self.preprocessor.persist_named_layer(layer["share_data"], layer, info["data"])
+                    except Exception as e:
+                        self.logger.debug(f"persist share_data cache failed: {e}")
             info['coor'] = layer['coordinates']
             info['method'] = layer.get("method", "scatter")
             info['style'] = layer.get("style", {})
@@ -460,28 +474,50 @@ class Figure:
     def load_layer_data(self, layer):
         lyinfo = layer.get("data", False)
         lycomb = layer.get("combine", "concat")
+        share_name = layer.get("share_data")
+
+        if self.preprocessor is not None and share_name:
+            try:
+                named = self.preprocessor.load_named_layer(share_name, layer)
+                if named is not None:
+                    self.logger.debug(f"Loaded share_data '{share_name}' from named cache.")
+                    return named
+            except Exception as e:
+                self.logger.debug(f"Named share_data cache load failed: {e}")
+
         if lyinfo:
             if lycomb == "concat":
                 dts = []
                 for ds in lyinfo:
                     src = ds.get('source')
+                    use_cache = bool(ds.get("cache", True))
                     self.logger.debug("Loading layer data source -> {}".format(src))
                     if src and self.context:
-                        from copy import deepcopy
-                        if isinstance(src, (list, tuple)):
-                            self.logger.debug("loading datasets in list mode")
-                            dsrc = []
-                            for srcitem in src: 
-                                self.logger.debug("loading layer data source item -> {}".format(srcitem))
-                                dt = deepcopy(self.context.get(srcitem))
-                                dsrc.append(dt)
-                            dfsrcs = pd.concat(dsrc, ignore_index=False)
-                            dt = self.load_bool_df(dfsrcs, ds.get("transform", None))
-                            dts.append(dt)
-                        elif self.context.get(src) is not None:
-                            dt = deepcopy(self.context.get(src))
-                            dt = self.load_bool_df(dt, ds.get("transform", None))
-                            dts.append(dt)
+                        if self.preprocessor is not None:
+                            dt, _, _ = self.preprocessor.run_pipeline(
+                                source=src,
+                                transform=ds.get("transform", None),
+                                combine="concat",
+                                use_cache=use_cache,
+                            )
+                            if dt is not None:
+                                dts.append(dt)
+                        else:
+                            from copy import deepcopy
+                            if isinstance(src, (list, tuple)):
+                                self.logger.debug("loading datasets in list mode")
+                                dsrc = []
+                                for srcitem in src: 
+                                    self.logger.debug("loading layer data source item -> {}".format(srcitem))
+                                    dt = deepcopy(self.context.get(srcitem))
+                                    dsrc.append(dt)
+                                dfsrcs = pd.concat(dsrc, ignore_index=False)
+                                dt = self.load_bool_df(dfsrcs, ds.get("transform", None))
+                                dts.append(dt)
+                            elif self.context.get(src) is not None:
+                                dt = deepcopy(self.context.get(src))
+                                dt = self.load_bool_df(dt, ds.get("transform", None))
+                                dts.append(dt)
                     else:
                         self.logger.error("DataSet -> {} not specified".format(src))
                 if len(dts) == 0:
@@ -495,12 +531,25 @@ class Figure:
                 for ds in lyinfo: 
                     src = ds.get("source")
                     label = ds.get("label")
+                    use_cache = bool(ds.get("cache", True))
                     self.logger.debug("Loading layer data source -> {}".format(src))
-                    if src and self.context and self.context.get(src) is not None:
-                        from copy import deepcopy
-                        dt = deepcopy(self.context.get(src))
-                        dt = self.load_bool_df(dt, ds.get("transform", None))
-                        dts[label] = dt
+                    if src and self.context:
+                        if self.preprocessor is not None:
+                            dt, _, _ = self.preprocessor.run_pipeline(
+                                source=src,
+                                transform=ds.get("transform", None),
+                                combine="concat",
+                                use_cache=use_cache,
+                            )
+                        else:
+                            from copy import deepcopy
+                            if self.context.get(src) is None:
+                                dt = None
+                            else:
+                                dt = deepcopy(self.context.get(src))
+                                dt = self.load_bool_df(dt, ds.get("transform", None))
+                        if dt is not None:
+                            dts[label] = dt
                     else:
                         self.logger.error("DataSet -> {} not specified".format(src))
                 if len(dts) == 0: 
@@ -511,6 +560,8 @@ class Figure:
                
          
     def load_bool_df(self, df, transform):
+        if self.preprocessor is not None:
+            return self.preprocessor.apply_runtime_transforms(df, transform)
         if transform is None:
             return df 
         elif not isinstance(transform, list): 

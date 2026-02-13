@@ -286,24 +286,102 @@ class StdAxesAdapter:
 
         return _auto_clip(artists, self.ax, self._clip_path)
 
-    def tripcolor(self, **kwargs):
-        """Matplotlib-native tripcolor (data coordinates).
+    def _tripcolor_impl(self, x, y, z, kw, axes_space: bool):
+        x = np.asarray(x)
+        y = np.asarray(y)
+        z = np.asarray(z)
 
-        This preserves the original Matplotlib behavior:
-        - (x, y) interpreted in data coordinates
-        - no mapping to Axes coordinates
-        - no extra masking/triangulation preprocessing beyond Matplotlib
+        if axes_space:
+            # Map data -> axes coordinates; triangulation in display space is
+            # robust under log scales and avoids visually stretched cells.
+            pts = np.c_[x, y]
+            pts_disp = self.ax.transData.transform(pts)
+            pts_axes = self.ax.transAxes.inverted().transform(pts_disp)
+            xa = pts_axes[:, 0]
+            ya = pts_axes[:, 1]
+            m = np.isfinite(xa) & np.isfinite(ya)
+            # Keep only visible points in the axes box for stable triangulation.
+            m &= (xa >= 0.0) & (xa <= 1.0) & (ya >= 0.0) & (ya <= 1.0)
+            if m.sum() < 3:
+                return []
+            xa = xa[m]
+            ya = ya[m]
+            z = z[m]
+        else:
+            xa = x
+            ya = y
+            m = np.isfinite(xa) & np.isfinite(ya)
+            if m.sum() < 3:
+                return []
+            xa = xa[m]
+            ya = ya[m]
+            z = z[m]
 
-        Required:
-          - x, y, z
-        """
-        x = np.asarray(kwargs.pop("x"))
-        y = np.asarray(kwargs.pop("y"))
-        z = np.asarray(kwargs.pop("z"))
+        # non-finite z should produce holes
+        z_nonfinite = ~np.isfinite(z)
 
-        kw = self._merge("tripcolor", kwargs)
-        artists = self.ax.tripcolor(x, y, z, **kw)
+        # options consumed for masking behavior; remove before calling tripcolor
+        extend_opt = kw.pop("extend", "neither")
+        levels_opt = kw.pop("levels", None)
+        z_masked, vmin_eff, vmax_eff = _mask_by_extend(
+            z,
+            extend=extend_opt,
+            vmin=kw.get("vmin"),
+            vmax=kw.get("vmax"),
+            levels=levels_opt,
+            norm=kw.get("norm"),
+        )
+
+        try:
+            base_mask = np.ma.getmaskarray(z_masked)
+            z_masked = np.ma.array(z_masked, mask=(base_mask | z_nonfinite))
+        except Exception:
+            z_masked = np.ma.array(z, mask=z_nonfinite)
+
+        if kw.get("norm") is not None:
+            kw.pop("vmin", None)
+            kw.pop("vmax", None)
+        else:
+            kw.setdefault("vmin", vmin_eff)
+            kw.setdefault("vmax", vmax_eff)
+
+        import matplotlib.tri as tri
+
+        tri_obj = tri.Triangulation(xa, ya)
+        mask_v = np.ma.getmaskarray(z_masked)
+        if mask_v is not False and mask_v is not None:
+            tri_mask = np.any(mask_v[tri_obj.triangles], axis=1)
+            tri_obj.set_mask(tri_mask)
+
+        z_for_plot = np.asarray(np.ma.filled(z_masked, 0.0))
+        if axes_space:
+            artists = self.ax.tripcolor(
+                tri_obj,
+                z_for_plot,
+                transform=self.ax.transAxes,
+                **kw,
+            )
+        else:
+            artists = self.ax.tripcolor(tri_obj, z_for_plot, **kw)
+
         return _auto_clip(artists, self.ax, self._clip_path)
+
+    def tripcolor(self, **kwargs):
+        """Triangulated color field.
+
+        Default behavior uses axes-space triangulation (`axes.transAxes`) to
+        keep cell geometry visually stable under log/linear axis transforms.
+        Set `space: data` to force data-space triangulation.
+        """
+        x = kwargs.pop("x")
+        y = kwargs.pop("y")
+        z = kwargs.pop("z")
+
+        # default: axes space
+        space = str(kwargs.pop("space", "axes")).lower()
+        use_axes_space = space != "data"
+        kw = self._merge("tripcolor", kwargs)
+        return self._tripcolor_impl(x=x, y=y, z=z, kw=kw, axes_space=use_axes_space)
 
     def tripcolor_axes(self, **kwargs):
         """Triangulated pseudocolor in axes coordinates.
@@ -323,81 +401,12 @@ class StdAxesAdapter:
           - shading (default: 'gouraud'), cmap, norm, vmin, vmax, alpha, zorder, etc.
           - extend/levels (optional): used to mask out-of-range z values consistently.
         """
-        x = np.asarray(kwargs.pop("x"))
-        y = np.asarray(kwargs.pop("y"))
-        z = np.asarray(kwargs.pop("z"))
-
+        x = kwargs.pop("x")
+        y = kwargs.pop("y")
+        z = kwargs.pop("z")
         kw = self._merge("tripcolor", kwargs)
         kw.setdefault("shading", "gouraud")
-
-        # --- map data -> axes coords (0..1) respecting scale + limits ---
-        # Using transforms is the safest way (handles log scales, inverted axes, etc.).
-        pts = np.c_[x, y]
-        pts_disp = self.ax.transData.transform(pts)
-        pts_axes = self.ax.transAxes.inverted().transform(pts_disp)
-        xa = pts_axes[:, 0]
-        ya = pts_axes[:, 1]
-
-        # --- basic finite mask and in-axes mask ---
-        m = np.isfinite(xa) & np.isfinite(ya)
-        # Keep only points that are inside the axes box; avoids Qhull warnings
-        # and keeps visual behavior consistent with other axes-space layers.
-        m &= (xa >= 0.0) & (xa <= 1.0) & (ya >= 0.0) & (ya <= 1.0)
-
-        if m.sum() < 3:
-            return []
-
-        xa = xa[m]
-        ya = ya[m]
-        z = z[m]
-
-        # Non-finite z values (NaN/inf) should create holes: triangles touching those vertices are masked.
-        z_nonfinite = ~np.isfinite(z)
-
-        # --- optional: mask z by extend/vmin/vmax/levels/norm (consistent with tricontourf) ---
-        z_masked, vmin_eff, vmax_eff = _mask_by_extend(
-            z,
-            extend=kw.get("extend", "neither"),
-            vmin=kw.get("vmin"),
-            vmax=kw.get("vmax"),
-            levels=kw.get("levels"),
-            norm=kw.get("norm"),
-        )
-
-        # Union plotting mask (extend/vmin/vmax/levels) with non-finite z values.
-        try:
-            base_mask = np.ma.getmaskarray(z_masked)
-            z_masked = np.ma.array(z_masked, mask=(base_mask | z_nonfinite))
-        except Exception:
-            z_masked = np.ma.array(z, mask=z_nonfinite)
-
-        if kw.get("norm") is not None:
-            kw.pop("vmin", None)
-            kw.pop("vmax", None)
-        else:
-            kw.setdefault("vmin", vmin_eff)
-            kw.setdefault("vmax", vmax_eff)
-
-        import matplotlib.tri as tri
-
-        tri_obj = tri.Triangulation(xa, ya)
-
-        # Mask triangles if any vertex is masked (NaN/inf or out-of-range via extend).
-        mask_v = np.ma.getmaskarray(z_masked)
-        if mask_v is not False and mask_v is not None:
-            tri_mask = np.any(mask_v[tri_obj.triangles], axis=1)
-            tri_obj.set_mask(tri_mask)
-
-        # Gouraud shading requires numeric z; masked triangles are suppressed by tri_mask.
-        z_for_plot = np.asarray(np.ma.filled(z_masked, 0.0))
-
-        artists = self.ax.tripcolor(
-            tri_obj,
-            z_for_plot,
-            transform=self.ax.transAxes,
-            **kw,
-        )
-        return _auto_clip(artists, self.ax, self._clip_path)
+        return self._tripcolor_impl(x=x, y=y, z=z, kw=kw, axes_space=True)
 
     def voronoi_cmapfill(self, **kwargs): 
         import matplotlib as mpl

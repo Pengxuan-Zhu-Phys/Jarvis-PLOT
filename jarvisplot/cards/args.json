@@ -45,6 +45,12 @@
             "dest": "no_logo",
             "help": "Disable the Jarvis-HEP logo panel (axlogo)",
             "action": "store_true"
+        },
+        {
+            "long": "--rebuild-cache",
+            "dest": "rebuild_cache",
+            "help": "Ignore and rebuild workdir/.cache before plotting",
+            "action": "store_true"
         }
     ]
 }

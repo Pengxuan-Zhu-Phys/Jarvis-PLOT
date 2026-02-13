@@ -3,8 +3,7 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Optional, Any, Dict, List
-import yaml
-import os, sys 
+import os
 import pandas as pd 
 import h5py
 import numpy as np
@@ -20,22 +19,131 @@ class DataSet():
         self.data                   = None
         self.group                  = None
         self.is_gambit              = False
+        self.columnmap              = {}
+        self.cache                  = None
+        self._loaded                = False
+        self._summary_emitted       = False
        
-    def setinfo(self, dtinfo, rootpath):
-        self.file = os.path.join(rootpath, dtinfo['path'])
+    def setinfo(self, dtinfo, rootpath, eager: bool = False, cache=None):
+        self.cache = cache
+        raw_path = str(dtinfo['path'])
+        p = Path(raw_path).expanduser()
+        if p.is_absolute():
+            resolved = p
+        else:
+            base = Path(rootpath or ".").expanduser().resolve()
+            resolved = (base / p).resolve()
+        self.file = str(resolved)
         self.name = dtinfo['name']
         self.type = dtinfo['type'].lower()
-        if self.type == "csv":
-            self.load_csv()
-        if self.type == "hdf5" and dtinfo.get('dataset'): 
+        if self.type == "hdf5" and dtinfo.get('dataset'):
             self.group = dtinfo['dataset']
             self.is_gambit = dtinfo.get('is_gambit', False)
             self.columnmap = dtinfo.get('columnmap', {})
+        elif self.type == "hdf5":
+            self.columnmap = dtinfo.get('columnmap', {})
+
+        if eager:
+            self.load(force=True)
+        else:
+            self._prepare_lazy_metadata()
+
+    def _prepare_lazy_metadata(self):
+        """Fetch cheap metadata only; avoid full table load."""
+        if self.type == "csv":
+            try:
+                head = pd.read_csv(self.path, nrows=0)
+                self.keys = list(head.columns)
+                if self.logger:
+                    self.logger.debug(
+                        f"Dataset '{self.name}' registered in lazy mode (csv columns={len(self.keys)})."
+                    )
+            except Exception as e:
+                if self.logger:
+                    self.logger.warning(f"Dataset '{self.name}' lazy metadata failed: {e}")
+        else:
+            if self.logger:
+                self.logger.debug(f"Dataset '{self.name}' registered in lazy mode.")
+
+    def fingerprint(self, cache=None):
+        cache = cache or self.cache
+        extra = {"name": self.name, "type": self.type, "group": self.group}
+        if cache is not None:
+            return cache.source_fingerprint(self.path, extra=extra)
+        try:
+            st = os.stat(self.path)
+            return {
+                "path": self.path,
+                "size": int(st.st_size),
+                "mtime_ns": int(st.st_mtime_ns),
+                "md5": None,
+                **extra,
+            }
+        except Exception:
+            return {"path": self.path, "size": None, "mtime_ns": None, "md5": None, **extra}
+
+    def load(self, force: bool = False):
+        if self._loaded and self.data is not None and not force:
+            return self.data
+        if self.type == "csv":
+            self.load_csv()
+        elif self.type == "hdf5":
             self.load_hdf5()
-            
-        
-       
-     
+        else:
+            raise ValueError(f"Unsupported dataset type: {self.type}")
+        self._loaded = True
+        return self.data
+
+    def get_data(self):
+        return self.load(force=False)
+
+    def _summary_name(self) -> str:
+        if self.type == "hdf5":
+            return f" HDF5 loaded!\n\t name  -> {self.name}\n\t group -> {self.group}\n\t path  -> {self.path}"
+        return f" CSV loaded!\n\t name  -> {self.name}\n\t path  -> {self.path}"
+
+    def _emit_summary_text(self, summary_msg: str) -> None:
+        if self.logger:
+            self.logger.warning("\n" + str(summary_msg))
+        else:
+            print(summary_msg)
+        self._summary_emitted = True
+
+    def emit_summary(self, force_load: bool = True) -> bool:
+        """Emit source summary even when data pipeline hits cache.
+
+        Priority:
+        1) cached summary text in .cache/summary
+        2) build from already loaded dataframe
+        3) optional fallback: load source and emit summary from loader
+        """
+        if self._summary_emitted:
+            return True
+
+        source_fp = self.fingerprint()
+        if self.cache is not None:
+            cached = self.cache.get_summary(source_fp)
+            if cached is not None:
+                self._emit_summary_text(cached)
+                return True
+
+        if self.data is not None:
+            try:
+                msg = dataframe_summary(self.data, name=self._summary_name())
+            except Exception:
+                msg = f"DataFrame shape: {self.data.shape}"
+            if self.cache is not None:
+                self.cache.put_summary(source_fp, msg)
+            self._emit_summary_text(msg)
+            return True
+
+        if force_load:
+            self.load(force=False)
+            self._summary_emitted = True
+            return True
+
+        return False
+
     @property 
     def file(self) -> Optional[str]:
         return self._file 
@@ -72,7 +180,8 @@ class DataSet():
             self._type = None
             
         self._type = str(value).lower()
-        self.logger.debug("Dataset -> {} is assigned as \n\t-> {}\ttype".format(self.base, self.type))
+        if self.logger:
+            self.logger.debug("Dataset -> {} is assigned as \n\t-> {}\ttype".format(self.base, self.type))
     
     def load_csv(self):
         if self.type == "csv":
@@ -83,17 +192,22 @@ class DataSet():
             self.keys = list(self.data.columns)
 
             # Emit the same pretty summary used for HDF5 datasets
-            summary_name = f" CSV loaded!\n\t name  -> {self.name}\n\t path  -> {self.path}"
-            try:
-                summary_msg = dataframe_summary(self.data, name=summary_name)
-            except Exception:
-                # Fallback minimal summary if something goes wrong
-                summary_msg = f"CSV loaded  {summary_name}\nDataFrame shape: {self.data.shape}"
+            summary_name = self._summary_name()
+            summary_msg = None
+            source_fp = self.fingerprint()
+            if self.cache is not None:
+                summary_msg = self.cache.get_summary(source_fp)
 
-            if self.logger:
-                self.logger.warning("\n" + summary_msg)
-            else:
-                print(summary_msg)
+            if summary_msg is None:
+                try:
+                    summary_msg = dataframe_summary(self.data, name=summary_name)
+                except Exception:
+                    # Fallback minimal summary if something goes wrong
+                    summary_msg = f"CSV loaded  {summary_name}\nDataFrame shape: {self.data.shape}"
+                if self.cache is not None:
+                    self.cache.put_summary(source_fp, summary_msg)
+
+            self._emit_summary_text(summary_msg)
     
     def load_hdf5(self):
             def _iter_datasets(hobj, prefix=""):
@@ -196,12 +310,16 @@ class DataSet():
                                 self.rename_columns(cmap)
                                 
                         # Emit a pretty summary BEFORE returning
-                        summary_name = f" HDF5 loaded!\n\t name  -> {self.name}\n\t group -> {self.group}\n\t path  -> {self.path}"
-                        summary_msg = dataframe_summary(self.data, name=summary_name)
-                        if self.logger:
-                            self.logger.warning("\n" + summary_msg)
-                        else:
-                            print(summary_msg)
+                        summary_name = self._summary_name()
+                        source_fp = self.fingerprint()
+                        summary_msg = None
+                        if self.cache is not None:
+                            summary_msg = self.cache.get_summary(source_fp)
+                        if summary_msg is None:
+                            summary_msg = dataframe_summary(self.data, name=summary_name)
+                            if self.cache is not None:
+                                self.cache.put_summary(source_fp, summary_msg)
+                        self._emit_summary_text(summary_msg)
 
                         return  # IMPORTANT: stop here; avoid falling through to single-dataset path
                     else:
@@ -222,6 +340,8 @@ class DataSet():
                     path, arr = _pick_dataset(f1)
     
     def gambit_filtering(self, kkeys): 
+        if self.data is None:
+            self.load(force=False)
         isvalids = []
         for kk in kkeys: 
             if "_isvalid" == kk[-8:] and kk[:-8] in self.keys: 
@@ -234,6 +354,8 @@ class DataSet():
         self.keys = list(self.data.columns)
                 
     def rename_columns(self, vdict):
+        if self.data is None:
+            self.load(force=False)
         self.data = self.data.rename(columns=vdict)
         self.keys = list(self.data.columns)
         
