@@ -51,6 +51,7 @@ METHOD_DISPATCH: Dict[str, str] = {
     "pcolor":       "pcolor",
     "contour":      "contour",
     "contourf":     "contourf",
+    "grid_profile": "grid_profile",
 
     # tri related
     "tripcolor":    "tripcolor",
@@ -224,6 +225,15 @@ def _bootstrap_default_registry() -> None:
         "tripcolor_axes",
         axes_types=("tri", "any"),
         aliases=("tri_field_axes",),
+        overwrite=True,
+    )
+
+    # Data-preprocessed grid profile convenience key for layer.method
+    REGISTRY.register(
+        "grid_profile",
+        "grid_profile",
+        axes_types=("rect", "tri", "any"),
+        aliases=("grid_profiling",),
         overwrite=True,
     )
 

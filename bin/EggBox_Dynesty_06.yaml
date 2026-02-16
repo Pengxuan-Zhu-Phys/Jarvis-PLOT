@@ -61,7 +61,7 @@ Figures:
       zorder: 1
 
 - name: XY_profL
-  enable: false
+  enable: true
   style:
   - a4paper_2x1
   - rectcmap
@@ -83,7 +83,7 @@ Figures:
     - source: [df_samples_0, df_samples_1, df_samples_2, df_samples_3, df_samples_4 ]
       transform: 
       - profile: 
-          bin: 160 
+          bin: 100 
           coordinates: 
             x: 
               expr: x 
@@ -133,7 +133,7 @@ Figures:
       vmax: 0 
 
 - name: XY_triprofL
-  enable: true
+  enable: false
   style:
   - a4paper_2x1
   - rectcmap
@@ -155,7 +155,7 @@ Figures:
     - source: [df_samples_0, df_samples_1, df_samples_2, df_samples_3, df_samples_4 ]
       transform: 
       - profile: 
-          bin: 160 
+          bin: 100 
           coordinates: 
             x: 
               expr: x 
@@ -202,6 +202,75 @@ Figures:
       cmap: jarvis_rainbow2_r
       vmin: -50
       vmax: 0 
+
+- name: XY_gridprofL
+  enable: true
+  style:
+  - a4paper_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: $x$
+        y: $y$
+      xlim: [0.1, 5]
+      ylim: [0, 5]
+      xscale: log
+      yscale: linear
+    axc:
+      label:
+        ylabel: $\log{\mathcal{L}}$
+  layers:
+  - name: grid_points
+    data:
+    - source: [df_samples_0, df_samples_1, df_samples_2, df_samples_3, df_samples_4 ]
+      transform:
+      - profile:
+          method: grid
+          bin: 60
+          coordinates:
+            x:
+              expr: x
+              name: xx
+              scale: log
+              lim: [0.1, 5]
+            y:
+              expr: y
+              scale: linear
+              name: yy
+              lim: [0, 5]
+            z:
+              expr: LogL
+              scale: linear
+              name: z0
+          objective: max
+          grid_points: rect
+    share_data: gridprofXY
+    axes: ax
+    method: scatter
+    coordinates:
+      x: {expr: xx}
+      y: {expr: yy}
+    style:
+      marker: .
+      s: 1
+      color: 'none'
+      zorder: 10
+  - name: grid_map
+    data:
+    - source: gridprofXY
+    axes: ax
+    method: grid_profile
+    coordinates:
+      x: {expr: xx}
+      y: {expr: yy}
+      z: {expr: z0}
+    style:
+      cmap: jarvis_rainbow2_r
+      vmin: -50
+      vmax: 0
+      edgecolor: none
+      linewidth: 0
 
 
 
@@ -308,10 +377,11 @@ output:
   dpi: 400
   formats:
   - png
+  - pdf
 
 project:
   name: Example_Dynesty
-  workdir: /Users/p.zhu/Workshop/Jarvis-HEP/Results/EggBox_Dynesty_06/IMAGE
+  workdir: /Users/p.zhu/Jarvis-Workshop/Jarvis-HEP/Results/EggBox_Dynesty_06/IMAGE
 
 version: 0.3
 

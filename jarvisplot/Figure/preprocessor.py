@@ -8,7 +8,7 @@ import json
 
 import pandas as pd
 
-from .load_data import _preprofiling, addcolumn, filter as filter_df, profiling, sortby
+from .load_data import _preprofiling, addcolumn, filter as filter_df, grid_profiling, profiling, sortby
 
 
 class DataPreprocessor:
@@ -18,6 +18,8 @@ class DataPreprocessor:
         self.dataset_registry = dataset_registry or {}
         self.logger = logger
         self._emitted_sources = set()
+        self._preprofile_alias_meta: Dict[str, Dict[str, Any]] = {}
+        self._named_share_signatures: Dict[str, str] = {}
 
     def _debug(self, msg: str) -> None:
         if self.logger:
@@ -48,12 +50,34 @@ class DataPreprocessor:
         except Exception:
             return deepcopy(df)
 
+    @staticmethod
+    def _safe_nrows(df: Any) -> Optional[int]:
+        if isinstance(df, pd.DataFrame):
+            return int(df.shape[0])
+        return None
+
+    def _runtime_source_label(self, source: Any) -> str:
+        if isinstance(source, str):
+            return source
+        if isinstance(source, (list, tuple)):
+            return "[" + ", ".join(str(x) for x in source) + "]"
+        return str(source)
+
     def _source_token(self, source: Any, combine: str = "concat") -> Dict[str, Any]:
         if isinstance(source, str):
             dts = self.dataset_registry.get(source)
             if dts is not None and hasattr(dts, "fingerprint"):
                 fp = dts.fingerprint(self.cache)
                 return {"source": source, "fingerprint": fp}
+            named_sig = self._named_share_signatures.get(source)
+            if named_sig:
+                return {
+                    "source": source,
+                    "fingerprint": {
+                        "kind": "named_share",
+                        "signature": str(named_sig),
+                    },
+                }
             return {"source": source, "fingerprint": {"kind": "shared_only"}}
 
         if isinstance(source, (list, tuple)):
@@ -73,7 +97,7 @@ class DataPreprocessor:
     ) -> str:
         payload = {
             "kind": "pipeline",
-            "algo": "pregrid-v1",
+            "algo": "pregrid-v6",
             "source": self._source_token(source, combine=combine),
             "transform": transform,
             "combine": str(combine),
@@ -82,6 +106,30 @@ class DataPreprocessor:
         if self.cache is not None:
             return self.cache.cache_key(payload)
         return self._stable_hash(payload)
+
+    def _demand_payload(
+        self,
+        source: Any,
+        transform: Any,
+        combine: str = "concat",
+        mode: str = "runtime",
+    ) -> Dict[str, Any]:
+        return {
+            "schema": "jp-demand-v7",
+            "source": self._source_token(source, combine=combine),
+            "transform": transform,
+            "combine": str(combine),
+            "mode": str(mode),
+        }
+
+    def _demand_fingerprint(
+        self,
+        source: Any,
+        transform: Any,
+        combine: str = "concat",
+        mode: str = "runtime",
+    ) -> str:
+        return self._stable_hash(self._demand_payload(source, transform, combine=combine, mode=mode))
 
     def _layer_signature(self, layer: Mapping[str, Any]) -> str:
         ds = layer.get("data", [])
@@ -103,11 +151,107 @@ class DataPreprocessor:
         }
         return self._stable_hash(payload)
 
+    def _runtime_profile_tokens(self, transform: Any) -> List[Dict[str, Any]]:
+        tokens: List[Dict[str, Any]] = []
+        if not isinstance(transform, list):
+            return tokens
+        for step in transform:
+            if not isinstance(step, Mapping):
+                continue
+            if "profile" in step:
+                cfg = step.get("profile", {})
+                if isinstance(cfg, Mapping):
+                    cfg = deepcopy(cfg)
+                else:
+                    cfg = {"value": cfg}
+                tokens.append({"kind": "profile", "cfg": cfg})
+            elif "grid_profile" in step:
+                cfg = step.get("grid_profile", {})
+                if isinstance(cfg, Mapping):
+                    cfg = deepcopy(cfg)
+                else:
+                    cfg = {}
+                cfg.setdefault("method", "grid")
+                tokens.append({"kind": "grid_profile", "cfg": cfg})
+        return tokens
+
+    def _runtime_profile_signature(self, transform: Any) -> Optional[str]:
+        tokens = self._runtime_profile_tokens(transform)
+        if not tokens:
+            return None
+        return self._stable_hash(tokens)
+
+    def _is_runtime_profile_cache_compatible(
+        self,
+        transform: Any,
+        meta: Optional[Mapping[str, Any]],
+        mode: str,
+    ) -> bool:
+        if str(mode).lower() != "runtime":
+            return True
+        current_sig = self._runtime_profile_signature(transform)
+        if current_sig is None:
+            return True
+        if not isinstance(meta, Mapping):
+            return False
+        cached_sig = meta.get("runtime_profile_signature")
+        if not cached_sig:
+            return False
+        if str(cached_sig) != str(current_sig):
+            return False
+        current_transform_sig = self._stable_hash(transform)
+        cached_transform_sig = meta.get("runtime_transform_signature")
+        if not cached_transform_sig:
+            return False
+        return str(cached_transform_sig) == str(current_transform_sig)
+
+    def _is_dataframe_cache_compatible(
+        self,
+        source: Any,
+        transform: Any,
+        combine: str,
+        mode: str,
+        key: str,
+        meta: Optional[Mapping[str, Any]],
+    ) -> Tuple[bool, str]:
+        if not isinstance(meta, Mapping):
+            return False, "meta-missing"
+
+        expected_demand = self._demand_fingerprint(source, transform, combine=combine, mode=mode)
+        cached_demand = meta.get("demand_fingerprint")
+        if not cached_demand:
+            return False, "demand-fingerprint-missing"
+        if str(cached_demand) != str(expected_demand):
+            return False, "demand-fingerprint-mismatch"
+
+        if not self._is_runtime_profile_cache_compatible(transform, meta, mode):
+            return False, "runtime-profile-signature-mismatch"
+
+        if self.cache is not None and hasattr(self.cache, "is_dataframe_meta_consistent"):
+            try:
+                ok_file = bool(self.cache.is_dataframe_meta_consistent(key, dict(meta)))
+            except Exception:
+                ok_file = False
+            if not ok_file:
+                return False, "cache-file-fingerprint-mismatch"
+
+        return True, "ok"
+
     def load_named_layer(self, name: Optional[str], layer: Mapping[str, Any]):
         if not name or self.cache is None:
             return None
         signature = self._layer_signature(layer)
-        return self.cache.get_named(name, signature)
+        self._named_share_signatures[str(name)] = str(signature)
+        named = self.cache.get_named(name, signature)
+        if isinstance(named, pd.DataFrame):
+            self._warn(
+                "Named share_data cache HIT:\n\t name \t\t-> {}, \n\t signature \t-> {}, \n\t rows \t\t-> {}.".format(
+                    name,
+                    signature,
+                    self._safe_nrows(named) if self._safe_nrows(named) is not None else "NA",
+                )
+            )
+        return named
 
     def persist_named_layer(self, name: Optional[str], layer: Mapping[str, Any], data) -> None:
         if not name or self.cache is None:
@@ -115,6 +259,7 @@ class DataPreprocessor:
         if not isinstance(data, pd.DataFrame):
             return
         signature = self._layer_signature(layer)
+        self._named_share_signatures[str(name)] = str(signature)
         self.cache.put_named(name, signature, data)
         self._debug(f"Stored named dataset '{name}' into cache.")
 
@@ -124,18 +269,35 @@ class DataPreprocessor:
 
         if isinstance(source, (list, tuple)):
             frames: List[pd.DataFrame] = []
+            source_rows: List[str] = []
+            rows_before = 0
             for ss in source:
                 dt = self.context.get(str(ss))
                 if dt is None:
                     self._warn(f"Source '{ss}' not found in context.")
                     continue
+                if not isinstance(dt, pd.DataFrame):
+                    self._warn(f"Source '{ss}' is not a DataFrame (type={type(dt)}), skipped in concat.")
+                    continue
+                nrow = int(dt.shape[0])
+                rows_before += nrow
+                source_rows.append(f"{ss}:{nrow}")
                 frames.append(dt)
             if not frames:
                 return None
             mode = str(combine or "concat").lower()
             if mode != "concat":
                 self._warn(f"Unsupported source-list combine mode '{combine}', fallback to 'concat'.")
-            return pd.concat(frames, ignore_index=False)
+            out = pd.concat(frames, ignore_index=False)
+            rows_after = int(out.shape[0]) if isinstance(out, pd.DataFrame) else "NA"
+            self._warn(
+                "Source concat rows:\n\t sources -> {}\n\t rows_before -> {}\n\t rows_after -> {}.".format(
+                    ", ".join(source_rows) if source_rows else "<none>",
+                    rows_before,
+                    rows_after,
+                )
+            )
+            return out
 
         self._warn(f"Unsupported source type in pipeline: {type(source)}")
         return None
@@ -166,6 +328,7 @@ class DataPreprocessor:
         df,
         transform: Optional[Sequence[Mapping[str, Any]]],
         profile_mode: str = "runtime",
+        source_label: Optional[str] = None,
     ):
         if transform is None:
             return df
@@ -181,10 +344,68 @@ class DataPreprocessor:
             if "filter" in trans:
                 df = filter_df(df, trans["filter"], self.logger)
             elif "profile" in trans:
+                profile_cfg = trans.get("profile", {})
                 if str(profile_mode).lower() == "preprofile":
-                    df = _preprofiling(df, trans["profile"], self.logger)
+                    df = _preprofiling(df, profile_cfg, self.logger)
                 else:
-                    df = profiling(df, trans["profile"], self.logger)
+                    before_rows = self._safe_nrows(df)
+                    method = "bridson"
+                    binv = "default"
+                    if isinstance(profile_cfg, Mapping):
+                        method = str(profile_cfg.get("method", "bridson")).lower()
+                        if "bin" in profile_cfg:
+                            binv = profile_cfg.get("bin")
+                    self._warn(
+                        "Runtime profile START:\n\t source \t-> {}\n\t step \t\t-> profile, \n\t method \t-> {}\n\t bin \t\t-> {}\n\t rows_before \t-> {}".format(
+                            source_label or "<unknown>",
+                            method,
+                            binv,
+                            before_rows if before_rows is not None else "NA",
+                        )
+                    )
+                    df = profiling(df, profile_cfg, self.logger)
+                    after_rows = self._safe_nrows(df)
+                    delta = "NA"
+                    if before_rows is not None and after_rows is not None:
+                        delta = after_rows - before_rows
+                    self._warn(
+                        "Runtime profile DONE: \n\t source \t-> {}\n\t step \t\t-> profile \n\t method \t-> {}\n\t bin \t\t-> {}\n\t rows_after \t-> {}\n\t delta \t\t-> {}".format(
+                            source_label or "<unknown>",
+                            method,
+                            binv,
+                            after_rows if after_rows is not None else "NA",
+                            delta,
+                        )
+                    )
+            elif "grid_profile" in trans:
+                profile_cfg = trans.get("grid_profile", {})
+                if isinstance(profile_cfg, Mapping):
+                    profile_cfg = deepcopy(profile_cfg)
+                    profile_cfg.setdefault("method", "grid")
+                else:
+                    profile_cfg = {"method": "grid"}
+                before_rows = self._safe_nrows(df)
+                binv = profile_cfg.get("bin", "default")
+                self._warn(
+                    "Runtime profile START: source \t-> {}\n\t step \t-> 'grid_profile,\n\t method \t-> 'grid',\n\t bin \t-> {},\n\t rows_before \t-> {}".format(
+                        source_label or "<unknown>",
+                        binv,
+                        before_rows if before_rows is not None else "NA",
+                    )
+                )
+                df = grid_profiling(df, profile_cfg, self.logger)
+                after_rows = self._safe_nrows(df)
+                delta = "NA"
+                if before_rows is not None and after_rows is not None:
+                    delta = after_rows - before_rows
+                self._warn(
+                    "Runtime profile DONE: \n\t source \t-> {}\n\tstep \t-> 'grid_profile,\n\t method \t-> 'grid',\n\t bin \t\t-> {}\n\t rows_after \t-> {},\n\t delta \t->".format(
+                        source_label or "<unknown>",
+                        binv,
+                        after_rows if after_rows is not None else "NA",
+                        delta,
+                    )
+                )
             elif "sortby" in trans:
                 df = sortby(df, trans["sortby"], self.logger)
             elif "add_column" in trans:
@@ -196,9 +417,14 @@ class DataPreprocessor:
         """Prebuild pass: execute profile step as lightweight _preprofiling."""
         return self._apply_transforms(df, transform, profile_mode="preprofile")
 
-    def apply_runtime_transforms(self, df, transform: Optional[Sequence[Mapping[str, Any]]]):
+    def apply_runtime_transforms(
+        self,
+        df,
+        transform: Optional[Sequence[Mapping[str, Any]]],
+        source_label: Optional[str] = None,
+    ):
         """Runtime pass: keep original profiling behavior."""
-        return self._apply_transforms(df, transform, profile_mode="runtime")
+        return self._apply_transforms(df, transform, profile_mode="runtime", source_label=source_label)
 
     def run_pipeline(
         self,
@@ -209,17 +435,100 @@ class DataPreprocessor:
         mode: str = "runtime",
     ) -> Tuple[Optional[pd.DataFrame], str, bool]:
         key = self._pipeline_key(source, transform, combine=combine, mode=mode)
+        runtime_mode = str(mode).lower() == "runtime"
+        runtime_sig = self._runtime_profile_signature(transform) if runtime_mode else None
+        demand_fp = self._demand_fingerprint(source, transform, combine=combine, mode=mode)
 
         if use_cache and self.cache is not None:
-            cached = self.cache.get_dataframe(key)
-            if cached is not None:
-                self._emit_source_summary(source)
-                self._debug(f"Pipeline cache HIT -> {key}")
-                return self._clone_df(cached), key, True
+            meta = None
+            try:
+                if hasattr(self.cache, "get_dataframe_meta"):
+                    meta = self.cache.get_dataframe_meta(key)
+            except Exception:
+                meta = None
+
+            compatible, reason = self._is_dataframe_cache_compatible(
+                source=source,
+                transform=transform,
+                combine=combine,
+                mode=mode,
+                key=key,
+                meta=meta,
+            )
+            if compatible:
+                cached = self.cache.get_dataframe(key)
+                if cached is not None:
+                    if runtime_mode and runtime_sig is not None:
+                        cache_file = "<unknown>"
+                        try:
+                            cache_file = str((self.cache.data_dir / f"{key}.pkl").resolve())
+                        except Exception:
+                            pass
+                        self._warn(
+                            "Runtime profile cache HIT:\n\t source \t-> {},\n\t key \t\t-> {},\n\t fingerprint \t-> {},\n\t cache_file \t-> {},\n\t rows \t\t-> {}.".format(
+                                self._runtime_source_label(source),
+                                key,
+                                demand_fp,
+                                cache_file,
+                                self._safe_nrows(cached) if self._safe_nrows(cached) is not None else "NA",
+                            )
+                        )
+                    self._emit_source_summary(source)
+                    self._debug(f"Pipeline cache HIT -> {key}")
+                    return self._clone_df(cached), key, True
+                reason = "cache-read-failed"
+
+            if runtime_mode and runtime_sig is not None:
+                if reason in {"meta-missing", "demand-fingerprint-missing"}:
+                    self._warn(
+                        "Runtime profile cache MISS:\n\t source \t-> {},\n\t key \t\t-> {},\n\t fingerprint \t-> {}".format(
+                            self._runtime_source_label(source),
+                            key,
+                            demand_fp,
+                        )
+                    )
+                else:
+                    cached_sig = None
+                    cached_transform_sig = None
+                    cached_demand = None
+                    if isinstance(meta, Mapping):
+                        cached_sig = meta.get("runtime_profile_signature")
+                        cached_transform_sig = meta.get("runtime_transform_signature")
+                        cached_demand = meta.get("demand_fingerprint")
+                    self._warn(
+                        "Runtime profile cache INVALID:\n\t source \t-> {},\n\t key \t-> {},\n\t reason \t-> {},\n\t expected_demand \t-> {},\n\t cached_demand \t-> {},\n\t expected_profile_sig \t-> {},\n\t cached_profile_sig \t-> {},\n\t expected_transform_sig \t-> {},\n\t cached_transform_sig \t-> {}".format(
+                            self._runtime_source_label(source),
+                            key,
+                            reason,
+                            demand_fp,
+                            str(cached_demand) if cached_demand else "<none>",
+                            runtime_sig,
+                            str(cached_sig) if cached_sig else "<none>",
+                            self._stable_hash(transform),
+                            str(cached_transform_sig) if cached_transform_sig else "<none>",
+                        )
+                    )
+            else:
+                if reason != "meta-missing":
+                    self._debug(f"Pipeline cache INVALID ({reason}) -> {key}")
 
         raw = self._resolve_source_data(source, combine=combine)
         if raw is None:
             return None, key, False
+
+        if str(mode).lower() == "runtime":
+            src_label = self._runtime_source_label(source)
+            if isinstance(source, str) and source in self._preprofile_alias_meta:
+                meta = self._preprofile_alias_meta.get(source, {})
+                self._warn(
+                    "Runtime profile input:\n\t source \t-> {},\n uses preprofile alias:\n\t key \t\t-> {},\n\t origin \t-> {},\n\t cache_file \t-> {},\n\t rows_in \t-> {}.".format(
+                        src_label,
+                        meta.get("pre_key", "<unknown>")[:16] if isinstance(meta.get("pre_key"), str) else "<unknown>",
+                        meta.get("origin", "<unknown>"),
+                        meta.get("cache_file", "<memory-only>"),
+                        self._safe_nrows(raw) if self._safe_nrows(raw) is not None else "NA",
+                    )
+                )
 
         if isinstance(raw, pd.DataFrame):
             work = raw.copy(deep=True)
@@ -228,19 +537,43 @@ class DataPreprocessor:
         if str(mode).lower() == "preprofile":
             work = self.apply_transforms(work, transform)
         else:
-            work = self.apply_runtime_transforms(work, transform)
+            work = self.apply_runtime_transforms(
+                work,
+                transform,
+                source_label=self._runtime_source_label(source),
+            )
 
         if use_cache and self.cache is not None and isinstance(work, pd.DataFrame):
+            meta = {
+                "source": self._source_token(source, combine=combine),
+                "combine": combine,
+                "transform": transform,
+                "mode": mode,
+                "demand_fingerprint": demand_fp,
+            }
+            runtime_profile_sig = runtime_sig if runtime_mode else None
+            if runtime_mode and runtime_profile_sig is not None:
+                meta["runtime_profile_signature"] = runtime_profile_sig
+                meta["runtime_transform_signature"] = self._stable_hash(transform)
             self.cache.put_dataframe(
                 key,
                 work,
-                meta={
-                    "source": self._source_token(source, combine=combine),
-                    "combine": combine,
-                    "transform": transform,
-                    "mode": mode,
-                },
+                meta=meta,
             )
+            if runtime_mode and runtime_profile_sig is not None:
+                cache_file = "<unknown>"
+                try:
+                    cache_file = str((self.cache.data_dir / f"{key}.pkl").resolve())
+                except Exception:
+                    pass
+                self._warn(
+                    "Runtime profile cache STORE:\n\t source \t-> {},\n\t key \t\t-> {},\n\t cache_file \t-> {},\n\t rows \t\t-> {}.".format(
+                        self._runtime_source_label(source),
+                        key[:16],
+                        cache_file,
+                        self._safe_nrows(work) if self._safe_nrows(work) is not None else "NA",
+                    )
+                )
             self._debug(f"Pipeline cache STORE -> {key}")
 
         if isinstance(work, pd.DataFrame):
@@ -267,23 +600,13 @@ class DataPreprocessor:
 
     @staticmethod
     def _preprofile_profile_cfg(profile_cfg: Any) -> Any:
+        # Preprofile cache identity is intentionally coordinates-only:
+        # runtime profile method/bin/objective changes must reuse same preprofile.
         if not isinstance(profile_cfg, Mapping):
-            return profile_cfg
+            return {}
         slim: Dict[str, Any] = {}
         if "coordinates" in profile_cfg:
             slim["coordinates"] = deepcopy(profile_cfg["coordinates"])
-        if "objective" in profile_cfg:
-            slim["objective"] = profile_cfg["objective"]
-        if "grid_points" in profile_cfg:
-            slim["grid_points"] = profile_cfg["grid_points"]
-        if "pregrid" in profile_cfg:
-            slim["pregrid"] = deepcopy(profile_cfg["pregrid"])
-        if "pregrid_bin" in profile_cfg:
-            slim["pregrid_bin"] = profile_cfg["pregrid_bin"]
-        if "coordinates" not in slim and "coordinates" in profile_cfg:
-            slim["coordinates"] = deepcopy(profile_cfg["coordinates"])
-        if not slim:
-            return deepcopy(profile_cfg)
         return slim
 
     def _split_prebuild_transform(self, transform: Any):
@@ -301,8 +624,11 @@ class DataPreprocessor:
         first = transform[idx]
         if not isinstance(first, Mapping) or "profile" not in first:
             return None, None
+
+        profile_cfg: Any = first.get("profile", {})
+
         pre_transform.append(
-            {"profile": self._preprofile_profile_cfg(first.get("profile", {}))}
+            {"profile": self._preprofile_profile_cfg(profile_cfg)}
         )
 
         runtime_transform = deepcopy(transform[idx:])
@@ -325,6 +651,7 @@ class DataPreprocessor:
         hits = 0
         miss = 0
         tasks: Dict[str, Dict[str, Any]] = {}
+        self._preprofile_alias_meta = {}
 
         for fig in figures:
             if not isinstance(fig, Mapping):
@@ -375,20 +702,78 @@ class DataPreprocessor:
                     else:
                         task["cache_flag"] = bool(task["cache_flag"] or cache_flag)
 
-                    task["targets"].append({"ds": ds, "runtime_transform": runtime_transform})
+                    fig_name = fig.get("name", "<noname>")
+                    layer_name = layer.get("name", "<noname>")
+                    task["targets"].append(
+                        {
+                            "ds": ds,
+                            "runtime_transform": runtime_transform,
+                            "figure_name": fig_name,
+                            "layer_name": layer_name,
+                        }
+                    )
 
         # phase-1: preprofile cache fast-path
         pending: List[Dict[str, Any]] = []
         for key, task in tasks.items():
             alias = None
             if bool(task.get("cache_flag", True)) and self.cache is not None:
-                cached = self.cache.get_dataframe(key)
-                if cached is not None:
-                    alias = f"__jp_preprofile_{key[:16]}"
-                    self.context.update(alias, self._clone_df(cached))
-                    prepared[key] = alias
-                    self._emit_source_summary(task.get("source"))
-                    hits += 1
+                meta = None
+                try:
+                    if hasattr(self.cache, "get_dataframe_meta"):
+                        meta = self.cache.get_dataframe_meta(key)
+                except Exception:
+                    meta = None
+
+                ok_cache, reason = self._is_dataframe_cache_compatible(
+                    source=task.get("source"),
+                    transform=task.get("pre_transform"),
+                    combine=task.get("combine", "concat"),
+                    mode="preprofile",
+                    key=key,
+                    meta=meta,
+                )
+                if ok_cache:
+                    cached = self.cache.get_dataframe(key)
+                    if cached is not None:
+                        alias = f"__jp_preprofile_{key[:16]}"
+                        self.context.update(alias, self._clone_df(cached))
+                        prepared[key] = alias
+                        self._emit_source_summary(task.get("source"))
+                        cache_file = "<memory-only>"
+                        if self.cache is not None:
+                            try:
+                                cache_file = str((self.cache.data_dir / f"{key}.pkl").resolve())
+                            except Exception:
+                                cache_file = "<memory-only>"
+                        self._preprofile_alias_meta[alias] = {
+                            "pre_key": key,
+                            "origin": "cache-hit",
+                            "cache_file": cache_file,
+                            "source": task.get("source"),
+                            "rows": self._safe_nrows(cached),
+                        }
+                        logged_pairs = set()
+                        for tgt in task.get("targets", []):
+                            fig_name = str(tgt.get("figure_name", "<noname>"))
+                            layer_name = str(tgt.get("layer_name", "<noname>"))
+                            pair = (fig_name, layer_name)
+                            if pair in logged_pairs:
+                                continue
+                            logged_pairs.add(pair)
+                            self._warn(
+                                "Preprofile cache HIT:\n\t figure -> {},\n\t layer -> {},\n\t source -> {},\n\t key -> {}".format(
+                                    fig_name,
+                                    layer_name,
+                                    task.get("source"),
+                                    key[:16],
+                                )
+                            )
+                        hits += 1
+                    else:
+                        self._debug(f"Preprofile cache INVALID (cache-read-failed) -> {key}")
+                elif reason != "meta-missing":
+                    self._debug(f"Preprofile cache INVALID ({reason}) -> {key}")
 
             if alias is None:
                 pending.append(task)
@@ -426,6 +811,12 @@ class DataPreprocessor:
 
                 key = task["pre_key"]
                 if bool(task.get("cache_flag", True)) and self.cache is not None and isinstance(out, pd.DataFrame):
+                    pre_demand_fp = self._demand_fingerprint(
+                        task.get("source"),
+                        task.get("pre_transform"),
+                        combine=task.get("combine", "concat"),
+                        mode="preprofile",
+                    )
                     self.cache.put_dataframe(
                         key,
                         out,
@@ -434,11 +825,25 @@ class DataPreprocessor:
                             "combine": task.get("combine", "concat"),
                             "transform": task.get("pre_transform"),
                             "mode": "preprofile",
+                            "demand_fingerprint": pre_demand_fp,
                         },
                     )
 
                 alias = f"__jp_preprofile_{key[:16]}"
                 self.context.update(alias, self._clone_df(out))
+                cache_file = "<memory-only>"
+                if bool(task.get("cache_flag", True)) and self.cache is not None:
+                    try:
+                        cache_file = str((self.cache.data_dir / f"{key}.pkl").resolve())
+                    except Exception:
+                        cache_file = "<memory-only>"
+                self._preprofile_alias_meta[alias] = {
+                    "pre_key": key,
+                    "origin": "rebuilt",
+                    "cache_file": cache_file,
+                    "source": task.get("source"),
+                    "rows": self._safe_nrows(out),
+                }
                 prepared[key] = alias
                 miss += 1
 

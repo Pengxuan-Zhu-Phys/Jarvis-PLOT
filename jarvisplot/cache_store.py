@@ -88,6 +88,14 @@ class ProjectCache:
                 md5.update(chunk)
         return md5.hexdigest()
 
+    @staticmethod
+    def _sha1_file(path: str, chunk_size: int = 8 * 1024 * 1024) -> str:
+        sha1 = hashlib.sha1()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(chunk_size), b""):
+                sha1.update(chunk)
+        return sha1.hexdigest()
+
     def source_fingerprint(self, path: str, extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         abs_path = str(Path(path).expanduser().resolve())
         try:
@@ -132,14 +140,80 @@ class ProjectCache:
             self._warn(f"Failed loading dataframe cache '{p}': {e}")
             return None
 
+    def dataframe_cache_path(self, key: str) -> Path:
+        return self.data_dir / f"{key}.pkl"
+
+    def is_dataframe_meta_consistent(self, key: str, meta: Optional[Dict[str, Any]]) -> bool:
+        if self.rebuild:
+            return False
+        if not isinstance(meta, dict):
+            return False
+        p = self.dataframe_cache_path(key)
+        if not p.exists():
+            return False
+        try:
+            st = p.stat()
+        except Exception:
+            return False
+
+        expect_size = meta.get("cache_file_size")
+        if expect_size is not None:
+            try:
+                if int(expect_size) != int(st.st_size):
+                    return False
+            except Exception:
+                return False
+
+        expect_sha1 = meta.get("cache_file_sha1")
+        if expect_sha1:
+            try:
+                real_sha1 = self._sha1_file(str(p))
+            except Exception:
+                return False
+            if str(real_sha1) != str(expect_sha1):
+                return False
+        return True
+
+    def get_dataframe_meta(self, key: str) -> Optional[Dict[str, Any]]:
+        if self.rebuild:
+            return None
+        p = self.data_dir / f"{key}.json"
+        if not p.exists():
+            return None
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                obj = json.load(f)
+            if isinstance(obj, dict):
+                return obj
+            return None
+        except Exception as e:
+            self._warn(f"Failed loading dataframe cache meta '{p}': {e}")
+            return None
+
     def put_dataframe(self, key: str, df, meta: Optional[Dict[str, Any]] = None) -> None:
         p = self.data_dir / f"{key}.pkl"
         try:
             df.to_pickle(p)
-            if meta is not None:
-                m = self.data_dir / f"{key}.json"
-                with open(m, "w", encoding="utf-8") as f:
-                    json.dump(meta, f, ensure_ascii=True, indent=2, sort_keys=True, default=str)
+            payload: Dict[str, Any] = {}
+            if isinstance(meta, dict):
+                payload.update(meta)
+            payload.setdefault("cache_schema", "jp-cache-v2")
+            payload["cache_key"] = str(key)
+            payload["cache_file"] = str(p.resolve())
+            try:
+                st = p.stat()
+                payload["cache_file_size"] = int(st.st_size)
+                payload["cache_file_mtime_ns"] = int(st.st_mtime_ns)
+            except Exception:
+                pass
+            try:
+                payload["cache_file_sha1"] = self._sha1_file(str(p))
+            except Exception:
+                pass
+
+            m = self.data_dir / f"{key}.json"
+            with open(m, "w", encoding="utf-8") as f:
+                json.dump(payload, f, ensure_ascii=True, indent=2, sort_keys=True, default=str)
         except Exception as e:
             self._warn(f"Failed writing dataframe cache '{p}': {e}")
 
@@ -176,9 +250,25 @@ class ProjectCache:
         try:
             df.to_pickle(p)
             named = self.manifest.setdefault("named", {})
+            sha1 = None
+            size = None
+            mtime_ns = None
+            try:
+                st = p.stat()
+                size = int(st.st_size)
+                mtime_ns = int(st.st_mtime_ns)
+            except Exception:
+                pass
+            try:
+                sha1 = self._sha1_file(str(p))
+            except Exception:
+                sha1 = None
             named[str(name)] = {
                 "signature": str(signature),
                 "path": str(p.relative_to(self.root)),
+                "sha1": sha1,
+                "size": size,
+                "mtime_ns": mtime_ns,
             }
             self._save_manifest()
         except Exception as e:
@@ -197,6 +287,21 @@ class ProjectCache:
             p = self.root / item["path"]
             if not p.exists():
                 return None
+            try:
+                st = p.stat()
+                expect_size = item.get("size")
+                if expect_size is not None and int(expect_size) != int(st.st_size):
+                    return None
+            except Exception:
+                return None
+            expect_sha1 = item.get("sha1")
+            if expect_sha1:
+                try:
+                    real_sha1 = self._sha1_file(str(p))
+                except Exception:
+                    return None
+                if str(real_sha1) != str(expect_sha1):
+                    return None
             return pd.read_pickle(p)
         except Exception:
             return None

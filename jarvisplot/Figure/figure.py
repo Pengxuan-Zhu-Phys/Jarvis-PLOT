@@ -579,6 +579,16 @@ class Figure:
                     from .load_data import profiling
                     df = profiling(df, trans['profile'], self.logger)
                     self.logger.debug("After profiling -> {}".format(df.shape))
+                elif "grid_profile" in trans.keys():
+                    from .load_data import grid_profiling
+                    cfg = trans.get("grid_profile", {})
+                    if isinstance(cfg, dict):
+                        cfg = cfg.copy()
+                        cfg.setdefault("method", "grid")
+                    else:
+                        cfg = {"method": "grid"}
+                    df = grid_profiling(df, cfg, self.logger)
+                    self.logger.debug("After grid profiling -> {}".format(df.shape))
                 elif "sortby" in trans.keys(): 
                     from .load_data import sortby
                     df = sortby(df, trans['sortby'], self.logger)
@@ -1521,6 +1531,8 @@ class Figure:
                 raise ValueError("Ternary layer must define coordinates: {left, right, bottom} or {x, y} with exprs.")
             for kk, vv in coor.items(): 
                 style[kk] = self._eval_series(df, vv)
+            if method_key in {"grid_profile", "grid_profiling"}:
+                style["__df__"] = df
             return method(**style)
 
         elif getattr(ax, "_type", None) == "rect":
@@ -1565,6 +1577,8 @@ class Figure:
                     else:
                         # Mode 2：(list/tuple/ndarray/scalar) 
                         style[kk] = vv
+                if method_key in {"grid_profile", "grid_profiling"}:
+                    style["__df__"] = df
                 # if "norm" in style.keys():
                 #     style = self.load_norm(style)
                 return method(**style)
