@@ -63,7 +63,7 @@ Figures:
 - name: XY_profL
   enable: true
   style:
-  - a4paper_2x1
+  - a4paper_4x1
   - rectcmap
   frame:
     ax:
@@ -76,7 +76,7 @@ Figures:
       yscale: linear
     axc:
       label:
-        ylabel: $\log{\mathcal{L}}$
+        xlabel: $\log{\mathcal{L}}$
   layers:
   - name: scatter
     data:
@@ -206,7 +206,7 @@ Figures:
 - name: XY_gridprofL
   enable: true
   style:
-  - a4paper_2x1
+  - a4paper_4x1
   - rectcmap
   frame:
     ax:
@@ -219,7 +219,7 @@ Figures:
       yscale: linear
     axc:
       label:
-        ylabel: $\log{\mathcal{L}}$
+        xlabel: $\log{\mathcal{L}}$
   layers:
   - name: grid_points
     data:
@@ -227,7 +227,7 @@ Figures:
       transform:
       - profile:
           method: grid
-          bin: 60
+          bin: 100
           coordinates:
             x:
               expr: x
