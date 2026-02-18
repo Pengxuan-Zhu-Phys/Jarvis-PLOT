@@ -1267,10 +1267,9 @@ class Figure:
             # CLI override: disable logo panel
             if self.print:
                 try:
-                    if self.mode == "Jarvis": 
-                        if isinstance(self.frame.get("axes"), dict):
-                            self.frame["axes"].pop("axlogo", None)
-                        self.frame.pop("axlogo", None)  # optional: drop logo content too
+                    if isinstance(self.frame.get("axes"), dict):
+                        self.frame["axes"].pop("axlogo", None)
+                    self.frame.pop("axlogo", None)  # optional: drop logo content too
                 except Exception:
                     pass
 

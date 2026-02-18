@@ -20,6 +20,7 @@ class DataSet():
         self.group                  = None
         self.is_gambit              = False
         self.columnmap              = {}
+        self.transform              = None
         self.cache                  = None
         self._loaded                = False
         self._summary_emitted       = False
@@ -36,6 +37,7 @@ class DataSet():
         self.file = str(resolved)
         self.name = dtinfo['name']
         self.type = dtinfo['type'].lower()
+        self.transform = dtinfo.get("transform", None)
         if self.type == "hdf5" and dtinfo.get('dataset'):
             self.group = dtinfo['dataset']
             self.is_gambit = dtinfo.get('is_gambit', False)
@@ -67,7 +69,7 @@ class DataSet():
 
     def fingerprint(self, cache=None):
         cache = cache or self.cache
-        extra = {"name": self.name, "type": self.type, "group": self.group}
+        extra = {"name": self.name, "type": self.type, "group": self.group, "transform": self.transform}
         if cache is not None:
             return cache.source_fingerprint(self.path, extra=extra)
         try:
@@ -182,6 +184,70 @@ class DataSet():
         self._type = str(value).lower()
         if self.logger:
             self.logger.debug("Dataset -> {} is assigned as \n\t-> {}\ttype".format(self.base, self.type))
+
+    @staticmethod
+    def _shape_token(df) -> str:
+        if isinstance(df, pd.DataFrame):
+            return f"{df.shape}"
+        return "NA"
+
+    def _apply_dataset_transform(self, stage: str = "dataset") -> None:
+        """
+        Apply DataSet-level transforms using the same operators as layer transforms.
+        For HDF5 this is called after GAMBIT cleaning + column map rename.
+        """
+        if self.data is None:
+            return
+        if self.transform is None:
+            return
+        if not isinstance(self.transform, list):
+            if self.logger:
+                self.logger.warning(
+                    "Dataset '{}' transform ignored: list required, got {}.".format(
+                        self.name, type(self.transform)
+                    )
+                )
+            return
+
+        from .Figure.load_data import addcolumn, filter as filter_df, grid_profiling, profiling, sortby
+
+        df = self.data
+        before_shape = self._shape_token(df)
+        for trans in self.transform:
+            if not isinstance(trans, dict):
+                if self.logger:
+                    self.logger.warning(f"Dataset '{self.name}' invalid transform step skipped -> {trans}")
+                continue
+
+            if "filter" in trans:
+                df = filter_df(df, trans["filter"], self.logger)
+            elif "profile" in trans:
+                df = profiling(df, trans["profile"], self.logger)
+            elif "grid_profile" in trans:
+                cfg = trans.get("grid_profile", {})
+                if isinstance(cfg, dict):
+                    cfg = cfg.copy()
+                    cfg.setdefault("method", "grid")
+                else:
+                    cfg = {"method": "grid"}
+                df = grid_profiling(df, cfg, self.logger)
+            elif "sortby" in trans:
+                df = sortby(df, trans["sortby"], self.logger)
+            elif "add_column" in trans:
+                df = addcolumn(df, trans["add_column"], self.logger)
+
+        self.data = df
+        if isinstance(self.data, pd.DataFrame):
+            self.keys = list(self.data.columns)
+        if self.logger:
+            self.logger.warning(
+                "DataSet transform done:\n\t name \t-> {}\n\t stage \t-> {}\n\t rows \t-> {} -> {}".format(
+                    self.name,
+                    stage,
+                    before_shape,
+                    self._shape_token(self.data),
+                )
+            )
     
     def load_csv(self):
         if self.type == "csv":
@@ -190,6 +256,7 @@ class DataSet():
 
             self.data = pd.read_csv(self.path)
             self.keys = list(self.data.columns)
+            self._apply_dataset_transform(stage="csv")
 
             # Emit the same pretty summary used for HDF5 datasets
             summary_name = self._summary_name()
@@ -308,6 +375,7 @@ class DataSet():
                                 for item in self.columnmap.get("list", False): 
                                     cmap[item['source_name']] = item['new_name']
                                 self.rename_columns(cmap)
+                        self._apply_dataset_transform(stage="hdf5")
                                 
                         # Emit a pretty summary BEFORE returning
                         summary_name = self._summary_name()

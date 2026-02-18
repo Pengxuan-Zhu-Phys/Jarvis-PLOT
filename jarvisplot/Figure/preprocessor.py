@@ -35,6 +35,13 @@ class DataPreprocessor:
             except Exception:
                 pass
 
+    def _info(self, msg: str) -> None:
+        if self.logger:
+            try:
+                self.logger.info(msg)
+            except Exception:
+                pass
+
     @staticmethod
     def _canonical_json(payload: Any) -> str:
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True, default=str)
@@ -62,6 +69,42 @@ class DataPreprocessor:
         if isinstance(source, (list, tuple)):
             return "[" + ", ".join(str(x) for x in source) + "]"
         return str(source)
+
+    def _dataset_transform(self, source: Any):
+        if not isinstance(source, str):
+            return None
+        dts = self.dataset_registry.get(source)
+        if dts is None:
+            return None
+        tf = getattr(dts, "transform", None)
+        if isinstance(tf, list):
+            return tf
+        return None
+
+    def _effective_transform(self, source: Any, transform: Any):
+        """Drop duplicated transform prefix when dataset already applies the same steps."""
+        if transform is None or not isinstance(transform, list):
+            return transform
+        base = self._dataset_transform(source)
+        if not isinstance(base, list) or len(base) == 0:
+            return transform
+
+        nmatch = 0
+        nmax = min(len(base), len(transform))
+        while nmatch < nmax and transform[nmatch] == base[nmatch]:
+            nmatch += 1
+        if nmatch <= 0:
+            return transform
+
+        trimmed = transform[nmatch:]
+        self._debug(
+            "Pipeline transform prefix dedup:\n\t source \t-> {}\n\t stripped \t-> {}\n\t remained \t-> {}".format(
+                self._runtime_source_label(source),
+                nmatch,
+                len(trimmed),
+            )
+        )
+        return trimmed if trimmed else None
 
     def _source_token(self, source: Any, combine: str = "concat") -> Dict[str, Any]:
         if isinstance(source, str):
@@ -95,11 +138,12 @@ class DataPreprocessor:
         combine: str = "concat",
         mode: str = "runtime",
     ) -> str:
+        eff_transform = self._effective_transform(source, transform)
         payload = {
             "kind": "pipeline",
             "algo": "pregrid-v6",
             "source": self._source_token(source, combine=combine),
-            "transform": transform,
+            "transform": eff_transform,
             "combine": str(combine),
             "mode": str(mode),
         }
@@ -114,10 +158,11 @@ class DataPreprocessor:
         combine: str = "concat",
         mode: str = "runtime",
     ) -> Dict[str, Any]:
+        eff_transform = self._effective_transform(source, transform)
         return {
             "schema": "jp-demand-v7",
             "source": self._source_token(source, combine=combine),
-            "transform": transform,
+            "transform": eff_transform,
             "combine": str(combine),
             "mode": str(mode),
         }
@@ -136,10 +181,12 @@ class DataPreprocessor:
         tokens = []
         for item in ds:
             if isinstance(item, Mapping):
+                src = item.get("source")
+                tf = self._effective_transform(src, item.get("transform"))
                 tokens.append(
                     {
-                        "source": self._source_token(item.get("source")),
-                        "transform": item.get("transform"),
+                        "source": self._source_token(src),
+                        "transform": tf,
                     }
                 )
         payload = {
@@ -434,10 +481,11 @@ class DataPreprocessor:
         use_cache: bool = True,
         mode: str = "runtime",
     ) -> Tuple[Optional[pd.DataFrame], str, bool]:
-        key = self._pipeline_key(source, transform, combine=combine, mode=mode)
+        effective_transform = self._effective_transform(source, transform)
+        key = self._pipeline_key(source, effective_transform, combine=combine, mode=mode)
         runtime_mode = str(mode).lower() == "runtime"
-        runtime_sig = self._runtime_profile_signature(transform) if runtime_mode else None
-        demand_fp = self._demand_fingerprint(source, transform, combine=combine, mode=mode)
+        runtime_sig = self._runtime_profile_signature(effective_transform) if runtime_mode else None
+        demand_fp = self._demand_fingerprint(source, effective_transform, combine=combine, mode=mode)
 
         if use_cache and self.cache is not None:
             meta = None
@@ -449,7 +497,7 @@ class DataPreprocessor:
 
             compatible, reason = self._is_dataframe_cache_compatible(
                 source=source,
-                transform=transform,
+                transform=effective_transform,
                 combine=combine,
                 mode=mode,
                 key=key,
@@ -464,7 +512,7 @@ class DataPreprocessor:
                             cache_file = str((self.cache.data_dir / f"{key}.pkl").resolve())
                         except Exception:
                             pass
-                        self._warn(
+                        self._info(
                             "Runtime profile cache HIT:\n\t source \t-> {},\n\t key \t\t-> {},\n\t fingerprint \t-> {},\n\t cache_file \t-> {},\n\t rows \t\t-> {}.".format(
                                 self._runtime_source_label(source),
                                 key,
@@ -480,7 +528,7 @@ class DataPreprocessor:
 
             if runtime_mode and runtime_sig is not None:
                 if reason in {"meta-missing", "demand-fingerprint-missing"}:
-                    self._warn(
+                    self._info(
                         "Runtime profile cache MISS:\n\t source \t-> {},\n\t key \t\t-> {},\n\t fingerprint \t-> {}".format(
                             self._runtime_source_label(source),
                             key,
@@ -504,7 +552,7 @@ class DataPreprocessor:
                             str(cached_demand) if cached_demand else "<none>",
                             runtime_sig,
                             str(cached_sig) if cached_sig else "<none>",
-                            self._stable_hash(transform),
+                            self._stable_hash(effective_transform),
                             str(cached_transform_sig) if cached_transform_sig else "<none>",
                         )
                     )
@@ -535,11 +583,11 @@ class DataPreprocessor:
         else:
             work = deepcopy(raw)
         if str(mode).lower() == "preprofile":
-            work = self.apply_transforms(work, transform)
+            work = self.apply_transforms(work, effective_transform)
         else:
             work = self.apply_runtime_transforms(
                 work,
-                transform,
+                effective_transform,
                 source_label=self._runtime_source_label(source),
             )
 
@@ -547,14 +595,14 @@ class DataPreprocessor:
             meta = {
                 "source": self._source_token(source, combine=combine),
                 "combine": combine,
-                "transform": transform,
+                "transform": effective_transform,
                 "mode": mode,
                 "demand_fingerprint": demand_fp,
             }
             runtime_profile_sig = runtime_sig if runtime_mode else None
             if runtime_mode and runtime_profile_sig is not None:
                 meta["runtime_profile_signature"] = runtime_profile_sig
-                meta["runtime_transform_signature"] = self._stable_hash(transform)
+                meta["runtime_transform_signature"] = self._stable_hash(effective_transform)
             self.cache.put_dataframe(
                 key,
                 work,
@@ -761,7 +809,7 @@ class DataPreprocessor:
                             if pair in logged_pairs:
                                 continue
                             logged_pairs.add(pair)
-                            self._warn(
+                            self._info(
                                 "Preprofile cache HIT:\n\t figure -> {},\n\t layer -> {},\n\t source -> {},\n\t key -> {}".format(
                                     fig_name,
                                     layer_name,

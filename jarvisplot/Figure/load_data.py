@@ -439,7 +439,7 @@ def _preprofiling(df, prof, logger):
 
     if logger:
         if explicit_source is None:
-            logger.warning(
+            logger.info(
                 "Preprofiling auto-prebin:\n\t rows_in -> {}\n\t prebin -> {}\n\t rule -> {}\n\t enabled -> {}.".format(
                     rows_in,
                     prebin,
@@ -448,7 +448,7 @@ def _preprofiling(df, prof, logger):
                 )
             )
         else:
-            logger.warning(
+            logger.info(
                 "Preprofiling explicit prebin:\n\t rows_in -> {}\n\t prebin -> {}\n\t source -> {}\n\t enabled -> {}.".format(
                     rows_in,
                     prebin,
