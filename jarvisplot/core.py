@@ -284,6 +284,7 @@ class JarvisPLOT():
         for dt in dts:
             dataset = DataSet()
             dataset.logger = self.logger
+            dataset.full_load = getattr(self.args, 'parse_data', False) # bypass whitelist for --parse-data
             dataset.setinfo(dt, data_root, eager=eager, cache=self.cache)
             self.dataset.append(dataset)
 

@@ -321,15 +321,16 @@ class DataSet():
                     col = name if name else "value"
                     return pd.DataFrame({col: np.ravel(arr)})
 
-            def _collect_group_datasets(g: h5py.Group, prefix: str=""):
+            def _collect_group_datasets(g: h5py.Group, prefix: str="", whitelist=None):
                 """Recursively collect (path, ndarray) for all datasets under a group."""
                 items = []
                 for k, v in g.items():
                     path = f"{prefix}/{k}" if prefix else k
                     if isinstance(v, h5py.Dataset):
-                        items.append((path, v[()]))
+                        if whitelist is None or path in whitelist:
+                            items.append((path, v[()]))
                     elif isinstance(v, h5py.Group):
-                        items.extend(_collect_group_datasets(v, path))
+                        items.extend(_collect_group_datasets(v, path, whitelist))
                 return items
 
             with h5py.File(self.path, "r") as f1:
@@ -341,9 +342,24 @@ class DataSet():
                     self.logger.debug("Loading HDF5 group '{}' from {}".format(self.group, self.path))
                     if self.is_gambit: 
                         self.logger.debug("GAMBIT Standard Output")
+                        
+                    # Build whitelist from columnmap if provided and not doing a full discovery scan
+                    whitelist = None
+                    if not getattr(self, 'full_load', False):
+                        cmap_list = self.columnmap.get("list", []) if self.columnmap else []
+                        if cmap_list:
+                            needed = {item['source_name'] for item in cmap_list}
+                            if self.is_gambit:
+                                # Include _isvalid companions required by gambit_filtering()
+                                needed = needed | {s + '_isvalid' for s in needed}
+                            whitelist = needed
+                            self.logger.debug(
+                                f"HDF5 whitelist: {len(whitelist)} paths from columnmap "
+                                f"(out of all datasets in group '{self.group}')"
+                            )
 
                     # Collect all datasets under the group (recursively)
-                    items = _collect_group_datasets(group, prefix=self.group)
+                    items = _collect_group_datasets(group, prefix=self.group, whitelist=whitelist)
                     if not items:
                         raise RuntimeError(f"HDF5 group '{self.group}' contains no datasets.")
 
