@@ -120,6 +120,15 @@ class DataSet():
             return f" HDF5 loaded!\n\t name  -> {self.name}\n\t group -> {self.group}\n\t path  -> {self.path}"
         return f" CSV loaded!\n\t name  -> {self.name}\n\t path  -> {self.path}"
 
+    def _debug_enabled(self) -> bool:
+        """Best-effort check for loguru debug level without assuming logger internals."""
+        try:
+            core = getattr(self.logger, "_core", None)
+            min_level = getattr(core, "min_level", 100)
+            return int(min_level) <= 10
+        except Exception:
+            return False
+
     def _emit_summary_text(self, summary_msg: str) -> None:
         if self.logger:
             self.logger.warning("\n" + str(summary_msg))
@@ -429,37 +438,74 @@ class DataSet():
                 _, path, ds = best
                 return path, ds[()]
 
-            def _to_dataframe(arr, name=""):
-                if isinstance(arr, np.ndarray) and getattr(arr.dtype, "names", None):
-                    df = pd.DataFrame.from_records(arr)
-                    # prefix columns to keep dataset origin
-                    if name:
-                        df.columns = [f"{name}:{c}" for c in df.columns]
-                    return df
-                elif hasattr(arr, "ndim") and arr.ndim == 2:
-                    cols = [f"col{i}" for i in range(arr.shape[1])]
-                    if name:
-                        cols = [f"{name}:{c}" for c in cols]
-                    return pd.DataFrame(arr, columns=cols)
-                else:
-                    col = name if name else "value"
-                    return pd.DataFrame({col: np.ravel(arr)})
-
-            def _collect_group_datasets(g: h5py.Group, prefix: str="", whitelist=None):
-                """Recursively collect (path, ndarray) for all datasets under a group."""
-                items = []
+            def _collect_group_dataset_paths(g: h5py.Group, prefix: str="", whitelist=None):
+                """Recursively collect dataset paths under a group."""
+                paths = []
                 for k, v in g.items():
                     path = f"{prefix}/{k}" if prefix else k
                     if isinstance(v, h5py.Dataset):
                         if whitelist is None or path in whitelist:
-                            items.append((path, v[()]))
+                            paths.append(path)
                     elif isinstance(v, h5py.Group):
-                        items.extend(_collect_group_datasets(v, path, whitelist=whitelist))
-                return items
+                        paths.extend(_collect_group_dataset_paths(v, path, whitelist=whitelist))
+                return paths
+
+            def _dataset_to_columns(path: str, ds: h5py.Dataset, row_mask=None, rename_map=None):
+                """
+                Convert one HDF5 dataset to DataFrame-ready columns.
+                Returns: (columns_dict, nrows, shape_tuple)
+                """
+                arr = ds[()]
+
+                def _apply_mask(vec):
+                    if row_mask is None:
+                        return vec
+                    if len(vec) != len(row_mask):
+                        raise ValueError(
+                            "HDF5 row mismatch while applying is_valid mask: "
+                            f"dataset='{path}', rows={len(vec)}, mask_rows={len(row_mask)}"
+                        )
+                    return vec[row_mask]
+
+                def _map_name(name: str) -> str:
+                    if isinstance(rename_map, dict):
+                        return rename_map.get(name, name)
+                    return name
+
+                if isinstance(arr, np.ndarray) and getattr(arr.dtype, "names", None):
+                    # Structured array: one output column per field
+                    out = {}
+                    for fname in arr.dtype.names:
+                        src = f"{path}:{fname}"
+                        dst = _map_name(src)
+                        vec = np.asarray(arr[fname]).reshape(-1)
+                        out[dst] = _apply_mask(vec)
+                    nrows = len(next(iter(out.values()))) if out else 0
+                    return out, nrows, (nrows, len(out))
+
+                if hasattr(arr, "ndim") and getattr(arr, "ndim", 0) == 2:
+                    # 2D array: one output column per axis-1 entry
+                    out = {}
+                    nrows = int(arr.shape[0])
+                    ncols = int(arr.shape[1])
+                    for i in range(ncols):
+                        src = f"{path}:col{i}"
+                        dst = _map_name(src)
+                        out[dst] = _apply_mask(arr[:, i])
+                    out_rows = len(next(iter(out.values()))) if out else 0
+                    return out, out_rows, (nrows, ncols)
+
+                # Scalar / 1D / anything else: flatten to one column
+                flat = np.ravel(arr)
+                src = path if path else "value"
+                dst = _map_name(src)
+                out = _apply_mask(flat)
+                return {dst: out}, len(out), (len(flat), 1)
 
             with h5py.File(self.path, "r") as f1:
-                # Log top-level keys to help the user
-                print_hdf5_tree_ascii(f1[self.group], root_name=self.group, logger=self.logger)
+                # Tree traversal is expensive on large files; keep it behind debug mode.
+                if self._debug_enabled() and self.group in f1:
+                    print_hdf5_tree_ascii(f1[self.group], root_name=self.group, logger=self.logger)
 
                 if self.group in f1 and isinstance(f1[self.group], h5py.Group):
                     group = f1[self.group]
@@ -473,9 +519,9 @@ class DataSet():
                                 "HDF5 load_whitelist enabled -> {} paths".format(len(whitelist))
                             )
 
-                    # Collect all datasets under the group (recursively)
-                    items = _collect_group_datasets(group, prefix=self.group, whitelist=whitelist)
-                    if not items:
+                    # Collect dataset paths only (defer heavy reads to reduce peak memory)
+                    dataset_paths = _collect_group_dataset_paths(group, prefix=self.group, whitelist=whitelist)
+                    if not dataset_paths:
                         if whitelist is not None:
                             raise RuntimeError(
                                 "HDF5 group '{}' has no datasets after applying columns.load_whitelist.".format(
@@ -484,43 +530,110 @@ class DataSet():
                             )
                         raise RuntimeError(f"HDF5 group '{self.group}' contains no datasets.")
 
-                    # If there is only one dataset, behave like before
-                    kkeys = []
-                    if len(items) == 1:
-                        path, arr = items[0]
-                        dfs = [(path, _to_dataframe(arr, name=path))]
-                        kkeys.append(path)
-                    else:
-                        # Build a dataframe per dataset
-                        dfs = [(p, _to_dataframe(arr, name=p)) for p, arr in items]
-                        kkeys = [p for p, arr in items]
-                    
-                    # Try to concatenate along columns; all datasets must have identical row counts
-                    lengths = {len(df) for _, df in dfs}
-                    if len(lengths) == 1:
+                    dataset_set = set(dataset_paths)
+                    base_paths = [p for p in dataset_paths if not p.endswith("_isvalid")]
+                    isvalid_paths = [p for p in dataset_paths if p.endswith("_isvalid")]
+
+                    # Step 1: parse columns config and finalize rename mapping first.
+                    rename_entries = self._columns_dict().get("rename", [])
+                    rename_map = {}
+                    if isinstance(rename_entries, list) and rename_entries:
+                        self.logger.warning("{}: Loading Columns Rename Map".format(self.name))
+                        for item in rename_entries:
+                            if not isinstance(item, dict):
+                                continue
+                            source = str(item.get("source", "")).strip()
+                            target = str(item.get("target", "")).strip()
+                            if not source or not target:
+                                continue
+                            source_canon = self._canonical_dataset_path(source)
+                            rename_map[source_canon] = target
+                            rename_map[f"{source_canon}_isvalid"] = f"{target}_isvalid"
+
+                    # Step 2: build row mask by isvalid policy, before main table assembly.
+                    row_mask = None
+                    filter_rows_before = None
+                    filter_rows_after = None
+                    required_base = self._whitelist_base_paths if isinstance(self._whitelist_base_paths, set) else None
+
+                    if self.isvalid_policy == "clean":
+                        filter_isvalid_paths = []
+                        if required_base is not None:
+                            missing_base = sorted([c for c in required_base if c not in dataset_set])
+                            missing_isvalid = sorted([f"{c}_isvalid" for c in required_base if f"{c}_isvalid" not in dataset_set])
+                            if missing_base or missing_isvalid:
+                                self.logger.warning(
+                                    "Skip is_valid policy: not all whitelist columns have companion _isvalid columns. "
+                                    "missing_base={}, missing_isvalid={}".format(missing_base, missing_isvalid)
+                                )
+                            else:
+                                filter_isvalid_paths = [f"{c}_isvalid" for c in sorted(required_base)]
+                        else:
+                            # No whitelist: use all available *_isvalid columns with base companions.
+                            filter_isvalid_paths = [p for p in isvalid_paths if p[:-8] in dataset_set]
+
+                        if filter_isvalid_paths:
+                            mask = None
+                            nrows_ref = None
+                            for vp in filter_isvalid_paths:
+                                vec = np.ravel(f1[vp][()]).astype(bool, copy=False)
+                                if nrows_ref is None:
+                                    nrows_ref = len(vec)
+                                    mask = vec.copy()
+                                else:
+                                    if len(vec) != nrows_ref:
+                                        raise ValueError(
+                                            "HDF5 is_valid datasets have inconsistent row counts: '{}' has {}, expected {}.".format(
+                                                vp, len(vec), nrows_ref
+                                            )
+                                        )
+                                    mask &= vec
+                            row_mask = mask
+                            filter_rows_before = int(nrows_ref or 0)
+                            filter_rows_after = int(mask.sum()) if mask is not None else filter_rows_before
+
+                    # Step 3: decide final output columns, then assemble DataFrame once.
+                    # clean mode drops *_isvalid by default; if whitelist is incomplete, keep them (existing behavior).
+                    read_paths = list(base_paths)
+                    if self.isvalid_policy == "raw":
+                        read_paths.extend(isvalid_paths)
+                    elif required_base is not None and row_mask is None:
+                        read_paths.extend(isvalid_paths)
+
+                    merged_cols = {}
+                    shapes = {}
+                    expected_rows = None
+                    row_mismatch = False
+                    for path in read_paths:
+                        ds = f1[path]
+                        cols_dict, nrows, shape_token = _dataset_to_columns(path, ds, row_mask=row_mask, rename_map=rename_map)
+                        shapes[path] = shape_token
+
+                        if expected_rows is None:
+                            expected_rows = nrows
+                        elif nrows != expected_rows:
+                            row_mismatch = True
+
+                        for cname, cval in cols_dict.items():
+                            merged_cols[cname] = cval
+
+                    if not row_mismatch:
                         # safe to concat by columns → single merged DataFrame only
-                        self.data = pd.concat([df for _, df in dfs], axis=1)
+                        self.data = pd.DataFrame(merged_cols, copy=False)
                         
                         self.keys = list(self.data.columns)
-                        
-                        self.apply_is_valid_policy(kkeys)
 
-                        rename_entries = self._columns_dict().get("rename", [])
-                        if isinstance(rename_entries, list) and rename_entries:
-                            self.logger.warning("{}: Loading Columns Rename Map".format(self.name))
-                            cmap = {}
-                            for item in rename_entries:
-                                if not isinstance(item, dict):
-                                    continue
-                                source = str(item.get("source", "")).strip()
-                                target = str(item.get("target", "")).strip()
-                                if not source or not target:
-                                    continue
-                                source_canon = self._canonical_dataset_path(source)
-                                cmap[source_canon] = target
-                                cmap[f"{source_canon}_isvalid"] = f"{target}_isvalid"
-                            if cmap:
-                                self.rename_columns(cmap)
+                        if row_mask is not None and self.isvalid_policy == "clean":
+                            self.logger.warning("Filtering Invalid Data from HDF5 Output")
+                            self.logger.warning(
+                                "DataSet Shape: \n\t Before filtering -> ({}, {})\n\t  After filtering -> ({}, {})".format(
+                                    filter_rows_before if filter_rows_before is not None else self.data.shape[0],
+                                    self.data.shape[1],
+                                    filter_rows_after if filter_rows_after is not None else self.data.shape[0],
+                                    self.data.shape[1],
+                                )
+                            )
+
                         self._apply_dataset_transform(stage="hdf5")
                                 
                         # Emit a pretty summary BEFORE returning
@@ -542,7 +655,6 @@ class DataSet():
                             print_hdf5_tree_ascii(group, root_name=self.group, logger=self.logger)
                         except Exception:
                             pass
-                        shapes = {p: df.shape for p, df in dfs}
                         raise ValueError(
                             "HDF5 group '{grp}' is invalid for merging: datasets have different row counts. "
                             "Please fix the input or choose a different dataset/group. Details: {details}".format(
@@ -557,16 +669,14 @@ class DataSet():
         if self.data is None:
             self.load(force=False)
 
-        isvalids = []
-        all_isvalid_cols = []
-        if self.keys is not None:
-            for col in self.keys:
-                if isinstance(col, str) and col.endswith("_isvalid"):
-                    all_isvalid_cols.append(col)
+        source_cols = list(self.keys or [])
+        source_col_set = set(source_cols)
+        all_isvalid_cols = [col for col in source_cols if isinstance(col, str) and col.endswith("_isvalid")]
 
-        for kk in kkeys:
-            if isinstance(kk, str) and kk.endswith("_isvalid") and kk[:-8] in self.keys:
-                isvalids.append(kk)
+        isvalids = [
+            kk for kk in kkeys
+            if isinstance(kk, str) and kk.endswith("_isvalid") and kk[:-8] in source_col_set
+        ]
 
         # Fallback: if mapping by kkeys fails, still use loaded *_isvalid columns.
         if not isvalids:
@@ -574,9 +684,8 @@ class DataSet():
 
         required_base = self._whitelist_base_paths if isinstance(self._whitelist_base_paths, set) else None
         if required_base is not None:
-            loaded_cols = set(self.keys or [])
-            missing_base = sorted([c for c in required_base if c not in loaded_cols])
-            missing_isvalid = sorted([f"{c}_isvalid" for c in required_base if f"{c}_isvalid" not in loaded_cols])
+            missing_base = sorted([c for c in required_base if c not in source_col_set])
+            missing_isvalid = sorted([f"{c}_isvalid" for c in required_base if f"{c}_isvalid" not in source_col_set])
             if missing_base or missing_isvalid:
                 self.logger.warning(
                     "Skip is_valid policy: not all whitelist columns have companion _isvalid columns. "
@@ -642,9 +751,21 @@ def dataframe_summary(df: pd.DataFrame, name: str = "") -> str:
         tail = max(0, width - head - 3)
         return s[:head] + "..." + s[-tail:]
 
+    def human_bytes(num_bytes: int) -> str:
+        size = float(max(0, num_bytes))
+        for unit in ("B", "KB", "MB", "GB", "TB"):
+            if size < 1024.0 or unit == "TB":
+                return f"{size:.2f} {unit}"
+            size /= 1024.0
+
     nrows, ncols = df.shape
     cols = list(df.columns)
     show_cols = cols[:]
+    try:
+        # Fast estimate (deep=False) to avoid expensive scans on large object columns.
+        mem_bytes = int(df.memory_usage(index=True, deep=False).sum())
+    except Exception:
+        mem_bytes = 0
 
     # Compute per-column stats for the shown columns
     dtypes = df[show_cols].dtypes.astype(str)
@@ -699,7 +820,8 @@ def dataframe_summary(df: pd.DataFrame, name: str = "") -> str:
     head_lines = []
     if name:
         head_lines.append(f"Selected dataset:{name}")
-    head_lines.append(f"DataFrame shape:\n\t {nrows}\t rows × {ncols} \tcols\n")
+    head_lines.append(f"\t DataFrame shape\t-> {nrows}\t rows × {ncols} \tcols")
+    head_lines.append(f"\t Approx memory usage\t-> {human_bytes(mem_bytes)}")
     head_lines.append("=== DataFrame Summary Table ===")
 
     # Column table header
