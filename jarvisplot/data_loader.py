@@ -18,9 +18,11 @@ class DataSet():
         self._logger                = None 
         self.data                   = None
         self.group                  = None
-        self.is_gambit              = False
-        self.columnmap              = {}
+        self.columns                = {}
+        self.isvalid_policy         = "clean"
+        self.full_load              = False
         self.transform              = None
+        self._whitelist_base_paths  = None
         self.cache                  = None
         self._loaded                = False
         self._summary_emitted       = False
@@ -38,12 +40,19 @@ class DataSet():
         self.name = dtinfo['name']
         self.type = dtinfo['type'].lower()
         self.transform = dtinfo.get("transform", None)
-        if self.type == "hdf5" and dtinfo.get('dataset'):
-            self.group = dtinfo['dataset']
-            self.is_gambit = dtinfo.get('is_gambit', False)
-            self.columnmap = dtinfo.get('columnmap', {})
-        elif self.type == "hdf5":
-            self.columnmap = dtinfo.get('columnmap', {})
+        if self.type == "hdf5":
+            self.group = dtinfo.get("dataset", None)
+            self.columns = dtinfo.get("columns", {})
+            if not isinstance(self.columns, dict):
+                self.columns = {}
+            policy_raw = str(self.columns.get("isvalid_policy", "clean")).strip().lower()
+            if policy_raw not in {"clean", "raw"}:
+                raise ValueError(
+                    "columns.isvalid_policy must be one of: clean, raw. got: {}".format(
+                        self.columns.get("isvalid_policy")
+                    )
+                )
+            self.isvalid_policy = policy_raw
 
         if eager:
             self.load(force=True)
@@ -69,7 +78,14 @@ class DataSet():
 
     def fingerprint(self, cache=None):
         cache = cache or self.cache
-        extra = {"name": self.name, "type": self.type, "group": self.group, "transform": self.transform}
+        extra = {
+            "name": self.name,
+            "type": self.type,
+            "group": self.group,
+            "transform": self.transform,
+            "columns": self.columns,
+            "full_load": bool(getattr(self, "full_load", False)),
+        }
         if cache is not None:
             return cache.source_fingerprint(self.path, extra=extra)
         try:
@@ -185,6 +201,114 @@ class DataSet():
         if self.logger:
             self.logger.debug("Dataset -> {} is assigned as \n\t-> {}\ttype".format(self.base, self.type))
 
+    def _columns_dict(self) -> Dict[str, Any]:
+        if isinstance(self.columns, dict):
+            return self.columns
+        return {}
+
+    def _canonical_dataset_path(self, value: str) -> str:
+        sval = str(value).strip()
+        if not sval:
+            return ""
+        if self.group and not sval.startswith(f"{self.group}/"):
+            return f"{self.group}/{sval}"
+        return sval
+
+    def _path_aliases(self, value: str) -> set[str]:
+        sval = str(value).strip()
+        if not sval:
+            return set()
+        aliases = {sval}
+        if self.group:
+            prefix = f"{self.group}/"
+            if sval.startswith(prefix):
+                aliases.add(sval[len(prefix):])
+            else:
+                aliases.add(prefix + sval)
+        return aliases
+
+    def _rename_source_by_alias(self) -> Dict[str, str]:
+        alias_map: Dict[str, str] = {}
+        rename_list = self._columns_dict().get("rename", [])
+        if not isinstance(rename_list, list):
+            return alias_map
+
+        for item in rename_list:
+            if not isinstance(item, dict):
+                continue
+            source = str(item.get("source", "")).strip()
+            target = str(item.get("target", "")).strip()
+            if not source:
+                continue
+            source_canon = self._canonical_dataset_path(source)
+            for alias in self._path_aliases(source):
+                alias_map[alias] = source_canon
+            if target:
+                alias_map[target] = source_canon
+        return alias_map
+
+    def _build_hdf5_whitelist(self) -> Optional[set[str]]:
+        cfg = self._columns_dict()
+        raw_whitelist = cfg.get("load_whitelist", None)
+        if raw_whitelist is None:
+            self._whitelist_base_paths = None
+            return None
+
+        use_only_in_list = False
+        requested_tokens: List[str] = []
+
+        if isinstance(raw_whitelist, list):
+            for item in raw_whitelist:
+                if item is None:
+                    continue
+                sval = str(item).strip()
+                if not sval:
+                    continue
+                requested_tokens.append(sval)
+        elif isinstance(raw_whitelist, str):
+            sval = raw_whitelist.strip()
+            if not sval:
+                return None
+            if sval == "only_in_list":
+                use_only_in_list = True
+            else:
+                raise ValueError(
+                    "columns.load_whitelist only supports a list or the string 'only_in_list'."
+                )
+        else:
+            raise TypeError(
+                "columns.load_whitelist must be a list or the string 'only_in_list'."
+            )
+
+        if use_only_in_list:
+            rename_list = cfg.get("rename", [])
+            if not isinstance(rename_list, list):
+                raise TypeError(
+                    "columns.load_whitelist='only_in_list' requires columns.rename to be a list."
+                )
+            for item in rename_list:
+                if not isinstance(item, dict):
+                    continue
+                source = str(item.get("source", "")).strip()
+                if source:
+                    requested_tokens.append(source)
+
+        alias_to_source = self._rename_source_by_alias()
+        selected_paths: set[str] = set()
+        for token in requested_tokens:
+            source = alias_to_source.get(token, token)
+            source_canon = self._canonical_dataset_path(source)
+            if source_canon:
+                selected_paths.add(source_canon)
+        self._whitelist_base_paths = {p for p in selected_paths if not p.endswith("_isvalid")}
+
+        # Always add companion validity columns so filtering/keeping works consistently.
+        with_isvalid = set(selected_paths)
+        for path in list(selected_paths):
+            if not path.endswith("_isvalid"):
+                with_isvalid.add(f"{path}_isvalid")
+        return with_isvalid
+
     @staticmethod
     def _shape_token(df) -> str:
         if isinstance(df, pd.DataFrame):
@@ -194,7 +318,7 @@ class DataSet():
     def _apply_dataset_transform(self, stage: str = "dataset") -> None:
         """
         Apply DataSet-level transforms using the same operators as layer transforms.
-        For HDF5 this is called after GAMBIT cleaning + column map rename.
+        For HDF5 this is called after is_valid policy + columns rename.
         """
         if self.data is None:
             return
@@ -321,15 +445,16 @@ class DataSet():
                     col = name if name else "value"
                     return pd.DataFrame({col: np.ravel(arr)})
 
-            def _collect_group_datasets(g: h5py.Group, prefix: str=""):
+            def _collect_group_datasets(g: h5py.Group, prefix: str="", whitelist=None):
                 """Recursively collect (path, ndarray) for all datasets under a group."""
                 items = []
                 for k, v in g.items():
                     path = f"{prefix}/{k}" if prefix else k
                     if isinstance(v, h5py.Dataset):
-                        items.append((path, v[()]))
+                        if whitelist is None or path in whitelist:
+                            items.append((path, v[()]))
                     elif isinstance(v, h5py.Group):
-                        items.extend(_collect_group_datasets(v, path))
+                        items.extend(_collect_group_datasets(v, path, whitelist=whitelist))
                 return items
 
             with h5py.File(self.path, "r") as f1:
@@ -339,12 +464,24 @@ class DataSet():
                 if self.group in f1 and isinstance(f1[self.group], h5py.Group):
                     group = f1[self.group]
                     self.logger.debug("Loading HDF5 group '{}' from {}".format(self.group, self.path))
-                    if self.is_gambit: 
-                        self.logger.debug("GAMBIT Standard Output")
+
+                    whitelist = None
+                    if not bool(getattr(self, "full_load", False)):
+                        whitelist = self._build_hdf5_whitelist()
+                        if whitelist is not None:
+                            self.logger.debug(
+                                "HDF5 load_whitelist enabled -> {} paths".format(len(whitelist))
+                            )
 
                     # Collect all datasets under the group (recursively)
-                    items = _collect_group_datasets(group, prefix=self.group)
+                    items = _collect_group_datasets(group, prefix=self.group, whitelist=whitelist)
                     if not items:
+                        if whitelist is not None:
+                            raise RuntimeError(
+                                "HDF5 group '{}' has no datasets after applying columns.load_whitelist.".format(
+                                    self.group
+                                )
+                            )
                         raise RuntimeError(f"HDF5 group '{self.group}' contains no datasets.")
 
                     # If there is only one dataset, behave like before
@@ -366,14 +503,23 @@ class DataSet():
                         
                         self.keys = list(self.data.columns)
                         
-                        # Deal GAMBIT filtering 
-                        if self.is_gambit:
-                            self.gambit_filtering(kkeys)
-                            if self.columnmap.get("list", False):
-                                self.logger.warning("{}: Loading Column Maps".format(self.name))
-                                cmap = {}
-                                for item in self.columnmap.get("list", False): 
-                                    cmap[item['source_name']] = item['new_name']
+                        self.apply_is_valid_policy(kkeys)
+
+                        rename_entries = self._columns_dict().get("rename", [])
+                        if isinstance(rename_entries, list) and rename_entries:
+                            self.logger.warning("{}: Loading Columns Rename Map".format(self.name))
+                            cmap = {}
+                            for item in rename_entries:
+                                if not isinstance(item, dict):
+                                    continue
+                                source = str(item.get("source", "")).strip()
+                                target = str(item.get("target", "")).strip()
+                                if not source or not target:
+                                    continue
+                                source_canon = self._canonical_dataset_path(source)
+                                cmap[source_canon] = target
+                                cmap[f"{source_canon}_isvalid"] = f"{target}_isvalid"
+                            if cmap:
                                 self.rename_columns(cmap)
                         self._apply_dataset_transform(stage="hdf5")
                                 
@@ -407,18 +553,60 @@ class DataSet():
                 else:
                     path, arr = _pick_dataset(f1)
     
-    def gambit_filtering(self, kkeys): 
+    def apply_is_valid_policy(self, kkeys): 
         if self.data is None:
             self.load(force=False)
+
         isvalids = []
-        for kk in kkeys: 
-            if "_isvalid" == kk[-8:] and kk[:-8] in self.keys: 
+        all_isvalid_cols = []
+        if self.keys is not None:
+            for col in self.keys:
+                if isinstance(col, str) and col.endswith("_isvalid"):
+                    all_isvalid_cols.append(col)
+
+        for kk in kkeys:
+            if isinstance(kk, str) and kk.endswith("_isvalid") and kk[:-8] in self.keys:
                 isvalids.append(kk)
-        self.logger.warning("Filtering Invalid Data from GAMBIT Output")
-        sps = self.data.shape
-        mask = self.data[isvalids].all(axis=1)
-        self.data = self.data[mask].drop(columns=isvalids)
-        self.logger.warning("DataSet Shape: \n\t Before filtering -> {}\n\t  After filtering -> {}".format(sps, self.data.shape))
+
+        # Fallback: if mapping by kkeys fails, still use loaded *_isvalid columns.
+        if not isvalids:
+            isvalids = all_isvalid_cols[:]
+
+        required_base = self._whitelist_base_paths if isinstance(self._whitelist_base_paths, set) else None
+        if required_base is not None:
+            loaded_cols = set(self.keys or [])
+            missing_base = sorted([c for c in required_base if c not in loaded_cols])
+            missing_isvalid = sorted([f"{c}_isvalid" for c in required_base if f"{c}_isvalid" not in loaded_cols])
+            if missing_base or missing_isvalid:
+                self.logger.warning(
+                    "Skip is_valid policy: not all whitelist columns have companion _isvalid columns. "
+                    "missing_base={}, missing_isvalid={}".format(missing_base, missing_isvalid)
+                )
+                self.keys = list(self.data.columns)
+                return
+
+        if self.isvalid_policy == "raw":
+            self.logger.warning(
+                "isvalid_policy=raw -> skip is_valid filtering and keep {} is_valid columns".format(
+                    len(all_isvalid_cols)
+                )
+            )
+            self.keys = list(self.data.columns)
+            return
+
+        if isvalids:
+            self.logger.warning("Filtering Invalid Data from HDF5 Output")
+            sps = self.data.shape
+            mask = self.data[isvalids].all(axis=1)
+            self.data = self.data[mask]
+            self.logger.warning(
+                "DataSet Shape: \n\t Before filtering -> {}\n\t  After filtering -> {}".format(
+                    sps, self.data.shape
+                )
+            )
+
+        if all_isvalid_cols:
+            self.data = self.data.drop(columns=all_isvalid_cols, errors="ignore")
         self.keys = list(self.data.columns)
                 
     def rename_columns(self, vdict):

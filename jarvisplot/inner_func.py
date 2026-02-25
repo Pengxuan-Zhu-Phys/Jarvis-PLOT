@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sys
+from types import SimpleNamespace
 from sympy.core import numbers as SCNum
 import sympy 
 import numpy as np
@@ -134,7 +135,42 @@ def LogGauss(xx, mean, err):
     prob = -0.5*((xx - mean)/err)**2
     return prob
 
+
+def _extract_operas_full_name_map(func_locals, numeric_funcs):
+    """Build `namespace.function -> callable` map from Jarvis-Operas dicts."""
+    full_name_map = {}
+    for namespace, ns_obj in (func_locals or {}).items():
+        if not isinstance(namespace, str):
+            continue
+        attrs = getattr(ns_obj, "__dict__", None)
+        if not isinstance(attrs, dict):
+            continue
+        for short_name, symbol_fn in attrs.items():
+            if not isinstance(short_name, str):
+                continue
+            symbolic_name = str(symbol_fn)
+            fn = numeric_funcs.get(symbolic_name)
+            if callable(fn):
+                full_name_map[f"{namespace}.{short_name}"] = fn
+    return full_name_map
+
+
+def _build_operas_eval_namespaces(full_name_map):
+    """Build `namespace -> SimpleNamespace(function=callable)` for plain eval."""
+    grouped = {}
+    for full_name, fn in (full_name_map or {}).items():
+        if not callable(fn) or "." not in full_name:
+            continue
+        namespace, short_name = full_name.split(".", 1)
+        if not namespace or not short_name:
+            continue
+        grouped.setdefault(namespace, {})[short_name] = fn
+    return {namespace: SimpleNamespace(**attrs) for namespace, attrs in grouped.items()}
+
+
 def update_funcs(funcs):
+    if funcs is None:
+        funcs = {}
     funcs['sympy'] = sympy
     funcs['Gauss'] = Gauss
     funcs['LogGauss'] = LogGauss
@@ -143,6 +179,20 @@ def update_funcs(funcs):
 
     # Built-in functions
     funcs.update(_Inner_FCs)
+
+    # Jarvis-Operas registered functions.
+    # Keep both symbolic/numeric views for compatibility, and provide
+    # namespace-style objects so plain `eval` can call `namespace.func(x)`.
+    try:
+        from jarvis_operas import func_locals, numeric_funcs
+
+        funcs.update(numeric_funcs)
+        funcs.update(func_locals)
+        operas_full_name_map = _extract_operas_full_name_map(func_locals, numeric_funcs)
+        funcs.update(operas_full_name_map)
+        funcs.update(_build_operas_eval_namespaces(operas_full_name_map))
+    except Exception:
+        pass
 
     # External functions (e.g. lazy-loaded interpolators). External takes priority.
     try:

@@ -2,7 +2,6 @@
 
 import numpy as np 
 import pandas as pd 
-import json
 from copy import deepcopy
 
 def eval_series(df: pd.DataFrame, set: dict, logger):
@@ -639,7 +638,11 @@ def addcolumn(df, adds, logger):
         df[name] = value 
         return df
     except Exception as e: 
-        logger.error("Errors when add new column -> {}:\n\t{}".format(adds, json.dumps(e)))   
+        logger.error(
+            "Errors when add new column -> {}:\n\t{}: {}".format(
+                adds, e.__class__.__name__, e
+            )
+        )
         return df               
         
 def sortby(df, expr, logger):

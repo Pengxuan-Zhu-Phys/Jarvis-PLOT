@@ -1,0 +1,315 @@
+DataSet:
+- dataset: data
+  name: h5
+  path: ./datas/EWMSSMpp_lightweight_for_PengXuan.hdf5
+  type: hdf5
+  columns:
+    load_whitelist: only_in_list  # Comment4Chirs: Two modes: 
+                                  #  (1) "only_in_list" -> build whitelist from columns.rename[*].source; 
+                                  #  (2) explicit list, e.g. ["A", "data/B"], where target/source names can be mixed and are resolved to real HDF5 column paths.
+    isvalid_policy: clean         # optional: raw | clean. "row" will keep isvalid column, "clean" will remove them
+    rename:
+    - source: data/#L3_Chargino_Leptonic_LLike @ColliderBit::L3_Chargino_Leptonic_Conservative_LLike
+      target: LogL_39
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::ATLAS_13TeV_0LEP_139invfb__combined_LogLike
+      target: LogL_11
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::ATLAS_13TeV_1OR3LEP_StopHZ_139invfb__combined_LogLike
+      target: LogL_08
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::ATLAS_13TeV_2LEP0JET_EW_139invfb__combined_LogLike
+      target: LogL_02
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::ATLAS_13TeV_2LEPJETS_RJR_139invfb__combined_LogLike
+      target: LogL_04
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::ATLAS_13TeV_2LEPStop_inclusive_139invfb__combined_LogLike
+      target: LogL_13
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::ATLAS_13TeV_2OR3LEP_139invfb__combined_LogLike
+      target: LogL_06
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::ATLAS_13TeV_2bMET_36invfb__combined_LogLike
+      target: LogL_17
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::ATLAS_13TeV_4b_139invfb__combined_LogLike
+      target: LogL_09
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::ATLAS_13TeV_MultiLEP_strong_139invfb__combined_LogLike
+      target: LogL_18
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::ATLAS_13TeV_PhotonGGM_1Photon_139invfb__combined_LogLike
+      target: LogL_20
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::ATLAS_13TeV_PhotonGGM_2Photon_36invfb__combined_LogLike
+      target: LogL_19
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::ATLAS_13TeV_ZGammaGrav_CONFNOTE_80invfb__combined_LogLike
+      target: LogL_21
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::ATLAS_13TeV_bTaus_StopStau_139invfb__combined_LogLike
+      target: LogL_07
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::CMS_13TeV_0LEPStop_137invfb__combined_LogLike
+      target: LogL_24
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::CMS_13TeV_0LEP_137invfb__combined_LogLike
+      target: LogL_28
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::CMS_13TeV_0LEP_chargino_VV_VH_137invfb__combined_LogLike
+      target: LogL_25
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::CMS_13TeV_1LEPStop_36invfb__combined_LogLike
+      target: LogL_29
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::CMS_13TeV_1LEPbb_137invfb__combined_LogLike
+      target: LogL_22
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::CMS_13TeV_1Photon1Lepton_emu_combined_36invfb__combined_LogLike
+      target: LogL_30
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::CMS_13TeV_2Higgs_4b_neutralino_137invfb__combined_LogLike
+      target: LogL_23
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::CMS_13TeV_2LEPStop_36invfb__combined_LogLike
+      target: LogL_31
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::CMS_13TeV_2OSLEP_EW_Production_137invfb__combined_LogLike
+      target: LogL_38
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::CMS_13TeV_2OSLEP_for_chargino_36invfb__combined_LogLike
+      target: LogL_27
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::CMS_13TeV_2OSLEP_for_stop_36invfb__combined_LogLike
+      target: LogL_32
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::CMS_13TeV_2Photon_GMSB_36invfb__combined_LogLike
+      target: LogL_33
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::CMS_13TeV_2SSLEP_Stop_137invfb__combined_LogLike
+      target: LogL_34
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::CMS_13TeV_MultiLEP_2LEP_137invfb__combined_LogLike
+      target: LogL_35
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::CMS_13TeV_MultiLEP_3LEP_137invfb__combined_LogLike
+      target: LogL_36
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::CMS_13TeV_MultiLEP_4LEP_137invfb__combined_LogLike
+      target: LogL_37
+    - source: data/#LHC_LogLike_per_SR @ColliderBit::get_LHC_LogLike_per_SR::CMS_13TeV_Photon_GMSB_137invfb__combined_LogLike
+      target: LogL_26
+    - source: data/#LHC_measurements_LogLike @ColliderBit::Contur_LHC_measurements_LogLike
+      target: LogL_measure
+    - source: data/#LHC_measurements_LogLike_perPool @ColliderBit::Contur_LHC_measurements_LogLike_perPool::ATLAS_13_L1L2_JETS_DATABG
+      target: LogL_measure_01
+    - source: data/#LHC_measurements_LogLike_perPool @ColliderBit::Contur_LHC_measurements_LogLike_perPool::ATLAS_13_LMETJET_DATABG
+      target: LogL_measure_02
+    - source: data/#LHC_measurements_LogLike_perPool @ColliderBit::Contur_LHC_measurements_LogLike_perPool::ATLAS_13_LMETJET_SMBG
+      target: LogL_measure_03
+    - source: data/#MSSM11atQ_mA_parameters @MSSM11atQ_mA::primary_parameters::M1
+      target: pM1
+    - source: data/#MSSM11atQ_mA_parameters @MSSM11atQ_mA::primary_parameters::M2
+      target: pM2
+    - source: data/#MSSM11atQ_mA_parameters @MSSM11atQ_mA::primary_parameters::M3
+      target: pM3
+    - source: data/#MSSM11atQ_mA_parameters @MSSM11atQ_mA::primary_parameters::Qin
+      target: pQin
+    - source: data/#MSSM11atQ_mA_parameters @MSSM11atQ_mA::primary_parameters::TanBeta
+      target: pTanBeta
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi+_1 Pole_Mass
+      target: mC1
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi+_2 Pole_Mass
+      target: mC2
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(1,1) Pole_Mixing
+      target: N11
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(1,2) Pole_Mixing
+      target: N12
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(1,3) Pole_Mixing
+      target: N13
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(1,4) Pole_Mixing
+      target: N14
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(2,1) Pole_Mixing
+      target: N21
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(2,2) Pole_Mixing
+      target: N22
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(2,3) Pole_Mixing
+      target: N23
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(2,4) Pole_Mixing
+      target: N24
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(3,1) Pole_Mixing
+      target: N31
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(3,2) Pole_Mixing
+      target: N32
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(3,3) Pole_Mixing
+      target: N33
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(3,4) Pole_Mixing
+      target: N34
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(4,1) Pole_Mixing
+      target: N41
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(4,2) Pole_Mixing
+      target: N42
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(4,3) Pole_Mixing
+      target: N43
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_(4,4) Pole_Mixing
+      target: N44
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_1 Pole_Mass
+      target: mN1
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_2 Pole_Mass
+      target: mN2
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_3 Pole_Mass
+      target: mN3
+    - source: data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_4 Pole_Mass
+      target: mN4
+    - source: data/#OPAL_Chargino_Hadronic_LLike @ColliderBit::OPAL_Chargino_Hadronic_Conservative_LLike
+      target: LogL_40
+    - source: data/#OPAL_Chargino_Leptonic_LLike @ColliderBit::OPAL_Chargino_Leptonic_Conservative_LLike
+      target: LogL_42
+    - source: data/#OPAL_Chargino_SemiLeptonic_LLike @ColliderBit::OPAL_Chargino_SemiLeptonic_Conservative_LLike
+      target: LogL_41
+    - source: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi+_1 Width
+      target: wC1p
+    - source: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi+_2 Width
+      target: wC2p 
+    - source: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi-_1 Width
+      target: wC1m 
+    - source: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi-_2 Width
+      target: wC2m 
+    - source: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi0_1 Width
+      target: wN1
+    - source: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi0_2 Width
+      target: wN2
+    - source: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi0_3 Width
+      target: wN3
+    - source: data/#particle_widths_as_map @DecayBit::get_particle_widths_as_map::~chi0_4 Width
+      target: wN4
+    - source: data/ATLAS_13TeV_1Lep2b_139invfb_pyhf_combined_LogLike
+      target: LogL_01
+    - source: data/ATLAS_13TeV_2BoostedBosons_139invfb_pyhf_combined_LogLike
+      target: LogL_12
+    - source: data/ATLAS_13TeV_2LEPJETS_EW_139invfb_pyhf_combined_LogLike
+      target: LogL_03
+    - source: data/ATLAS_13TeV_2LEPsoft_139invfb_pyhf_combined_LogLike
+      target: LogL_10
+    - source: data/ATLAS_13TeV_2OSLEP_chargino_139invfb_pyhf_combined_LogLike
+      target: LogL_14
+    - source: data/ATLAS_13TeV_3LEP_139invfb_pyhf_combined_LogLike
+      target: LogL_15
+    - source: data/ATLAS_13TeV_3LEP_eRJR_139invfb_pyhf_combined_LogLike
+      target: LogL_05
+    - source: data/ATLAS_13TeV_4LEP_139invfb_pyhf_combined_LogLike
+      target: LogL_16
+  transform:
+  - add_column:
+      name: LogLike_total
+      expr: LogL_01 + LogL_02 + LogL_03 + LogL_04 + LogL_05 + LogL_06 + LogL_07
+        + LogL_08 + LogL_09 + LogL_10 + LogL_11 + LogL_12 + LogL_13 + LogL_14
+        + LogL_15 + LogL_16 + LogL_17 + LogL_18 + LogL_19 + LogL_20 + LogL_21
+        + LogL_22 + LogL_23 + LogL_24 + LogL_25 + LogL_26 + LogL_27 + LogL_28
+        + LogL_29 + LogL_30 + LogL_31 + LogL_32 + LogL_33 + LogL_34 + LogL_35
+        + LogL_36 + LogL_37 + LogL_38 + LogL_39 + LogL_40 + LogL_41 + LogL_42
+        + LogL_measure - LogL_measure_01 - LogL_measure_02 - LogL_measure_03
+  - sortby: LogLike_total
+  - filter: wC1p > 1.97e-15
+
+Figures:
+- name: mN2mN1_BinoN1_HinoN2_ProfLogL
+  enable: true
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: $m_{\tilde{\chi}_2^0}~({\rm TeV})$
+        y: $m_{\tilde{\chi}_1^0}~({\rm TeV})$
+      xlim:
+      - 0
+      - 1.4
+      ylim:
+      - 0
+      - 1.4
+      text:
+      - x: 0.75
+        y: 1.0018
+        s: EWMSSM.
+        ha: right
+        va: bottom
+        fontfamily: STIXGeneral
+        fontsize: x-small
+        transform: true
+      - x: 0.05
+        y: 0.85
+        s: All searches and measurement
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+      - x: 0.05
+        y: 0.75
+        s: Higgsino-dominated $\tilde{\chi}_2^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+      - x: 0.05
+        y: 0.65
+        s: Bino-dominated $\tilde{\chi}_1^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral        
+        transform: true
+    axc:
+      label:
+        ylabel: $\ln{\mathcal{L}}$
+  layers:
+  - name: scatter   # Comment4Chirs: Just a name, No special could be anything. 
+    data:           # Comment4Chirs: Loading Data (optional)
+    - source: h5    # Comment4Chirs: Which dataset you want 
+      #transform:   # Comment4Chirs: Data processing, including add_column, profiling, sort, filter and etc. 
+      #- filter: (np.abs(N11)**2 > np.abs(N12)**2) & (np.abs(N11)**2 > np.abs(N13)**2 + np.abs(N14)**2) 
+      #- filter: (np.abs(N23)**2 + np.abs(N24)**2 > np.abs(N21) ** 2) & (np.abs(N23)**2 + np.abs(N24)**2 > np.abs(N22) ** 2)
+      #- profile:
+      #    bin: 150
+      #    coordinates:
+      #      x:
+      #        expr: abs(mN2)/1000
+      #        scale: linear
+      #        name: xx
+      #        lim:
+      #        - 0
+      #        - 1.4
+      #      y:
+      #        expr: abs(mN1)/1000
+      #        scale: linear
+      #        name: yy
+      #        lim:
+      #        - 0
+      #        - 1.4
+      #      z:
+      #        expr: np.exp(LogLike_total)
+      #        scale: linear
+      #        name: z0
+      #    objective: max
+      #    grid_points: rect
+    share_data: mN2mN1_BinoN1_HinoN2_profile  # Comment4Chirs: a name for other plot to reuse this data.  
+    axes: ax                                  # Comment4Chirs: which axes you want to plot.  
+    method: scatter                           # Comment4Chirs: A plotting method, scatter is from matplotlib. 
+    coordinates:                              # Comment4Chirs: arraylike args for scatter plot, see https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.scatter.html#matplotlib.axes.Axes.scatter 
+      x:                    # Comment4Chirs: x: a np.array or a expression 
+        expr: abs(mN2)/1000 # must be a python expression, supporting by Jarvis-HEP Expression parsing function
+      y:                    # Comment4Chirs: same as x 
+        expr: abs(mN1)/1000
+      c:                    # Comment4Chirs: c is not positional, but still an np.array
+        expr: LogLike_total
+    style:                  # Comment4Chirs: Other args for beautying scatter, see https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.scatter.html#matplotlib.axes.Axes.scatter 
+      marker: .
+      cmap: chrisB
+      vmin: -3.09
+      vmax: 3.09
+  - name: fillbounds
+    axes: ax
+    method: fill
+    coordinates:
+      x:
+      - 0.0
+      - 1.4
+      - 0.0
+      - 0.0
+      y: [0.0, 1.4, 1.4, 0.0] # Comment4Chirs: same for yaml based format. 
+      # - 0.0
+      # - 1.4
+      # - 1.4
+      # - 0.0
+    style:
+      facecolor: '#808080'
+      edgecolor: none
+      zorder: 1.2
+
+
+output:
+  dir: ./SUSYRun2_EWMSSM
+  dpi: 400
+  formats:
+  - png
+project:
+  name: SUSYRun2 for EWMSSM 
+  workdir: ../Workshop  # Comment4Chirs: A working dir for plotting, all other path is a relative path to this. If not decleared, using YAML dirpath. 
+                        # Comment4Chirs: To avoid redundant data processing, Jarvis-PLOT automatically writes processed data to a cache, which can sometimes be quite large.
+                        # the cache path will be in workdir/.cache/ . Please remove it when you do not needed them. 
+version: 1.1

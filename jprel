@@ -1,0 +1,156 @@
+
+# JarvisPLOT release helper
+# Usage:
+#   jprel 1.0.2            # build + upload to PyPI using ~/.pypirc (repository = pypi)
+#   jprel 1.0.2 --tag      # also git tag + push tags
+#   jprel 1.0.2 --dry      # build + twine check only, no upload
+#   jprel 1.0.2 -e         # refresh local editable install after release (clean old local records first)
+
+jprel () {
+  	set -euo pipefail
+
+  if [[ $# -lt 1 ]]; then
+    echo "Usage: jprel <version> [--tag] [--dry] [-e|--editable]"
+    echo "Example: jprel 1.0.2 --tag -e"
+    return 2
+  fi
+
+  local ver="$1"; shift || true
+  local do_tag=0
+  local dry=0
+  local editable=0
+  local pkg_name="jarvisplot"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --tag) do_tag=1 ;;
+      --dry) dry=1 ;;
+      -e|--editable) editable=1 ;;
+      *) echo "Unknown option: $1"; return 2 ;;
+    esac
+    shift
+  done
+
+  # ---- basic sanity checks ----
+  if [[ ! -f "pyproject.toml" ]]; then
+    echo "ERROR: pyproject.toml not found. Run this in your project root."
+    return 1
+  fi
+
+  echo "==> JarvisPLOT release: v${ver}"
+  echo "==> Python: $(python3 -V 2>/dev/null || true)"
+  echo "==> PWD: $(pwd)"
+
+  # ---- ensure tooling ----
+  python3 -m pip -q install -U build twine >/dev/null
+
+  # ---- clean old dists ----
+  echo "==> Cleaning dist/ build/ *.egg-info ..."
+  rm -rf dist build *.egg-info
+
+  # ---- (optional) bump version in pyproject.toml ----
+  # If you keep version in pyproject.toml as: version = "x.y.z"
+  # This will update it to the provided version (safe if it exists; no-op otherwise).
+  if grep -qE '^[[:space:]]*version[[:space:]]*=' pyproject.toml; then
+    echo "==> Updating pyproject.toml version -> ${ver}"
+    # macOS sed needs -i '' for in-place
+    sed -i '' -E "s/^([[:space:]]*version[[:space:]]*=[[:space:]]*\")([^\"]+)(\".*)$/\1${ver}\3/" pyproject.toml || true
+  else
+    echo "==> Note: version field not found in pyproject.toml (skip auto-bump)."
+  fi
+
+  # ---- build ----
+  echo "==> Building sdist + wheel ..."
+  python3 -m build
+
+  # ---- check ----
+  echo "==> Twine check ..."
+  python3 -m twine check dist/*
+
+  # ---- upload ----
+  if [[ ${dry} -eq 1 ]]; then
+    echo "==> DRY RUN: skip upload."
+  else
+    echo "==> Uploading to PyPI (using ~/.pypirc, repository=pypi) ..."
+    python3 -m twine upload -r pypi dist/*
+  fi
+
+  # ---- git tag/push (optional) ----
+  if [[ ${do_tag} -eq 1 ]]; then
+    echo "==> Git status:"
+    git status --porcelain || true
+
+    echo "==> Committing version bump (if any) ..."
+    # Only commit if there are changes
+    if [[ -n "$(git status --porcelain)" ]]; then
+      git add pyproject.toml || true
+      git commit -m "Release v${ver}" || true
+    fi
+
+    echo "==> Tagging and pushing ..."
+    git tag -a "v${ver}" -m "JarvisPLOT v${ver}" || true
+    git push jplot main
+    git push jplot --tags
+  fi
+
+  echo "==> Done: v${ver}"
+
+  # ---- optional editable reinstall (clean stale local records first) ----
+  if [[ ${editable} -eq 1 ]]; then
+    echo "==> Editable mode: cleaning old local install records for ${pkg_name} ..."
+    python3 -m pip uninstall -y "${pkg_name}" >/dev/null 2>&1 || true
+    python3 -m pip cache remove "${pkg_name}" >/dev/null 2>&1 || true
+
+    # Remove stale dist-info/egg-info/egg-link that can keep old versions visible in local metadata.
+    python3 - <<'PY'
+import pathlib
+import shutil
+import site
+import sysconfig
+
+pkg = "jarvisplot"
+paths = set()
+for p in getattr(site, "getsitepackages", lambda: [])():
+    if p:
+        paths.add(pathlib.Path(p))
+usp = site.getusersitepackages()
+if usp:
+    paths.add(pathlib.Path(usp))
+for key in ("purelib", "platlib"):
+    p = sysconfig.get_paths().get(key)
+    if p:
+        paths.add(pathlib.Path(p))
+
+patterns = (
+    f"{pkg}-*.dist-info",
+    f"{pkg}.dist-info",
+    f"{pkg}-*.egg-info",
+    f"{pkg}.egg-info",
+    f"{pkg}.egg-link",
+)
+
+for base in paths:
+    if not base.exists():
+        continue
+    for pat in patterns:
+        for m in base.glob(pat):
+            try:
+                if m.is_dir():
+                    shutil.rmtree(m, ignore_errors=True)
+                else:
+                    m.unlink(missing_ok=True)
+            except Exception:
+                pass
+PY
+
+    echo "==> Reinstall editable ${pkg_name} ..."
+    python3 -m pip install --no-deps -e .
+  fi
+
+}
+
+
+
+
+
+

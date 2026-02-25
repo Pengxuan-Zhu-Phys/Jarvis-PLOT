@@ -6,6 +6,7 @@ from typing import Optional, Any, Dict
 from .cli import CLI
 from loguru import logger
 import os, sys
+import yaml
 from .config import ConfigLoader
 from .data_loader import DataSet
 import io
@@ -15,6 +16,22 @@ import json
 from .Figure.data_pipelines import SharedContent, DataContext
 from .cache_store import ProjectCache
 from .Figure.preprocessor import DataPreprocessor
+
+
+class _QuotedString(str):
+    """Marker string that should always be dumped with double quotes."""
+
+
+class _QuotedDumper(yaml.SafeDumper):
+    pass
+
+
+def _quoted_string_representer(dumper, data):
+    return dumper.represent_scalar("tag:yaml.org,2002:str", str(data), style='"')
+
+
+_QuotedDumper.add_representer(_QuotedString, _quoted_string_representer)
+
 
 class JarvisPLOT():
     def __init__(self) -> None:
@@ -211,6 +228,10 @@ class JarvisPLOT():
                 if figobj.set(fig):
                     self.logger.warning(f"Succefully loading figure -> {figobj.name} setting")
                     figobj.plot()
+                else:
+                    self.logger.warning(
+                        f"Skip figure {fig.get('name', '<noname>')}: setup failed before plotting."
+                    )
             except Exception as e:
                 self.logger.warning(f"Figure {fig.get('name', '<noname>')} failed: {e}")
                 continue
@@ -284,26 +305,66 @@ class JarvisPLOT():
         for dt in dts:
             dataset = DataSet()
             dataset.logger = self.logger
+            dataset.full_load = bool(getattr(self.args, "parse_data", False))
             dataset.setinfo(dt, data_root, eager=eager, cache=self.cache)
             self.dataset.append(dataset)
 
     def rename_hdf5_and_renew_yaml(self):
+        def _as_quoted_str(value: Any) -> _QuotedString:
+            return _QuotedString(str(value))
+
+        def _normalize_whitelist_as_quoted(raw):
+            if isinstance(raw, list):
+                return [_as_quoted_str(v) for v in raw if v is not None and str(v).strip()]
+            if isinstance(raw, str):
+                sval = raw.strip()
+                if sval:
+                    return _as_quoted_str(sval)
+            return []
+
+        for dcfg in self.yaml.config.get("DataSet", []):
+            if isinstance(dcfg, dict):
+                dcfg.pop("is_gambit", None)
+                dcfg.pop("columnmap", None)
+
         for dt in self.dataset:
             self.logger.warning("DataSet -> {}, type -> {}".format(dt.name, dt.type))
             vmap_dict = {}
             vmap_list = []
             if dt.type == "hdf5":
+                old_columns = dt.columns if isinstance(dt.columns, dict) else {}
                 for ii, kk in enumerate(dt.keys):
                     vname = "Var{}@{}".format(ii, dt.name)
                     vmap_dict[kk] = vname
                     vmap_list.append({
-                        "source_name":  r"{}".format(kk),
-                        "new_name":     vname
+                        "source":  _as_quoted_str(kk),
+                        "target":  vname
                     })
-                self.yaml.update_dataset(dt.name, {"columnmap": {"list": vmap_list}})
+                columns_payload = {}
+                if isinstance(old_columns, dict):
+                    for k, v in old_columns.items():
+                        if k in {"rename", "load_whitelist"}:
+                            continue
+                        columns_payload[k] = v
+                columns_payload["rename"] = vmap_list
+
+                if isinstance(old_columns, dict) and "load_whitelist" in old_columns:
+                    columns_payload["load_whitelist"] = _normalize_whitelist_as_quoted(
+                        old_columns.get("load_whitelist")
+                    )
+
+                self.yaml.update_dataset(dt.name, {"columns": columns_payload})
                 dt.rename_columns(vmap_dict)
                 print(dt.keys)
 
-        import yaml
         with open(self.args.out, 'w', encoding='utf-8') as f1:
-            yaml.dump(self.yaml.config, f1, sort_keys=False, default_flow_style=False, indent=2)
+            yaml.dump(
+                self.yaml.config,
+                f1,
+                Dumper=_QuotedDumper,
+                sort_keys=False,
+                default_flow_style=False,
+                indent=2,
+                allow_unicode=True,
+                width=100000,
+            )

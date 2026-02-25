@@ -1281,7 +1281,18 @@ class Figure:
                 changed = False 
 
             return changed
-        except: 
+        except Exception as e:
+            if self.logger:
+                try:
+                    import traceback
+                    self.logger.error(
+                        "Failed to configure figure '{}': {}".format(
+                            getattr(self, "name", "<noname>"), e
+                        )
+                    )
+                    self.logger.debug(traceback.format_exc())
+                except Exception:
+                    pass
             return False 
 
 
