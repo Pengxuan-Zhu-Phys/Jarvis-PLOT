@@ -136,23 +136,14 @@ def LogGauss(xx, mean, err):
     return prob
 
 
-def _extract_operas_full_name_map(func_locals, numeric_funcs):
-    """Build `namespace.function -> callable` map from Jarvis-Operas dicts."""
-    full_name_map = {}
-    for namespace, ns_obj in (func_locals or {}).items():
-        if not isinstance(namespace, str):
-            continue
-        attrs = getattr(ns_obj, "__dict__", None)
-        if not isinstance(attrs, dict):
-            continue
-        for short_name, symbol_fn in attrs.items():
-            if not isinstance(short_name, str):
-                continue
-            symbolic_name = str(symbol_fn)
-            fn = numeric_funcs.get(symbolic_name)
-            if callable(fn):
-                full_name_map[f"{namespace}.{short_name}"] = fn
-    return full_name_map
+def _extract_operas_full_name_map():
+    """Build `namespace.function -> callable` map from Jarvis-Operas registry."""
+    try:
+        from jarvis_operas import build_register_dicts
+
+        return build_register_dicts()
+    except Exception:
+        return {}
 
 
 def _build_operas_eval_namespaces(full_name_map):
@@ -184,11 +175,15 @@ def update_funcs(funcs):
     # Keep both symbolic/numeric views for compatibility, and provide
     # namespace-style objects so plain `eval` can call `namespace.func(x)`.
     try:
-        from jarvis_operas import func_locals, numeric_funcs
+        from jarvis_operas import build_sympy_dicts
 
+        operas_full_name_map = _extract_operas_full_name_map()
+        func_locals, numeric_funcs = build_sympy_dicts(
+            operas_full_name_map,
+            include_all=True,
+        )
         funcs.update(numeric_funcs)
         funcs.update(func_locals)
-        operas_full_name_map = _extract_operas_full_name_map(func_locals, numeric_funcs)
         funcs.update(operas_full_name_map)
         funcs.update(_build_operas_eval_namespaces(operas_full_name_map))
     except Exception:
