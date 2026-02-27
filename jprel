@@ -1,8 +1,7 @@
-
 # JarvisPLOT release helper
 # Usage:
 #   jprel 1.0.2            # build + upload to PyPI using ~/.pypirc (repository = pypi)
-#   jprel 1.0.2 --tag      # also git tag + push tags
+#   jprel 1.0.2 --tag      # also create local git tag (no push)
 #   jprel 1.0.2 --dry      # build + twine check only, no upload
 #   jprel 1.0.2 -e         # refresh local editable install after release (clean old local records first)
 
@@ -75,7 +74,7 @@ jprel () {
     python3 -m twine upload -r pypi dist/*
   fi
 
-  # ---- git tag/push (optional) ----
+  # ---- git tag (optional, local only) ----
   if [[ ${do_tag} -eq 1 ]]; then
     echo "==> Git status:"
     git status --porcelain || true
@@ -87,10 +86,8 @@ jprel () {
       git commit -m "Release v${ver}" || true
     fi
 
-    echo "==> Tagging and pushing ..."
+    echo "==> Creating local git tag (push disabled by policy) ..."
     git tag -a "v${ver}" -m "JarvisPLOT v${ver}" || true
-    git push jplot main
-    git push jplot --tags
   fi
 
   echo "==> Done: v${ver}"
@@ -148,7 +145,6 @@ PY
   fi
 
 }
-
 
 
 
