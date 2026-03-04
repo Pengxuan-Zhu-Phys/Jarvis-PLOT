@@ -170,7 +170,11 @@ Figures:
     axc:
       label:
         xlabel: "$\\Gamma(\\tilde{\\chi}_2^0)~({\\rm GeV})$"
-      xscale: "log"
+      color:
+        scale: "log"
+        cmap: jarvis_rainbow2_r
+        vmin: 1.e-20
+        vmax: 1.e-12
   layers:
   - name: scatter 
     data: 
@@ -201,10 +205,6 @@ Figures:
     style:
       marker: .
       s: 2
-      cmap: jarvis_rainbow2_r
-      vmin: 1.e-20
-      vmax: 1.e-12
-      norm: "log"
       zorder: 2
   - name: scatter_exc1 
     data: 
@@ -320,6 +320,10 @@ Figures:
     axc:
       label:
         xlabel: "$\\tan{\\beta}$"
+      color:
+        cmap: jarvis_rainbow2_r
+        vmin: 1
+        vmax: 50
   layers:
   - name: scatter 
     data: 
@@ -349,9 +353,6 @@ Figures:
     style:
       marker: .
       s: 2
-      cmap: jarvis_rainbow2_r
-      vmin: 1
-      vmax: 50
       zorder: 2
   - name: line
     axes: ax 
@@ -405,6 +406,10 @@ Figures:
     axc:
       label:
         xlabel: "$M_2 / M_1$"
+      color:
+        cmap: jarvis_rainbow2
+        vmin: -3
+        vmax: -2.5
   layers:
   - name: scatter 
     data: 
@@ -420,9 +425,6 @@ Figures:
     style:
       marker: .
       s: 0.3
-      cmap: jarvis_rainbow2
-      vmin: -3
-      vmax: -2.5
       zorder: 1
 
 - name: s_muTB_ratiot
@@ -454,6 +456,10 @@ Figures:
     axc:
       label:
         xlabel: "$M_2 / M_1$"
+      color:
+        cmap: jarvis_rainbow2
+        vmin: -3
+        vmax: -2.5
   layers:
   - name: scatter 
     data: 
@@ -477,9 +483,6 @@ Figures:
     style:
       marker: .
       s: 0.8
-      cmap: jarvis_rainbow2
-      vmin: -3
-      vmax: -2.5
       zorder: 1
 
 - name: muTB_ratiot
@@ -552,6 +555,10 @@ Figures:
     axc:
       label:
         xlabel: "$M_2 / M_1$"
+      color:
+        cmap: jarvis_rainbow2
+        vmin: -3
+        vmax: -2.5
   layers:
   - name: scatter 
     data: 
@@ -573,9 +580,6 @@ Figures:
       y: {expr: TanBeta}
       z: {expr: ratio}
     style:
-      cmap: jarvis_rainbow2
-      vmin: -3
-      vmax: -2.5
       zorder: 0.1
   - name: inFASER2 
     data: 
@@ -748,6 +752,11 @@ Figures:
       label:
         xlabel: $c\tau\left( \tilde{\chi}_2^0 \right)~(\rm cm)$
       # xscale: "log"
+      color:
+        scale: log
+        cmap: jarvis_rainbow2_r
+        vmin: 1.e-6
+        vmax: 1.e+4
   layers:
   - name: outFASER2 
     data: 
@@ -760,10 +769,6 @@ Figures:
       z:      {expr: "1.0 / WN2 * 0.179e-15 * 100"}
       where:  {expr: "FASER2(np.log(WN2)) < np.abs(mN2)"}
     style:
-      cmap: jarvis_rainbow2_r
-      vmin: 1.e-6
-      vmax: 1.e+4
-      norm: "log"
       zorder: 1
   - name: inFASER2 
     data: 

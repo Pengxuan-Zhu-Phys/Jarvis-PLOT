@@ -2056,6 +2056,10 @@ Figures:
     axc: 
       label:
         ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: gambit_cmap
+        vmin: -3.09
+        vmax: 3.09
   layers:
   - name: scatter 
     data: 
@@ -2074,9 +2078,6 @@ Figures:
       c: {expr: LogLike_total}
     style:
       marker: '.'
-      cmap: gambit_cmap
-      vmin: -3.09
-      vmax: 3.09
   - name: scatter_exc
     data: 
     - source: h5
@@ -2122,6 +2123,10 @@ Figures:
     axc: 
       label:
         ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
   layers:
   - name: prof 
     data: 
@@ -2147,10 +2152,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: LogLike_total}
-    style:
-      cmap: chrisB
-      vmin: -3.09
-      vmax: 3.09
+    style: {}
   - name: lines 
     axes: ax 
     method: plot 
@@ -2190,6 +2192,10 @@ Figures:
     axc:
       label:
         ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
   layers:
   - name: prof
     data:
@@ -2215,10 +2221,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: LogLike_total}
-    style:
-      cmap: chrisB
-      vmin: -3.09
-      vmax: 3.09
+    style: {}
   - name: lines 
     axes: ax 
     method: plot 
@@ -2258,6 +2261,10 @@ Figures:
     axc:
       label:
         ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
   layers:
   - name: prof
     data:
@@ -2283,10 +2290,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: LogLike_total}
-    style:
-      cmap: chrisB
-      vmin: -3.09
-      vmax: 3.09
+    style: {}
   - name: lines 
     axes: ax 
     method: plot 
@@ -2328,6 +2332,10 @@ Figures:
       label:
         ylabel: $\ln{\mathcal{L}}$
         fontsize: 13
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
   layers:
   - name: prof
     data:
@@ -2352,12 +2360,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: LogLike_total}
-    style:
-      cmap: chrisB
-      vmin: -3.09
-      vmax: 3.09
-
-# Profile Likelihood mN1-mN2
+    style: {}
 - name: mN2mN1_ProfLogL
   enable: false
   style:
@@ -2393,6 +2396,10 @@ Figures:
     axc:
       label:
         ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
   layers:
   - name: prof
     data:
@@ -2417,10 +2424,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: LogLike_total}
-    style:
-      cmap: chrisB
-      vmin: -3.09
-      vmax: 3.09
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -2459,7 +2463,11 @@ Figures:
     axc:
       label:
         ylabel: Total production $\sigma~({\rm fb})$
-      yscale: log
+      color:
+        scale: log
+        cmap: viridis
+        vmin: 1
+        vmax: 100000
   layers:
   - name: prof
     data:
@@ -2470,11 +2478,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: np.abs(XSectinFB)}
-    style:
-      cmap: viridis
-      norm: LogNorm
-      vmin: 1
-      vmax: 100000
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -2513,6 +2517,10 @@ Figures:
     axc:
       label:
         ylabel: ${\rm BR}(\tilde{\chi}_1^\pm \to W^\pm \tilde{G})$
+      color:
+        cmap: viridis
+        vmin: 0
+        vmax: 1
   layers:
   - name: prof
     data:
@@ -2523,10 +2531,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: np.abs(BRC12WG)}
-    style:
-      cmap: viridis
-      vmin: 0
-      vmax: 1
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -2565,6 +2570,10 @@ Figures:
     axc:
       label:
         ylabel: ${\rm BR}(\tilde{\chi}_1^0 \to \gamma \tilde{G})$
+      color:
+        cmap: viridis
+        vmin: 0
+        vmax: 1
   layers:
   - name: prof
     data:
@@ -2575,10 +2584,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: np.abs(BRN12aG)}
-    style:
-      cmap: viridis
-      vmin: 0
-      vmax: 1
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -2617,6 +2623,10 @@ Figures:
     axc:
       label:
         ylabel: ${\rm BR}(\tilde{\chi}_1^0 \to Z \tilde{G})$
+      color:
+        cmap: viridis
+        vmin: 0
+        vmax: 1
   layers:
   - name: prof
     data:
@@ -2627,10 +2637,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: np.abs(BRN12ZG)}
-    style:
-      cmap: viridis
-      vmin: 0
-      vmax: 1
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -2669,6 +2676,10 @@ Figures:
     axc:
       label:
         ylabel: ${\rm BR}(\tilde{\chi}_1^0 \to h \tilde{G})$
+      color:
+        cmap: viridis
+        vmin: 0
+        vmax: 1
   layers:
   - name: prof
     data:
@@ -2679,10 +2690,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: np.abs(BRN12HG)}
-    style:
-      cmap: viridis
-      vmin: 0
-      vmax: 1
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -2721,6 +2729,10 @@ Figures:
     axc:
       label:
         ylabel: $|N_{11}|^2$
+      color:
+        cmap: viridis
+        vmin: 0
+        vmax: 1
   layers:
   - name: prof
     data:
@@ -2731,10 +2743,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: np.abs(N11)**2}
-    style:
-      cmap: viridis
-      vmin: 0
-      vmax: 1
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -2773,6 +2782,10 @@ Figures:
     axc:
       label:
         ylabel: $|N_{12}|^2$
+      color:
+        cmap: viridis
+        vmin: 0
+        vmax: 1
   layers:
   - name: prof
     data:
@@ -2783,10 +2796,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: np.abs(N12)**2}
-    style:
-      cmap: viridis
-      vmin: 0
-      vmax: 1
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -2825,6 +2835,10 @@ Figures:
     axc:
       label:
         ylabel: $|N_{13}|^2 + |N_{14}|^2$
+      color:
+        cmap: viridis
+        vmin: 0
+        vmax: 1
   layers:
   - name: prof
     data:
@@ -2835,10 +2849,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: np.abs(N13)**2 + np.abs(N14)**2}
-    style:
-      cmap: viridis
-      vmin: 0
-      vmax: 1
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -2895,6 +2906,10 @@ Figures:
     axc:
       label:
         ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
   layers:
   - name: prof
     data:
@@ -2920,10 +2935,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: LogLike_total}
-    style:
-      cmap: chrisB
-      vmin: -3.09
-      vmax: 3.09
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -2979,6 +2991,10 @@ Figures:
     axc:
       label:
         ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
   layers:
   - name: prof
     data:
@@ -3004,10 +3020,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: LogLike_total}
-    style:
-      cmap: chrisB
-      vmin: -3.09
-      vmax: 3.09
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -3063,6 +3076,10 @@ Figures:
     axc:
       label:
         ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
   layers:
   - name: prof
     data:
@@ -3088,10 +3105,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: LogLike_total}
-    style:
-      cmap: chrisB
-      vmin: -3.09
-      vmax: 3.09
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -3138,6 +3152,10 @@ Figures:
     axc:
       label:
         ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
   layers:
   - name: prof
     data:
@@ -3162,10 +3180,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: LogLike_total}
-    style:
-      cmap: chrisB
-      vmin: -3.09
-      vmax: 3.09
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -3204,7 +3219,11 @@ Figures:
     axc:
       label:
         ylabel: Total production $\sigma~({\rm fb})$
-      yscale: log
+      color:
+        scale: log
+        cmap: viridis
+        vmin: 1
+        vmax: 100000
   layers:
   - name: prof
     data:
@@ -3215,11 +3234,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: np.abs(XSectinFB)}
-    style:
-      cmap: viridis
-      norm: LogNorm
-      vmin: 1
-      vmax: 100000
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -3258,6 +3273,10 @@ Figures:
     axc:
       label:
         ylabel: $|N_{11}|^2$
+      color:
+        cmap: viridis
+        vmin: 0
+        vmax: 1
   layers:
   - name: prof
     data:
@@ -3268,10 +3287,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: np.abs(N11)**2}
-    style:
-      cmap: viridis
-      vmin: 0
-      vmax: 1
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -3310,6 +3326,10 @@ Figures:
     axc:
       label:
         ylabel: $|N_{12}|^2$
+      color:
+        cmap: viridis
+        vmin: 0
+        vmax: 1
   layers:
   - name: prof
     data:
@@ -3320,10 +3340,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: np.abs(N12)**2}
-    style:
-      cmap: viridis
-      vmin: 0
-      vmax: 1
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -3362,6 +3379,10 @@ Figures:
     axc:
       label:
         ylabel: $|N_{13}|^2 + |N_{14}|^2$
+      color:
+        cmap: viridis
+        vmin: 0
+        vmax: 1
   layers:
   - name: prof
     data:
@@ -3372,10 +3393,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: np.abs(N13)**2 + np.abs(N14)**2}
-    style:
-      cmap: viridis
-      vmin: 0
-      vmax: 1
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -3416,6 +3434,10 @@ Figures:
     axc:
       label:
         ylabel: ${\rm BR}(\tilde{\chi}_1^\pm \to W^\pm \tilde{G})$
+      color:
+        cmap: viridis
+        vmin: 0
+        vmax: 1
   layers:
   - name: prof
     data:
@@ -3426,10 +3448,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: np.abs(BRC12WG)}
-    style:
-      cmap: viridis
-      vmin: 0
-      vmax: 1
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -3468,6 +3487,10 @@ Figures:
     axc:
       label:
         ylabel: ${\rm BR}(\tilde{\chi}_1^0 \to \gamma \tilde{G})$
+      color:
+        cmap: viridis
+        vmin: 0
+        vmax: 1
   layers:
   - name: prof
     data:
@@ -3478,10 +3501,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: np.abs(BRN12aG)}
-    style:
-      cmap: viridis
-      vmin: 0
-      vmax: 1
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -3520,6 +3540,10 @@ Figures:
     axc:
       label:
         ylabel: ${\rm BR}(\tilde{\chi}_1^0 \to Z \tilde{G})$
+      color:
+        cmap: viridis
+        vmin: 0
+        vmax: 1
   layers:
   - name: prof
     data:
@@ -3530,10 +3554,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: np.abs(BRN12ZG)}
-    style:
-      cmap: viridis
-      vmin: 0
-      vmax: 1
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -3572,6 +3593,10 @@ Figures:
     axc:
       label:
         ylabel: ${\rm BR}(\tilde{\chi}_1^0 \to h \tilde{G})$
+      color:
+        cmap: viridis
+        vmin: 0
+        vmax: 1
   layers:
   - name: prof
     data:
@@ -3582,10 +3607,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: np.abs(BRN12HG)}
-    style:
-      cmap: viridis
-      vmin: 0
-      vmax: 1
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -3643,6 +3665,10 @@ Figures:
     axc:
       label:
         ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
   layers:
   - name: prof
     data:
@@ -3668,10 +3694,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: LogLike_total}
-    style:
-      cmap: chrisB
-      vmin: -3.09
-      vmax: 3.09
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -3727,6 +3750,10 @@ Figures:
     axc:
       label:
         ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
   layers:
   - name: prof
     data:
@@ -3752,10 +3779,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: LogLike_total}
-    style:
-      cmap: chrisB
-      vmin: -3.09
-      vmax: 3.09
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -3811,6 +3835,10 @@ Figures:
     axc:
       label:
         ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
   layers:
   - name: prof
     data:
@@ -3836,10 +3864,7 @@ Figures:
       x: { expr: xx }
       y: { expr: yy }
       z: { expr: LogLike_total}
-    style:
-      cmap: chrisB
-      vmin: -3.09
-      vmax: 3.09
+    style: {}
   - name: fillbounds
     axes: ax 
     method: fill 
@@ -3868,6 +3893,10 @@ Figures:
     axc:
       label:
         ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: seismic_r
+        vmin: -3.09
+        vmax: 3.09
   legend:
     loc: 1
   layers:
@@ -3896,9 +3925,6 @@ Figures:
         expr: LogLike_total 
     style:
       s: 1.0
-      cmap: seismic_r
-      vmin: -3.09
-      vmax: 3.09
 
 # Profile Likelihood Ternary Plot N1-component
 - name: N1_comps_prof
@@ -3915,6 +3941,10 @@ Figures:
     axc:
       label:
         ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
   legend:
     loc: 1
   layers:
@@ -3949,12 +3979,7 @@ Figures:
         expr: yy
       z:
         expr: LogLike_total
-    style:
-      cmap: chrisB
-      vmin: -3.09
-      vmax: 3.09
-
-# Profile Likelihood Ternary Plot N2-component
+    style: {}
 - name: N2_comps_prof
   enable: false
   style:
@@ -3969,6 +3994,10 @@ Figures:
     axc:
       label:
         ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
   legend:
     loc: 1
   layers:
@@ -4003,12 +4032,7 @@ Figures:
         expr: yy
       z:
         expr: LogLike_total
-    style:
-      cmap: chrisB
-      vmin: -3.09
-      vmax: 3.09
-
-# Profile Likelihood Ternary Plot N3-component
+    style: {}
 - name: N3_comps_prof
   enable: false
   style:
@@ -4023,6 +4047,10 @@ Figures:
     axc:
       label:
         ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
   legend:
     loc: 1
   layers:
@@ -4057,12 +4085,7 @@ Figures:
         expr: yy
       z:
         expr: LogLike_total
-    style:
-      cmap: chrisB
-      vmin: -3.09
-      vmax: 3.09
-
-# Profile Likelihood Ternary Plot N4-component
+    style: {}
 - name: N4_comps_prof
   enable: false
   style:
@@ -4077,6 +4100,10 @@ Figures:
     axc:
       label:
         ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
   legend:
     loc: 1
   layers:
@@ -4111,27 +4138,7 @@ Figures:
         expr: yy
       z:
         expr: LogLike_total
-    style:
-      cmap: chrisB
-      vmin: -3.09
-      vmax: 3.09
-
-
-#  - name: scatter_exc1
-#    data:
-#    - source: tri_profile
-#    axes: ax
-#    method: scatter
-#    coordinates:
-#      x: {expr: xx}
-#      y: {expr: yy}
-#    style:
-#      s: 0.1
-#      alpha: 0.2
-#      marker: '.'
-#      c: "#FF42A1"
-
-
+    style: {}
 output:
   dir: ./Workshop/SUSYRun2_GEWMSSM
   dpi: 600

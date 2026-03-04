@@ -538,7 +538,7 @@ DataSet:
       target: Var264@h5
     - source: "data/#MSSM11atQ_mA_parameters @MSSM11atQ_mA::primary_parameters::mq2"
       target: Var265@h5
-    - source: "data/#MSSM11atQ_mA_parameters @MSSM11atQ_mA::primary_parameters::mu"
+    - source: "pMu"
       target: Var266@h5
     - source: "data/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::A0 Pole_Mass"
       target: Var267@h5
@@ -1368,7 +1368,7 @@ DataSet:
       target: Var679@h5
     - source: "data/#TotalCrossSectionAsMap @ColliderBit::getTotalCrossSectionAsMap::LHC_13TeV__xsec_err_fb"
       target: Var680@h5
-    - source: "data/#TotalCrossSectionAsMap @ColliderBit::getTotalCrossSectionAsMap::LHC_13TeV__xsec_fb"
+    - source: "XSectinFB"
       target: Var681@h5
     - source: "data/#TotalCrossSectionAsMap @ColliderBit::getTotalCrossSectionAsMap::LHC_13TeV__xsec_relerr"
       target: Var682@h5
@@ -1401,7 +1401,7 @@ DataSet:
     - source: "data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_2->W++~chi-_2"
       target: Var696@h5
     - source: "data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_2->Z0+~chi0_1"
-      target: Var697@h5
+      target: BRN22ZN1
     - source: "data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_2->h0_1+~chi0_1"
       target: Var698@h5
     - source: "data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_3->W++~chi-_1"
@@ -1409,7 +1409,7 @@ DataSet:
     - source: "data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_3->W++~chi-_2"
       target: Var700@h5
     - source: "data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_3->Z0+~chi0_1"
-      target: Var701@h5
+      target: BRN32ZN1
     - source: "data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_3->Z0+~chi0_2"
       target: Var702@h5
     - source: "data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_3->h0_1+~chi0_1"
@@ -1628,6 +1628,7 @@ DataSet:
       target: Var809@h5
     - source: "LogLike_total"
       target: Var810@h5
+    load_whitelist: "only_in_list"
   transform:
   - add_column:
       name: LogLike_total
@@ -1687,6 +1688,10 @@ Figures:
     axc:
       label:
         ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
   layers:
   - name: scatter
     data:
@@ -1703,9 +1708,299 @@ Figures:
         expr: LogLike_total
     style:
       marker: .
-      cmap: chrisB
-      vmin: -3.09
-      vmax: 3.09
+  - name: fillbounds
+    axes: ax
+    method: fill
+    coordinates:
+      x:
+      - 0.0
+      - 1.4
+      - 0.0
+      - 0.0
+      y:
+      - 0.0
+      - 1.4
+      - 1.4
+      - 0.0
+    style:
+      facecolor: '#808080'
+      edgecolor: none
+      zorder: 1.2
+- name: mN2mN1_BinoN1_HinoN2_pure_ProfLogL
+  enable: true
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: $m_{\tilde{\chi}_2^0}~({\rm TeV})$
+        y: $m_{\tilde{\chi}_1^0}~({\rm TeV})$
+      xlim:
+      - 0
+      - 1.4
+      ylim:
+      - 0
+      - 1.4
+      text:
+      - x: 0.75
+        y: 1.0018
+        s: EWMSSM.
+        ha: right
+        va: bottom
+        fontfamily: STIXGeneral
+        fontsize: x-small
+        transform: true
+      - x: 0.05
+        y: 0.85
+        s: All searches and measurement
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+      - x: 0.05
+        y: 0.75
+        s: Higgsino-dominated $\tilde{\chi}_2^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+      - x: 0.05
+        y: 0.65
+        s: Bino-dominated $\tilde{\chi}_1^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+    axc:
+      label:
+        ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
+  layers:
+  - name: prof
+    data:
+    - source: h5
+      transform:
+      - filter: (np.abs(N11)**2 > np.abs(N12)**2) & (np.abs(N11)**2 > np.abs(N13)**2 + np.abs(N14)**2)
+      - filter: (np.abs(N23)**2 + np.abs(N24)**2 > 0.9)
+      - profile:
+          bin: 150
+          coordinates:
+            x:
+              expr: abs(mN2)/1000
+              scale: linear
+              name: xx
+              lim:
+              - 0
+              - 1.4
+            y:
+              expr: abs(mN1)/1000
+              scale: linear
+              name: yy
+              lim:
+              - 0
+              - 1.4
+            z:
+              expr: np.exp(LogLike_total)
+              scale: linear
+              name: z0
+          objective: max
+          grid_points: rect
+    share_data: mN2mN1_BinoN1_HinoN2_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: LogLike_total
+    style: {}
+  - name: fillbounds
+    axes: ax
+    method: fill
+    coordinates:
+      x:
+      - 0.0
+      - 1.4
+      - 0.0
+      - 0.0
+      y:
+      - 0.0
+      - 1.4
+      - 1.4
+      - 0.0
+    style:
+      facecolor: '#808080'
+      edgecolor: none
+      zorder: 1.2
+- name: mN2mN1_BinoN1_HinoN2_XSect
+  enable: true
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: $m_{\tilde{\chi}_2^0}~({\rm TeV})$
+        y: $m_{\tilde{\chi}_1^0}~({\rm TeV})$
+      xlim:
+      - 0
+      - 1.4
+      ylim:
+      - 0
+      - 1.4
+      text:
+      - x: 0.75
+        y: 1.0018
+        s: EWMSSM.
+        ha: right
+        va: bottom
+        fontfamily: STIXGeneral
+        fontsize: x-small
+        transform: true
+      - x: 0.05
+        y: 0.85
+        s: All searches and measurement
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+      - x: 0.05
+        y: 0.75
+        s: Higgsino-dominated $\tilde{\chi}_2^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+      - x: 0.05
+        y: 0.65
+        s: Bino-dominated $\tilde{\chi}_1^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+    axc:
+      label:
+        ylabel: Total production $\sigma~({\rm fb})$
+      color:
+        scale: log
+        cmap: viridis
+        vmin: 1
+        vmax: 1.e3
+  layers:
+  - name: prof
+    data:
+    - source: mN2mN1_BinoN1_HinoN2_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: np.abs(XSectinFB)
+    style: {}
+  - name: fillbounds
+    axes: ax
+    method: fill
+    coordinates:
+      x:
+      - 0.0
+      - 1.4
+      - 0.0
+      - 0.0
+      y:
+      - 0.0
+      - 1.4
+      - 1.4
+      - 0.0
+    style:
+      facecolor: '#808080'
+      edgecolor: none
+      zorder: 1.2
+
+- name: mN2mN1_BinoN1_HinoN2_M2
+  enable: true
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: $m_{\tilde{\chi}_2^0}~({\rm TeV})$
+        y: $m_{\tilde{\chi}_1^0}~({\rm TeV})$
+      xlim:
+      - 0
+      - 1.4
+      ylim:
+      - 0
+      - 1.4
+      text:
+      - x: 0.75
+        y: 1.0018
+        s: EWMSSM.
+        ha: right
+        va: bottom
+        fontfamily: STIXGeneral
+        fontsize: x-small
+        transform: true
+      - x: 0.05
+        y: 0.85
+        s: All searches and measurement
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+      - x: 0.05
+        y: 0.75
+        s: Higgsino-dominated $\tilde{\chi}_2^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+      - x: 0.05
+        y: 0.65
+        s: Bino-dominated $\tilde{\chi}_1^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+    axc:
+      label:
+        ylabel: 'BR$(\tilde{\chi}_2^0 \to Z + \tilde{\chi}_2^0)$'
+      color:
+        cmap: tab20c
+        vmin: 0
+        vmax: 1.5
+  layers:
+  - name: prof
+    data:
+    - source: mN2mN1_BinoN1_HinoN2_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: BRN32ZN1 + BRN22ZN1
+    style: {}
   - name: fillbounds
     axes: ax
     method: fill

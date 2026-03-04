@@ -236,6 +236,10 @@ Figures:
     axc:
       label:
         ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
   layers:
   - name: scatter #prof
     data:
@@ -290,9 +294,6 @@ Figures:
         expr: LogLike_total
     style:
       marker: .
-      cmap: chrisB
-      vmin: -3.09
-      vmax: 3.09
   - name: fillbounds
     axes: ax
     method: fill

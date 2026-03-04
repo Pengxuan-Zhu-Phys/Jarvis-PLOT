@@ -33,6 +33,10 @@ Figures:
     axc:
       label:
         ylabel: $-2 \ln{\mathcal{L}}$
+      color:
+        cmap: jarvis_rainbow2_r
+        vmin: 0
+        vmax: 1
   layers:
   - name: prof
     data:
@@ -71,11 +75,7 @@ Figures:
         expr: yy
       z:
         expr: np.exp(-2.0 * (X2tot - np.min(X2tot)))
-    style:
-      cmap: jarvis_rainbow2_r
-      vmin: 0
-      vmax: 1
-
+    style: {}
 - name: pL3L5_ProfLogL
   enable: true
   style:
@@ -91,6 +91,10 @@ Figures:
     axc:
       label:
         ylabel: $-2 \ln{\mathcal{L}}$
+      color:
+        cmap: jarvis_rainbow2_r
+        vmin: 0
+        vmax: 1
   layers:
   - name: prof
     data:
@@ -125,11 +129,7 @@ Figures:
         expr: yy
       z:
         expr: np.exp(-2.0 * (X2tot - np.min(X2tot)))
-    style:
-      cmap: jarvis_rainbow2_r
-      vmin: 0
-      vmax: 1
-
+    style: {}
 - name: pAlphaMHin_ProfLogL
   enable: true
   style:
@@ -145,6 +145,10 @@ Figures:
     axc:
       label:
         ylabel: profile likelihood ratio $\mathcal{L}/ \mathcal{L}_{\rm max}$
+      color:
+        cmap: jarvis_rainbow2_r
+        vmin: 0
+        vmax: 1
   layers:
   - name: prof
     data:
@@ -178,11 +182,7 @@ Figures:
         expr: xx
       z:
         expr: np.exp(-2.0 * (X2tot - np.min(X2tot)))
-    style:
-      cmap: jarvis_rainbow2_r
-      vmin: 0
-      vmax: 1
-
+    style: {}
 - name: pSinTHMhin_ProfLogL
   enable: true
   style:
@@ -198,6 +198,10 @@ Figures:
     axc:
       label:
         ylabel: profile likelihood ratio $\mathcal{L}/ \mathcal{L}_{\rm max}$
+      color:
+        cmap: jarvis_rainbow2_r
+        vmin: 0
+        vmax: 1
   layers:
   - name: prof
     data:
@@ -232,11 +236,7 @@ Figures:
         expr: yy
       z:
         expr: np.exp(-2.0 * (X2tot - np.min(X2tot)))
-    style:
-      cmap: jarvis_rainbow2_r
-      vmin: 0
-      vmax: 1
-
+    style: {}
 - name: pmHmh_ProfLogL
   enable: true
   style:
@@ -252,6 +252,10 @@ Figures:
     axc:
       label:
         ylabel: profile likelihood ratio $\mathcal{L}/ \mathcal{L}_{\rm max}$
+      color:
+        cmap: jarvis_rainbow2_r
+        vmin: 0.0
+        vmax: 1.0
   layers:
   - name: prof
     data:
@@ -292,11 +296,7 @@ Figures:
         expr: yy
       z:
         expr: np.exp(-0.5 * (X2tot - np.min(X2tot)))
-    style:
-      cmap: jarvis_rainbow2_r
-      vmin: 0.0
-      vmax: 1.0
-
+    style: {}
 - name: mH5mh3_ProfLogL
   enable: true
   style:
@@ -312,6 +312,10 @@ Figures:
     axc:
       label:
         ylabel: profile likelihood ratio $\mathcal{L}/ \mathcal{L}_{\rm max}$
+      color:
+        cmap: jarvis_rainbow2_r
+        vmin: 0.0
+        vmax: 1.0
   layers:
   - name: prof
     data:
@@ -347,11 +351,7 @@ Figures:
         expr: yy
       z:
         expr: np.exp(-0.5 * (X2tot - np.min(X2tot)))
-    style:
-      cmap: jarvis_rainbow2_r
-      vmin: 0.0
-      vmax: 1.0
-
+    style: {}
 - name: Excess_ProfLogL
   enable: true
   style:
@@ -367,6 +367,10 @@ Figures:
     axc:
       label:
         ylabel: profile likelihood ratio $\mathcal{L}/ \mathcal{L}_{\rm max}$
+      color:
+        cmap: jarvis_rainbow2_r
+        vmin: 0.0
+        vmax: 1.0
   layers:
   - name: prof
     data:
@@ -406,11 +410,7 @@ Figures:
         expr: yy
       z:
         expr: np.exp(-0.5 * (X2tot - np.min(X2tot)))
-    style:
-      cmap: jarvis_rainbow2_r
-      vmin: 0.0
-      vmax: 1.0
-
+    style: {}
 - name: Kappa_ProfLogL
   enable: true
   style:
@@ -426,6 +426,10 @@ Figures:
     axc:
       label:
         ylabel: profile likelihood ratio $\mathcal{L}/ \mathcal{L}_{\rm max}$
+      color:
+        cmap: jarvis_rainbow2_r
+        vmin: 0.0
+        vmax: 1.0
   layers:
   - name: prof
     data:
@@ -462,11 +466,7 @@ Figures:
         expr: yy
       z:
         expr: np.exp(-0.5 * (X2tot - np.min(X2tot)))
-    style:
-      cmap: jarvis_rainbow2_r
-      vmin: 0.0
-      vmax: 1.0
-
+    style: {}
 - name: mHmh_ProfLogL
   enable: true
   style:
@@ -482,6 +482,10 @@ Figures:
     axc:
       label:
         ylabel: profile likelihood ratio $\mathcal{L}/ \mathcal{L}_{\rm max}$
+      color:
+        cmap: jarvis_rainbow2_r
+        vmin: 0.0
+        vmax: 1.0
   layers:
   - name: prof
     data:
@@ -522,11 +526,7 @@ Figures:
         expr: yy
       z:
         expr: np.exp(-0.5 * (X2tot - np.min(X2tot)))
-    style:
-      cmap: jarvis_rainbow2_r
-      vmin: 0.0
-      vmax: 1.0
-
+    style: {}
 - name: BRB0BRBXGamma_ProfLogL
   enable: true
   style:
@@ -542,6 +542,10 @@ Figures:
     axc:
       label:
         ylabel: profile likelihood ratio $\mathcal{L}/ \mathcal{L}_{\rm max}$
+      color:
+        cmap: jarvis_rainbow2_r
+        vmin: 0.0
+        vmax: 1.0
   layers:
   - name: prof
     data:
@@ -578,11 +582,7 @@ Figures:
         expr: yy
       z:
         expr: np.exp(-0.5 * (X2tot - np.min(X2tot)))
-    style:
-      cmap: jarvis_rainbow2_r
-      vmin: 0.0
-      vmax: 1.0
-
+    style: {}
 - name: ST_ProfLogL
   enable: true
   style:
@@ -598,6 +598,10 @@ Figures:
     axc:
       label:
         ylabel: profile likelihood ratio $\mathcal{L}/ \mathcal{L}_{\rm max}$
+      color:
+        cmap: jarvis_rainbow2_r
+        vmin: 0.0
+        vmax: 1.0
   layers:
   - name: prof
     data:
@@ -633,11 +637,7 @@ Figures:
         expr: yy
       z:
         expr: np.exp(-0.5 * (X2tot - np.min(X2tot)))
-    style:
-      cmap: jarvis_rainbow2_r
-      vmin: 0.0
-      vmax: 1.0
-
+    style: {}
 - name: mH5sinHxBR_ProfLogL
   enable: true
   style:
@@ -665,6 +665,10 @@ Figures:
     axc:
       label:
         ylabel: profile likelihood ratio $\mathcal{L}/ \mathcal{L}_{\rm max}$
+      color:
+        cmap: jarvis_rainbow2_r
+        vmin: 0.0
+        vmax: 1.0
   layers:
   - name: prof
     data:
@@ -702,10 +706,7 @@ Figures:
         expr: yy
       z:
         expr: np.exp(-0.5 * (X2tot - np.min(X2tot)))
-    style:
-      cmap: jarvis_rainbow2_r
-      vmin: 0.0
-      vmax: 1.0
+    style: {}
   - name: line2 
     axes: ax 
     data:

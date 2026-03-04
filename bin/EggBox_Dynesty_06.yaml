@@ -36,6 +36,11 @@ Figures:
     axc:
       label:
         ylabel: $\log{\mathcal{L}}$
+      color:
+        scale: linear
+        cmap: jarvis_rainbow2_r
+        vmin: -50
+        vmax: 0
   layers:
   - name: scatter
     data:
@@ -54,10 +59,6 @@ Figures:
     style:
       marker: .
       s: 2
-      cmap: jarvis_rainbow2_r
-      vmin: -50
-      vmax: 0
-      norm: linear
       zorder: 1
 
 - name: XY_profL
@@ -77,6 +78,10 @@ Figures:
     axc:
       label:
         xlabel: $\log{\mathcal{L}}$
+      color:
+        cmap: jarvis_rainbow2_r
+        vmin: -50
+        vmax: 0
   layers:
   - name: scatter
     data:
@@ -127,11 +132,7 @@ Figures:
       x: {expr: xx}
       y: {expr: yy}
       z: {expr: LogL}
-    style:
-      cmap: jarvis_rainbow2_r
-      vmin: -50
-      vmax: 0 
-
+    style: {}
 - name: XY_triprofL
   enable: false
   style:
@@ -149,6 +150,10 @@ Figures:
     axc:
       label:
         ylabel: $\log{\mathcal{L}}$
+      color:
+        cmap: jarvis_rainbow2_r
+        vmin: -50
+        vmax: 0
   layers:
   - name: scatter
     data:
@@ -199,9 +204,6 @@ Figures:
     style:
       # cmap: gambit_cmap
       shading: gouraud
-      cmap: jarvis_rainbow2_r
-      vmin: -50
-      vmax: 0 
 
 - name: XY_gridprofL
   enable: true
@@ -220,6 +222,10 @@ Figures:
     axc:
       label:
         xlabel: $\log{\mathcal{L}}$
+      color:
+        cmap: jarvis_rainbow2_r
+        vmin: -50
+        vmax: 0
   layers:
   - name: grid_points
     data:
@@ -266,9 +272,6 @@ Figures:
       y: {expr: yy}
       z: {expr: z0}
     style:
-      cmap: jarvis_rainbow2_r
-      vmin: -50
-      vmax: 0
       edgecolor: none
       linewidth: 0
 

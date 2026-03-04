@@ -171,6 +171,16 @@ DataSet:
       target: LogL_05
     - source: data/ATLAS_13TeV_4LEP_139invfb_pyhf_combined_LogLike
       target: LogL_16
+    - source: data/#TotalCrossSectionAsMap @ColliderBit::getTotalCrossSectionAsMap::LHC_13TeV__xsec_fb
+      target: XSectinFB
+    - source: data/#MSSM11atQ_mA_parameters @MSSM11atQ_mA::primary_parameters::mu
+      target: pMu
+    - source: "data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_2->Z0+~chi0_1"
+      target: BRN22ZN1
+    - source: "data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_3->Z0+~chi0_1"
+      target: BRN32ZN1
+    - source: "data/#branching_fractions_as_map @DecayBit::get_branching_fractions_as_map::~chi0_2->h0_1+~chi0_1"
+      target: BRN22HN1
   transform:
   - add_column:
       name: LogLike_total
@@ -237,6 +247,10 @@ Figures:
     axc:
       label:
         ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
   layers:
   - name: scatter   # Comment4Chirs: Just a name, No special could be anything. 
     data:           # Comment4Chirs: Loading Data (optional)
@@ -279,9 +293,6 @@ Figures:
         expr: LogLike_total
     style:                  # Comment4Chirs: Other args for beautying scatter, see https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.scatter.html#matplotlib.axes.Axes.scatter 
       marker: .
-      cmap: chrisB
-      vmin: -3.09
-      vmax: 3.09
   - name: fillbounds
     axes: ax
     method: fill
@@ -353,6 +364,10 @@ Figures:
     axc:
       label:
         ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
   layers:
   - name: prof
     data:
@@ -393,10 +408,7 @@ Figures:
         expr: yy
       z:
         expr: LogLike_total
-    style:
-      cmap: chrisB
-      vmin: -3.09
-      vmax: 3.09
+    style: {}
   - name: fillbounds
     axes: ax
     method: fill
@@ -468,7 +480,12 @@ Figures:
     axc:
       label:
         ylabel: Total production $\sigma~({\rm fb})$
-      yscale: log
+      # v1.2.6 single interface for color-axis control
+      color:
+        scale: log
+        cmap: viridis
+        vmin: 1
+        vmax: 1.e3
   layers:
   - name: prof
     data:
@@ -482,11 +499,418 @@ Figures:
         expr: yy
       z:
         expr: np.abs(XSectinFB)
+    style: {}
+  - name: fillbounds
+    axes: ax
+    method: fill
+    coordinates:
+      x:
+      - 0.0
+      - 1.4
+      - 0.0
+      - 0.0
+      y:
+      - 0.0
+      - 1.4
+      - 1.4
+      - 0.0
     style:
-      cmap: viridis
-      norm: LogNorm
-      vmin: 1
-      vmax: 1.e5
+      facecolor: '#808080'
+      edgecolor: none
+      zorder: 1.2
+
+- name: mN2mN1_BinoN1_HinoN2_M2
+  enable: true
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: $m_{\tilde{\chi}_2^0}~({\rm TeV})$
+        y: $m_{\tilde{\chi}_1^0}~({\rm TeV})$
+      xlim:
+      - 0
+      - 1.4
+      ylim:
+      - 0
+      - 1.4
+      text:
+      - x: 0.75
+        y: 1.0018
+        s: EWMSSM.
+        ha: right
+        va: bottom
+        fontfamily: STIXGeneral
+        fontsize: x-small
+        transform: true
+      - x: 0.05
+        y: 0.85
+        s: All searches and measurement
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+      - x: 0.05
+        y: 0.75
+        s: Higgsino-dominated $\tilde{\chi}_2^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+      - x: 0.05
+        y: 0.65
+        s: Bino-dominated $\tilde{\chi}_1^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral        
+        transform: true
+    axc:
+      label:
+        ylabel: Total production $\sigma~({\rm fb})$
+      # v1.2.6 single interface for color-axis control
+      color:
+        cmap: tab20c
+        vmin: 0
+        vmax: 1.5
+  layers:
+  - name: prof
+    data:
+    - source: mN2mN1_BinoN1_HinoN2_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: np.abs(pM2) / 1000
+    style: {}
+  - name: fillbounds
+    axes: ax
+    method: fill
+    coordinates:
+      x:
+      - 0.0
+      - 1.4
+      - 0.0
+      - 0.0
+      y:
+      - 0.0
+      - 1.4
+      - 1.4
+      - 0.0
+    style:
+      facecolor: '#808080'
+      edgecolor: none
+      zorder: 1.2
+
+- name: mN2mN1_BinoN1_HinoN2_BRN2N32ZN1
+  enable: true
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: $m_{\tilde{\chi}_2^0}~({\rm TeV})$
+        y: $m_{\tilde{\chi}_1^0}~({\rm TeV})$
+      xlim:
+      - 0
+      - 1.4
+      ylim:
+      - 0
+      - 1.4
+      text:
+      - x: 0.75
+        y: 1.0018
+        s: EWMSSM.
+        ha: right
+        va: bottom
+        fontfamily: STIXGeneral
+        fontsize: x-small
+        transform: true
+      - x: 0.05
+        y: 0.85
+        s: All searches and measurement
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+      - x: 0.05
+        y: 0.75
+        s: Higgsino-dominated $\tilde{\chi}_2^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+      - x: 0.05
+        y: 0.65
+        s: Bino-dominated $\tilde{\chi}_1^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+    axc:
+      label:
+        ylabel: 'BR$(\tilde{\chi}_2^0 \to Z + \tilde{\chi}_1^0)$ + BR$(\tilde{\chi}_3^0 \to Z + \tilde{\chi}_1^0)$'
+      color:
+        cmap: tab20c
+        vmin: 0
+        vmax: 1
+  layers:
+  - name: prof
+    data:
+    - source: mN2mN1_BinoN1_HinoN2_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: BRN32ZN1 + BRN22ZN1
+    style: {}
+  - name: fillbounds
+    axes: ax
+    method: fill
+    coordinates:
+      x:
+      - 0.0
+      - 1.4
+      - 0.0
+      - 0.0
+      y:
+      - 0.0
+      - 1.4
+      - 1.4
+      - 0.0
+    style:
+      facecolor: '#808080'
+      edgecolor: none
+      zorder: 1.2
+
+- name: mN2mN1_BinoN1_WinoN2_ProfLogL
+  enable: true
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: $m_{\tilde{\chi}_2^0}~({\rm TeV})$
+        y: $m_{\tilde{\chi}_1^0}~({\rm TeV})$
+      xlim:
+      - 0
+      - 1.4
+      ylim:
+      - 0
+      - 1.4
+      text:
+      - x: 0.75
+        y: 1.0018
+        s: EWMSSM.
+        ha: right
+        va: bottom
+        fontfamily: STIXGeneral
+        fontsize: x-small
+        transform: true
+      - x: 0.05
+        y: 0.85
+        s: All searches and measurement
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+      - x: 0.05
+        y: 0.75
+        s: Wino-dominated $\tilde{\chi}_2^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+      - x: 0.05
+        y: 0.65
+        s: Bino-dominated $\tilde{\chi}_1^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral        
+        transform: true
+    axc:
+      label:
+        ylabel: $\ln{\mathcal{L}}$
+      color:
+        cmap: chrisB
+        vmin: -3.09
+        vmax: 3.09
+  layers:
+  - name: prof
+    data:
+    - source: h5
+      transform:
+      - filter: (np.abs(N11)**2 > np.abs(N12)**2) & (np.abs(N11)**2 > np.abs(N13)**2 + np.abs(N14)**2) 
+      - filter: (np.abs(N22)**2 > np.abs(N21)**2) & (np.abs(N22)**2 > np.abs(N23)**2 + np.abs(N24)**2)
+      - profile:
+          bin: 150
+          coordinates:
+            x:
+              expr: abs(mN2)/1000
+              scale: linear
+              name: xx
+              lim:
+              - 0
+              - 1.4
+            y:
+              expr: abs(mN1)/1000
+              scale: linear
+              name: yy
+              lim:
+              - 0
+              - 1.4
+            z:
+              expr: np.exp(LogLike_total)
+              scale: linear
+              name: z0
+          objective: max
+          grid_points: rect
+    share_data: mN2mN1_BinoN1_WinoN2_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: LogLike_total
+    style: {}
+  - name: fillbounds
+    axes: ax
+    method: fill
+    coordinates:
+      x:
+      - 0.0
+      - 1.4
+      - 0.0
+      - 0.0
+      y:
+      - 0.0
+      - 1.4
+      - 1.4
+      - 0.0
+    style:
+      facecolor: '#808080'
+      edgecolor: none
+      zorder: 1.2
+
+- name: mN2mN1_BinoN1_WinoN2_BRN22ZN1
+  enable: true
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: $m_{\tilde{\chi}_2^0}~({\rm TeV})$
+        y: $m_{\tilde{\chi}_1^0}~({\rm TeV})$
+      xlim:
+      - 0
+      - 1.4
+      ylim:
+      - 0
+      - 1.4
+      text:
+      - x: 0.75
+        y: 1.0018
+        s: EWMSSM.
+        ha: right
+        va: bottom
+        fontfamily: STIXGeneral
+        fontsize: x-small
+        transform: true
+      - x: 0.05
+        y: 0.85
+        s: All searches and measurement
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+      - x: 0.05
+        y: 0.75
+        s: Wino-dominated $\tilde{\chi}_2^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+      - x: 0.05
+        y: 0.65
+        s: Bino-dominated $\tilde{\chi}_1^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral        
+        transform: true
+    axc:
+      label:
+        ylabel: 'BR$(\tilde{\chi}_2^0 \to h + \tilde{\chi}_1^0)$'
+      color:
+        cmap: viridis
+        vmin: 0
+        vmax: 1
+  layers:
+  - name: prof
+    data:
+    - source: h5
+      transform:
+      - filter: (np.abs(N11)**2 > np.abs(N12)**2) & (np.abs(N11)**2 > np.abs(N13)**2 + np.abs(N14)**2) 
+      - filter: (np.abs(N22)**2 > np.abs(N21)**2) & (np.abs(N22)**2 > np.abs(N23)**2 + np.abs(N24)**2)
+      - profile:
+          bin: 150
+          coordinates:
+            x:
+              expr: abs(mN2)/1000
+              scale: linear
+              name: xx
+              lim:
+              - 0
+              - 1.4
+            y:
+              expr: abs(mN1)/1000
+              scale: linear
+              name: yy
+              lim:
+              - 0
+              - 1.4
+            z:
+              expr: np.exp(LogLike_total)
+              scale: linear
+              name: z0
+          objective: max
+          grid_points: rect
+    share_data: mN2mN1_BinoN1_WinoN2_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: BRN22HN1
+    style: {}
   - name: fillbounds
     axes: ax
     method: fill

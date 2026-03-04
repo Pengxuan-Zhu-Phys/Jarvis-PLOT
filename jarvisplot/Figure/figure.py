@@ -135,6 +135,44 @@ class Figure:
         except Exception:
             return False
 
+    def _axc_is_horizontal(self) -> bool:
+        return str(self.frame.get("axc", {}).get("orientation", "")).lower() == "horizontal"
+
+    def _axc_color_config(self) -> dict:
+        """Return normalized frame.axc.color config with legacy fallbacks."""
+        out = {}
+        axc_cfg = self.frame.get("axc", {})
+        color_cfg = axc_cfg.get("color", {})
+        if not isinstance(color_cfg, dict):
+            color_cfg = {}
+
+        if "cmap" in color_cfg:
+            out["cmap"] = color_cfg.get("cmap")
+
+        # Preferred v1.2.6 interface
+        for key in ("vmin", "vmax"):
+            if key in color_cfg:
+                try:
+                    val = float(color_cfg.get(key))
+                    if np.isfinite(val):
+                        out[key] = val
+                except Exception:
+                    pass
+
+        scale = color_cfg.get("scale", None)
+        if scale is None:
+            # Backward compatibility with legacy axc.xscale/yscale.
+            if self._axc_is_horizontal():
+                scale = axc_cfg.get("xscale", axc_cfg.get("yscale", None))
+            else:
+                scale = axc_cfg.get("yscale", axc_cfg.get("xscale", None))
+        if isinstance(scale, str):
+            scale = scale.strip().lower()
+            if scale:
+                out["scale"] = scale
+
+        return out
+
     def _apply_axis_endpoints(self, ax_obj, axis_cfg: dict, which: str):
         """
         which: 'x' or 'y'
@@ -820,59 +858,46 @@ class Figure:
                 norm=self.axc._cb.get("norm")
             )
             mappable.set_array([])
-            if self.frame['axc'].get('orientation') != "horizontal":
+            ticks_cfg = self.frame.get('axc', {}).get('ticks', {})
+            if not isinstance(ticks_cfg, dict):
+                ticks_cfg = {}
+
+            if not self._axc_is_horizontal():
                 cbar = self.fig.colorbar(mappable, cax=self.axc)
                 cbar.minorticks_on()
-                self.axc.set_ylim(self.axc._cb['vmin'], self.axc._cb['vmax'])
+                if (self.axc._cb.get('vmin') is not None) and (self.axc._cb.get('vmax') is not None):
+                    self.axc.set_ylim(self.axc._cb['vmin'], self.axc._cb['vmax'])
 
                 if str(self.axc._cb.get('mode', 'auto')).lower() == 'log':
                     from matplotlib.ticker import LogLocator
-                    # Use default subs for log scale minor ticks
                     self.axc.yaxis.set_minor_locator(LogLocator(subs='auto'))
                 else:
                     from matplotlib.ticker import AutoMinorLocator
                     self.axc.yaxis.set_minor_locator(AutoMinorLocator())
 
-                self.axc.yaxis.set_ticks_position(self.frame['axc']['ticks']['ticks_position'])
-                self.axc.yaxis.set_label_position("right")
+                _tp = ticks_cfg.get('ticks_position', 'right')
+                self.axc.yaxis.set_ticks_position(_tp)
+                self.axc.yaxis.set_label_position('left' if _tp == 'left' else 'right')
 
-                # Apply tick params (major/minor) as provided in frame config
-                self.axc.tick_params(**self.frame['axc']['ticks'].get('both', {}))
-                self.axc.tick_params(**self.frame['axc']['ticks'].get('major', {}))
-                self.axc.tick_params(**self.frame['axc']['ticks'].get('minor', {}))
+                self.axc.tick_params(**ticks_cfg.get('both', {}))
+                self.axc.tick_params(**ticks_cfg.get('major', {}))
+                self.axc.tick_params(**ticks_cfg.get('minor', {}))
 
-                self.axc.yaxis.set_ticks_position(self.frame['axc']['ticks']['ticks_position'])
-                self.axc.yaxis.set_label_position("right")
-
-                # Apply tick params (major/minor) as provided in frame config
-                self.axc.tick_params(**self.frame['axc']['ticks'].get('both', {}))
-                self.axc.tick_params(**self.frame['axc']['ticks'].get('major', {}))
-                self.axc.tick_params(**self.frame['axc']['ticks'].get('minor', {}))
-                self.axc.set_ylabel(**self.frame['axc'].get('label', {}))
-                if self.frame['axc'].get('ylabel_coords'): 
-                    self.axc.yaxis.set_label_coords(self.frame['axc']['ylabel_coords']['x'], self.frame['axc']['ylabel_coords']['y'])
-                                    # Apply manual ticks for colorbar (y-axis) at initialization if provided
-                cbar_ticks_cfg = self.frame.get('axc', {}).get('ticks', {}).get('y', {})
-                # self._apply_manual_ticks(self.axc, 'y', cbar_ticks_cfg)
+                self.axc.set_ylabel(**self.frame.get('axc', {}).get('label', {}))
+                if self.frame.get('axc', {}).get('ylabel_coords'):
+                    self.axc.yaxis.set_label_coords(
+                        self.frame['axc']['ylabel_coords']['x'],
+                        self.frame['axc']['ylabel_coords']['y']
+                    )
+                self._apply_manual_ticks(self.axc, 'y', ticks_cfg.get('y', {}))
                 self.logger.debug("Loaded colorbar axes -> axc")
-            # else:
-            #     cbar = self.fig.colorbar(mappable, cax=self.axc, orientation="horizontal")
-            #     cbar.minorticks_on()
-            #     self.axc.xaxis.set_ticks_position(self.frame['axc']['ticks']['ticks_position'])
-            #     self.axc.xaxis.set_label_position("top")    
-            #     self.axc.set_xlim(self.axc._cb['vmin'], self.axc._cb['vmax'])
-
-            #     self.axc.set_xlabel(**self.frame['axc'].get("label", {}))
-                
             else:
                 # Horizontal colorbar: drive everything from x-axis
                 cbar = self.fig.colorbar(mappable, cax=self.axc, orientation="horizontal")
                 cbar.minorticks_on()
+                if (self.axc._cb.get('vmin') is not None) and (self.axc._cb.get('vmax') is not None):
+                    self.axc.set_xlim(self.axc._cb['vmin'], self.axc._cb['vmax'])
 
-                # Limits use xlim for horizontal bars
-                self.axc.set_xlim(self.axc._cb['vmin'], self.axc._cb['vmax'])
-
-                # Minor locator depends on mode
                 if str(self.axc._cb.get('mode', 'auto')).lower() == 'log':
                     from matplotlib.ticker import LogLocator
                     self.axc.xaxis.set_minor_locator(LogLocator(subs='auto'))
@@ -880,18 +905,16 @@ class Figure:
                     from matplotlib.ticker import AutoMinorLocator
                     self.axc.xaxis.set_minor_locator(AutoMinorLocator())
 
-                # Ticks/label positions (top/bottom for horizontal)
-                _tp = self.frame.get('axc', {}).get('ticks', {}).get('ticks_position', 'top')
+                _tp = ticks_cfg.get('ticks_position', 'top')
                 self.axc.xaxis.set_ticks_position(_tp)
                 self.axc.xaxis.set_label_position('top' if _tp == 'top' else 'bottom')
 
-                # Apply tick params (both/major/minor)
-                self.axc.tick_params(**self.frame.get('axc', {}).get('ticks', {}).get('both', {}))
-                self.axc.tick_params(**self.frame.get('axc', {}).get('ticks', {}).get('major', {}))
-                self.axc.tick_params(**self.frame.get('axc', {}).get('ticks', {}).get('minor', {}))
-                # Apply label if configured
+                self.axc.tick_params(**ticks_cfg.get('both', {}))
+                self.axc.tick_params(**ticks_cfg.get('major', {}))
+                self.axc.tick_params(**ticks_cfg.get('minor', {}))
                 if self.frame.get('axc', {}).get('isxlabel'):
                     self.axc.set_xlabel(**self.frame.get('axc', {}).get('label', {}))
+                self._apply_manual_ticks(self.axc, 'x', ticks_cfg.get('x', {}))
 
 
 
@@ -1157,8 +1180,9 @@ class Figure:
                 if not self._has_manual_ticks('ax', 'y'):
                     self._apply_auto_ticks(ax, 'y')
             elif name == 'axc':
-                if not self._has_manual_ticks('axc', 'y'):
-                    self._apply_auto_ticks(ax, 'y')
+                axc_tick_axis = 'x' if self._axc_is_horizontal() else 'y'
+                if not self._has_manual_ticks('axc', axc_tick_axis):
+                    self._apply_auto_ticks(ax, axc_tick_axis)
             if getattr(ax, 'needs_finalize', True) and hasattr(ax, 'finalize'):
                 try:
                     ax.finalize()
@@ -1362,108 +1386,158 @@ class Figure:
             return style
 
         s = dict(style)
-        uses_color = bool(style.get("cmap")) or ("c" in coor)
+        colored_z_methods = {
+            "contour",
+            "contourf",
+            "tricontour",
+            "tricontourf",
+            "tripcolor",
+            "tripcolor_axes",
+            "pcolor",
+            "pcolormesh",
+            "imshow",
+            "voronoi",
+            "voronoif",
+            "grid_profile",
+            "grid_profiling",
+        }
+        uses_color = bool(s.get("cmap")) or ("c" in coor) or (("z" in coor) and (method_key in colored_z_methods))
         if not uses_color:
             return style
-        self.axc._cb["cmap"] = s.get("cmap")
+        color_cfg = self._axc_color_config()
 
-        # ---- 1) records vmin and vmax ----
-        z = None
-        if self.axc._cb["vmin"] is None:
-            if ("vmin" in s and isinstance(s['vmin'], (int, float))):
-                self.axc._cb['vmin'] = s['vmin']
-            else:
-                if z is None:
-                    if "z" in coor and isinstance(coor["z"], dict) and "expr" in coor["z"]:
-                        z = self._eval_series(df, {"expr": coor["z"]["expr"]})
-                    elif "c" in coor and isinstance(coor["c"], dict) and "expr" in coor["c"]:
-                        z = self._eval_series(df, {"expr": coor["c"]["expr"]})
-                if z is not None:
-                    z = z[np.isfinite(z)]
-                    if z.size:
-                        self.axc._cb["vmin"] = float(np.min(z))
+        def _coerce_scalar(v):
+            try:
+                vv = float(v)
+                if np.isfinite(vv):
+                    return vv
+            except Exception:
+                pass
+            return None
 
-        if self.axc._cb["vmax"] is None:
-            if ("vmax" in s and isinstance(s['vmax'], (int, float))):
-                self.axc._cb['vmax'] = s['vmax']
-            else:
-                if z is None:
-                    if "z" in coor and isinstance(coor["z"], dict) and "expr" in coor["z"]:
-                        z = self._eval_series(df, {"expr": coor["z"]["expr"]})
-                    elif "c" in coor and isinstance(coor["c"], dict) and "expr" in coor["c"]:
-                        z = self._eval_series(df, {"expr": coor["c"]["expr"]})
-                if z is not None:
-                    z = z[np.isfinite(z)]
-                    if z.size:
-                        self.axc._cb["vmax"] = float(np.max(z))
+        def _load_color_series():
+            arr = None
+            if isinstance(coor.get("z"), dict) and ("expr" in coor["z"]):
+                arr = self._eval_series(df, {"expr": coor["z"]["expr"]})
+            elif isinstance(coor.get("c"), dict) and ("expr" in coor["c"]):
+                arr = self._eval_series(df, {"expr": coor["c"]["expr"]})
+            elif "z" in s:
+                arr = s.get("z")
+            elif "c" in s and not isinstance(s.get("c"), str):
+                arr = s.get("c")
+            if arr is None:
+                return None
+            try:
+                arr = np.asarray(arr, dtype=float)
+            except Exception:
+                return None
+            arr = arr[np.isfinite(arr)]
+            return arr if arr.size else None
 
-        # ---- 2) Resolve/attach norm (priority: explicit 'norm' in style) ----
+        # frame.axc.color has higher priority than layer style cmap
+        chosen_cmap = color_cfg.get("cmap", s.get("cmap"))
+        if chosen_cmap is not None:
+            s["cmap"] = chosen_cmap
+        self.axc._cb["cmap"] = chosen_cmap
+
+        data_series = _load_color_series()
+        data_vmin = float(np.min(data_series)) if data_series is not None else None
+        data_vmax = float(np.max(data_series)) if data_series is not None else None
+
+        frame_vmin = _coerce_scalar(color_cfg.get("vmin", None))
+        frame_vmax = _coerce_scalar(color_cfg.get("vmax", None))
+        style_vmin = _coerce_scalar(s.get("vmin", None))
+        style_vmax = _coerce_scalar(s.get("vmax", None))
+
+        if frame_vmin is not None:
+            self.axc._cb["vmin"] = frame_vmin
+        else:
+            cand_min = style_vmin if style_vmin is not None else data_vmin
+            if cand_min is not None:
+                cur_min = _coerce_scalar(self.axc._cb.get("vmin", None))
+                self.axc._cb["vmin"] = cand_min if cur_min is None else min(cur_min, cand_min)
+
+        if frame_vmax is not None:
+            self.axc._cb["vmax"] = frame_vmax
+        else:
+            cand_max = style_vmax if style_vmax is not None else data_vmax
+            if cand_max is not None:
+                cur_max = _coerce_scalar(self.axc._cb.get("vmax", None))
+                self.axc._cb["vmax"] = cand_max if cur_max is None else max(cur_max, cand_max)
+
+        # ---- 2) Resolve/attach norm ----
         if (self.axc._cb["vmin"] is not None) and (self.axc._cb["vmax"] is not None):
-            vmin, vmax = self.axc._cb["vmin"], self.axc._cb["vmax"]
+            vmin = float(self.axc._cb["vmin"])
+            vmax = float(self.axc._cb["vmax"])
+            if vmax < vmin:
+                vmin, vmax = vmax, vmin
+                self.axc._cb["vmin"], self.axc._cb["vmax"] = vmin, vmax
 
             def _resolve_norm(nv, *, vmin=None, vmax=None):
                 """Turn user-specified 'norm' into a matplotlib.colors.Normalize instance."""
                 if nv is None:
                     return None
-                # Already a Normalize subclass
                 if isinstance(nv, mcolors.Normalize):
                     return nv
-                # String shorthand, e.g. "LogNorm", "TwoSlopeNorm", "Normalize"
                 if isinstance(nv, str):
                     key = nv.strip().lower()
                     if key in {"log", "lognorm"}:
+                        if (vmin is None) or (vmax is None) or (vmin <= 0) or (vmax <= 0):
+                            if self.logger:
+                                self.logger.warning("axc log scale requires positive vmin/vmax; fallback to linear Normalize.")
+                            return mcolors.Normalize(vmin=vmin, vmax=vmax)
                         return mcolors.LogNorm(vmin=vmin, vmax=vmax)
                     if key in {"twoslopenorm", "diverging"}:
-                        # default vcenter=0 for diverging data; user can override via dict form
                         return mcolors.TwoSlopeNorm(vcenter=0.0, vmin=vmin, vmax=vmax)
-                    if key in {"norm", "normalize", "linear"}:
-                        return mcolors.Normalize(vmin=vmin, vmax=vmax)
-                    # Fallback: unknown string → default linear
+                    if key in {"symlog", "symlognorm"}:
+                        return mcolors.SymLogNorm(linthresh=1.0, linscale=1.0, base=10, vmin=vmin, vmax=vmax)
                     return mcolors.Normalize(vmin=vmin, vmax=vmax)
-                # Dict form: {"type": "LogNorm", "vmin": ..., "vmax": ..., ...}
                 if isinstance(nv, dict):
                     t = str(nv.get("type", "Normalize")).strip().lower()
-                    # Prefer explicit vmin/vmax in dict; otherwise use inferred values
                     _vmin = nv.get("vmin", vmin)
                     _vmax = nv.get("vmax", vmax)
                     if t in {"log", "lognorm"}:
+                        if (_vmin is None) or (_vmax is None) or (_vmin <= 0) or (_vmax <= 0):
+                            if self.logger:
+                                self.logger.warning("axc log norm requires positive vmin/vmax; fallback to linear Normalize.")
+                            return mcolors.Normalize(vmin=_vmin, vmax=_vmax)
                         return mcolors.LogNorm(vmin=_vmin, vmax=_vmax)
                     if t in {"twoslopenorm", "diverging"}:
                         vcenter = nv.get("vcenter", 0.0)
                         return mcolors.TwoSlopeNorm(vcenter=vcenter, vmin=_vmin, vmax=_vmax)
                     if t in {"symlog", "symlognorm"}:
-                        # Optional parameters for SymLogNorm
                         linthresh = nv.get("linthresh", 1.0)
                         linscale = nv.get("linscale", 1.0)
                         base = nv.get("base", 10)
-                        return mcolors.SymLogNorm(linthresh=linthresh, linscale=linscale, base=base, vmin=_vmin, vmax=_vmax)
-                    # Default linear
+                        return mcolors.SymLogNorm(
+                            linthresh=linthresh,
+                            linscale=linscale,
+                            base=base,
+                            vmin=_vmin,
+                            vmax=_vmax,
+                        )
                     return mcolors.Normalize(vmin=_vmin, vmax=_vmax)
-                # Anything else → default linear
                 return mcolors.Normalize(vmin=vmin, vmax=vmax)
 
-            # Priority 1: explicit norm in style
-            user_norm = style.get("norm", None)
-            resolved = _resolve_norm(user_norm, vmin=vmin, vmax=vmax)
-
-            # If no explicit norm provided, keep existing (if any) or use linear as default
-            if resolved is None:
-                if self.axc._cb["norm"] is None:
-                    self.axc._cb["norm"] = mcolors.Normalize(vmin=vmin, vmax=vmax)
+            requested_scale = str(color_cfg.get("scale", "")).lower()
+            if requested_scale in {"linear", "norm", "normalize"}:
+                resolved = mcolors.Normalize(vmin=vmin, vmax=vmax)
+            elif requested_scale == "log":
+                resolved = _resolve_norm("lognorm", vmin=vmin, vmax=vmax)
             else:
-                self.axc._cb["norm"] = resolved
+                # Backward compatibility: use per-layer style.norm when frame.axc.color.scale is absent.
+                user_norm = style.get("norm", None)
+                resolved = _resolve_norm(user_norm, vmin=vmin, vmax=vmax)
+                if resolved is None:
+                    resolved = mcolors.Normalize(vmin=vmin, vmax=vmax)
 
-            # Also store the resolved norm back into the outgoing style so that plotting receives a proper Normalize
-            if self.axc._cb["norm"] is not None:
-                s["norm"] = self.axc._cb["norm"]
-
-            # Set a backward-compatible 'mode' tag based on the resolved norm
+            self.axc._cb["norm"] = resolved
+            s["norm"] = self.axc._cb["norm"]
             if isinstance(self.axc._cb["norm"], mcolors.LogNorm):
                 self.axc._cb['mode'] = "log"
             elif isinstance(self.axc._cb["norm"], mcolors.TwoSlopeNorm):
                 self.axc._cb['mode'] = "diverging"
             elif isinstance(self.axc._cb["norm"], mcolors.SymLogNorm):
-                # Mark as 'log' to trigger log-style minor locators on colorbar if needed
                 self.axc._cb['mode'] = "log"
             else:
                 self.axc._cb['mode'] = "norm"
@@ -1533,7 +1607,8 @@ class Figure:
                 style = self._cb_collect_and_attach(style, coor, method_key, df)
                 self.logger.debug("Successful loading colorbar style")
             except Exception as _e:
-                self._logger.debug(f"colorbar lazy-attach failed: {_e}")
+                if self.logger:
+                    self.logger.debug(f"colorbar lazy-attach failed: {_e}")
             # Ternary coordinates required: left/right/bottom
             requiredlbr = {"left", "right", "bottom"}
             requiredxy  = {"x", "y"}
@@ -1552,7 +1627,8 @@ class Figure:
                 style = self._cb_collect_and_attach(style, coor, method_key, df)
                 self.logger.debug("Successful loading colorbar style")
             except Exception as _e:
-                self._logger.debug(f"colorbar lazy-attach failed: {_e}")
+                if self.logger:
+                    self.logger.debug(f"colorbar lazy-attach failed: {_e}")
                 
             if layer_info['method'] == "hist":
                 if isinstance(layer_info['data'], dict): 
