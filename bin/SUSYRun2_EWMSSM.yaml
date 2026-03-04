@@ -171,6 +171,10 @@ DataSet:
       target: LogL_05
     - source: data/ATLAS_13TeV_4LEP_139invfb_pyhf_combined_LogLike
       target: LogL_16
+    - source: data/#TotalCrossSectionAsMap @ColliderBit::getTotalCrossSectionAsMap::LHC_13TeV__xsec_fb
+      target: XSectinFB
+    - source: data/#MSSM11atQ_mA_parameters @MSSM11atQ_mA::primary_parameters::mu
+      target: pMu
   transform:
   - add_column:
       name: LogLike_total
@@ -187,7 +191,7 @@ DataSet:
 
 Figures:
 - name: sm1m2_ProfLogL
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -233,7 +237,7 @@ Figures:
       vmax: 1
 
 - name: pm1m2_ProfLogL
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -321,7 +325,7 @@ Figures:
       zorder: 1.5
 
 - name: pm1mu_ProfLogL
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -409,7 +413,7 @@ Figures:
       zorder: 1.5
 
 - name: pm2mu_ProfLogL
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -497,7 +501,7 @@ Figures:
       zorder: 1.5
 
 - name: pmutb_ProfLogL
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -569,7 +573,7 @@ Figures:
       vmax: 3.09
 
 - name: mN2mN1_ProfLogL
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -666,7 +670,7 @@ Figures:
       zorder: 1.2
 
 - name: mN2mN1_XSect
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -732,7 +736,7 @@ Figures:
       zorder: 1.2
 
 - name: mN2mN1_binoComp
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -796,7 +800,7 @@ Figures:
       zorder: 1.2
 
 - name: mN2mN1_winoComp
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -860,7 +864,7 @@ Figures:
       zorder: 1.2
 
 - name: mN2mN1_hinoComp
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -924,7 +928,7 @@ Figures:
       zorder: 1.2
 
 - name: mN2mN1_N2binoComp
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -988,7 +992,7 @@ Figures:
       zorder: 1.2
 
 - name: mN2mN1_N2winoComp
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -1052,7 +1056,7 @@ Figures:
       zorder: 1.2
 
 - name: mN2mN1_N2hinoComp
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -1115,9 +1119,8 @@ Figures:
       edgecolor: none
       zorder: 1.2
 
-
 - name: mN2mN1_BinoN1_ProfLogL
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -1224,7 +1227,7 @@ Figures:
       zorder: 1.2
 
 - name: mN2mN1_WinoN1_ProfLogL
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -1331,7 +1334,7 @@ Figures:
       zorder: 1.2
 
 - name: mN2mN1_HinoN1_ProfLogL
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -1438,7 +1441,7 @@ Figures:
       zorder: 1.2
 
 - name: mC1mN1_ProfLogL_filtered
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -1535,7 +1538,7 @@ Figures:
       zorder: 1.2
 
 - name: mC1mN1_binoComp
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -1599,7 +1602,7 @@ Figures:
       zorder: 1.2
 
 - name: mC1mN1_winoComp
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -1663,7 +1666,7 @@ Figures:
       zorder: 1.2
 
 - name: mC1mN1_hinoComp
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -1727,7 +1730,7 @@ Figures:
       zorder: 1.2
 
 - name: mC1mN1_N2binoComp
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -1791,7 +1794,7 @@ Figures:
       zorder: 1.2
 
 - name: mC1mN1_N2winoComp
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -1855,7 +1858,7 @@ Figures:
       zorder: 1.2
 
 - name: mC1mN1_N2hinoComp
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -1917,8 +1920,6 @@ Figures:
       facecolor: '#808080'
       edgecolor: none
       zorder: 1.2
-
-
 
 - name: mC1mN1_BinoN1_ProfLogL
   enable: true
@@ -2241,7 +2242,6 @@ Figures:
       edgecolor: none
       zorder: 1.2
 
-
 - name: mC1mN1_BinoN1_HinoN2_ProfLogL
   enable: true
   style:
@@ -2472,10 +2472,8 @@ Figures:
       edgecolor: none
       zorder: 1.2
 
-
-
 - name: mC1mN1_BinoN1_WinoN2_ProfLogL
-  enable: true
+  enable: false
   style:
   - gambit_2x1
   - rectcmap
@@ -2703,6 +2701,97 @@ Figures:
       facecolor: '#808080'
       edgecolor: none
       zorder: 1.2
+
+- name: mN2mN1_BinoN1_HinoN2_XSect
+  enable: true
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: $m_{\tilde{\chi}_2^0}~({\rm TeV})$
+        y: $m_{\tilde{\chi}_1^0}~({\rm TeV})$
+      xlim:
+      - 0
+      - 1.4
+      ylim:
+      - 0
+      - 1.4
+      text:
+      - x: 0.75
+        y: 1.0018
+        s: EWMSSM.
+        ha: right
+        va: bottom
+        fontfamily: STIXGeneral
+        fontsize: x-small
+        transform: true
+      - x: 0.05
+        y: 0.85
+        s: All searches and measurement
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+      - x: 0.05
+        y: 0.75
+        s: Higgsino-dominated $\tilde{\chi}_2^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral
+        transform: true
+      - x: 0.05
+        y: 0.65
+        s: Bino-dominated $\tilde{\chi}_1^0$
+        c: white
+        ha: left
+        va: bottom
+        fontfamily: STIXGeneral        
+        transform: true
+    axc:
+      label:
+        ylabel: Total production $\sigma~({\rm fb})$
+      yscale: log
+  layers:
+  - name: prof
+    data:
+    - source: mN2mN1_BinoN1_HinoN2_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: np.abs(XSectinFB)
+    style:
+      cmap: viridis
+      norm: LogNorm
+      vmin: 1
+      vmax: 1.e5
+  - name: fillbounds
+    axes: ax
+    method: fill
+    coordinates:
+      x:
+      - 0.0
+      - 1.4
+      - 0.0
+      - 0.0
+      y:
+      - 0.0
+      - 1.4
+      - 1.4
+      - 0.0
+    style:
+      facecolor: '#808080'
+      edgecolor: none
+      zorder: 1.2
+
 
 - name: mN2mN1_BinoN1_HinoN2_ProfLogL
   enable: true
