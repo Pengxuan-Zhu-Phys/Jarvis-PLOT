@@ -3,6 +3,7 @@
 import numpy as np 
 import pandas as pd 
 from copy import deepcopy
+from ..memtrace import memtrace_checkpoint
 
 def eval_series(df: pd.DataFrame, set: dict, logger):
     """
@@ -99,6 +100,16 @@ def grid_profiling(df, prof, logger):
     except Exception:
         bin = 100
     bin = max(bin, 1)
+    memtrace_checkpoint(
+        logger,
+        "grid_profile.before",
+        df,
+        extra={
+            "bin": bin,
+            "objective": prof.get("objective", "max") if isinstance(prof, dict) else "max",
+            "grid_points": prof.get("grid_points", "rect") if isinstance(prof, dict) else "rect",
+        },
+    )
 
     coors = prof.get("coordinates", {})
     obj = str(prof.get("objective", "max")).lower()
@@ -134,7 +145,7 @@ def grid_profiling(df, prof, logger):
     xscale = xcfg.get("scale", "linear") if isinstance(xcfg, dict) else "linear"
     yscale = ycfg.get("scale", "linear") if isinstance(ycfg, dict) else "linear"
 
-    out = df.copy()
+    out = df.copy(deep=False)
     out[xind] = x
     out[yind] = y
     out[zind] = z
@@ -191,6 +202,12 @@ def grid_profiling(df, prof, logger):
         })
         loc = tmp.groupby("__cell__", sort=False)["__zkey__"].idxmax()
 
+    memtrace_checkpoint(
+        logger,
+        "grid_profile.groupby_ready",
+        tmp,
+        extra={"bin": bin, "objective": obj},
+    )
     pick = tmp.loc[loc, ["__ix__", "__iy__", "__zraw__"]].copy()
 
     grid = np.full((bin, bin), empty_value, dtype=float)
@@ -234,6 +251,12 @@ def grid_profiling(df, prof, logger):
         logger.debug(
             f"After grid profiling ({bin}x{bin}) -> {reduced.shape}, filled={n_filled}/{bin*bin}"
         )
+    memtrace_checkpoint(
+        logger,
+        "grid_profile.after",
+        reduced,
+        extra={"bin": bin, "filled": int(np.isfinite(grid).sum()), "cells": int(bin * bin)},
+    )
     return reduced
 
 
@@ -243,119 +266,148 @@ def profiling(df, prof, logger):
         mode = str(prof.get("method", "bridson")).lower()
     if mode in {"grid", "grid_profile", "grid_profiling"}:
         return grid_profiling(df, prof, logger)
+    memtrace_checkpoint(
+        logger,
+        "profile.before",
+        df,
+        extra={
+            "method": mode,
+            "bin": prof.get("bin", 100) if isinstance(prof, dict) else 100,
+            "grid_points": prof.get("grid_points", "rect") if isinstance(prof, dict) else "rect",
+            "objective": prof.get("objective", "max") if isinstance(prof, dict) else "max",
+        },
+    )
 
-    def profile_bridson_sorted(idx, xx, yy, zz, radius, msk):
-        for i in range(len(idx)):
+    def profile_bridson_sorted(xx, yy, zz, radius):
+        msk = np.full(xx.shape, True, dtype=bool)
+        # The historical implementation reset the dataframe index before
+        # profiling, so the greedy pass is effectively "keep row i, then
+        # suppress later rows j > i" on a contiguous position axis.
+        for i in range(len(xx)):
             if not msk[i]:
                 continue
-            dx = xx[idx > idx[i]] - xx[i]
-            dy = yy[idx > idx[i]] - yy[i]
-            dz = zz[idx > idx[i]] - zz[i]
+            if i + 1 >= len(xx):
+                continue
+            dx = xx[i + 1 :] - xx[i]
+            dy = yy[i + 1 :] - yy[i]
+            dz = zz[i + 1 :] - zz[i]
             dist0 = (dx**2 + dy**2)**0.5
             dist1 = (dx**2 + dy**2 + dz**2)**0.5
             near0 = (dist0 < 0.707 * radius) | (dist0 < radius) & (dist1 > radius)
-            sel = (idx > idx[i])
-            msk[sel] &= ~near0                     
+            msk[i + 1 :] &= ~near0
         return msk
-            
-    bin     = prof.get("bin", 100)
-    coors   = prof.get("coordinates", {})
-    obj     = prof.get("objective", "max")
-    grid    = prof.get("grid_points", "rect")
-    gdata   = None 
 
-    radius  = 1 / bin 
-    if "expr" in coors['x'].keys():
-        x = eval_series(df, coors['x'], logger)
-    else: 
-        x = df['x']
-    
-    if "expr" in coors['y'].keys():
-        y = eval_series(df, coors['y'], logger)
-    else: 
-        y = df['y']
-        
-    if "expr" in coors['z'].keys():
-        z = eval_series(df, coors['z'], logger)
-    else: 
-        z = df['z']
+    bin = prof.get("bin", 100)
+    coors = prof.get("coordinates", {})
+    obj = prof.get("objective", "max")
+    grid = prof.get("grid_points", "rect")
+
+    radius = 1 / bin
+    xcfg = coors.get("x", {}) if isinstance(coors, dict) else {}
+    ycfg = coors.get("y", {}) if isinstance(coors, dict) else {}
+    zcfg = coors.get("z", {}) if isinstance(coors, dict) else {}
+
+    if "expr" in xcfg.keys():
+        x = eval_series(df, xcfg, logger)
+    else:
+        x = df["x"]
+
+    if "expr" in ycfg.keys():
+        y = eval_series(df, ycfg, logger)
+    else:
+        y = df["y"]
+
+    if "expr" in zcfg.keys():
+        z = eval_series(df, zcfg, logger)
+    else:
+        z = df["z"]
 
     logger.debug("After loading profiling x, y, z. ")
 
+    x = np.asarray(x)
+    y = np.asarray(y)
+    z = np.asarray(z)
+
     if grid == "ternary":
-        xlim = coors['x'].get("lim", [0, 1])
-        ylim = coors['y'].get("lim", [0, 1])
-        zlim = coors['z'].get("lim", [np.min(z), np.max(z)])
-        xscale = coors['x'].get("scale", "linear")
-        yscale = coors['y'].get("scale", "linear")
-        zscale = coors['z'].get("scale", "linear")
-        zind   = coors['z'].get("name", "z")
-        xind   = coors['x'].get("name", "x")
-        yind   = coors['y'].get("name", "y")
+        xlim = xcfg.get("lim", [0, 1])
+        ylim = ycfg.get("lim", [0, 1])
+        zlim = zcfg.get("lim", [np.min(z), np.max(z)])
+        xscale = xcfg.get("scale", "linear")
+        yscale = ycfg.get("scale", "linear")
+        zscale = zcfg.get("scale", "linear")
+        zind = zcfg.get("name", "z")
+        xind = xcfg.get("name", "x")
+        yind = ycfg.get("name", "y")
     elif grid == "rect":
-        xlim = coors['x'].get("lim", [np.min(x), np.max(x)])
-        ylim = coors['y'].get("lim", [np.min(y), np.max(y)])
-        zlim = coors['z'].get("lim", [np.min(z), np.max(z)])
+        xlim = xcfg.get("lim", [np.min(x), np.max(x)])
+        ylim = ycfg.get("lim", [np.min(y), np.max(y)])
+        zlim = zcfg.get("lim", [np.min(z), np.max(z)])
+        xscale = xcfg.get("scale", "linear")
+        yscale = ycfg.get("scale", "linear")
+        zscale = zcfg.get("scale", "linear")
+        zind = zcfg.get("name", "z")
+        xind = xcfg.get("name", "x")
+        yind = ycfg.get("name", "y")
+    else:
+        xlim = xcfg.get("lim", [np.min(x), np.max(x)])
+        ylim = ycfg.get("lim", [np.min(y), np.max(y)])
+        zlim = zcfg.get("lim", [np.min(z), np.max(z)])
+        xscale = xcfg.get("scale", "linear")
+        yscale = ycfg.get("scale", "linear")
+        zscale = zcfg.get("scale", "linear")
+        zind = zcfg.get("name", "z")
+        xind = xcfg.get("name", "x")
+        yind = ycfg.get("name", "y")
 
-        xscale = coors['x'].get("scale", "linear")
-        yscale = coors['y'].get("scale", "linear")
-        zscale = coors['z'].get("scale", "linear")
-
-        zind = coors['z'].get("name", "z")
-        xind = coors['x'].get("name", "x")
-        yind = coors['y'].get("name", "y") 
-
-
-    # profiling will add new columns into dataframe, so that can be used in the next step
-    df[xind] = x 
-    df[yind] = y
-    df[zind] = z
-            # print(x.min(), x.max(), y.min(), y.max(), z.min(), z.max())
-
+    zord = np.asarray(z, dtype=float)
+    if obj == "max":
+        # Keep NaN at the tail to match pandas sort_values(..., na_position='last')
+        # while avoiding Series materialization.
+        zkey = np.where(np.isfinite(zord), zord, -np.inf)
+        order = np.argsort(zkey, kind="quicksort")[::-1].astype(np.int64, copy=False)
+    elif obj == "min":
+        zkey = np.where(np.isfinite(zord), zord, np.inf)
+        order = np.argsort(zkey, kind="quicksort").astype(np.int64, copy=False)
+    else:
+        zkey = np.where(np.isfinite(zord), zord, -np.inf)
+        order = np.argsort(zkey, kind="quicksort")[::-1].astype(np.int64, copy=False)
+        logger.error("Sort dataset method: objective: {} not support, using default value -> 'max'".format(obj))
 
     if grid == "ternary":
         bb = np.linspace(0, 1, bin + 1)
         rr = np.linspace(0, 1, bin + 1)
         Bg, Rg = np.meshgrid(bb, rr)
         r = Rg.ravel()
-        b = Bg.ravel() 
+        b = Bg.ravel()
         l = 1.0 - b - r
         mask = (l >= 0) & (b >= 0) & (r >= 0)
-        x = b + 0.5 * r 
-        y = r 
-        xxg, yyg = x[mask], y[mask]
-        llg, bbg, rrg, = l[mask], b[mask], r[mask]
-        gdata = pd.DataFrame({
-            xind: xxg, 
-            yind: yyg, 
-            zind: np.ones(xxg.shape) * (np.min(z) - 0.1)
-        })
-
+        x_grid = (b + 0.5 * r)[mask]
+        y_grid = r[mask]
     elif grid == "rect":
         xx = np.linspace(xlim[0], xlim[1], bin+1)
         yy = np.linspace(ylim[0], ylim[1], bin+1)
         xg, yg = np.meshgrid(xx, yy)
-
-        gdata = pd.DataFrame({
-            xind: xg.ravel(),
-            yind: yg.ravel(),
-            zind: np.ones(xg.ravel().shape) * (np.min(z) - 0.1)
-        })
-
-    if obj == "max":    
-        df = df.sort_values(zind, ascending=False).reset_index(drop=True)
-    elif obj == "min":
-        df = df.sort_values(zind, ascending=True).reset_index(drop=True)
+        x_grid = xg.ravel()
+        y_grid = yg.ravel()
     else:
-        df = df.sort_values(zind, ascending=False).reset_index(drop=True)
-        logger.error("Sort dataset method: objective: {} not support, using default value -> 'max'".format(obj))
-    df = pd.concat([df, gdata], ignore_index=True)
-                        
-    idx = deepcopy(np.array(df.index))
-    xx  = deepcopy(np.array(df[xind]))
-    yy  = deepcopy(np.array(df[yind]))
-    zz  = deepcopy(np.array(df[zind]))
-            # mapping xx, yy, zz to range [0, 1]
+        x_grid = np.asarray([], dtype=float)
+        y_grid = np.asarray([], dtype=float)
+    z_grid = np.ones(x_grid.shape, dtype=float) * (np.min(z) - 0.1)
+
+    xx = np.concatenate([x[order], x_grid], axis=0)
+    yy = np.concatenate([y[order], y_grid], axis=0)
+    zz = np.concatenate([z[order], z_grid], axis=0)
+    memtrace_checkpoint(
+        logger,
+        "profile.concat_ready",
+        None,
+        extra={
+            "source_rows": int(order.shape[0]),
+            "grid_rows": int(x_grid.shape[0]),
+            "concat_rows": int(xx.shape[0]),
+        },
+    )
+
     if xscale == "log":
         xx = (np.log(xx) - np.log(xlim[0])) / (np.log(xlim[1]) - np.log(xlim[0]))
     else:  # linear scale
@@ -371,12 +423,49 @@ def profiling(df, prof, logger):
     else:  # linear scale
         zz = (zz - zlim[0]) / (zlim[1] - zlim[0])
 
-    # (removed print(radius))
-    msk = np.full(idx.shape, True)
-    msk = profile_bridson_sorted(idx, xx, yy, zz, radius, msk)
-    df = df.iloc[idx[msk]]
+    msk = profile_bridson_sorted(xx, yy, zz, radius)
+    keep_pos = np.flatnonzero(msk).astype(np.int64, copy=False)
 
-    return df 
+    source_count = int(order.shape[0])
+    keep_source = keep_pos[keep_pos < source_count]
+    keep_grid = keep_pos[keep_pos >= source_count] - source_count
+
+    source_rows = order[keep_source]
+    source_x = x[source_rows]
+    source_y = y[source_rows]
+    source_z = z[source_rows]
+    grid_x_keep = x_grid[keep_grid]
+    grid_y_keep = y_grid[keep_grid]
+    grid_z_keep = z_grid[keep_grid]
+
+    xx = None
+    yy = None
+    zz = None
+    x_grid = None
+    y_grid = None
+    z_grid = None
+
+    out = df.iloc[source_rows].copy()
+    out.index = keep_source
+    out[xind] = source_x
+    out[yind] = source_y
+    out[zind] = source_z
+
+    if keep_grid.size > 0:
+        grid_out = pd.DataFrame(index=keep_grid + source_count)
+        grid_out[xind] = grid_x_keep
+        grid_out[yind] = grid_y_keep
+        grid_out[zind] = grid_z_keep
+        grid_out = grid_out.reindex(columns=out.columns)
+        out = pd.concat([out, grid_out], axis=0, ignore_index=False)
+
+    memtrace_checkpoint(
+        logger,
+        "profile.after",
+        out,
+        extra={"source_rows": int(source_rows.shape[0]), "grid_rows": int(keep_grid.shape[0])},
+    )
+    return out
 
 
 def _preprofiling(df, prof, logger):
@@ -545,17 +634,20 @@ def _preprofiling(df, prof, logger):
     yind = yset.get("name", "y")
     zind = zset.get("name", "z")
 
-    out = df.copy()
-    out[xind] = x
-    out[yind] = y
-    out[zind] = z
+    xvals = np.asarray(x)
+    yvals = np.asarray(y)
+    zvals = np.asarray(z)
 
-    xnorm = _norm(out[xind].to_numpy(), xlim, xscale)
-    ynorm = _norm(out[yind].to_numpy(), ylim, yscale)
+    xnorm = _norm(xvals, xlim, xscale)
+    ynorm = _norm(yvals, ylim, yscale)
     valid = np.isfinite(xnorm) & np.isfinite(ynorm)
     if not np.any(valid):
         if logger:
             logger.warning("Preprofiling got no finite points; returning original dataframe.")
+        out = df.copy(deep=False)
+        out[xind] = xvals
+        out[yind] = yvals
+        out[zind] = zvals
         return out
 
     xv = np.clip(xnorm[valid], 0.0, 1.0 - 1e-12)
@@ -567,7 +659,7 @@ def _preprofiling(df, prof, logger):
     # Use positional index (not label index) to avoid expansion when source
     # frames were concatenated with duplicate index labels.
     idx_src = np.flatnonzero(valid).astype(np.int64)
-    zraw = np.asarray(out[zind], dtype=float)[valid]
+    zraw = np.asarray(zvals, dtype=float)[valid]
     zmax = np.where(np.isfinite(zraw), zraw, -np.inf)
     zmin = np.where(np.isfinite(zraw), zraw, np.inf)
     tmp = pd.DataFrame(
@@ -583,7 +675,10 @@ def _preprofiling(df, prof, logger):
     loc_min = tmp.groupby("__cell__", sort=False)["__zmin__"].idxmin().to_numpy(dtype=np.int64, copy=False)
     loc_all = np.unique(np.concatenate([loc_max, loc_min], axis=0))
     keep_pos = tmp.iloc[loc_all]["__pos__"].to_numpy(dtype=np.int64, copy=False)
-    reduced = out.iloc[keep_pos].copy()
+    reduced = df.iloc[keep_pos].copy()
+    reduced[xind] = xvals[keep_pos]
+    reduced[yind] = yvals[keep_pos]
+    reduced[zind] = zvals[keep_pos]
     if logger:
         logger.debug(f"After preprofiling ({prebin}x{prebin}) -> {reduced.shape}")
     return reduced
@@ -592,15 +687,15 @@ def _preprofiling(df, prof, logger):
 def filter(df, condition, logger):
     try:
         if isinstance(condition, bool):
-            return df.copy() if condition else df.iloc[0:0].copy()
+            return df.copy(deep=False) if condition else df.iloc[0:0].copy()
         if isinstance(condition, (int, float)) and condition in (0, 1):
-            return df.copy() if int(condition) == 1 else df.iloc[0:0].copy()
+            return df.copy(deep=False) if int(condition) == 1 else df.iloc[0:0].copy()
         
         if isinstance(condition, str):
             s = condition.strip()
             low = s.lower()
             if low in {"true", "t", "yes", "y"}:
-                return df.copy()
+                return df.copy(deep=False)
             if low in {"false", "f", "no", "n"}:
                 return df.iloc[0:0].copy()
             s = s.replace("&&", " & ").replace("||", " | ")
@@ -615,10 +710,12 @@ def filter(df, condition, logger):
         mask = eval(condition, allowed_globals, local_vars)
 
         if isinstance(mask, (bool, np.bool_, int, float)):
-            return df.copy() if bool(mask) else df.iloc[0:0].copy()
+            return df.copy(deep=False) if bool(mask) else df.iloc[0:0].copy()
         if not isinstance(mask, pd.Series):
             mask = pd.Series(mask, index=df.index)
         mask = mask.astype(bool)
+        if bool(mask.all()):
+            return df.copy(deep=False)
         return df[mask].copy()
     except Exception as e:
         logger.error(f"Errors when evaluating condition -> {condition}:\n\t{e}")
@@ -661,12 +758,29 @@ def sort_df_by_expr(df: pd.DataFrame, expr: str, logger) -> pd.DataFrame:
     if df is None or expr is None:
         return df
     try:
-        # Try evaluate as expression (could be column or expression)
-        values = eval_series(df, {"expr": expr}, logger)
-        df = df.assign(__sortkey__=values)
-        df = df.sort_values(by="__sortkey__", ascending=True)
-        df = df.drop(columns=["__sortkey__"])
-        return df
+        key = str(expr).strip()
+        # Fast path: direct column sort via positional argsort to avoid
+        # pandas block-manager heavy sort/copy behavior on wide tables.
+        if key in df.columns:
+            values = np.asarray(df[key].to_numpy(copy=False))
+            if values.ndim != 1 or values.shape[0] != int(df.shape[0]):
+                raise ValueError(
+                    "sort key length mismatch: "
+                    f"rows={int(df.shape[0])}, key_shape={getattr(values, 'shape', None)}"
+                )
+            order = np.argsort(values, kind="quicksort")
+            return df.iloc[order]
+
+        # Expression path: evaluate once and reorder by positional argsort,
+        # avoiding assignment of a temporary "__sortkey__" column.
+        values = np.asarray(eval_series(df, {"expr": expr}, logger))
+        if values.ndim != 1 or values.shape[0] != int(df.shape[0]):
+            raise ValueError(
+                "sort expression output length mismatch: "
+                f"rows={int(df.shape[0])}, values={getattr(values, 'shape', None)}"
+            )
+        order = np.argsort(values, kind="quicksort")
+        return df.iloc[order]
     except Exception as e:
         logger.warning(f"LB: sortby failed for expr={expr}: {e}")
-        return df   
+        return df

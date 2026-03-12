@@ -2,13 +2,23 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import gc
+import re
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 import hashlib
 import json
 
+import numpy as np
 import pandas as pd
 
+try:
+    import polars as pl
+except Exception:
+    pl = None
+
+from ..data_loader import JP_ROW_IDX
 from .load_data import _preprofiling, addcolumn, filter as filter_df, grid_profiling, profiling, sortby
+from ..memtrace import memtrace_checkpoint, memtrace_object_inventory
 
 
 class DataPreprocessor:
@@ -20,6 +30,7 @@ class DataPreprocessor:
         self._emitted_sources = set()
         self._preprofile_alias_meta: Dict[str, Dict[str, Any]] = {}
         self._named_share_signatures: Dict[str, str] = {}
+        self._named_share_sources: Dict[str, Any] = {}
 
     def _debug(self, msg: str) -> None:
         if self.logger:
@@ -51,6 +62,276 @@ class DataPreprocessor:
         return hashlib.sha1(cls._canonical_json(payload).encode("utf-8")).hexdigest()
 
     @staticmethod
+    def _expr_symbols(expr: Any) -> List[str]:
+        if expr is None or isinstance(expr, (int, float, bool)):
+            return []
+        toks = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", str(expr)))
+        ignore = {
+            "np",
+            "math",
+            "True",
+            "False",
+            "None",
+            "and",
+            "or",
+            "not",
+            "in",
+            "if",
+            "else",
+            "for",
+            "lambda",
+            "abs",
+            "min",
+            "max",
+            "sum",
+            "len",
+            "int",
+            "float",
+            "str",
+            "bool",
+            "round",
+            "sin",
+            "cos",
+            "tan",
+            "exp",
+            "log",
+            "sqrt",
+            "pi",
+            "e",
+        }
+        return sorted(t for t in toks if t not in ignore)
+
+    def _profile_cfg_input_columns(self, cfg: Any) -> List[str]:
+        out: set[str] = set()
+        if not isinstance(cfg, Mapping):
+            return []
+        coors = cfg.get("coordinates", {})
+        if not isinstance(coors, Mapping):
+            return []
+        for axis_key, axis_cfg in coors.items():
+            axis = str(axis_key).strip()
+            if isinstance(axis_cfg, Mapping):
+                out.update(self._expr_symbols(axis_cfg.get("expr")))
+                name = axis_cfg.get("name")
+                if isinstance(name, str) and name.strip():
+                    out.add(name.strip())
+                elif axis in {"x", "y", "z", "left", "right", "bottom"}:
+                    out.add(axis)
+            elif isinstance(axis_cfg, str):
+                out.update(self._expr_symbols(axis_cfg))
+                if axis in {"x", "y", "z", "left", "right", "bottom"}:
+                    out.add(axis)
+        return sorted(out)
+
+    def _profile_cfg_output_columns(self, cfg: Any) -> List[str]:
+        out: set[str] = set()
+        if not isinstance(cfg, Mapping):
+            return []
+        coors = cfg.get("coordinates", {})
+        if not isinstance(coors, Mapping):
+            return []
+        for axis_key, axis_cfg in coors.items():
+            axis = str(axis_key).strip()
+            if isinstance(axis_cfg, Mapping):
+                name = axis_cfg.get("name")
+                if isinstance(name, str) and name.strip():
+                    out.add(name.strip())
+                elif axis in {"x", "y", "z", "left", "right", "bottom"}:
+                    out.add(axis)
+        return sorted(out)
+
+    def _transform_input_columns(self, transform: Any) -> List[str]:
+        out: set[str] = set()
+        if not isinstance(transform, list):
+            return []
+        for step in transform:
+            if not isinstance(step, Mapping):
+                continue
+            if "filter" in step:
+                out.update(self._expr_symbols(step.get("filter")))
+            if "sortby" in step:
+                out.update(self._expr_symbols(step.get("sortby")))
+            if "add_column" in step:
+                add_cfg = step.get("add_column", {})
+                if isinstance(add_cfg, Mapping):
+                    out.update(self._expr_symbols(add_cfg.get("expr")))
+            if "profile" in step:
+                out.update(self._profile_cfg_input_columns(step.get("profile", {})))
+            if "grid_profile" in step:
+                out.update(self._profile_cfg_input_columns(step.get("grid_profile", {})))
+        return sorted(out)
+
+    def _transform_output_columns(self, transform: Any) -> List[str]:
+        out: set[str] = set()
+        if not isinstance(transform, list):
+            return []
+        for step in transform:
+            if not isinstance(step, Mapping):
+                continue
+            if "add_column" in step:
+                add_cfg = step.get("add_column", {})
+                if isinstance(add_cfg, Mapping):
+                    name = add_cfg.get("name")
+                    if isinstance(name, str) and name.strip():
+                        out.add(name.strip())
+            if "profile" in step:
+                out.update(self._profile_cfg_output_columns(step.get("profile", {})))
+            if "grid_profile" in step:
+                out.update(self._profile_cfg_output_columns(step.get("grid_profile", {})))
+                out.update(
+                    {
+                        "__grid_ix__",
+                        "__grid_iy__",
+                        "__grid_bin__",
+                        "__grid_xmin__",
+                        "__grid_xmax__",
+                        "__grid_ymin__",
+                        "__grid_ymax__",
+                        "__grid_xscale__",
+                        "__grid_yscale__",
+                        "__grid_objective__",
+                        "__grid_empty_value__",
+                    }
+                )
+        return sorted(out)
+
+    def _layer_expr_columns(self, obj: Any) -> List[str]:
+        out: set[str] = set()
+
+        def _walk(node: Any) -> None:
+            if isinstance(node, Mapping):
+                for kk, vv in node.items():
+                    if str(kk).strip().lower() == "expr":
+                        out.update(self._expr_symbols(vv))
+                    else:
+                        _walk(vv)
+            elif isinstance(node, (list, tuple)):
+                for item in node:
+                    _walk(item)
+
+        _walk(obj)
+        return sorted(out)
+
+    def layer_demand_columns(self, layer: Mapping[str, Any]) -> List[str]:
+        out: set[str] = set()
+        if not isinstance(layer, Mapping):
+            return []
+        out.update(self._layer_expr_columns(layer.get("coordinates", {})))
+        out.update(self._layer_expr_columns(layer.get("style", {})))
+        return sorted(out)
+
+    @staticmethod
+    def _projection_list(columns: Optional[Sequence[str]]) -> Optional[List[str]]:
+        if not columns:
+            return None
+        out = sorted({str(c).strip() for c in columns if str(c).strip()})
+        return out if out else None
+
+    def _runtime_projection(self, transform: Any, demand_columns: Optional[Sequence[str]]) -> Optional[List[str]]:
+        out: set[str] = {JP_ROW_IDX}
+        out.update(self._transform_input_columns(transform))
+        out.update(self._transform_output_columns(transform))
+        if demand_columns:
+            out.update(str(c).strip() for c in demand_columns if str(c).strip())
+        return self._projection_list(sorted(out))
+
+    def _runtime_cache_columns(self, transform: Any, demand_columns: Optional[Sequence[str]]) -> Optional[List[str]]:
+        out: set[str] = {JP_ROW_IDX}
+        out.update(self._transform_output_columns(transform))
+        if demand_columns:
+            out.update(str(c).strip() for c in demand_columns if str(c).strip())
+        return self._projection_list(sorted(out))
+
+    def _preprofile_base_projection(self, prefix_transform: Any, profile_cfg: Any) -> Optional[List[str]]:
+        out: set[str] = {JP_ROW_IDX}
+        out.update(self._transform_input_columns(prefix_transform))
+        out.update(self._transform_output_columns(prefix_transform))
+        out.update(self._profile_cfg_input_columns(profile_cfg))
+        return self._projection_list(sorted(out))
+
+    def _select_columns(self, df: Any, columns: Optional[Sequence[str]]):
+        proj = self._projection_list(columns)
+        if not proj:
+            return df
+        if isinstance(df, pd.DataFrame):
+            keep = [c for c in proj if c in df.columns]
+            if not keep or len(keep) == int(df.shape[1]):
+                return df
+            return df.loc[:, keep].copy(deep=False)
+        if pl is not None and isinstance(df, pl.DataFrame):
+            keep = [c for c in proj if c in df.columns]
+            if not keep or len(keep) == int(df.width):
+                return df
+            return df.select(keep)
+        if pl is not None and isinstance(df, pl.LazyFrame):
+            keep = [c for c in proj if c in self._polars_schema_names(df)]
+            if not keep:
+                return df
+            return df.select(keep)
+        return df
+
+    @staticmethod
+    def _single_layer_source(layer: Mapping[str, Any]) -> Any:
+        entries = layer.get("data", [])
+        if not isinstance(entries, list) or len(entries) != 1:
+            return None
+        entry = entries[0]
+        if not isinstance(entry, Mapping):
+            return None
+        return deepcopy(entry.get("source"))
+
+    def _resolve_base_dataset_source(self, source: Any):
+        current = source
+        seen: set[str] = set()
+        if isinstance(current, (list, tuple)) and len(current) == 1 and isinstance(current[0], str):
+            current = current[0]
+        while isinstance(current, str):
+            if current in seen:
+                return None
+            seen.add(current)
+            if current in self.dataset_registry:
+                return current
+            if current in self._preprofile_alias_meta:
+                meta = self._preprofile_alias_meta.get(current, {})
+                loader = meta.get("loader", {}) if isinstance(meta, Mapping) else {}
+                current = loader.get("source") if isinstance(loader, Mapping) else None
+                continue
+            if current in self._named_share_sources:
+                current = self._named_share_sources.get(current)
+                continue
+            return None
+        return None
+
+    def _enrich_for_demand(self, df: Any, source: Any, demand_columns: Optional[Sequence[str]]):
+        if not isinstance(df, pd.DataFrame):
+            return df
+        if JP_ROW_IDX not in df.columns:
+            return df
+        demand = self._projection_list(demand_columns)
+        if not demand:
+            return df
+        missing = [c for c in demand if c not in df.columns]
+        if not missing:
+            return df
+        base_source = self._resolve_base_dataset_source(source)
+        if not isinstance(base_source, str):
+            return df
+        dataset = self.dataset_registry.get(base_source)
+        if dataset is None or not hasattr(dataset, "fetch_rows_columns"):
+            return df
+        try:
+            row_ids = np.asarray(df[JP_ROW_IDX].to_numpy(copy=False), dtype=np.int64)
+        except Exception:
+            return df
+        extra = dataset.fetch_rows_columns(row_ids, missing, row_key=JP_ROW_IDX)
+        if not isinstance(extra, pd.DataFrame) or extra.empty:
+            return df
+        out = self._clone_df(df)
+        for col in [c for c in extra.columns if c in missing]:
+            out[col] = extra[col].to_numpy(copy=False)
+        return out
+
+    @staticmethod
     def _clone_df(df: pd.DataFrame) -> pd.DataFrame:
         try:
             return df.copy(deep=False)
@@ -58,10 +339,71 @@ class DataPreprocessor:
             return deepcopy(df)
 
     @staticmethod
+    def _should_collect_dataframe(df: Any) -> bool:
+        if not isinstance(df, pd.DataFrame):
+            return False
+        try:
+            return int(df.shape[0]) >= 100_000
+        except Exception:
+            return True
+
+    @staticmethod
     def _safe_nrows(df: Any) -> Optional[int]:
         if isinstance(df, pd.DataFrame):
             return int(df.shape[0])
+        if pl is not None and isinstance(df, pl.DataFrame):
+            return int(df.height)
         return None
+
+    @staticmethod
+    def _is_polars_frame(df: Any) -> bool:
+        if pl is None:
+            return False
+        return isinstance(df, (pl.DataFrame, pl.LazyFrame))
+
+    @staticmethod
+    def _polars_schema_names(lf) -> List[str]:
+        if pl is None:
+            return []
+        try:
+            if isinstance(lf, pl.DataFrame):
+                return list(lf.columns)
+            if isinstance(lf, pl.LazyFrame):
+                return list(lf.collect_schema().names())
+        except Exception:
+            return []
+        return []
+
+    def _polars_to_pandas_compat(self, df: Any, reason: str = "runtime"):
+        if pl is None:
+            return df
+        if isinstance(df, pl.LazyFrame):
+            memtrace_checkpoint(self.logger, "pipeline.polars_collect.before", df, extra={"reason": reason})
+            self._info(f"Collecting polars LazyFrame -> {reason}")
+            df = df.collect()
+            memtrace_checkpoint(self.logger, "pipeline.polars_collect.after", df, extra={"reason": reason})
+        if isinstance(df, pl.DataFrame):
+            memtrace_checkpoint(self.logger, "pipeline.pandas_convert.before", df, extra={"reason": reason})
+            self._info(f"Converting polars DataFrame to pandas -> {reason}")
+            try:
+                out = df.to_pandas()
+            except ModuleNotFoundError:
+                self._warn(
+                    f"pyarrow unavailable during polars->pandas conversion; using dict fallback -> {reason}"
+                )
+                out = pd.DataFrame(df.to_dict(as_series=False))
+            memtrace_checkpoint(self.logger, "pipeline.pandas_convert.after", out, extra={"reason": reason})
+            return out
+        return df
+
+    def ensure_pandas(self, df: Any, reason: str = "runtime"):
+        if pl is None:
+            return df
+        if isinstance(df, (pl.LazyFrame, pl.DataFrame)):
+            return self._polars_to_pandas_compat(df, reason=reason)
+        if isinstance(df, dict):
+            return {kk: self.ensure_pandas(vv, reason=reason) for kk, vv in df.items()}
+        return df
 
     def _runtime_source_label(self, source: Any) -> str:
         if isinstance(source, str):
@@ -137,6 +479,7 @@ class DataPreprocessor:
         transform: Any,
         combine: str = "concat",
         mode: str = "runtime",
+        projection: Optional[Sequence[str]] = None,
     ) -> str:
         eff_transform = self._effective_transform(source, transform)
         payload = {
@@ -146,6 +489,7 @@ class DataPreprocessor:
             "transform": eff_transform,
             "combine": str(combine),
             "mode": str(mode),
+            "projection": self._projection_list(projection),
         }
         if self.cache is not None:
             return self.cache.cache_key(payload)
@@ -157,6 +501,7 @@ class DataPreprocessor:
         transform: Any,
         combine: str = "concat",
         mode: str = "runtime",
+        projection: Optional[Sequence[str]] = None,
     ) -> Dict[str, Any]:
         eff_transform = self._effective_transform(source, transform)
         return {
@@ -165,6 +510,7 @@ class DataPreprocessor:
             "transform": eff_transform,
             "combine": str(combine),
             "mode": str(mode),
+            "projection": self._projection_list(projection),
         }
 
     def _demand_fingerprint(
@@ -173,8 +519,11 @@ class DataPreprocessor:
         transform: Any,
         combine: str = "concat",
         mode: str = "runtime",
+        projection: Optional[Sequence[str]] = None,
     ) -> str:
-        return self._stable_hash(self._demand_payload(source, transform, combine=combine, mode=mode))
+        return self._stable_hash(
+            self._demand_payload(source, transform, combine=combine, mode=mode, projection=projection)
+        )
 
     def _layer_signature(self, layer: Mapping[str, Any]) -> str:
         ds = layer.get("data", [])
@@ -228,6 +577,132 @@ class DataPreprocessor:
             return None
         return self._stable_hash(tokens)
 
+    @staticmethod
+    def _preprofile_alias_name(key: str) -> str:
+        return f"__jp_preprofile_{str(key)[:16]}"
+
+    def _preprofile_cache_file(self, key: str) -> str:
+        if self.cache is None:
+            return "<memory-only>"
+        try:
+            return str((self.cache.data_dir / f"{key}.pkl").resolve())
+        except Exception:
+            return "<memory-only>"
+
+    @staticmethod
+    def _preprofile_loader_spec(task: Mapping[str, Any]) -> Dict[str, Any]:
+        return {
+            "source": deepcopy(task.get("source")),
+            "combine": str(task.get("combine", "concat")),
+            "pre_transform": deepcopy(task.get("pre_transform")),
+            "prefix_transform": deepcopy(task.get("prefix_transform")),
+            "profile_cfg": deepcopy(task.get("profile_cfg", {})),
+            "base_projection": deepcopy(task.get("base_projection")),
+            "cache_flag": bool(task.get("cache_flag", True)),
+        }
+
+    def _register_preprofile_alias(
+        self,
+        alias: str,
+        task: Mapping[str, Any],
+        origin: str,
+        rows: Optional[int] = None,
+        cache_ready: bool = False,
+    ) -> None:
+        key = str(task.get("pre_key", ""))
+        cache_file = self._preprofile_cache_file(key) if cache_ready else "<lazy-recompute>"
+        self._preprofile_alias_meta[str(alias)] = {
+            "pre_key": key,
+            "origin": str(origin),
+            "cache_file": cache_file,
+            "source": deepcopy(task.get("source")),
+            "rows": rows,
+            "cache_ready": bool(cache_ready),
+            "loader": self._preprofile_loader_spec(task),
+        }
+        self.context.register(
+            str(alias),
+            lambda _shared, _alias=str(alias): self._load_preprofile_alias(_alias),
+        )
+
+    def _load_preprofile_alias(self, alias: str):
+        meta = self._preprofile_alias_meta.get(str(alias))
+        if not isinstance(meta, Mapping):
+            self._warn(f"Lazy preprofile alias metadata missing -> {alias}")
+            return None
+
+        key = str(meta.get("pre_key", ""))
+        if bool(meta.get("cache_ready")) and self.cache is not None and key:
+            cached = self.cache.get_dataframe(key)
+            if cached is not None:
+                if meta.get("rows") is None:
+                    meta["rows"] = self._safe_nrows(cached)
+                self._debug(f"Lazy preprofile alias cache LOAD -> {alias}")
+                return cached
+
+        loader = meta.get("loader")
+        if not isinstance(loader, Mapping):
+            self._warn(f"Lazy preprofile alias loader missing -> {alias}")
+            return None
+
+        self._info(
+            "Lazy preprofile alias BUILD:\n\t alias \t-> {},\n\t source \t-> {},\n\t key \t-> {}".format(
+                alias,
+                self._runtime_source_label(loader.get("source")),
+                key[:16] if key else "<none>",
+            )
+        )
+
+        base_df, _, _ = self.run_pipeline(
+            source=loader.get("source"),
+            transform=loader.get("prefix_transform"),
+            combine=loader.get("combine", "concat"),
+            use_cache=bool(loader.get("cache_flag", True)),
+            mode="preprofile-base",
+            projection=loader.get("base_projection"),
+        )
+        if base_df is None:
+            return None
+
+        try:
+            out = _preprofiling(base_df, loader.get("profile_cfg", {}), self.logger)
+        finally:
+            base_df = None
+            gc.collect()
+
+        if out is None:
+            return None
+
+        out = self._select_columns(out, loader.get("base_projection"))
+        rows = self._safe_nrows(out)
+        if bool(loader.get("cache_flag", True)) and self.cache is not None and isinstance(out, pd.DataFrame) and key:
+            pre_demand_fp = self._demand_fingerprint(
+                loader.get("source"),
+                loader.get("pre_transform"),
+                combine=loader.get("combine", "concat"),
+                mode="preprofile",
+                projection=loader.get("base_projection"),
+            )
+            self.cache.put_dataframe(
+                key,
+                out,
+                meta={
+                    "source": self._source_token(loader.get("source"), combine=loader.get("combine", "concat")),
+                    "combine": loader.get("combine", "concat"),
+                    "transform": loader.get("pre_transform"),
+                    "mode": "preprofile",
+                    "demand_fingerprint": pre_demand_fp,
+                    "projection": loader.get("base_projection"),
+                    "rows": rows,
+                },
+            )
+            meta["cache_ready"] = True
+            meta["cache_file"] = self._preprofile_cache_file(key)
+
+        meta["rows"] = rows
+        self._preprofile_alias_meta[str(alias)] = dict(meta)
+        return out
+
     def _is_runtime_profile_cache_compatible(
         self,
         transform: Any,
@@ -260,11 +735,18 @@ class DataPreprocessor:
         mode: str,
         key: str,
         meta: Optional[Mapping[str, Any]],
+        projection: Optional[Sequence[str]] = None,
     ) -> Tuple[bool, str]:
         if not isinstance(meta, Mapping):
             return False, "meta-missing"
 
-        expected_demand = self._demand_fingerprint(source, transform, combine=combine, mode=mode)
+        expected_demand = self._demand_fingerprint(
+            source,
+            transform,
+            combine=combine,
+            mode=mode,
+            projection=projection,
+        )
         cached_demand = meta.get("demand_fingerprint")
         if not cached_demand:
             return False, "demand-fingerprint-missing"
@@ -284,10 +766,25 @@ class DataPreprocessor:
 
         return True, "ok"
 
-    def load_named_layer(self, name: Optional[str], layer: Mapping[str, Any]):
+    def load_named_layer(
+        self,
+        name: Optional[str],
+        layer: Mapping[str, Any],
+        demand_columns: Optional[Sequence[str]] = None,
+    ):
         if not name or self.cache is None:
             return None
         signature = self._layer_signature(layer)
+        return self.load_named_layer_by_signature(name, signature, demand_columns=demand_columns)
+
+    def load_named_layer_by_signature(
+        self,
+        name: Optional[str],
+        signature: str,
+        demand_columns: Optional[Sequence[str]] = None,
+    ):
+        if not name or self.cache is None:
+            return None
         self._named_share_signatures[str(name)] = str(signature)
         named = self.cache.get_named(name, signature)
         if isinstance(named, pd.DataFrame):
@@ -298,15 +795,53 @@ class DataPreprocessor:
                     self._safe_nrows(named) if self._safe_nrows(named) is not None else "NA",
                 )
             )
-        return named
+        return self._enrich_for_demand(named, str(name), demand_columns)
 
-    def persist_named_layer(self, name: Optional[str], layer: Mapping[str, Any], data) -> None:
+    def register_named_layer(self, name: Optional[str], layer: Mapping[str, Any]) -> bool:
+        if not name or self.cache is None:
+            return False
+        signature = self._layer_signature(layer)
+        self._named_share_signatures[str(name)] = str(signature)
+        self._named_share_sources[str(name)] = self._single_layer_source(layer)
+        self.context.register(
+            str(name),
+            lambda _shared, _name=str(name), _sig=str(signature): self.load_named_layer_by_signature(_name, _sig),
+        )
+        return True
+
+    def should_release_between_uses(self, source: Any) -> bool:
+        if not isinstance(source, str):
+            return False
+        if source in self.dataset_registry:
+            return False
+        if source in self._preprofile_alias_meta:
+            return True
+        if source in self._named_share_signatures:
+            return True
+        return False
+
+    def persist_named_layer(
+        self,
+        name: Optional[str],
+        layer: Mapping[str, Any],
+        data,
+        cache_ref: Optional[str] = None,
+    ) -> None:
         if not name or self.cache is None:
             return
         if not isinstance(data, pd.DataFrame):
             return
         signature = self._layer_signature(layer)
         self._named_share_signatures[str(name)] = str(signature)
+        self._named_share_sources[str(name)] = self._single_layer_source(layer)
+        ref_key = str(cache_ref or "").strip()
+        if ref_key:
+            try:
+                self.cache.put_named_reference(name, signature, ref_key)
+                self._debug(f"Stored named dataset '{name}' as data-cache reference -> {ref_key[:16]}")
+                return
+            except Exception as e:
+                self._debug(f"Named dataset reference fallback to dataframe store for '{name}': {e}")
         self.cache.put_named(name, signature, data)
         self._debug(f"Stored named dataset '{name}' into cache.")
 
@@ -315,32 +850,40 @@ class DataPreprocessor:
             return self.context.get(source)
 
         if isinstance(source, (list, tuple)):
-            frames: List[pd.DataFrame] = []
+            frames: List[Any] = []
             source_rows: List[str] = []
-            rows_before = 0
+            rows_before_total = 0
             for ss in source:
                 dt = self.context.get(str(ss))
                 if dt is None:
                     self._warn(f"Source '{ss}' not found in context.")
                     continue
-                if not isinstance(dt, pd.DataFrame):
-                    self._warn(f"Source '{ss}' is not a DataFrame (type={type(dt)}), skipped in concat.")
-                    continue
-                nrow = int(dt.shape[0])
-                rows_before += nrow
-                source_rows.append(f"{ss}:{nrow}")
+                nrow = self._safe_nrows(dt)
+                if nrow is not None:
+                    rows_before_total += int(nrow)
+                source_rows.append(f"{ss}:{nrow if nrow is not None else 'NA'}")
                 frames.append(dt)
             if not frames:
                 return None
             mode = str(combine or "concat").lower()
             if mode != "concat":
                 self._warn(f"Unsupported source-list combine mode '{combine}', fallback to 'concat'.")
-            out = pd.concat(frames, ignore_index=False)
-            rows_after = int(out.shape[0]) if isinstance(out, pd.DataFrame) else "NA"
+
+            if pl is not None and all(self._is_polars_frame(frame) for frame in frames):
+                lazy_frames = [
+                    frame if isinstance(frame, pl.LazyFrame) else frame.lazy()
+                    for frame in frames
+                ]
+                out = pl.concat(lazy_frames, how="vertical_relaxed")
+                rows_after = "lazy"
+            else:
+                pandas_frames = [self.ensure_pandas(frame, reason="concat-source-list") for frame in frames]
+                out = pd.concat(pandas_frames, ignore_index=False)
+                rows_after = int(out.shape[0]) if isinstance(out, pd.DataFrame) else "NA"
             self._warn(
                 "Source concat rows:\n\t sources -> {}\n\t rows_before -> {}\n\t rows_after -> {}.".format(
                     ", ".join(source_rows) if source_rows else "<none>",
-                    rows_before,
+                    rows_before_total if rows_before_total else "NA",
                     rows_after,
                 )
             )
@@ -383,17 +926,32 @@ class DataPreprocessor:
             self._warn(f"Illegal transform format, list required -> {transform}")
             return df
 
+        df = self.ensure_pandas(df, reason=f"{profile_mode}-transform")
+
         for trans in transform:
             if not isinstance(trans, Mapping):
                 self._warn(f"Invalid transform step skipped -> {trans}")
                 continue
+            prev_df = df
 
             if "filter" in trans:
                 df = filter_df(df, trans["filter"], self.logger)
             elif "profile" in trans:
                 profile_cfg = trans.get("profile", {})
                 if str(profile_mode).lower() == "preprofile":
+                    memtrace_checkpoint(
+                        self.logger,
+                        "pipeline.profile.before",
+                        df,
+                        extra={"source": source_label or "<preprofile>", "mode": profile_mode},
+                    )
                     df = _preprofiling(df, profile_cfg, self.logger)
+                    memtrace_checkpoint(
+                        self.logger,
+                        "pipeline.profile.after",
+                        df,
+                        extra={"source": source_label or "<preprofile>", "mode": profile_mode},
+                    )
                 else:
                     before_rows = self._safe_nrows(df)
                     method = "bridson"
@@ -410,6 +968,17 @@ class DataPreprocessor:
                             before_rows if before_rows is not None else "NA",
                         )
                     )
+                    memtrace_checkpoint(
+                        self.logger,
+                        "pipeline.profile.before",
+                        df,
+                        extra={
+                            "source": source_label or "<unknown>",
+                            "mode": profile_mode,
+                            "method": method,
+                            "bin": binv,
+                        },
+                    )
                     df = profiling(df, profile_cfg, self.logger)
                     after_rows = self._safe_nrows(df)
                     delta = "NA"
@@ -423,6 +992,17 @@ class DataPreprocessor:
                             after_rows if after_rows is not None else "NA",
                             delta,
                         )
+                    )
+                    memtrace_checkpoint(
+                        self.logger,
+                        "pipeline.profile.after",
+                        df,
+                        extra={
+                            "source": source_label or "<unknown>",
+                            "mode": profile_mode,
+                            "method": method,
+                            "bin": binv,
+                        },
                     )
             elif "grid_profile" in trans:
                 profile_cfg = trans.get("grid_profile", {})
@@ -440,6 +1020,16 @@ class DataPreprocessor:
                         before_rows if before_rows is not None else "NA",
                     )
                 )
+                memtrace_checkpoint(
+                    self.logger,
+                    "pipeline.grid_profile.before",
+                    df,
+                    extra={
+                        "source": source_label or "<unknown>",
+                        "mode": profile_mode,
+                        "bin": binv,
+                    },
+                )
                 df = grid_profiling(df, profile_cfg, self.logger)
                 after_rows = self._safe_nrows(df)
                 delta = "NA"
@@ -453,10 +1043,29 @@ class DataPreprocessor:
                         delta,
                     )
                 )
+                memtrace_checkpoint(
+                    self.logger,
+                    "pipeline.grid_profile.after",
+                    df,
+                    extra={
+                        "source": source_label or "<unknown>",
+                        "mode": profile_mode,
+                        "bin": binv,
+                    },
+                )
             elif "sortby" in trans:
                 df = sortby(df, trans["sortby"], self.logger)
             elif "add_column" in trans:
                 df = addcolumn(df, trans["add_column"], self.logger)
+
+            if prev_df is not df:
+                collect_prev = self._should_collect_dataframe(prev_df)
+                try:
+                    del prev_df
+                except Exception:
+                    prev_df = None
+                if collect_prev:
+                    gc.collect()
 
         return df
 
@@ -480,14 +1089,27 @@ class DataPreprocessor:
         combine: str = "concat",
         use_cache: bool = True,
         mode: str = "runtime",
+        demand_columns: Optional[Sequence[str]] = None,
+        projection: Optional[Sequence[str]] = None,
     ) -> Tuple[Optional[pd.DataFrame], str, bool]:
+        mode_lower = str(mode).lower()
         effective_transform = self._effective_transform(source, transform)
-        key = self._pipeline_key(source, effective_transform, combine=combine, mode=mode)
-        runtime_mode = str(mode).lower() == "runtime"
+        if projection is None and mode_lower == "runtime":
+            projection = self._runtime_projection(effective_transform, demand_columns)
+        projection = self._projection_list(projection)
+        key = self._pipeline_key(source, effective_transform, combine=combine, mode=mode, projection=projection)
+        runtime_mode = mode_lower == "runtime"
+        cache_enabled = bool(use_cache) and mode_lower != "preprofile-base"
         runtime_sig = self._runtime_profile_signature(effective_transform) if runtime_mode else None
-        demand_fp = self._demand_fingerprint(source, effective_transform, combine=combine, mode=mode)
+        demand_fp = self._demand_fingerprint(
+            source,
+            effective_transform,
+            combine=combine,
+            mode=mode,
+            projection=projection,
+        )
 
-        if use_cache and self.cache is not None:
+        if cache_enabled and self.cache is not None:
             meta = None
             try:
                 if hasattr(self.cache, "get_dataframe_meta"):
@@ -502,6 +1124,7 @@ class DataPreprocessor:
                 mode=mode,
                 key=key,
                 meta=meta,
+                projection=projection,
             )
             if compatible:
                 cached = self.cache.get_dataframe(key)
@@ -523,6 +1146,13 @@ class DataPreprocessor:
                         )
                     self._emit_source_summary(source)
                     self._debug(f"Pipeline cache HIT -> {key}")
+                    memtrace_checkpoint(
+                        self.logger,
+                        "pipeline.cache_hit",
+                        cached,
+                        extra={"source": self._runtime_source_label(source), "mode": mode},
+                    )
+                    cached = self._enrich_for_demand(cached, source, demand_columns)
                     return self._clone_df(cached), key, True
                 reason = "cache-read-failed"
 
@@ -563,8 +1193,26 @@ class DataPreprocessor:
         raw = self._resolve_source_data(source, combine=combine)
         if raw is None:
             return None, key, False
+        raw = self._select_columns(raw, projection)
+        memtrace_checkpoint(
+            self.logger,
+            "pipeline.source_resolved",
+            raw,
+            extra={
+                "source": self._runtime_source_label(source),
+                "mode": mode,
+                "combine": combine,
+            },
+        )
+        memtrace_object_inventory(
+            self.logger,
+            "pipeline.source_resolved.inventory",
+            {"raw": raw},
+            roles={"raw": "source dataframe"},
+            min_bytes=64 * 1024 * 1024,
+        )
 
-        if str(mode).lower() == "runtime":
+        if mode_lower == "runtime":
             src_label = self._runtime_source_label(source)
             if isinstance(source, str) and source in self._preprofile_alias_meta:
                 meta = self._preprofile_alias_meta.get(source, {})
@@ -578,26 +1226,53 @@ class DataPreprocessor:
                     )
                 )
 
-        if isinstance(raw, pd.DataFrame):
-            work = raw.copy(deep=True)
+        must_pandas = mode_lower != "runtime"
+        if effective_transform is None:
+            work = self.ensure_pandas(raw, reason=f"{mode}-pipeline") if must_pandas else raw
+        elif isinstance(raw, pd.DataFrame):
+            if mode_lower in {"preprofile-base", "preprofile"}:
+                work = raw
+            else:
+                work = self._clone_df(raw)
         else:
-            work = deepcopy(raw)
-        if str(mode).lower() == "preprofile":
+            work = self.ensure_pandas(raw, reason=f"{mode}-pipeline")
+
+        if mode_lower == "preprofile":
             work = self.apply_transforms(work, effective_transform)
-        else:
+        elif effective_transform is not None:
             work = self.apply_runtime_transforms(
                 work,
                 effective_transform,
                 source_label=self._runtime_source_label(source),
             )
+        if mode_lower == "runtime":
+            work = self._select_columns(work, self._runtime_cache_columns(effective_transform, demand_columns))
+        memtrace_checkpoint(
+            self.logger,
+            "pipeline.transform_done",
+            work,
+            extra={"source": self._runtime_source_label(source), "mode": mode},
+        )
+        memtrace_object_inventory(
+            self.logger,
+            "pipeline.transform_done.inventory",
+            {"raw": raw, "work": work},
+            roles={
+                "raw": "source dataframe",
+                "work": "transform output",
+            },
+            min_bytes=64 * 1024 * 1024,
+        )
+        raw = None
 
-        if use_cache and self.cache is not None and isinstance(work, pd.DataFrame):
+        if cache_enabled and self.cache is not None and isinstance(work, pd.DataFrame):
             meta = {
                 "source": self._source_token(source, combine=combine),
                 "combine": combine,
                 "transform": effective_transform,
                 "mode": mode,
                 "demand_fingerprint": demand_fp,
+                "projection": projection,
             }
             runtime_profile_sig = runtime_sig if runtime_mode else None
             if runtime_mode and runtime_profile_sig is not None:
@@ -624,8 +1299,15 @@ class DataPreprocessor:
                 )
             self._debug(f"Pipeline cache STORE -> {key}")
 
-        if isinstance(work, pd.DataFrame):
+        work = self._enrich_for_demand(work, source, demand_columns)
+        if isinstance(work, pd.DataFrame) and mode_lower == "runtime":
             work = self._clone_df(work)
+        memtrace_checkpoint(
+            self.logger,
+            "pipeline.return",
+            work,
+            extra={"source": self._runtime_source_label(source), "mode": mode},
+        )
         return work, key, False
 
     @staticmethod
@@ -729,13 +1411,20 @@ class DataPreprocessor:
                     cache_flag = bool(ds.get("cache", True))
                     combine = "concat"
 
-                    key = self._pipeline_key(src, pre_transform, combine=combine, mode="preprofile")
+                    prefix_transform = pre_transform[:-1]
+                    profile_cfg = {}
+                    if pre_transform and isinstance(pre_transform[-1], Mapping):
+                        profile_cfg = deepcopy(pre_transform[-1].get("profile", {}))
+                    base_projection = self._preprofile_base_projection(prefix_transform, profile_cfg)
+                    key = self._pipeline_key(
+                        src,
+                        pre_transform,
+                        combine=combine,
+                        mode="preprofile",
+                        projection=base_projection,
+                    )
                     task = tasks.get(key)
                     if task is None:
-                        prefix_transform = pre_transform[:-1]
-                        profile_cfg = {}
-                        if pre_transform and isinstance(pre_transform[-1], Mapping):
-                            profile_cfg = deepcopy(pre_transform[-1].get("profile", {}))
                         task = {
                             "pre_key": key,
                             "source": src,
@@ -743,6 +1432,7 @@ class DataPreprocessor:
                             "pre_transform": pre_transform,
                             "prefix_transform": prefix_transform,
                             "profile_cfg": profile_cfg,
+                            "base_projection": base_projection,
                             "cache_flag": cache_flag,
                             "targets": [],
                         }
@@ -780,51 +1470,42 @@ class DataPreprocessor:
                     mode="preprofile",
                     key=key,
                     meta=meta,
+                    projection=task.get("base_projection"),
                 )
                 if ok_cache:
-                    cached = self.cache.get_dataframe(key)
-                    if cached is not None:
-                        alias = f"__jp_preprofile_{key[:16]}"
-                        self.context.update(alias, self._clone_df(cached))
-                        prepared[key] = alias
-                        self._emit_source_summary(task.get("source"))
-                        cache_file = "<memory-only>"
-                        if self.cache is not None:
-                            try:
-                                cache_file = str((self.cache.data_dir / f"{key}.pkl").resolve())
-                            except Exception:
-                                cache_file = "<memory-only>"
-                        self._preprofile_alias_meta[alias] = {
-                            "pre_key": key,
-                            "origin": "cache-hit",
-                            "cache_file": cache_file,
-                            "source": task.get("source"),
-                            "rows": self._safe_nrows(cached),
-                        }
-                        logged_pairs = set()
-                        for tgt in task.get("targets", []):
-                            fig_name = str(tgt.get("figure_name", "<noname>"))
-                            layer_name = str(tgt.get("layer_name", "<noname>"))
-                            pair = (fig_name, layer_name)
-                            if pair in logged_pairs:
-                                continue
-                            logged_pairs.add(pair)
-                            self._info(
-                                "Preprofile cache HIT:\n\t figure -> {},\n\t layer -> {},\n\t source -> {},\n\t key -> {}".format(
-                                    fig_name,
-                                    layer_name,
-                                    task.get("source"),
-                                    key[:16],
-                                )
+                    alias = self._preprofile_alias_name(key)
+                    rows = meta.get("rows") if isinstance(meta, Mapping) else None
+                    self._register_preprofile_alias(alias, task, origin="cache-hit", rows=rows, cache_ready=True)
+                    prepared[key] = alias
+                    self._emit_source_summary(task.get("source"))
+                    logged_pairs = set()
+                    for tgt in task.get("targets", []):
+                        fig_name = str(tgt.get("figure_name", "<noname>"))
+                        layer_name = str(tgt.get("layer_name", "<noname>"))
+                        pair = (fig_name, layer_name)
+                        if pair in logged_pairs:
+                            continue
+                        logged_pairs.add(pair)
+                        self._info(
+                            "Preprofile cache HIT:\n\t figure -> {},\n\t layer -> {},\n\t source -> {},\n\t key -> {}".format(
+                                fig_name,
+                                layer_name,
+                                task.get("source"),
+                                key[:16],
                             )
-                        hits += 1
-                    else:
-                        self._debug(f"Preprofile cache INVALID (cache-read-failed) -> {key}")
+                        )
+                    hits += 1
                 elif reason != "meta-missing":
                     self._debug(f"Preprofile cache INVALID ({reason}) -> {key}")
 
             if alias is None:
-                pending.append(task)
+                if bool(task.get("cache_flag", True)) and self.cache is not None:
+                    pending.append(task)
+                else:
+                    alias = self._preprofile_alias_name(key)
+                    self._register_preprofile_alias(alias, task, origin="lazy-recompute", rows=None, cache_ready=False)
+                    prepared[key] = alias
+                    miss += 1
 
         # phase-2: batch by identical input data
         groups: Dict[str, List[Dict[str, Any]]] = {}
@@ -848,22 +1529,36 @@ class DataPreprocessor:
                 combine=sample.get("combine", "concat"),
                 use_cache=any(bool(t.get("cache_flag", True)) for t in grp),
                 mode="preprofile-base",
+                projection=sorted(
+                    {
+                        str(col).strip()
+                        for task in grp
+                        for col in (task.get("base_projection") or [])
+                        if str(col).strip()
+                    }
+                ),
             )
             if base_df is None:
                 continue
 
             for task in grp:
-                out = _preprofiling(self._clone_df(base_df), task.get("profile_cfg", {}), self.logger)
+                # _preprofiling is implemented as read-mostly on input dataframe.
+                # Reusing base_df here avoids cloning a large table for every
+                # task in the same preprofile group.
+                out = _preprofiling(base_df, task.get("profile_cfg", {}), self.logger)
                 if out is None:
                     continue
 
+                out = self._select_columns(out, task.get("base_projection"))
                 key = task["pre_key"]
+                rows = self._safe_nrows(out)
                 if bool(task.get("cache_flag", True)) and self.cache is not None and isinstance(out, pd.DataFrame):
                     pre_demand_fp = self._demand_fingerprint(
                         task.get("source"),
                         task.get("pre_transform"),
                         combine=task.get("combine", "concat"),
                         mode="preprofile",
+                        projection=task.get("base_projection"),
                     )
                     self.cache.put_dataframe(
                         key,
@@ -874,26 +1569,21 @@ class DataPreprocessor:
                             "transform": task.get("pre_transform"),
                             "mode": "preprofile",
                             "demand_fingerprint": pre_demand_fp,
+                            "projection": task.get("base_projection"),
+                            "rows": rows,
                         },
                     )
 
-                alias = f"__jp_preprofile_{key[:16]}"
-                self.context.update(alias, self._clone_df(out))
-                cache_file = "<memory-only>"
-                if bool(task.get("cache_flag", True)) and self.cache is not None:
-                    try:
-                        cache_file = str((self.cache.data_dir / f"{key}.pkl").resolve())
-                    except Exception:
-                        cache_file = "<memory-only>"
-                self._preprofile_alias_meta[alias] = {
-                    "pre_key": key,
-                    "origin": "rebuilt",
-                    "cache_file": cache_file,
-                    "source": task.get("source"),
-                    "rows": self._safe_nrows(out),
-                }
+                alias = self._preprofile_alias_name(key)
+                self._register_preprofile_alias(alias, task, origin="rebuilt", rows=rows, cache_ready=True)
                 prepared[key] = alias
                 miss += 1
+                out = None
+                if rows is not None and int(rows) >= 100_000:
+                    gc.collect()
+
+            base_df = None
+            gc.collect()
 
         # phase-3: rewrite dataset sources to prepared aliases
         for key, task in tasks.items():

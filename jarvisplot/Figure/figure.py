@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from copy import deepcopy
+import gc
 from typing import Optional, Mapping
 import numpy as np 
 import os, sys 
@@ -11,10 +12,16 @@ from types import MethodType
 
 from .adapters import StdAxesAdapter, TernaryAxesAdapter
 from .method_registry import resolve_callable
+from ..memtrace import memtrace_checkpoint
 
 import json
 import time
 import re
+
+try:
+    import polars as pl
+except Exception:
+    pl = None
 
 
 class Figure:
@@ -382,6 +389,7 @@ class Figure:
         self.debug      = False
         # self._axtri     = None
         self._layers    = {}
+        self._render_queue = []
         self._ctx       = None
         self._preprocessor = None
         # allow optional initialization from a dict
@@ -489,57 +497,183 @@ class Figure:
     
     @layers.setter
     def layers(self, infos):
+        self._render_queue = []
         for layer in infos: 
             info = {}
             ax  = self.axes[layer['axes']]
             info['name'] = layer.get("name", "")
-            info['data'] = self.load_layer_data(layer)
+            info['data'] = None
+            info['data_loaded'] = False
+            info['layer_spec'] = layer
+            info['source_refs'] = self._source_refs_from_layer(layer)
+            info['share_name'] = layer.get("share_data")
             info['combine'] = layer.get("combine", "concat")
-            if layer.get("share_data") and info['data'] is not None:
-                from copy import deepcopy
-                self.context.update(layer["share_data"], deepcopy(info['data']))
-                if self.preprocessor is not None:
-                    try:
-                        self.preprocessor.persist_named_layer(layer["share_data"], layer, info["data"])
-                    except Exception as e:
-                        self.logger.debug(f"persist share_data cache failed: {e}")
             info['coor'] = layer['coordinates']
             info['method'] = layer.get("method", "scatter")
             info['style'] = layer.get("style", {})
             ax.layers.append(info)
+            self._render_queue.append((ax, info))
             self.logger.debug("Successfully loaded layer -> {}".format(info["name"]))
+
+    @staticmethod
+    def _is_polars_frame(obj) -> bool:
+        if pl is None:
+            return False
+        return isinstance(obj, (pl.DataFrame, pl.LazyFrame))
+
+    def _polars_to_pandas_compat(self, data, reason: str = "render"):
+        if pl is None:
+            return data
+        if isinstance(data, pl.LazyFrame):
+            memtrace_checkpoint(self.logger, "figure.polars_collect.before", data, extra={"reason": reason})
+            self.logger.debug(f"Collecting polars LazyFrame for pandas step -> {reason}")
+            data = data.collect()
+            memtrace_checkpoint(self.logger, "figure.polars_collect.after", data, extra={"reason": reason})
+        if isinstance(data, pl.DataFrame):
+            memtrace_checkpoint(self.logger, "figure.pandas_convert.before", data, extra={"reason": reason})
+            self.logger.debug(f"Materializing polars DataFrame for pandas step -> {reason}")
+            try:
+                out = data.to_pandas()
+            except ModuleNotFoundError:
+                self.logger.warning(
+                    f"pyarrow unavailable during polars->pandas conversion; using dict fallback -> {reason}"
+                )
+                out = pd.DataFrame(data.to_dict(as_series=False))
+            memtrace_checkpoint(self.logger, "figure.pandas_convert.after", out, extra={"reason": reason})
+            return out
+        return data
+
+    def _source_refs_from_layer(self, layer) -> list[str]:
+        refs: list[str] = []
+        entries = layer.get("data", [])
+        if not isinstance(entries, list):
+            return refs
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            source = entry.get("source")
+            if isinstance(source, str):
+                refs.append(source)
+            elif isinstance(source, (list, tuple)):
+                refs.extend(str(item) for item in source if isinstance(item, str))
+        return refs
+
+    def _ensure_pandas_data(self, data, reason: str = "render"):
+        if pl is None:
+            return data
+        if isinstance(data, (pl.LazyFrame, pl.DataFrame)):
+            return self._polars_to_pandas_compat(data, reason=reason)
+        if isinstance(data, dict):
+            return {kk: self._ensure_pandas_data(vv, reason=reason) for kk, vv in data.items()}
+        return data
+
+    def _concat_loaded_data(self, items):
+        if len(items) == 0:
+            return None
+        if len(items) == 1:
+            return items[0]
+        if pl is not None and all(self._is_polars_frame(item) for item in items):
+            lazy_items = [item if isinstance(item, pl.LazyFrame) else item.lazy() for item in items]
+            return pl.concat(lazy_items, how="vertical_relaxed")
+        pandas_items = [self._ensure_pandas_data(item, reason="concat-layer") for item in items]
+        try:
+            return pd.concat(pandas_items, ignore_index=False)
+        except Exception:
+            return pandas_items[0]
+
+    def _store_share_data_if_needed(self, layer, data, cache_ref: str | None = None):
+        share_name = layer.get("share_data")
+        if not share_name or data is None or self.context is None:
+            return
+
+        registered = False
+        if self.preprocessor is not None:
+            try:
+                self.preprocessor.persist_named_layer(share_name, layer, data, cache_ref=cache_ref)
+                registered = bool(self.preprocessor.register_named_layer(share_name, layer))
+            except Exception as e:
+                self.logger.debug(f"persist share_data cache failed: {e}")
+
+        if self.context.remaining_uses(share_name) <= 0:
+            return
+        if not registered:
+            self.context.update(share_name, data)
+
+    def _load_layer_runtime_data(self, layer_info):
+        if layer_info.get("data_loaded"):
+            return layer_info.get("data")
+        layer = layer_info.get("layer_spec", {})
+        loaded = self.load_layer_data(layer)
+        cache_ref = None
+        if isinstance(loaded, tuple) and len(loaded) == 2:
+            data, cache_ref = loaded
+        else:
+            data = loaded
+        layer_info["data"] = data
+        layer_info["data_loaded"] = True
+        layer_info["share_cache_ref"] = cache_ref
+        self._store_share_data_if_needed(layer, data, cache_ref=cache_ref)
+        return data
+
+    def _release_layer_runtime_data(self, layer_info):
+        layer_info["data"] = None
+        layer_info["data_loaded"] = False
+
+        share_name = layer_info.get("share_name")
+        if share_name and self.context is not None and self.context.remaining_uses(share_name) <= 0:
+            self.context.invalidate(share_name)
+
+        if self.context is not None:
+            for ref in layer_info.get("source_refs", []):
+                remain = self.context.consume(ref)
+                if remain > 0 and self.preprocessor is not None:
+                    try:
+                        if self.preprocessor.should_release_between_uses(ref):
+                            self.context.invalidate(ref)
+                    except Exception as e:
+                        self.logger.debug(f"transient source release failed for '{ref}': {e}")
+        gc.collect()
                         
     def load_layer_data(self, layer):
         lyinfo = layer.get("data", False)
         lycomb = layer.get("combine", "concat")
         share_name = layer.get("share_data")
+        layer_demand = None
+        if self.preprocessor is not None:
+            try:
+                layer_demand = self.preprocessor.layer_demand_columns(layer)
+            except Exception:
+                layer_demand = None
 
         if self.preprocessor is not None and share_name:
             try:
-                named = self.preprocessor.load_named_layer(share_name, layer)
+                named = self.preprocessor.load_named_layer(share_name, layer, demand_columns=layer_demand)
                 if named is not None:
                     self.logger.debug(f"Loaded share_data '{share_name}' from named cache.")
-                    return named
+                    return named, None
             except Exception as e:
                 self.logger.debug(f"Named share_data cache load failed: {e}")
 
         if lyinfo:
             if lycomb == "concat":
                 dts = []
+                cache_keys = []
                 for ds in lyinfo:
                     src = ds.get('source')
                     use_cache = bool(ds.get("cache", True))
                     self.logger.debug("Loading layer data source -> {}".format(src))
                     if src and self.context:
                         if self.preprocessor is not None:
-                            dt, _, _ = self.preprocessor.run_pipeline(
+                            dt, cache_key, _ = self.preprocessor.run_pipeline(
                                 source=src,
                                 transform=ds.get("transform", None),
                                 combine="concat",
                                 use_cache=use_cache,
+                                demand_columns=layer_demand,
                             )
                             if dt is not None:
                                 dts.append(dt)
+                                cache_keys.append(cache_key if isinstance(cache_key, str) and use_cache else None)
                         else:
                             from copy import deepcopy
                             if isinstance(src, (list, tuple)):
@@ -559,11 +693,12 @@ class Figure:
                     else:
                         self.logger.error("DataSet -> {} not specified".format(src))
                 if len(dts) == 0:
-                    return None
-                try:
-                        return pd.concat(dts, ignore_index=False)
-                except Exception:
-                    return dts[0]
+                    return None, None
+                combined = self._concat_loaded_data(dts)
+                cache_ref = None
+                if len(dts) == 1 and combined is dts[0] and len(cache_keys) == 1:
+                    cache_ref = cache_keys[0]
+                return combined, cache_ref
             elif lycomb == "seperate":
                 dts = {}
                 for ds in lyinfo: 
@@ -578,6 +713,7 @@ class Figure:
                                 transform=ds.get("transform", None),
                                 combine="concat",
                                 use_cache=use_cache,
+                                demand_columns=layer_demand,
                             )
                         else:
                             from copy import deepcopy
@@ -591,10 +727,10 @@ class Figure:
                     else:
                         self.logger.error("DataSet -> {} not specified".format(src))
                 if len(dts) == 0: 
-                    return None 
-                return dts 
+                    return None, None 
+                return dts, None 
         # Unsupported lyinfo shape -> no data
-        return None
+        return None, None
                
          
     def load_bool_df(self, df, transform):
@@ -1150,10 +1286,21 @@ class Figure:
         """
         Render all layers attached to each axes (we appended them in axtri/axlogo setters).
         """
+        memtrace_checkpoint(
+            self.logger,
+            "figure.render.before",
+            None,
+            extra={
+                "figure": self.name,
+                "layers": len(self._render_queue),
+            },
+        )
+        for ax, ly in self._render_queue:
+            self._load_layer_runtime_data(ly)
+            self.render_layer(ax, ly)
+            self._release_layer_runtime_data(ly)
+
         for ax_name, ax in self.axes.items():
-            ly_list = getattr(ax, "layers", [])
-            for ly in ly_list:
-                self.render_layer(ax, ly)
             # mark drawn after all layers on this axes
             if hasattr(ax, 'status'):
                 ax.status = 'drawn'
@@ -1189,6 +1336,15 @@ class Figure:
                 except Exception as e:
                     if self.logger:
                         self.logger.warning(f"Finalize failed on axes '{name}': {e}")
+        memtrace_checkpoint(
+            self.logger,
+            "figure.render.after",
+            None,
+            extra={
+                "figure": self.name,
+                "axes": len(self.axes),
+            },
+        )
 
     def _apply_manual_ticks(self, ax_obj, which: str, ticks_cfg: dict):
         """Apply manual ticks if YAML provides them; otherwise keep auto.
@@ -1599,7 +1755,8 @@ class Figure:
             style.update(layer_info.get("style", {}))
 
         if getattr(ax, "_type", None) == "tri":
-            df = layer_info["data"]
+            df = self._ensure_pandas_data(layer_info["data"], reason=f"render:{layer_info.get('name', '')}")
+            layer_info["data"] = df
             coor = layer_info.get("coor", {})
 
             # Apply per-figure shared colorbar (lazy) if an axc exists
@@ -1621,7 +1778,8 @@ class Figure:
             return method(**style)
 
         elif getattr(ax, "_type", None) == "rect":
-            df = layer_info["data"]
+            df = self._ensure_pandas_data(layer_info["data"], reason=f"render:{layer_info.get('name', '')}")
+            layer_info["data"] = df
             coor = layer_info.get("coor", {})
             try:
                 style = self._cb_collect_and_attach(style, coor, method_key, df)

@@ -11,6 +11,7 @@ import shutil
 import time
 
 import pandas as pd
+from .memtrace import memtrace_checkpoint, memtrace_file_checkpoint, memtrace_object_inventory
 
 
 class ProjectCache:
@@ -23,6 +24,7 @@ class ProjectCache:
         self.data_dir = self.root / "data"
         self.summary_dir = self.root / "summary"
         self.named_dir = self.root / "named"
+        self.materialized_dir = self.root / "materialized"
         self.manifest_path = self.root / "manifest.json"
         self.rebuild = bool(rebuild)
 
@@ -33,11 +35,18 @@ class ProjectCache:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.summary_dir.mkdir(parents=True, exist_ok=True)
         self.named_dir.mkdir(parents=True, exist_ok=True)
+        self.materialized_dir.mkdir(parents=True, exist_ok=True)
 
         self.manifest: Dict[str, Any] = self._load_json(
             self.manifest_path,
             default={"schema": 1, "files": {}, "named": {}},
         )
+        # In rebuild mode we ignore old cache on disk, but we still want to
+        # reuse artifacts written during the same process execution.
+        self._written_dataframe_keys: set[str] = set()
+        self._written_materialized_keys: set[str] = set()
+        self._written_named_keys: set[str] = set()
+        self._written_summary_keys: set[str] = set()
 
     def _debug(self, msg: str) -> None:
         if self.logger:
@@ -129,7 +138,7 @@ class ProjectCache:
         return fp
 
     def get_dataframe(self, key: str):
-        if self.rebuild:
+        if self.rebuild and str(key) not in self._written_dataframe_keys:
             return None
         p = self.data_dir / f"{key}.pkl"
         if not p.exists():
@@ -144,7 +153,7 @@ class ProjectCache:
         return self.data_dir / f"{key}.pkl"
 
     def is_dataframe_meta_consistent(self, key: str, meta: Optional[Dict[str, Any]]) -> bool:
-        if self.rebuild:
+        if self.rebuild and str(key) not in self._written_dataframe_keys:
             return False
         if not isinstance(meta, dict):
             return False
@@ -175,7 +184,7 @@ class ProjectCache:
         return True
 
     def get_dataframe_meta(self, key: str) -> Optional[Dict[str, Any]]:
-        if self.rebuild:
+        if self.rebuild and str(key) not in self._written_dataframe_keys:
             return None
         p = self.data_dir / f"{key}.json"
         if not p.exists():
@@ -193,6 +202,19 @@ class ProjectCache:
     def put_dataframe(self, key: str, df, meta: Optional[Dict[str, Any]] = None) -> None:
         p = self.data_dir / f"{key}.pkl"
         try:
+            memtrace_checkpoint(
+                self.logger,
+                "cache.put_dataframe.before",
+                df,
+                extra={"cache_key": str(key)[:16], "cache_file": str(p)},
+            )
+            memtrace_object_inventory(
+                self.logger,
+                "cache.put_dataframe.inventory",
+                {"df": df},
+                roles={"df": "cache-ready dataframe"},
+                min_bytes=64 * 1024 * 1024,
+            )
             df.to_pickle(p)
             payload: Dict[str, Any] = {}
             if isinstance(meta, dict):
@@ -214,6 +236,13 @@ class ProjectCache:
             m = self.data_dir / f"{key}.json"
             with open(m, "w", encoding="utf-8") as f:
                 json.dump(payload, f, ensure_ascii=True, indent=2, sort_keys=True, default=str)
+            self._written_dataframe_keys.add(str(key))
+            memtrace_file_checkpoint(
+                self.logger,
+                "cache.put_dataframe.after",
+                p,
+                extra={"cache_key": str(key)[:16]},
+            )
         except Exception as e:
             self._warn(f"Failed writing dataframe cache '{p}': {e}")
 
@@ -221,8 +250,43 @@ class ProjectCache:
         key = self.cache_key({"kind": "summary", "source": source_fp})
         return self.summary_dir / f"{key}.txt"
 
+    def materialized_slot(self, key: str) -> Path:
+        return self.materialized_dir / str(key)
+
+    def get_materialized_manifest(self, key: str) -> Optional[Dict[str, Any]]:
+        if self.rebuild and str(key) not in self._written_materialized_keys:
+            return None
+        path = self.materialized_slot(key) / "manifest.json"
+        if not path.exists():
+            return None
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, dict) else None
+        except Exception as e:
+            self._warn(f"Failed loading materialized manifest '{path}': {e}")
+            return None
+
+    def put_materialized_manifest(self, key: str, manifest: Dict[str, Any]) -> None:
+        slot = self.materialized_slot(key)
+        slot.mkdir(parents=True, exist_ok=True)
+        path = slot / "manifest.json"
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(manifest, f, ensure_ascii=True, indent=2, sort_keys=True, default=str)
+            self._written_materialized_keys.add(str(key))
+        except Exception as e:
+            self._warn(f"Failed writing materialized manifest '{path}': {e}")
+
+    def clear_materialized_slot(self, key: str) -> Path:
+        slot = self.materialized_slot(key)
+        shutil.rmtree(slot, ignore_errors=True)
+        slot.mkdir(parents=True, exist_ok=True)
+        return slot
+
     def get_summary(self, source_fp: Dict[str, Any]) -> Optional[str]:
-        if self.rebuild:
+        key = self.cache_key({"kind": "summary", "source": source_fp})
+        if self.rebuild and str(key) not in self._written_summary_keys:
             return None
         p = self._summary_path(source_fp)
         if not p.exists():
@@ -236,6 +300,8 @@ class ProjectCache:
         p = self._summary_path(source_fp)
         try:
             p.write_text(str(text), encoding="utf-8")
+            key = self.cache_key({"kind": "summary", "source": source_fp})
+            self._written_summary_keys.add(str(key))
         except Exception as e:
             self._warn(f"Failed writing summary cache '{p}': {e}")
 
@@ -248,6 +314,12 @@ class ProjectCache:
         slot = self.cache_key({"name": name, "signature": signature})[:12]
         p = self.named_dir / f"{safe}__{slot}.pkl"
         try:
+            memtrace_checkpoint(
+                self.logger,
+                "cache.put_named.before",
+                df,
+                extra={"name": str(name), "signature": str(signature)[:16]},
+            )
             df.to_pickle(p)
             named = self.manifest.setdefault("named", {})
             sha1 = None
@@ -264,18 +336,47 @@ class ProjectCache:
             except Exception:
                 sha1 = None
             named[str(name)] = {
+                "kind": "dataframe",
                 "signature": str(signature),
                 "path": str(p.relative_to(self.root)),
                 "sha1": sha1,
                 "size": size,
                 "mtime_ns": mtime_ns,
             }
+            self._written_named_keys.add(str(name))
             self._save_manifest()
+            memtrace_file_checkpoint(
+                self.logger,
+                "cache.put_named.after",
+                p,
+                extra={"name": str(name), "signature": str(signature)[:16]},
+            )
         except Exception as e:
             self._warn(f"Failed writing named cache '{name}': {e}")
 
+    def put_named_reference(self, name: str, signature: str, data_key: str) -> None:
+        key = str(data_key or "").strip()
+        if not key:
+            return
+        p = self.dataframe_cache_path(key)
+        if not p.exists():
+            return
+        try:
+            st = p.stat()
+        except Exception:
+            return
+        named = self.manifest.setdefault("named", {})
+        named[str(name)] = {
+            "kind": "dataframe-ref",
+            "signature": str(signature),
+            "ref_key": key,
+            "size": int(st.st_size),
+        }
+        self._written_named_keys.add(str(name))
+        self._save_manifest()
+
     def get_named(self, name: str, signature: str):
-        if self.rebuild:
+        if self.rebuild and str(name) not in self._written_named_keys:
             return None
         named = self.manifest.get("named", {})
         item = named.get(str(name))
@@ -284,6 +385,15 @@ class ProjectCache:
         if str(item.get("signature")) != str(signature):
             return None
         try:
+            kind = str(item.get("kind", "dataframe")).strip().lower()
+            if kind == "dataframe-ref":
+                ref_key = str(item.get("ref_key", "")).strip()
+                if not ref_key:
+                    return None
+                try:
+                    return self.get_dataframe(ref_key)
+                except Exception:
+                    return None
             p = self.root / item["path"]
             if not p.exists():
                 return None

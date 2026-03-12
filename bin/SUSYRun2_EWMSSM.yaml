@@ -3084,7 +3084,6 @@ Figures:
   - name: triscatter
     data:
     - source: h5
-    share_data: GEWMSSM_LogL
     axes: axtri
     method: scatter
     coordinates:
