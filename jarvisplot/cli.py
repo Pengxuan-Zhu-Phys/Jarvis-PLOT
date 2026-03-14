@@ -7,7 +7,12 @@ import os, sys
 # --- version import fallback ---
 try:
     from importlib.metadata import version as _pkg_version
-    JPLOT_VERSION = _pkg_version("jarvisplot")
+    for _dist_name in ("Jarvis-PLOT", "jarvisplot"):
+        try:
+            JPLOT_VERSION = _pkg_version(_dist_name)
+            break
+        except Exception:
+            JPLOT_VERSION = "0.0.0"
 except Exception:
     JPLOT_VERSION = "0.0.0"
 
@@ -62,4 +67,3 @@ class CLI():
                     self.args.add_argument(
                         opt['long'], **kwargs
                     )
-

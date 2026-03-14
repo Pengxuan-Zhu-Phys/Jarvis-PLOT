@@ -436,8 +436,6 @@ def profiling(df, prof, logger):
     source_z = z[source_rows]
     grid_x_keep = x_grid[keep_grid]
     grid_y_keep = y_grid[keep_grid]
-    grid_z_keep = z_grid[keep_grid]
-
     xx = None
     yy = None
     zz = None
@@ -455,7 +453,9 @@ def profiling(df, prof, logger):
         grid_out = pd.DataFrame(index=keep_grid + source_count)
         grid_out[xind] = grid_x_keep
         grid_out[yind] = grid_y_keep
-        grid_out[zind] = grid_z_keep
+        # Keep the internal sentinel for Bridson selection only; emitted grid
+        # support points should remain visually empty in downstream consumers.
+        grid_out[zind] = np.nan
         grid_out = grid_out.reindex(columns=out.columns)
         out = pd.concat([out, grid_out], axis=0, ignore_index=False)
 

@@ -320,15 +320,29 @@ class DataPreprocessor:
         if dataset is None or not hasattr(dataset, "fetch_rows_columns"):
             return df
         try:
-            row_ids = np.asarray(df[JP_ROW_IDX].to_numpy(copy=False), dtype=np.int64)
+            row_idx = pd.to_numeric(df[JP_ROW_IDX], errors="coerce")
+        except Exception:
+            return df
+        valid_mask = row_idx.notna().to_numpy(copy=False)
+        if not bool(np.any(valid_mask)):
+            return df
+        try:
+            row_ids = row_idx[valid_mask].astype(np.int64).to_numpy(copy=False)
         except Exception:
             return df
         extra = dataset.fetch_rows_columns(row_ids, missing, row_key=JP_ROW_IDX)
         if not isinstance(extra, pd.DataFrame) or extra.empty:
             return df
         out = self._clone_df(df)
+        valid_index = out.index[valid_mask]
         for col in [c for c in extra.columns if c in missing]:
-            out[col] = extra[col].to_numpy(copy=False)
+            values = extra[col].to_numpy(copy=False)
+            if int(values.shape[0]) != int(valid_index.shape[0]):
+                continue
+            if bool(np.all(valid_mask)):
+                out[col] = values
+            else:
+                out.loc[valid_index, col] = values
         return out
 
     @staticmethod
