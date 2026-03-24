@@ -127,17 +127,20 @@ Priority order:
 
 ## 5) Refactor Priority Queue (When Time Allows)
 
-1. unify expression evaluation path (`Figure._eval_series` + `load_data.eval_series`)
+1. reduce duplicated path-resolution and dataset-policy logic across `core.py`, `figure.py`, `data_loader.py`, `data_loader_runtime.py`, and `data_loader_hdf5.py`
 2. split `Figure` monolith into:
   - config ingestion
-  - axes builder
-  - layer renderer
+  - layout assembly
+  - layer runtime
   - colorbar manager
-3. replace ad-hoc dict contracts with typed schema/dataclasses for frame/layer color config
-4. add minimal automated regression tests for:
+  - render dispatch
+3. split `data_loader.py` into source loading and summary emission helpers; keep transform/runtime handling in `data_loader_runtime.py` and HDF5 policy in `data_loader_hdf5.py`
+4. replace ad-hoc dict contracts with typed schema/dataclasses for frame/layer color config
+5. add minimal automated regression tests for:
   - profile/grid_profile cache reuse
   - colorbar scale/limits
   - style fallback resolution
+  - path-resolution behavior on a real YAML input
 
 
 ## 6) Definition of Done (for Me)

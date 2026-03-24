@@ -1,12 +1,14 @@
 # Jarvis-PLOT Framework Logic (Execution Contract)
 
+Status: implemented
+
 ## 1) Execution Layers
 
 Jarvis-PLOT runtime can be viewed as four stacked layers:
 
 1. Orchestration layer (`core.py`)
-2. Data pipeline layer (`data_loader.py` + `preprocessor.py` + `load_data.py`)
-3. Render layer (`figure.py` + `adapters.py` + `method_registry.py`)
+2. Data pipeline layer (`data_loader.py` + `data_loader_summary.py` + `data_loader_hdf5.py` + `preprocessor.py` + `load_data.py` + `profile_runtime.py`)
+3. Render layer (`figure.py` + `adapters.py` + `adapters_rect.py` + `adapters_ternary.py` + `method_registry.py`)
 4. Asset/config layer (`cards/*.json` + user YAML in `bin/`)
 
 

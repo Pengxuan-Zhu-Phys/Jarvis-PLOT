@@ -1,4 +1,8 @@
-# Jarvis-PLOT Code Review Snapshot (2026-03-04)
+# Jarvis-PLOT Code Review Snapshot (2026-03-04, Archived)
+
+Status: historical
+
+This file is archived on purpose. It records the code-review state from 2026-03-04 so the backlog and the code map can reference concrete historical findings without keeping the review in the active context directory.
 
 Scope reviewed:
 

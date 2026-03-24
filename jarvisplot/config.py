@@ -61,9 +61,10 @@ class ConfigLoader:
     def update_dataset(self, target_name, updates: dict):
         for d in self.config["DataSet"]:
             if d.get("name") == target_name:
-                print(d.keys())
+                if self.logger:
+                    self.logger.debug(f"ConfigLoader.update_dataset before -> {list(d.keys())}")
                 d.update(updates)
-                print(d.keys())
+                if self.logger:
+                    self.logger.debug(f"ConfigLoader.update_dataset after -> {list(d.keys())}")
                 return True   # 成功更新
         return False          # 没找到
-

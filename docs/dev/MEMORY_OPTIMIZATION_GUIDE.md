@@ -25,12 +25,12 @@ The 1.3.0 pipeline moves memory pressure out of the hot path by narrowing tables
 
 ### 1. Compact Dataset Collect
 
-Implemented mainly in `jarvisplot/data_loader.py`.
+Implemented mainly in `jarvisplot/data_loader.py`, `jarvisplot/data_loader_runtime.py`, and `jarvisplot/data_loader_hdf5.py`.
 
 - `JarvisPLOT.plan_dataset_required_columns()` computes `required_columns` and `retained_columns` before datasets are materialized.
 - HDF5 sources use `_build_hdf5_whitelist()` to avoid loading unrelated leaf datasets.
-- `_load_hdf5_materialized()` writes selected columns to cached parquet parts instead of assembling a giant in-memory dataframe first.
-- `_apply_dataset_transform_polars()` keeps filter/sort/add-column work in polars when possible, then collects only the kept columns.
+- `jarvisplot/data_loader_runtime.py` owns `_load_hdf5_materialized()` and the HDF5 materialization path.
+- `jarvisplot/data_loader_runtime.py` keeps filter/sort/add-column work in polars when possible, then collects only the kept columns.
 
 Impact:
 

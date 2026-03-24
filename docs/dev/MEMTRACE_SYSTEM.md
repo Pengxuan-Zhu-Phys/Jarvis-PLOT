@@ -59,9 +59,9 @@ By default it only logs objects estimated at `>= 64 MiB`.
 Main probes:
 
 - `jarvisplot/data_loader.py:polars_to_pandas_compat()`
-- `jarvisplot/data_loader.py:_apply_dataset_transform()`
-- `jarvisplot/data_loader.py:_apply_dataset_transform_polars()`
-- `jarvisplot/data_loader.py:_activate_materialized_manifest()`
+- `jarvisplot/data_loader_runtime.py:apply_dataset_transform()`
+- `jarvisplot/data_loader_runtime.py:apply_dataset_transform_polars()`
+- `jarvisplot/data_loader_runtime.py:activate_materialized_manifest()`
 
 Stages include:
 
@@ -108,7 +108,7 @@ Examples:
 - `pipeline.transform_done`
 - `pipeline.return`
 
-`jarvisplot/Figure/load_data.py` also emits profiling-specific checkpoints such as:
+`jarvisplot/Figure/profile_runtime.py` emits profiling-specific checkpoints such as:
 
 - `profile.before`
 - `profile.concat_ready`

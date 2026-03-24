@@ -1,29 +1,36 @@
-# Jarvis-PLOT Local Docs Library
+# Jarvis-PLOT Docs
 
-This directory is a local documentation workspace for Jarvis-PLOT planning and engineering notes.
+This directory is the tracked documentation entry point for Jarvis-PLOT.
 
-- Scope: architecture context, release planning, migration notes, test playbooks.
-- Tracking policy: local-only, intentionally excluded from Git tracking.
+Use it to find the current implementation boundary, subsystem design notes, schema contracts, and developer rules.
 
 ## Structure
 
-- `context/`: project and codebase context documents.
-- `releases/`: version task lists and release notes drafts.
+- `context/`: primary Codex-facing boundary docs and code owner map
+- `design/`: architecture and subsystem design notes
+- `specs/`: schema and contract docs
+- `dev/`: contributor rules, memory notes, and instrumentation guidance
+- `roadmap/`: active implementation backlog and future work list
+- `templates/`: example scene, style, and profile payloads
+- `release/`: release playbooks and version notes
+- `archive/`: historical or retired notes
 
-## Context Docs Index
+## Primary Entry
+
+Start with:
 
 - `context/JARVIS_PLOT_CONTEXT.md`
-  - Codebase map, runtime call-chain, data/render/cache model.
+
+Then read:
+
+- `context/CODE_MAP_JARVIS_PLOT.md`
 - `context/JARVIS_PLOT_FRAMEWORK_LOGIC.md`
-  - YAML-to-figure execution logic and key runtime contracts.
-- `context/CODEX_JARVIS_PLOT_STYLE.md`
-  - My own engineering style policy for this repo:
-    - explicit `MUST NOT` rules
-    - `SHOULD AVOID` patterns
-    - change checklist
-- `context/JARVIS_PLOT_CODE_REVIEW_2026-03-04.md`
-  - Full-code review findings snapshot with file/line references.
+- `roadmap/IMPLEMENTATION_ROADMAP.md` when you need the remaining task list
 
-## Current Active Version Planning
+## Navigation Notes
 
-- `releases/v1.2.6.md`
+- `context/` explains project boundaries and current ownership.
+- `design/` explains current architecture and the intended split between layers.
+- `specs/` defines stable input contracts, especially semantic scene input.
+- `dev/` defines rules for safe implementation changes.
+- `templates/` provides example payloads that should stay aligned with the spec docs.

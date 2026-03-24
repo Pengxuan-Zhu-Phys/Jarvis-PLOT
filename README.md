@@ -101,18 +101,19 @@ jplot ./bin/SUSYRun2_GEWMSSM.yaml
 ### Documentation
 [https://pengxuan-zhu-phys.github.io/Jarvis-Docs/](https://pengxuan-zhu-phys.github.io/Jarvis-Docs/)
 
-### Developer Docs
+### Repository Docs
 
-Tracked architecture and maintenance docs now live in `docs/dev/`.
+Tracked project docs live in `docs/`.
 
-- `docs/dev/ARCHITECTURE_OVERVIEW.md`
-- `docs/dev/DATAFLOW_ARCHITECTURE.md`
-- `docs/dev/MEMORY_OPTIMIZATION_GUIDE.md`
-- `docs/dev/DEVELOPER_RULES.md`
-- `docs/dev/MEMTRACE_SYSTEM.md`
-- `docs/dev/CONTRIBUTION_GUIDE.md`
+- `docs/README.md` - repo doc index
+- `docs/context/JARVIS_PLOT_CONTEXT.md` - primary Codex-facing boundary doc
+- `docs/context/CODE_MAP_JARVIS_PLOT.md` - concrete code owner map
+- `docs/context/JARVIS_PLOT_FRAMEWORK_LOGIC.md` - runtime execution contract
+- `docs/roadmap/IMPLEMENTATION_ROADMAP.md` - active backlog and future work list
+- `docs/dev/DEVELOPER_RULES.md` - current pipeline and cache rules
+- `docs/dev/MEMORY_OPTIMIZATION_GUIDE.md` - narrow-table memory notes
 
-These documents describe the 1.3.0 selection-table pipeline architecture that 1.3.1 consolidates. Future work should preserve the narrow-table dataflow and must not reintroduce wide-table profiling or cache payloads.
+Read the context docs and roadmap before changing parsing, transforms, rendering, or layout-related behavior.
 
 ---
 

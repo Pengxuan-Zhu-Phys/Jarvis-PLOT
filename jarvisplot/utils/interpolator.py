@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Tuple, Literal
+
+from .expression import eval_dataframe_expression
+from .pathing import resolve_project_path
 
 
 BoundsMode = Literal["clamp", "extrapolate", "nan", "error"]
@@ -258,15 +260,7 @@ class InterpolatorManager:
         """
         Resolve YAML-relative path or absolute path.
         """
-        p = str(p)
-        if p.startswith("&JP/"):
-            # allow internal JP paths if needed; resolve relative to project root (yaml_dir's parent)
-            # but keep simple: treat as relative to yaml_dir for now.
-            p = p[4:]
-        path = Path(p).expanduser()
-        if not path.is_absolute():
-            path = (self._yaml_dir / path).resolve()
-        return path
+        return resolve_project_path(p, base_dir=self._yaml_dir or ".")
 
     def _load_csv_xy(self, spec: CSVSourceSpec) -> Tuple[Any, Any]:
         """
@@ -285,19 +279,9 @@ class InterpolatorManager:
         if spec.drop_duplicates is not None and spec.drop_duplicates in df.columns:
             df = df.drop_duplicates(subset=spec.drop_duplicates, keep="first")
 
-        # Allow spec.x/spec.y to be either column names OR python expressions.
-        import math as _math
-        from ..inner_func import update_funcs as _update_funcs
-
-        local_vars = df.to_dict("series")
-        allowed_globals = _update_funcs({"np": _np, "math": _math})
-
         def _eval_field(field: str):
-            if field in df.columns:
-                return _np.asarray(df[field].values, dtype=float)
-            # treat as expression
             try:
-                arr = eval(field, allowed_globals, local_vars)
+                arr = eval_dataframe_expression(df, field, allow_column=True)
                 return _np.asarray(arr, dtype=float)
             except Exception as e:
                 raise ValueError(

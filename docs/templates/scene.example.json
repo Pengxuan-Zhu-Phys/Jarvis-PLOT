@@ -1,0 +1,76 @@
+{
+  "schema": "jarvisplot.scene/v1",
+  "scene_type": "flowchart",
+  "scene_id": "example_flowchart",
+  "title": "Example Flowchart",
+  "metadata": {
+    "producer": "Jarvis-HEP",
+    "producer_version": "1.6.10"
+  },
+  "layers": [
+    {
+      "id": "layer_1",
+      "index": 1,
+      "label": "Inputs",
+      "nodes": ["inputs"]
+    },
+    {
+      "id": "layer_2",
+      "index": 2,
+      "label": "Processing",
+      "nodes": ["calc_a"]
+    }
+  ],
+  "nodes": [
+    {
+      "id": "inputs",
+      "kind": "source",
+      "role": "parameter_source",
+      "label": "Inputs",
+      "layer": "layer_1",
+      "out_ports": [
+        {
+          "id": "p0",
+          "role": "parameter",
+          "label": "p0"
+        }
+      ]
+    },
+    {
+      "id": "calc_a",
+      "kind": "module",
+      "role": "calculator",
+      "label": "Calc A",
+      "layer": "layer_2",
+      "in_ports": [
+        {
+          "id": "p0",
+          "role": "parameter",
+          "label": "p0"
+        }
+      ],
+      "out_ports": [
+        {
+          "id": "out",
+          "role": "observable",
+          "label": "out"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": {
+        "node": "inputs",
+        "port": "p0"
+      },
+      "target": {
+        "node": "calc_a",
+        "port": "p0"
+      },
+      "role": "parameterflow"
+    }
+  ],
+  "hints": {}
+}

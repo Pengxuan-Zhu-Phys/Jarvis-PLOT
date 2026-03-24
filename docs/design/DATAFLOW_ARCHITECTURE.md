@@ -1,12 +1,15 @@
 # JarvisPLOT Dataflow Architecture
 
-JarvisPLOT 1.3.0 replaced the old wide-table pipeline with a three-table model. The code does not expose these as separate classes, but the distinction is enforced by how `core.py`, `data_loader.py`, and `Figure/preprocessor.py` project, cache, and enrich data.
+Status: implemented
+
+JarvisPLOT 1.3.0 replaced the old wide-table pipeline with a three-table model. The code does not expose these as separate classes, but the distinction is enforced by how `core.py`, `data_loader.py`, `data_loader_summary.py`, `data_loader_runtime.py`, `data_loader_hdf5.py`, `Figure/preprocessor.py`, and `Figure/preprocessor_runtime.py` project, cache, and enrich data.
 
 ## The Three Table Types
 
 | Table type | Where it exists in code | Purpose | Allowed width |
 | --- | --- | --- | --- |
 | Dataset Table | `DataSet.data` in `jarvisplot/data_loader.py` | Compact retained source data after dataset load and dataset-level transforms | Narrow, retained columns only |
+| Dataset Runtime | `jarvisplot/data_loader_runtime.py` | HDF5 runtime loading/materialization and dataset transform execution | Narrow, helper-owned |
 | Selection Table | Output of `DataPreprocessor.run_pipeline()` before demand enrichment | Input to `profile`, `preprofile`, and `grid_profile`; compact cache payload | Narrow, profiling columns plus current-layer demand |
 | Enriched Table | Output of `DataPreprocessor._enrich_for_demand()` and then `Figure.render_layer()` | Rendering, layer style evaluation, `share_data`, export-oriented use | Add only layer-requested columns |
 
@@ -24,6 +27,9 @@ Properties:
   - HDF5 materialized to `.cache/materialized/<key>/part-*.parquet`, then exposed as a polars lazy scan before the pandas boundary
 - Sits on the polars-to-pandas boundary:
   - HDF5 path prefers `polars` lazy pushdown and only collects the kept columns
+- HDF5 whitelist / rename / manifest helpers live in `jarvisplot/data_loader_hdf5.py`
+- summary formatting and tree diagnostics live in `jarvisplot/data_loader_summary.py`
+- runtime loading/materialization helpers live in `jarvisplot/data_loader_runtime.py`
   - downstream transform/render code still consumes pandas dataframes
 
 What must be in it:

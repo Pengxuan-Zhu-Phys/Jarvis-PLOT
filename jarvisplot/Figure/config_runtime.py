@@ -1,0 +1,87 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Mapping
+
+
+def apply_figure_config(fig, info: Mapping) -> bool:
+    """Apply a YAML figure block to a Figure instance."""
+    if not isinstance(info, Mapping):
+        raise TypeError("from_dict expects a mapping/dict")
+
+    try:
+        changed = True
+        if "name" in info:
+            fig.name = info["name"]
+        else:
+            changed = False
+
+        if "yaml_dir" in info:
+            fig._yaml_dir = info.get("yaml_dir")
+        elif "_yaml_dir" in info:
+            fig._yaml_dir = info.get("_yaml_dir")
+        elif "yaml_path" in info:
+            try:
+                fig._yaml_dir = str(Path(info.get("yaml_path")).expanduser().resolve().parent)
+            except Exception:
+                pass
+
+        if "debug" in info:
+            fig.debug = info["debug"]
+            try:
+                fig.logger.debug("Loading plot -> {} in debug mode".format(fig.name))
+            except Exception:
+                pass
+
+        fig._enable = info.get("enable", True)
+        if not fig._enable:
+            fig.logger.warning("Skip plot -> {}".format(fig.name))
+            return False
+
+        if "style" in info:
+            fig.style = info["style"]
+        else:
+            fig.style = ["a4paper_2x1"]
+        fig.logger.debug("Figure style loaded")
+        if fig.style and "gambit" in str(fig.style[0]).lower():
+            fig.mode = "gambit"
+
+        if "frame" in info:
+            fig.frame = info["frame"]
+        fig.logger.debug("Figure frame information loaded")
+
+        import matplotlib.pyplot as plt
+
+        plt.rcParams["mathtext.fontset"] = "stix"
+        fig.fig = plt.figure(**fig.frame["figure"])
+
+        if fig.print:
+            try:
+                if isinstance(fig.frame.get("axes"), dict):
+                    fig.frame["axes"].pop("axlogo", None)
+                fig.frame.pop("axlogo", None)
+            except Exception:
+                pass
+
+        fig.load_axes()
+
+        if "layers" in info:
+            fig.layers = info["layers"]
+        else:
+            changed = False
+
+        return changed
+    except Exception as e:
+        if fig.logger:
+            try:
+                import traceback
+
+                fig.logger.error(
+                    "Failed to configure figure '{}': {}".format(
+                        getattr(fig, "name", "<noname>"), e
+                    )
+                )
+                fig.logger.debug(traceback.format_exc())
+            except Exception:
+                pass
+        return False

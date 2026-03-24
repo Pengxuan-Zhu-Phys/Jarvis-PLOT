@@ -1,5 +1,7 @@
 # JarvisPLOT Architecture Overview
 
+Status: implemented
+
 This document captures the runtime architecture that shipped in JarvisPLOT 1.3.0 and is being consolidated for the 1.3.1 documentation release.
 
 The main architectural constraint is deliberate: JarvisPLOT must keep a narrow, selection-table pipeline. Full source tables must not flow through runtime profiling, cache storage, or layer rendering by default.
@@ -9,8 +11,11 @@ The main architectural constraint is deliberate: JarvisPLOT must keep a narrow, 
 | Module | Main responsibilities | Key entry points |
 | --- | --- | --- |
 | `jarvisplot/core.py` | Top-level orchestration: CLI setup, YAML load, workdir/cache init, dataset registration, required-column planning, prebuild pass, figure loop | `JarvisPLOT.init()`, `plan_dataset_required_columns()`, `prepare_project_layout()`, `prebuild_profile_pipelines()`, `plot()` |
-| `jarvisplot/data_loader.py` | Source loading for CSV/HDF5, HDF5 materialization to cached parquet parts, dataset-level transforms, stable row ids, late row/column fetch | `DataSet.load()`, `load_hdf5()`, `_load_hdf5_materialized()`, `_apply_dataset_transform()`, `fetch_rows_columns()` |
-| `jarvisplot/Figure/preprocessor.py` | Pipeline execution, projection planning, preprofile prebuild, runtime transform application, pipeline cache compatibility, demand-based enrichment | `DataPreprocessor.prebuild_profiles()`, `run_pipeline()`, `_runtime_projection()`, `_runtime_cache_columns()`, `_enrich_for_demand()` |
+| `jarvisplot/data_loader.py` | CSV loading, dataset lifecycle, stable row ids, late row/column fetch, HDF5 call-through | `DataSet.load()`, `load_hdf5()`, `fetch_rows_columns()` |
+| `jarvisplot/data_loader_summary.py` | dataframe summary formatting and HDF5 tree diagnostics | `dataframe_summary()`, `print_hdf5_tree_ascii()` |
+| `jarvisplot/data_loader_runtime.py` | Runtime HDF5 loading/materialization and dataset transform execution | `load_hdf5()`, `load_hdf5_materialized()`, `apply_dataset_transform()` |
+| `jarvisplot/Figure/preprocessor.py` | Projection planning, preprofile prebuild, pipeline cache compatibility, demand-based enrichment | `DataPreprocessor.prebuild_profiles()`, `_runtime_projection()`, `_runtime_cache_columns()`, `_enrich_for_demand()` |
+| `jarvisplot/Figure/preprocessor_runtime.py` | Runtime source resolution and transform application | `resolve_source_data()`, `apply_transforms_impl()`, `run_pipeline()` |
 | `jarvisplot/Figure/figure.py` | Figure assembly, layer queueing, runtime data loading, `share_data` reuse, coordinate evaluation, adapter dispatch, rendering | `Figure.layers`, `load_layer_data()`, `render_layer()` |
 | `jarvisplot/cache_store.py` | Workdir-local cache store for pipeline payloads, summaries, named shared data, and materialized parquet manifests | `ProjectCache.put_dataframe()`, `get_dataframe()`, `put_named_reference()`, `put_materialized_manifest()` |
 | `jarvisplot/memtrace.py` | Opt-in memory tracing: RSS checkpoints, dataframe shape/backend tokens, large-object inventory, cache file checkpoints | `memtrace_checkpoint()`, `memtrace_object_inventory()`, `memtrace_file_checkpoint()` |
@@ -18,8 +23,16 @@ The main architectural constraint is deliberate: JarvisPLOT must keep a narrow, 
 Supporting infrastructure:
 
 - `jarvisplot/Figure/data_pipelines.py` provides `SharedContent` and `DataContext`, the session-level lazy data registry used by `core.py`, `preprocessor.py`, and `figure.py`.
+- `jarvisplot/Figure/preprocessor_runtime.py` holds runtime source resolution and transform execution helpers extracted from `preprocessor.py`.
 - `jarvisplot/Figure/load_data.py` contains the concrete transform primitives used by both the prebuild path and the runtime path.
+- `jarvisplot/Figure/profile_runtime.py` contains the concrete profiling and preprofiling algorithms used by both phases.
 - `jarvisplot/Figure/method_registry.py` and `jarvisplot/Figure/adapters.py` define how YAML `method` keys resolve to rectangular or ternary rendering behavior.
+- `jarvisplot/Figure/adapters_rect.py` and `jarvisplot/Figure/adapters_ternary.py` carry the adapter-family implementations; `jarvisplot/Figure/adapters.py` is a re-export facade.
+- `jarvisplot/core_assets.py` centralizes colormap, interpolator, and style bootstrap helpers.
+- `jarvisplot/utils/pathing.py` centralizes `&JP/` and workdir-relative path resolution.
+- `jarvisplot/data_loader_hdf5.py` centralizes HDF5 whitelist, rename, and materialization helpers.
+- `jarvisplot/data_loader_summary.py` centralizes dataframe summary formatting and HDF5 tree diagnostics.
+- `jarvisplot/Figure/style_runtime.py`, `jarvisplot/Figure/layout_runtime.py`, and `jarvisplot/Figure/colorbar_runtime.py` hold the helper logic extracted from the main figure runtime.
 
 ## Component Interaction
 
@@ -60,7 +73,7 @@ flowchart LR
 - Lazy pushdown happens mainly in `DataSet._load_hdf5_materialized()` and `DataSet._apply_dataset_transform_polars()`.
 - The compact dataset table is the post-load `DataSet.data` object plus `__jp_row_idx__`.
 - Selection-table projection is enforced by `DataPreprocessor._runtime_projection()`, `_runtime_cache_columns()`, and `_preprofile_base_projection()`.
-- Profiling is executed by `_preprofiling()`, `profiling()`, and `grid_profiling()` in `jarvisplot/Figure/load_data.py`.
+- Profiling is executed by `_preprofiling()`, `profiling()`, and `grid_profiling()` in `jarvisplot/Figure/profile_runtime.py`.
 - Layer-demand enrichment is performed by `DataPreprocessor._enrich_for_demand()` using `DataSet.fetch_rows_columns()`.
 
 ## Prebuild Branch

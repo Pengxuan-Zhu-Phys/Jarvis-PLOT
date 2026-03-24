@@ -18,6 +18,7 @@ except Exception:
 
 from ..data_loader import JP_ROW_IDX
 from .load_data import _preprofiling, addcolumn, filter as filter_df, grid_profiling, profiling, sortby
+from . import preprocessor_runtime as runtime
 from ..memtrace import memtrace_checkpoint, memtrace_object_inventory
 
 
@@ -860,72 +861,10 @@ class DataPreprocessor:
         self._debug(f"Stored named dataset '{name}' into cache.")
 
     def _resolve_source_data(self, source: Any, combine: str = "concat"):
-        if isinstance(source, str):
-            return self.context.get(source)
-
-        if isinstance(source, (list, tuple)):
-            frames: List[Any] = []
-            source_rows: List[str] = []
-            rows_before_total = 0
-            for ss in source:
-                dt = self.context.get(str(ss))
-                if dt is None:
-                    self._warn(f"Source '{ss}' not found in context.")
-                    continue
-                nrow = self._safe_nrows(dt)
-                if nrow is not None:
-                    rows_before_total += int(nrow)
-                source_rows.append(f"{ss}:{nrow if nrow is not None else 'NA'}")
-                frames.append(dt)
-            if not frames:
-                return None
-            mode = str(combine or "concat").lower()
-            if mode != "concat":
-                self._warn(f"Unsupported source-list combine mode '{combine}', fallback to 'concat'.")
-
-            if pl is not None and all(self._is_polars_frame(frame) for frame in frames):
-                lazy_frames = [
-                    frame if isinstance(frame, pl.LazyFrame) else frame.lazy()
-                    for frame in frames
-                ]
-                out = pl.concat(lazy_frames, how="vertical_relaxed")
-                rows_after = "lazy"
-            else:
-                pandas_frames = [self.ensure_pandas(frame, reason="concat-source-list") for frame in frames]
-                out = pd.concat(pandas_frames, ignore_index=False)
-                rows_after = int(out.shape[0]) if isinstance(out, pd.DataFrame) else "NA"
-            self._warn(
-                "Source concat rows:\n\t sources -> {}\n\t rows_before -> {}\n\t rows_after -> {}.".format(
-                    ", ".join(source_rows) if source_rows else "<none>",
-                    rows_before_total if rows_before_total else "NA",
-                    rows_after,
-                )
-            )
-            return out
-
-        self._warn(f"Unsupported source type in pipeline: {type(source)}")
-        return None
+        return runtime.resolve_source_data(self, source, combine=combine)
 
     def _emit_source_summary(self, source: Any) -> None:
-        names: List[str] = []
-        if isinstance(source, str):
-            names = [source]
-        elif isinstance(source, (list, tuple)):
-            names = [str(x) for x in source]
-
-        for name in names:
-            if name in self._emitted_sources:
-                continue
-            dts = self.dataset_registry.get(name)
-            if dts is None:
-                self._emitted_sources.add(name)
-                continue
-            try:
-                if hasattr(dts, "emit_summary"):
-                    dts.emit_summary(force_load=True)
-            except Exception as e:
-                self._warn(f"Emit summary failed for source '{name}': {e}")
-            self._emitted_sources.add(name)
+        return runtime.emit_source_summary(self, source)
 
     def _apply_transforms(
         self,
@@ -934,158 +873,16 @@ class DataPreprocessor:
         profile_mode: str = "runtime",
         source_label: Optional[str] = None,
     ):
-        if transform is None:
-            return df
-        if not isinstance(transform, list):
-            self._warn(f"Illegal transform format, list required -> {transform}")
-            return df
-
-        df = self.ensure_pandas(df, reason=f"{profile_mode}-transform")
-
-        for trans in transform:
-            if not isinstance(trans, Mapping):
-                self._warn(f"Invalid transform step skipped -> {trans}")
-                continue
-            prev_df = df
-
-            if "filter" in trans:
-                df = filter_df(df, trans["filter"], self.logger)
-            elif "profile" in trans:
-                profile_cfg = trans.get("profile", {})
-                if str(profile_mode).lower() == "preprofile":
-                    memtrace_checkpoint(
-                        self.logger,
-                        "pipeline.profile.before",
-                        df,
-                        extra={"source": source_label or "<preprofile>", "mode": profile_mode},
-                    )
-                    df = _preprofiling(df, profile_cfg, self.logger)
-                    memtrace_checkpoint(
-                        self.logger,
-                        "pipeline.profile.after",
-                        df,
-                        extra={"source": source_label or "<preprofile>", "mode": profile_mode},
-                    )
-                else:
-                    before_rows = self._safe_nrows(df)
-                    method = "bridson"
-                    binv = "default"
-                    if isinstance(profile_cfg, Mapping):
-                        method = str(profile_cfg.get("method", "bridson")).lower()
-                        if "bin" in profile_cfg:
-                            binv = profile_cfg.get("bin")
-                    self._warn(
-                        "Runtime profile START:\n\t source \t-> {}\n\t step \t\t-> profile, \n\t method \t-> {}\n\t bin \t\t-> {}\n\t rows_before \t-> {}".format(
-                            source_label or "<unknown>",
-                            method,
-                            binv,
-                            before_rows if before_rows is not None else "NA",
-                        )
-                    )
-                    memtrace_checkpoint(
-                        self.logger,
-                        "pipeline.profile.before",
-                        df,
-                        extra={
-                            "source": source_label or "<unknown>",
-                            "mode": profile_mode,
-                            "method": method,
-                            "bin": binv,
-                        },
-                    )
-                    df = profiling(df, profile_cfg, self.logger)
-                    after_rows = self._safe_nrows(df)
-                    delta = "NA"
-                    if before_rows is not None and after_rows is not None:
-                        delta = after_rows - before_rows
-                    self._warn(
-                        "Runtime profile DONE: \n\t source \t-> {}\n\t step \t\t-> profile \n\t method \t-> {}\n\t bin \t\t-> {}\n\t rows_after \t-> {}\n\t delta \t\t-> {}".format(
-                            source_label or "<unknown>",
-                            method,
-                            binv,
-                            after_rows if after_rows is not None else "NA",
-                            delta,
-                        )
-                    )
-                    memtrace_checkpoint(
-                        self.logger,
-                        "pipeline.profile.after",
-                        df,
-                        extra={
-                            "source": source_label or "<unknown>",
-                            "mode": profile_mode,
-                            "method": method,
-                            "bin": binv,
-                        },
-                    )
-            elif "grid_profile" in trans:
-                profile_cfg = trans.get("grid_profile", {})
-                if isinstance(profile_cfg, Mapping):
-                    profile_cfg = deepcopy(profile_cfg)
-                    profile_cfg.setdefault("method", "grid")
-                else:
-                    profile_cfg = {"method": "grid"}
-                before_rows = self._safe_nrows(df)
-                binv = profile_cfg.get("bin", "default")
-                self._warn(
-                    "Runtime profile START: source \t-> {}\n\t step \t-> 'grid_profile,\n\t method \t-> 'grid',\n\t bin \t-> {},\n\t rows_before \t-> {}".format(
-                        source_label or "<unknown>",
-                        binv,
-                        before_rows if before_rows is not None else "NA",
-                    )
-                )
-                memtrace_checkpoint(
-                    self.logger,
-                    "pipeline.grid_profile.before",
-                    df,
-                    extra={
-                        "source": source_label or "<unknown>",
-                        "mode": profile_mode,
-                        "bin": binv,
-                    },
-                )
-                df = grid_profiling(df, profile_cfg, self.logger)
-                after_rows = self._safe_nrows(df)
-                delta = "NA"
-                if before_rows is not None and after_rows is not None:
-                    delta = after_rows - before_rows
-                self._warn(
-                    "Runtime profile DONE: \n\t source \t-> {}\n\tstep \t-> 'grid_profile,\n\t method \t-> 'grid',\n\t bin \t\t-> {}\n\t rows_after \t-> {},\n\t delta \t->".format(
-                        source_label or "<unknown>",
-                        binv,
-                        after_rows if after_rows is not None else "NA",
-                        delta,
-                    )
-                )
-                memtrace_checkpoint(
-                    self.logger,
-                    "pipeline.grid_profile.after",
-                    df,
-                    extra={
-                        "source": source_label or "<unknown>",
-                        "mode": profile_mode,
-                        "bin": binv,
-                    },
-                )
-            elif "sortby" in trans:
-                df = sortby(df, trans["sortby"], self.logger)
-            elif "add_column" in trans:
-                df = addcolumn(df, trans["add_column"], self.logger)
-
-            if prev_df is not df:
-                collect_prev = self._should_collect_dataframe(prev_df)
-                try:
-                    del prev_df
-                except Exception:
-                    prev_df = None
-                if collect_prev:
-                    gc.collect()
-
-        return df
+        return runtime.apply_transforms_impl(
+            self,
+            df,
+            transform,
+            profile_mode=profile_mode,
+            source_label=source_label,
+        )
 
     def apply_transforms(self, df, transform: Optional[Sequence[Mapping[str, Any]]]):
-        """Prebuild pass: execute profile step as lightweight _preprofiling."""
-        return self._apply_transforms(df, transform, profile_mode="preprofile")
+        return runtime.apply_transforms(self, df, transform)
 
     def apply_runtime_transforms(
         self,
@@ -1093,8 +890,7 @@ class DataPreprocessor:
         transform: Optional[Sequence[Mapping[str, Any]]],
         source_label: Optional[str] = None,
     ):
-        """Runtime pass: keep original profiling behavior."""
-        return self._apply_transforms(df, transform, profile_mode="runtime", source_label=source_label)
+        return runtime.apply_runtime_transforms(self, df, transform, source_label=source_label)
 
     def run_pipeline(
         self,
@@ -1106,223 +902,16 @@ class DataPreprocessor:
         demand_columns: Optional[Sequence[str]] = None,
         projection: Optional[Sequence[str]] = None,
     ) -> Tuple[Optional[pd.DataFrame], str, bool]:
-        mode_lower = str(mode).lower()
-        effective_transform = self._effective_transform(source, transform)
-        if projection is None and mode_lower == "runtime":
-            projection = self._runtime_projection(effective_transform, demand_columns)
-        projection = self._projection_list(projection)
-        key = self._pipeline_key(source, effective_transform, combine=combine, mode=mode, projection=projection)
-        runtime_mode = mode_lower == "runtime"
-        cache_enabled = bool(use_cache) and mode_lower != "preprofile-base"
-        runtime_sig = self._runtime_profile_signature(effective_transform) if runtime_mode else None
-        demand_fp = self._demand_fingerprint(
+        return runtime.run_pipeline(
+            self,
             source,
-            effective_transform,
+            transform,
             combine=combine,
+            use_cache=use_cache,
             mode=mode,
+            demand_columns=demand_columns,
             projection=projection,
         )
-
-        if cache_enabled and self.cache is not None:
-            meta = None
-            try:
-                if hasattr(self.cache, "get_dataframe_meta"):
-                    meta = self.cache.get_dataframe_meta(key)
-            except Exception:
-                meta = None
-
-            compatible, reason = self._is_dataframe_cache_compatible(
-                source=source,
-                transform=effective_transform,
-                combine=combine,
-                mode=mode,
-                key=key,
-                meta=meta,
-                projection=projection,
-            )
-            if compatible:
-                cached = self.cache.get_dataframe(key)
-                if cached is not None:
-                    if runtime_mode and runtime_sig is not None:
-                        cache_file = "<unknown>"
-                        try:
-                            cache_file = str((self.cache.data_dir / f"{key}.pkl").resolve())
-                        except Exception:
-                            pass
-                        self._info(
-                            "Runtime profile cache HIT:\n\t source \t-> {},\n\t key \t\t-> {},\n\t fingerprint \t-> {},\n\t cache_file \t-> {},\n\t rows \t\t-> {}.".format(
-                                self._runtime_source_label(source),
-                                key,
-                                demand_fp,
-                                cache_file,
-                                self._safe_nrows(cached) if self._safe_nrows(cached) is not None else "NA",
-                            )
-                        )
-                    self._emit_source_summary(source)
-                    self._debug(f"Pipeline cache HIT -> {key}")
-                    memtrace_checkpoint(
-                        self.logger,
-                        "pipeline.cache_hit",
-                        cached,
-                        extra={"source": self._runtime_source_label(source), "mode": mode},
-                    )
-                    cached = self._enrich_for_demand(cached, source, demand_columns)
-                    return self._clone_df(cached), key, True
-                reason = "cache-read-failed"
-
-            if runtime_mode and runtime_sig is not None:
-                if reason in {"meta-missing", "demand-fingerprint-missing"}:
-                    self._info(
-                        "Runtime profile cache MISS:\n\t source \t-> {},\n\t key \t\t-> {},\n\t fingerprint \t-> {}".format(
-                            self._runtime_source_label(source),
-                            key,
-                            demand_fp,
-                        )
-                    )
-                else:
-                    cached_sig = None
-                    cached_transform_sig = None
-                    cached_demand = None
-                    if isinstance(meta, Mapping):
-                        cached_sig = meta.get("runtime_profile_signature")
-                        cached_transform_sig = meta.get("runtime_transform_signature")
-                        cached_demand = meta.get("demand_fingerprint")
-                    self._warn(
-                        "Runtime profile cache INVALID:\n\t source \t-> {},\n\t key \t-> {},\n\t reason \t-> {},\n\t expected_demand \t-> {},\n\t cached_demand \t-> {},\n\t expected_profile_sig \t-> {},\n\t cached_profile_sig \t-> {},\n\t expected_transform_sig \t-> {},\n\t cached_transform_sig \t-> {}".format(
-                            self._runtime_source_label(source),
-                            key,
-                            reason,
-                            demand_fp,
-                            str(cached_demand) if cached_demand else "<none>",
-                            runtime_sig,
-                            str(cached_sig) if cached_sig else "<none>",
-                            self._stable_hash(effective_transform),
-                            str(cached_transform_sig) if cached_transform_sig else "<none>",
-                        )
-                    )
-            else:
-                if reason != "meta-missing":
-                    self._debug(f"Pipeline cache INVALID ({reason}) -> {key}")
-
-        raw = self._resolve_source_data(source, combine=combine)
-        if raw is None:
-            return None, key, False
-        raw = self._select_columns(raw, projection)
-        memtrace_checkpoint(
-            self.logger,
-            "pipeline.source_resolved",
-            raw,
-            extra={
-                "source": self._runtime_source_label(source),
-                "mode": mode,
-                "combine": combine,
-            },
-        )
-        memtrace_object_inventory(
-            self.logger,
-            "pipeline.source_resolved.inventory",
-            {"raw": raw},
-            roles={"raw": "source dataframe"},
-            min_bytes=64 * 1024 * 1024,
-        )
-
-        if mode_lower == "runtime":
-            src_label = self._runtime_source_label(source)
-            if isinstance(source, str) and source in self._preprofile_alias_meta:
-                meta = self._preprofile_alias_meta.get(source, {})
-                self._warn(
-                    "Runtime profile input:\n\t source \t-> {},\n uses preprofile alias:\n\t key \t\t-> {},\n\t origin \t-> {},\n\t cache_file \t-> {},\n\t rows_in \t-> {}.".format(
-                        src_label,
-                        meta.get("pre_key", "<unknown>")[:16] if isinstance(meta.get("pre_key"), str) else "<unknown>",
-                        meta.get("origin", "<unknown>"),
-                        meta.get("cache_file", "<memory-only>"),
-                        self._safe_nrows(raw) if self._safe_nrows(raw) is not None else "NA",
-                    )
-                )
-
-        must_pandas = mode_lower != "runtime"
-        if effective_transform is None:
-            work = self.ensure_pandas(raw, reason=f"{mode}-pipeline") if must_pandas else raw
-        elif isinstance(raw, pd.DataFrame):
-            if mode_lower in {"preprofile-base", "preprofile"}:
-                work = raw
-            else:
-                work = self._clone_df(raw)
-        else:
-            work = self.ensure_pandas(raw, reason=f"{mode}-pipeline")
-
-        if mode_lower == "preprofile":
-            work = self.apply_transforms(work, effective_transform)
-        elif effective_transform is not None:
-            work = self.apply_runtime_transforms(
-                work,
-                effective_transform,
-                source_label=self._runtime_source_label(source),
-            )
-        if mode_lower == "runtime":
-            work = self._select_columns(work, self._runtime_cache_columns(effective_transform, demand_columns))
-        memtrace_checkpoint(
-            self.logger,
-            "pipeline.transform_done",
-            work,
-            extra={"source": self._runtime_source_label(source), "mode": mode},
-        )
-        memtrace_object_inventory(
-            self.logger,
-            "pipeline.transform_done.inventory",
-            {"raw": raw, "work": work},
-            roles={
-                "raw": "source dataframe",
-                "work": "transform output",
-            },
-            min_bytes=64 * 1024 * 1024,
-        )
-        raw = None
-
-        if cache_enabled and self.cache is not None and isinstance(work, pd.DataFrame):
-            meta = {
-                "source": self._source_token(source, combine=combine),
-                "combine": combine,
-                "transform": effective_transform,
-                "mode": mode,
-                "demand_fingerprint": demand_fp,
-                "projection": projection,
-            }
-            runtime_profile_sig = runtime_sig if runtime_mode else None
-            if runtime_mode and runtime_profile_sig is not None:
-                meta["runtime_profile_signature"] = runtime_profile_sig
-                meta["runtime_transform_signature"] = self._stable_hash(effective_transform)
-            self.cache.put_dataframe(
-                key,
-                work,
-                meta=meta,
-            )
-            if runtime_mode and runtime_profile_sig is not None:
-                cache_file = "<unknown>"
-                try:
-                    cache_file = str((self.cache.data_dir / f"{key}.pkl").resolve())
-                except Exception:
-                    pass
-                self._warn(
-                    "Runtime profile cache STORE:\n\t source \t-> {},\n\t key \t\t-> {},\n\t cache_file \t-> {},\n\t rows \t\t-> {}.".format(
-                        self._runtime_source_label(source),
-                        key[:16],
-                        cache_file,
-                        self._safe_nrows(work) if self._safe_nrows(work) is not None else "NA",
-                    )
-                )
-            self._debug(f"Pipeline cache STORE -> {key}")
-
-        work = self._enrich_for_demand(work, source, demand_columns)
-        if isinstance(work, pd.DataFrame) and mode_lower == "runtime":
-            work = self._clone_df(work)
-        memtrace_checkpoint(
-            self.logger,
-            "pipeline.return",
-            work,
-            extra={"source": self._runtime_source_label(source), "mode": mode},
-        )
-        return work, key, False
 
     @staticmethod
     def _contains_profile(transform: Any) -> bool:

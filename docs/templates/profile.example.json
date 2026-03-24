@@ -1,0 +1,16 @@
+{
+  "coordinates": {
+    "x": {
+      "expr": "mN1"
+    },
+    "y": {
+      "expr": "mC1"
+    },
+    "z": {
+      "expr": "LogL"
+    }
+  },
+  "method": "bridson",
+  "bin": 40,
+  "objective": "max"
+}

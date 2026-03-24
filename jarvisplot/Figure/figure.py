@@ -4,19 +4,36 @@ import gc
 from typing import Optional, Mapping
 import numpy as np 
 import os, sys 
-from ..core import jppwd
-import matplotlib.ticker as mticker
 import pandas as pd 
 import matplotlib as mpl
 from types import MethodType
 
 from .adapters import StdAxesAdapter, TernaryAxesAdapter
 from .method_registry import resolve_callable
+from .style_runtime import resolve_style_bundle
+from .config_runtime import apply_figure_config
+from .layer_runtime import (
+    load_layer_data as runtime_load_layer_data,
+    load_bool_df as runtime_load_bool_df,
+    load_layer_runtime_data as runtime_load_layer_runtime_data,
+    release_layer_runtime_data as runtime_release_layer_runtime_data,
+    render_layer as runtime_render_layer,
+)
+from .layout_runtime import (
+    apply_axis_endpoints,
+    apply_auto_ticks,
+    apply_manual_ticks,
+    ensure_numbered_rect_axes,
+    has_manual_ticks,
+    is_numbered_ax,
+)
+from .colorbar_runtime import axc_color_config, axc_is_horizontal, collect_and_attach_colorbar
+from ..utils.expression import eval_dataframe_expression
+from ..utils.pathing import resolve_project_path
 from ..memtrace import memtrace_checkpoint
 
 import json
 import time
-import re
 
 try:
     import polars as pl
@@ -27,214 +44,28 @@ except Exception:
 class Figure:
     def _is_numbered_ax(self, name: str) -> bool:
         """Return True iff name matches ax<NUMBER>, e.g. ax1, ax2, ax10."""
-        return isinstance(name, str) and re.fullmatch(r"ax\d+", name) is not None
+        return is_numbered_ax(name)
 
     def _ensure_numbered_rect_axes(self, ax_name: str, kwgs: dict):
-        """Create/configure a numbered rectangular axes (ax1, ax2, ...) using ax-style logic."""
-        if not self._is_numbered_ax(ax_name):
-            raise ValueError(f"Illegal dynamic axes name '{ax_name}'. Only ax<NUMBER> is allowed.")
-
-        # Reuse ax-style construction, but read frame config from frame[ax_name]
-        if ax_name not in self.axes.keys():
-            raw_ax = self.fig.add_axes(**kwgs)
-            if isinstance(kwgs, dict) and ("facecolor" in kwgs):
-                raw_ax.set_facecolor(kwgs['facecolor'])
-            adapter = StdAxesAdapter(raw_ax)
-            adapter._type = "rect"
-            adapter.layers = []
-            adapter._legend = self.frame.get(ax_name, {}).get("legend", False)
-            self.axes[ax_name] = adapter
-            adapter.status = 'configured'
-
-        ax_obj = self.axes[ax_name]
-
-        # ---- identical configuration path as ax, but keyed by ax_name ----
-        if self.frame.get(ax_name, {}).get("spines"):
-            if "color" in self.frame[ax_name]["spines"]:
-                for s in ax_obj.spines.values():
-                    s.set_color(self.frame[ax_name]['spines']['color'])
-
-        # y scale
-        if self.frame.get(ax_name, {}).get("yscale", "").lower() == 'log':
-            ax_obj.set_yscale("log")
-            from matplotlib.ticker import LogLocator
-            ax_obj.yaxis.set_minor_locator(LogLocator(subs='auto'))
-        else:
-            from matplotlib.ticker import AutoMinorLocator
-            ax_obj.yaxis.set_minor_locator(AutoMinorLocator())
-
-        # x scale
-        if self.frame.get(ax_name, {}).get("xscale", "").lower() == 'log':
-            ax_obj.set_xscale("log")
-            from matplotlib.ticker import LogLocator
-            ax_obj.xaxis.set_minor_locator(LogLocator(subs='auto'))
-        else:
-            from matplotlib.ticker import AutoMinorLocator
-            ax_obj.xaxis.set_minor_locator(AutoMinorLocator())
-
-        def _safe_cast(v):
-            try:
-                return float(v)
-            except Exception:
-                return v
-
-        # text
-        if self.frame.get(ax_name, {}).get("text"):
-            for txt in self.frame[ax_name]["text"]:
-                if txt.get("transform", False):
-                    txt.pop("transform")
-                    ax_obj.text(**txt, transform=ax_obj.transAxes)
-                else:
-                    ax_obj.text(**txt)
-
-        # limits
-        xlim = self.frame.get(ax_name, {}).get("xlim")
-        if xlim:
-            ax_obj.set_xlim(list(map(_safe_cast, xlim)))
-
-        ylim = self.frame.get(ax_name, {}).get("ylim")
-        if ylim:
-            ax_obj.set_ylim(list(map(_safe_cast, ylim)))
-
-        # labels
-        if self.frame.get(ax_name, {}).get('labels', {}).get("x"):
-            ax_obj.set_xlabel(self.frame[ax_name]['labels']['x'], **self.frame[ax_name]['labels']['xlabel'])
-        if self.frame.get(ax_name, {}).get('labels', {}).get("y"):
-            ax_obj.set_ylabel(self.frame[ax_name]['labels']['y'], **self.frame[ax_name]['labels']['ylabel'])
-            # ax_obj.yaxis.set_label_coords(
-            #     self.frame[ax_name]['labels']['ylabel_coords']['x'],
-            #     self.frame[ax_name]['labels']['ylabel_coords']['y']
-            # )
-
-        # ticks
-        ax_obj.tick_params(**self.frame.get(ax_name, {}).get('ticks', {}).get("both", {}))
-        ax_obj.tick_params(**self.frame.get(ax_name, {}).get('ticks', {}).get("major", {}))
-        ax_obj.tick_params(**self.frame.get(ax_name, {}).get('ticks', {}).get("minor", {}))
-
-        self._apply_axis_endpoints(ax_obj, self.frame.get(ax_name, {}).get('xaxis', {}), "x")
-        self._apply_axis_endpoints(ax_obj, self.frame.get(ax_name, {}).get('yaxis', {}), "y")
-
-        # finalize
-        if getattr(ax_obj, 'needs_finalize', True) and hasattr(ax_obj, 'finalize'):
-            try:
-                ax_obj.finalize()
-            except Exception as e:
-                if self.logger:
-                    self.logger.warning(f"Finalize failed on axes '{ax_name}': {e}")
-
-        try:
-            self.logger.debug(f"Loaded numbered rectangle axes -> {ax_name}")
-        except Exception:
-            pass
-
-        return ax_obj
+        """Create/configure a numbered rectangular axes (ax1, ax2, ...) using layout helpers."""
+        return ensure_numbered_rect_axes(self, ax_name, kwgs)
     def _has_manual_ticks(self, ax_key: str, which: str) -> bool:
         """Return True if YAML provides manual tick positions for given axis."""
-        try:
-            if ax_key == 'ax':
-                ticks_cfg = self.frame.get('ax', {}).get('ticks', {})
-            elif ax_key == 'axc':
-                ticks_cfg = self.frame.get('axc', {}).get('ticks', {})
-            else:
-                return False
-            node = ticks_cfg.get(which, {})
-            return isinstance(node, dict) and ((node.get('positions') is not None) or (node.get('pos') is not None))
-        except Exception:
-            return False
+        return has_manual_ticks(self.frame, ax_key, which)
 
     def _axc_is_horizontal(self) -> bool:
-        return str(self.frame.get("axc", {}).get("orientation", "")).lower() == "horizontal"
+        return axc_is_horizontal(self.frame)
 
     def _axc_color_config(self) -> dict:
         """Return normalized frame.axc.color config with legacy fallbacks."""
-        out = {}
-        axc_cfg = self.frame.get("axc", {})
-        color_cfg = axc_cfg.get("color", {})
-        if not isinstance(color_cfg, dict):
-            color_cfg = {}
-
-        if "cmap" in color_cfg:
-            out["cmap"] = color_cfg.get("cmap")
-
-        # Preferred v1.2.6 interface
-        for key in ("vmin", "vmax"):
-            if key in color_cfg:
-                try:
-                    val = float(color_cfg.get(key))
-                    if np.isfinite(val):
-                        out[key] = val
-                except Exception:
-                    pass
-
-        scale = color_cfg.get("scale", None)
-        if scale is None:
-            # Backward compatibility with legacy axc.xscale/yscale.
-            if self._axc_is_horizontal():
-                scale = axc_cfg.get("xscale", axc_cfg.get("yscale", None))
-            else:
-                scale = axc_cfg.get("yscale", axc_cfg.get("xscale", None))
-        if isinstance(scale, str):
-            scale = scale.strip().lower()
-            if scale:
-                out["scale"] = scale
-
-        return out
+        return axc_color_config(self.frame)
 
     def _apply_axis_endpoints(self, ax_obj, axis_cfg: dict, which: str):
         """
         which: 'x' or 'y'
         axis_cfg: self.frame['ax'].get('xaxis', {}) / 'yaxis'
         """
-        if not isinstance(axis_cfg, dict):
-            return
-
-        # Resolve underlying Matplotlib Axes (StdAxesAdapter or plain Axes)
-        target = ax_obj.ax if hasattr(ax_obj, "ax") else ax_obj
-
-        if which == 'x':
-            ticks = target.xaxis.get_major_ticks()
-            locs  = target.xaxis.get_majorticklocs()
-        else:
-            ticks = target.yaxis.get_major_ticks()
-            locs  = target.yaxis.get_majorticklocs()
-        if not ticks:
-            return
-
-        # Get axis limits for boundary check
-        if which == 'x':
-            lim0, lim1 = target.get_xlim()
-        else:
-            lim0, lim1 = target.get_ylim()
-
-        min_cfg = axis_cfg.get("min_endpoints", {})
-        max_cfg = axis_cfg.get("max_endpoints", {})
-        width   = abs(lim0 - lim1)
-
-        # 第一个 tick = min 端点
-        t0 = ticks[0]
-        # Check whether first tick is at the lower boundary
-        t0_loc = locs[0]
-
-        if abs(t0_loc - lim0) < 1e-3 * width:
-            if min_cfg.get("tick") is False:
-                t0.tick1line.set_visible(False)
-                t0.tick2line.set_visible(False)
-            if min_cfg.get("label") is False:
-                t0.label1.set_visible(False)
-                t0.label2.set_visible(False)
-
-        # 最后一个 tick = max 端点
-        t1 = ticks[-1]
-        # Check whether last tick is at the upper boundary
-        t1_loc = locs[-1]
-
-        if abs(t1_loc - lim1) < 1e-3 * width:
-            if max_cfg.get("tick") is False:
-                t1.tick1line.set_visible(False)
-                t1.tick2line.set_visible(False)
-            if max_cfg.get("label") is False:
-                t1.label1.set_visible(False)
-                t1.label2.set_visible(False)
+        return apply_axis_endpoints(self, ax_obj, axis_cfg, which)
                 
     def _apply_auto_ticks(self, ax_obj, which: str):
         """Lightweight auto-tick post-processing at finalize stage.
@@ -246,130 +77,7 @@ class Figure:
              otherwise defer to Matplotlib's LogFormatter.
              if linear scale -> use ScalarFormatter with sci notation, but never touch log formatters.
         """
-        target = ax_obj.ax if hasattr(ax_obj, "ax") else ax_obj
-        axis = target.xaxis if which == 'x' else target.yaxis
-
-        try:
-            # Ensure ticks/labels exist
-            labels = axis.get_ticklabels()
-
-            # --- X axis formatting (match Y axis behavior)
-            if which == 'x':
-                try:
-                    xscale = target.get_xscale()
-                except Exception:
-                    xscale = None
-
-                # only touch linear x-axis
-                if xscale not in ('log', 'symlog', 'logit'):
-                    fmt = mticker.ScalarFormatter(useMathText=True)
-                    # Do not use sci/offset for small exponents like 10^-1; reserve for <=1e-2 or >=1e4
-                    fmt.set_powerlimits((-3, 4))
-                    axis.set_major_formatter(fmt)
-                    try:
-                        target.ticklabel_format(style='sci', axis='x', scilimits=(-3, 4))
-                    except Exception:
-                        pass
-                    try:
-                        axis.set_offset_position('bottom')
-                    except Exception:
-                        pass
-                    mpl.rcParams['axes.formatter.useoffset'] = True
-
-                    # Ensure offset text is rendered and sized like tick labels (avoid huge ×10^n)
-                    try:
-                        target.figure.canvas.draw_idle()
-                        tl = axis.get_ticklabels()
-                        if tl:
-                            axis.offsetText.set_fontsize(tl[0].get_size() * 0.8)
-                        # Place the offset near the left of the x-axis (like y-axis), and nudge up/right
-                        axis.offsetText.set_horizontalalignment('left')
-                        # axis.offsetText.set_verticalalignment('top')
-                        axis.offsetText.set_x(1.02)   # axes fraction
-                        # axis.offsetText.set_y(1.08)   # small upward nudge (axes fraction)
-
-                    except Exception:
-                        pass
-
-                # optional: rotate long labels
-                try:
-                    long = any((t is not None) and (len(t) > 6) for t in (l.get_text() for l in labels))
-                except Exception:
-                    long = False
-                # if long:
-                #     target.tick_params(axis='x', labelrotation=35)
-
-                return
-
-            # --- Y axis formatting
-            if which == 'y':
-
-                # Detect scale
-                try:
-                    yscale = target.get_yscale()
-                except Exception:
-                    yscale = None
-
-                # 1) Log-like y-axis: compact decimals in range, otherwise default log formatter
-                if yscale in ('log', 'symlog', 'logit'):
-                    from matplotlib.ticker import LogFormatterMathtext, FuncFormatter
-
-                    base = LogFormatterMathtext()
-                    lo, hi = 1e-2, 1e2  # compact decimal range
-
-                    def _fmt(val, pos=None):
-                        if val is None or val <= 0:
-                            return ""
-                        try:
-                            exp = np.log10(val)
-                        except Exception:
-                            return ""
-                        # Only label exact decades
-                        if (not np.isfinite(exp)) or (not np.isclose(exp, round(exp))):
-                            return ""
-
-                        if lo <= val <= hi:
-                            e = int(round(exp))
-                            if e >= 0:
-                                return f"{int(10**e)}"
-                            # e=-1 -> 0.1 (1 dp), e=-2 -> 0.01 (2 dp)
-                            return f"{10**e:.{abs(e)}f}"
-
-                        # outside compact range: defer to Matplotlib
-                        return base(val, pos)
-
-                    axis.set_major_formatter(FuncFormatter(_fmt))
-                    return
-
-                # 2) Linear y-axis: ScalarFormatter sci notation
-                fmt = mticker.ScalarFormatter(useMathText=True)
-                # Do not use sci/offset for small exponents like 10^-1; reserve for <=1e-2 or >=1e4
-                fmt.set_powerlimits((-3, 4))
-                axis.set_major_formatter(fmt)
-                try:
-                    target.ticklabel_format(style='sci', axis='y', scilimits=(-3, 4))
-                except Exception:
-                    pass
-                try:
-                    axis.set_offset_position('left')
-                except Exception:
-                    pass
-                mpl.rcParams['axes.formatter.useoffset'] = True
-                try:
-                    target.figure.canvas.draw_idle()
-                    # shrink offset text a bit
-                    try:
-                        tl = axis.get_ticklabels()
-                        if tl:
-                            axis.offsetText.set_fontsize(tl[0].get_size() * 0.8)
-                    except Exception:
-                        pass
-                except Exception:
-                    pass
-
-        except Exception:
-            # Always fail silently here; tick post-processing must never crash plotting.
-            return
+        return apply_auto_ticks(ax_obj, which)
         
     def __init__(self, info: Optional[Mapping] = None):
         self.t0 = time.perf_counter()
@@ -459,18 +167,14 @@ class Figure:
     
     @style.setter
     def style(self, value) -> None: 
-        from copy import deepcopy 
-        if len(value) == 2: 
-            self._frame = deepcopy(self.jpstyles[value[0]][value[1]]['Frame'])
-            self._style = deepcopy(self.jpstyles[value[0]][value[1]]['Style'])
-            self.logger.debug("Style: [{} : {}] used for figure -> {}".format(value[0], value[1], self.name))
-        elif len(value) == 1: 
-            self._frame = deepcopy(self.jpstyles[value[0]]["default"]['Frame'])
-            self._style = deepcopy(self.jpstyles[value[0]]["default"]['Style'])
-            self.logger.debug("Style: [{} : {}] used for figure -> {}".format(value[0], "default", self.name))
-        else:
+        if len(value) not in (1, 2):
             self.logger.error("Undefined style -> {}".format(value))
             raise TypeError
+        family, selected, frame, style = resolve_style_bundle(self.jpstyles, value)
+        self._frame = frame
+        self._style = style
+        if self.logger:
+            self.logger.debug("Style: [{} : {}] used for figure -> {}".format(family, selected, self.name))
     
     @property
     def context(self):
@@ -600,179 +304,17 @@ class Figure:
             self.context.update(share_name, data)
 
     def _load_layer_runtime_data(self, layer_info):
-        if layer_info.get("data_loaded"):
-            return layer_info.get("data")
-        layer = layer_info.get("layer_spec", {})
-        loaded = self.load_layer_data(layer)
-        cache_ref = None
-        if isinstance(loaded, tuple) and len(loaded) == 2:
-            data, cache_ref = loaded
-        else:
-            data = loaded
-        layer_info["data"] = data
-        layer_info["data_loaded"] = True
-        layer_info["share_cache_ref"] = cache_ref
-        self._store_share_data_if_needed(layer, data, cache_ref=cache_ref)
-        return data
+        return runtime_load_layer_runtime_data(self, layer_info)
 
     def _release_layer_runtime_data(self, layer_info):
-        layer_info["data"] = None
-        layer_info["data_loaded"] = False
-
-        share_name = layer_info.get("share_name")
-        if share_name and self.context is not None and self.context.remaining_uses(share_name) <= 0:
-            self.context.invalidate(share_name)
-
-        if self.context is not None:
-            for ref in layer_info.get("source_refs", []):
-                remain = self.context.consume(ref)
-                if remain > 0 and self.preprocessor is not None:
-                    try:
-                        if self.preprocessor.should_release_between_uses(ref):
-                            self.context.invalidate(ref)
-                    except Exception as e:
-                        self.logger.debug(f"transient source release failed for '{ref}': {e}")
-        gc.collect()
+        return runtime_release_layer_runtime_data(self, layer_info)
                         
     def load_layer_data(self, layer):
-        lyinfo = layer.get("data", False)
-        lycomb = layer.get("combine", "concat")
-        share_name = layer.get("share_data")
-        layer_demand = None
-        if self.preprocessor is not None:
-            try:
-                layer_demand = self.preprocessor.layer_demand_columns(layer)
-            except Exception:
-                layer_demand = None
-
-        if self.preprocessor is not None and share_name:
-            try:
-                named = self.preprocessor.load_named_layer(share_name, layer, demand_columns=layer_demand)
-                if named is not None:
-                    self.logger.debug(f"Loaded share_data '{share_name}' from named cache.")
-                    return named, None
-            except Exception as e:
-                self.logger.debug(f"Named share_data cache load failed: {e}")
-
-        if lyinfo:
-            if lycomb == "concat":
-                dts = []
-                cache_keys = []
-                for ds in lyinfo:
-                    src = ds.get('source')
-                    use_cache = bool(ds.get("cache", True))
-                    self.logger.debug("Loading layer data source -> {}".format(src))
-                    if src and self.context:
-                        if self.preprocessor is not None:
-                            dt, cache_key, _ = self.preprocessor.run_pipeline(
-                                source=src,
-                                transform=ds.get("transform", None),
-                                combine="concat",
-                                use_cache=use_cache,
-                                demand_columns=layer_demand,
-                            )
-                            if dt is not None:
-                                dts.append(dt)
-                                cache_keys.append(cache_key if isinstance(cache_key, str) and use_cache else None)
-                        else:
-                            from copy import deepcopy
-                            if isinstance(src, (list, tuple)):
-                                self.logger.debug("loading datasets in list mode")
-                                dsrc = []
-                                for srcitem in src: 
-                                    self.logger.debug("loading layer data source item -> {}".format(srcitem))
-                                    dt = deepcopy(self.context.get(srcitem))
-                                    dsrc.append(dt)
-                                dfsrcs = pd.concat(dsrc, ignore_index=False)
-                                dt = self.load_bool_df(dfsrcs, ds.get("transform", None))
-                                dts.append(dt)
-                            elif self.context.get(src) is not None:
-                                dt = deepcopy(self.context.get(src))
-                                dt = self.load_bool_df(dt, ds.get("transform", None))
-                                dts.append(dt)
-                    else:
-                        self.logger.error("DataSet -> {} not specified".format(src))
-                if len(dts) == 0:
-                    return None, None
-                combined = self._concat_loaded_data(dts)
-                cache_ref = None
-                if len(dts) == 1 and combined is dts[0] and len(cache_keys) == 1:
-                    cache_ref = cache_keys[0]
-                return combined, cache_ref
-            elif lycomb == "seperate":
-                dts = {}
-                for ds in lyinfo: 
-                    src = ds.get("source")
-                    label = ds.get("label")
-                    use_cache = bool(ds.get("cache", True))
-                    self.logger.debug("Loading layer data source -> {}".format(src))
-                    if src and self.context:
-                        if self.preprocessor is not None:
-                            dt, _, _ = self.preprocessor.run_pipeline(
-                                source=src,
-                                transform=ds.get("transform", None),
-                                combine="concat",
-                                use_cache=use_cache,
-                                demand_columns=layer_demand,
-                            )
-                        else:
-                            from copy import deepcopy
-                            if self.context.get(src) is None:
-                                dt = None
-                            else:
-                                dt = deepcopy(self.context.get(src))
-                                dt = self.load_bool_df(dt, ds.get("transform", None))
-                        if dt is not None:
-                            dts[label] = dt
-                    else:
-                        self.logger.error("DataSet -> {} not specified".format(src))
-                if len(dts) == 0: 
-                    return None, None 
-                return dts, None 
-        # Unsupported lyinfo shape -> no data
-        return None, None
+        return runtime_load_layer_data(self, layer)
                
          
     def load_bool_df(self, df, transform):
-        if self.preprocessor is not None:
-            return self.preprocessor.apply_runtime_transforms(df, transform)
-        if transform is None:
-            return df 
-        elif not isinstance(transform, list): 
-            self.logger.error("illegal transform format, list type needed ->".format(json.dump(transform)))
-            return df 
-        else: 
-            for trans in transform:
-                self.logger.debug("Applying the transform ... ")
-                if "filter" in trans.keys():
-                    self.logger.debug("Before filtering -> {}".format(df.shape))
-                    from .load_data import filter
-                    df = filter(df, trans['filter'], self.logger)
-                    self.logger.debug("After filtering -> {}".format(df.shape))
-                elif "profile" in trans.keys(): 
-                    from .load_data import profiling
-                    df = profiling(df, trans['profile'], self.logger)
-                    self.logger.debug("After profiling -> {}".format(df.shape))
-                elif "grid_profile" in trans.keys():
-                    from .load_data import grid_profiling
-                    cfg = trans.get("grid_profile", {})
-                    if isinstance(cfg, dict):
-                        cfg = cfg.copy()
-                        cfg.setdefault("method", "grid")
-                    else:
-                        cfg = {"method": "grid"}
-                    df = grid_profiling(df, cfg, self.logger)
-                    self.logger.debug("After grid profiling -> {}".format(df.shape))
-                elif "sortby" in trans.keys(): 
-                    from .load_data import sortby
-                    df = sortby(df, trans['sortby'], self.logger)
-                    self.logger.debug("After sortby -> {}".format(df.shape))
-                elif "add_column" in trans.keys(): 
-                    from .load_data import addcolumn
-                    df = addcolumn(df, trans['add_column'], self.logger)
-                    self.logger.debug("After Add-column -> {}".format(df.shape))
-                
-            return df 
+        return runtime_load_bool_df(self, df, transform)
                          
          
             
@@ -1235,7 +777,7 @@ class Figure:
                 self.logger.warning(
                         "JarvisPlot successfully draw {}\t in {:.3f}s sec\n\t-> {}".format(self.name, float(time.perf_counter() - self.t0), spf)
                     )
-            except:
+            except Exception:
                 pass 
             self.fig.savefig(spf, dpi=self.dpi)
 
@@ -1353,127 +895,12 @@ class Figure:
           frame.ax.ticks.y: { positions: [...], labels: [...] }
           frame.axc.ticks.y: { positions: [...], labels: [...] }
         """
-        if not isinstance(ticks_cfg, dict):
-            return
-        pos = ticks_cfg.get("positions") or ticks_cfg.get("pos")
-        labs = ticks_cfg.get("labels")
-        if pos is None:
-            return
-        target = ax_obj.ax if hasattr(ax_obj, "ax") else ax_obj
-        try:
-            if which == "x":
-                target.set_xticks(pos)
-                if labs is not None:
-                    target.set_xticklabels(labs)
-            elif which == "y":
-                target.set_yticks(pos)
-                if labs is not None:
-                    target.set_yticklabels(labs)
-        except Exception as e:
-            if self.logger:
-                self.logger.warning(f"Manual ticks apply failed on {which}-axis: {e}")
+        return apply_manual_ticks(self, ax_obj, which, ticks_cfg)
             
     # --- config ingestion ---
     def from_dict(self, info: Mapping) -> bool:
-        """Apply settings from a dict. Returns True if any field was set.
-        Expected keys (so far): 'name'.
-        """
-        if not isinstance(info, Mapping):
-            raise TypeError("from_dict expects a mapping/dict")
-        
-        try: 
-            changed = True
-            if "name" in info:
-                self.name = info["name"]  # use the property setter correctly
-            else:
-                changed = False
-
-            # Base directory for resolving relative paths (e.g. output.dir, resources, etc.)
-            # Core should pass one of these keys.
-            if "yaml_dir" in info:
-                self._yaml_dir = info.get("yaml_dir")
-            elif "_yaml_dir" in info:
-                self._yaml_dir = info.get("_yaml_dir")
-            elif "yaml_path" in info:
-                try:
-                    from pathlib import Path
-                    self._yaml_dir = str(Path(info.get("yaml_path")).expanduser().resolve().parent)
-                except Exception:
-                    pass
-
-            if "debug" in info:
-                self.debug = info['debug']
-                try:
-                    self.logger.debug("Loading plot -> {} in debug mode".format(self.name))
-                except:
-                    pass 
-            self._enable = info.get("enable", True)
-            if not self._enable:
-                self.logger.warning("Skip plot -> {}".format(self.name))
-                return False
-            if "style" in info:
-                self.style = info['style']
-            else:
-                self.style = ["a4paper_2x1", "default"]
-            self.logger.debug("Figure style loaded")
-            if "gambit" in info['style'][0]:
-                self.mode = "gambit"
-
-            if "frame" in info:
-                self.frame = info['frame']
-            self.logger.debug("Figure frame information loaded")
-
-            import matplotlib.pyplot as plt
-            plt.rcParams['mathtext.fontset'] = 'stix'
-
-            # --- Ensure JarvisPLOT colormaps are registered globally before plotting ---
-            try:
-                from ..utils import cmaps as _jp_cmaps
-                _cmaps_summary = _jp_cmaps.setup(force=True)
-                if self.logger:
-                    try: 
-                        self.logger.debug(f"JarvisPLOT: colormaps registered (builtin/external): {_cmaps_summary}")
-                        self.logger.debug(f"JarvisPLOT: available cmaps sample: {_jp_cmaps.list_available()[:10]} ...")
-                    except: 
-                        pass 
-            except Exception as _e:
-                if self.logger:
-                    self.logger.warning(f"JarvisPLOT: failed to register colormaps: {_e}")
-
-            
-            # plt.rcParams['font.family'] = 'STIXGeneral'
-            self.fig = plt.figure(**self.frame['figure'])
-
-            # CLI override: disable logo panel
-            if self.print:
-                try:
-                    if isinstance(self.frame.get("axes"), dict):
-                        self.frame["axes"].pop("axlogo", None)
-                    self.frame.pop("axlogo", None)  # optional: drop logo content too
-                except Exception:
-                    pass
-
-            self.load_axes()
-
-            if "layers" in info: 
-                self.layers = info['layers']
-            else: 
-                changed = False 
-
-            return changed
-        except Exception as e:
-            if self.logger:
-                try:
-                    import traceback
-                    self.logger.error(
-                        "Failed to configure figure '{}': {}".format(
-                            getattr(self, "name", "<noname>"), e
-                        )
-                    )
-                    self.logger.debug(traceback.format_exc())
-                except Exception:
-                    pass
-            return False 
+        """Apply settings from a dict. Returns True if any field was set."""
+        return apply_figure_config(self, info)
 
 
     # Backward-compatible alias if other code still calls `set(info)`
@@ -1485,27 +912,11 @@ class Figure:
         """Resolve a path string.
 
         Rules:
-          - "&JP/..." is resolved relative to JarvisPLOT project root (jppwd).
+          - "&JP/..." is resolved relative to the Jarvis-PLOT repository root.
           - Absolute paths are kept.
           - Relative paths are resolved relative to `base_dir` if provided, otherwise CWD.
         """
-        path = str(path)
-        if path.startswith("&JP/"):
-            return os.path.abspath(os.path.join(jppwd, path[4:]))
-
-        from pathlib import Path
-        p = Path(path).expanduser()
-        if p.is_absolute():
-            return str(p.resolve())
-
-        if base_dir:
-            try:
-                bd = Path(str(base_dir)).expanduser().resolve()
-                return str((bd / p).resolve())
-            except Exception:
-                pass
-
-        return str(p.resolve())
+        return str(resolve_project_path(path, base_dir=base_dir or self._yaml_dir or "."))
     
 
     def _eval_series(self, df: pd.DataFrame, set: dict):
@@ -1516,320 +927,27 @@ class Figure:
         """
         try: 
             self.logger.debug("Loading variable expression -> {}".format(set['expr'])) 
-        except: 
+        except Exception:
             pass 
         if not "expr" in set.keys():
             raise ValueError(f"expr need for axes {set}.")
-        if set["expr"] in df.columns:
-            arr = df[set["expr"]].values
-            if np.isnan(arr).sum() and "fillna" in set.keys():
-                arr = np.where(np.isnan(arr), float(set['fillna']), arr)
-        else: 
-            # safe-ish eval with only df columns in locals
-            local_vars = df.to_dict("series")
-            import math
-            from ..inner_func import update_funcs
-            allowed_globals = update_funcs({"np": np, "math": math})
-            arr = eval(set["expr"], allowed_globals, local_vars)
-            if np.isnan(arr).sum() and "fillna" in set.keys():
-                arr = np.where(np.isnan(arr), float(set['fillna']), arr)
+        arr = eval_dataframe_expression(
+            df,
+            set["expr"],
+            logger=self.logger,
+            fillna=set.get("fillna", None),
+        )
         return np.asarray(arr)
 
     def _cb_collect_and_attach(self, style: dict, coor: dict, method_key: str, df: pd.DataFrame) -> dict:
-        import matplotlib.colors as mcolors
-        axc = self.axes.get("axc")
-        if axc is None or not hasattr(axc, "_cb"):
-            return style
-
-        s = dict(style)
-        colored_z_methods = {
-            "contour",
-            "contourf",
-            "tricontour",
-            "tricontourf",
-            "tripcolor",
-            "tripcolor_axes",
-            "pcolor",
-            "pcolormesh",
-            "imshow",
-            "voronoi",
-            "voronoif",
-            "grid_profile",
-            "grid_profiling",
-        }
-        uses_color = bool(s.get("cmap")) or ("c" in coor) or (("z" in coor) and (method_key in colored_z_methods))
-        if not uses_color:
-            return style
-        color_cfg = self._axc_color_config()
-
-        def _coerce_scalar(v):
-            try:
-                vv = float(v)
-                if np.isfinite(vv):
-                    return vv
-            except Exception:
-                pass
-            return None
-
-        def _load_color_series():
-            arr = None
-            if isinstance(coor.get("z"), dict) and ("expr" in coor["z"]):
-                arr = self._eval_series(df, {"expr": coor["z"]["expr"]})
-            elif isinstance(coor.get("c"), dict) and ("expr" in coor["c"]):
-                arr = self._eval_series(df, {"expr": coor["c"]["expr"]})
-            elif "z" in s:
-                arr = s.get("z")
-            elif "c" in s and not isinstance(s.get("c"), str):
-                arr = s.get("c")
-            if arr is None:
-                return None
-            try:
-                arr = np.asarray(arr, dtype=float)
-            except Exception:
-                return None
-            arr = arr[np.isfinite(arr)]
-            return arr if arr.size else None
-
-        # frame.axc.color has higher priority than layer style cmap
-        chosen_cmap = color_cfg.get("cmap", s.get("cmap"))
-        if chosen_cmap is not None:
-            s["cmap"] = chosen_cmap
-        self.axc._cb["cmap"] = chosen_cmap
-
-        data_series = _load_color_series()
-        data_vmin = float(np.min(data_series)) if data_series is not None else None
-        data_vmax = float(np.max(data_series)) if data_series is not None else None
-
-        frame_vmin = _coerce_scalar(color_cfg.get("vmin", None))
-        frame_vmax = _coerce_scalar(color_cfg.get("vmax", None))
-        style_vmin = _coerce_scalar(s.get("vmin", None))
-        style_vmax = _coerce_scalar(s.get("vmax", None))
-
-        if frame_vmin is not None:
-            self.axc._cb["vmin"] = frame_vmin
-        else:
-            cand_min = style_vmin if style_vmin is not None else data_vmin
-            if cand_min is not None:
-                cur_min = _coerce_scalar(self.axc._cb.get("vmin", None))
-                self.axc._cb["vmin"] = cand_min if cur_min is None else min(cur_min, cand_min)
-
-        if frame_vmax is not None:
-            self.axc._cb["vmax"] = frame_vmax
-        else:
-            cand_max = style_vmax if style_vmax is not None else data_vmax
-            if cand_max is not None:
-                cur_max = _coerce_scalar(self.axc._cb.get("vmax", None))
-                self.axc._cb["vmax"] = cand_max if cur_max is None else max(cur_max, cand_max)
-
-        # ---- 2) Resolve/attach norm ----
-        if (self.axc._cb["vmin"] is not None) and (self.axc._cb["vmax"] is not None):
-            vmin = float(self.axc._cb["vmin"])
-            vmax = float(self.axc._cb["vmax"])
-            if vmax < vmin:
-                vmin, vmax = vmax, vmin
-                self.axc._cb["vmin"], self.axc._cb["vmax"] = vmin, vmax
-
-            def _resolve_norm(nv, *, vmin=None, vmax=None):
-                """Turn user-specified 'norm' into a matplotlib.colors.Normalize instance."""
-                if nv is None:
-                    return None
-                if isinstance(nv, mcolors.Normalize):
-                    return nv
-                if isinstance(nv, str):
-                    key = nv.strip().lower()
-                    if key in {"log", "lognorm"}:
-                        if (vmin is None) or (vmax is None) or (vmin <= 0) or (vmax <= 0):
-                            if self.logger:
-                                self.logger.warning("axc log scale requires positive vmin/vmax; fallback to linear Normalize.")
-                            return mcolors.Normalize(vmin=vmin, vmax=vmax)
-                        return mcolors.LogNorm(vmin=vmin, vmax=vmax)
-                    if key in {"twoslopenorm", "diverging"}:
-                        return mcolors.TwoSlopeNorm(vcenter=0.0, vmin=vmin, vmax=vmax)
-                    if key in {"symlog", "symlognorm"}:
-                        return mcolors.SymLogNorm(linthresh=1.0, linscale=1.0, base=10, vmin=vmin, vmax=vmax)
-                    return mcolors.Normalize(vmin=vmin, vmax=vmax)
-                if isinstance(nv, dict):
-                    t = str(nv.get("type", "Normalize")).strip().lower()
-                    _vmin = nv.get("vmin", vmin)
-                    _vmax = nv.get("vmax", vmax)
-                    if t in {"log", "lognorm"}:
-                        if (_vmin is None) or (_vmax is None) or (_vmin <= 0) or (_vmax <= 0):
-                            if self.logger:
-                                self.logger.warning("axc log norm requires positive vmin/vmax; fallback to linear Normalize.")
-                            return mcolors.Normalize(vmin=_vmin, vmax=_vmax)
-                        return mcolors.LogNorm(vmin=_vmin, vmax=_vmax)
-                    if t in {"twoslopenorm", "diverging"}:
-                        vcenter = nv.get("vcenter", 0.0)
-                        return mcolors.TwoSlopeNorm(vcenter=vcenter, vmin=_vmin, vmax=_vmax)
-                    if t in {"symlog", "symlognorm"}:
-                        linthresh = nv.get("linthresh", 1.0)
-                        linscale = nv.get("linscale", 1.0)
-                        base = nv.get("base", 10)
-                        return mcolors.SymLogNorm(
-                            linthresh=linthresh,
-                            linscale=linscale,
-                            base=base,
-                            vmin=_vmin,
-                            vmax=_vmax,
-                        )
-                    return mcolors.Normalize(vmin=_vmin, vmax=_vmax)
-                return mcolors.Normalize(vmin=vmin, vmax=vmax)
-
-            requested_scale = str(color_cfg.get("scale", "")).lower()
-            if requested_scale in {"linear", "norm", "normalize"}:
-                resolved = mcolors.Normalize(vmin=vmin, vmax=vmax)
-            elif requested_scale == "log":
-                resolved = _resolve_norm("lognorm", vmin=vmin, vmax=vmax)
-            else:
-                # Backward compatibility: use per-layer style.norm when frame.axc.color.scale is absent.
-                user_norm = style.get("norm", None)
-                resolved = _resolve_norm(user_norm, vmin=vmin, vmax=vmax)
-                if resolved is None:
-                    resolved = mcolors.Normalize(vmin=vmin, vmax=vmax)
-
-            self.axc._cb["norm"] = resolved
-            s["norm"] = self.axc._cb["norm"]
-            if isinstance(self.axc._cb["norm"], mcolors.LogNorm):
-                self.axc._cb['mode'] = "log"
-            elif isinstance(self.axc._cb["norm"], mcolors.TwoSlopeNorm):
-                self.axc._cb['mode'] = "diverging"
-            elif isinstance(self.axc._cb["norm"], mcolors.SymLogNorm):
-                self.axc._cb['mode'] = "log"
-            else:
-                self.axc._cb['mode'] = "norm"
-
-        if method_key in ("contour","contourf","tricontour","tricontourf") and self.axc._cb["levels"] is None:
-            lv = s.get("levels", 10)
-            if isinstance(lv, int) and self.axc._cb["vmin"] is not None and self.axc._cb["vmax"] is not None:
-                self.axc._cb["levels"] = np.linspace(self.axc._cb["vmin"], self.axc._cb["vmax"], lv)
-            elif hasattr(lv, "__len__"):
-                self.axc._cb["levels"] = lv
-        if 'norm' in s and s['norm'] is not None:
-            s.pop('vmin', None)
-            s.pop('vmax', None)
-            s.pop('mode', None)
-        self.axc._cb["used"] = uses_color
-        return s
+        return collect_and_attach_colorbar(self, style, coor, method_key, df)
 
 
 
 
 
     def render_layer(self, ax, layer_info):
-        """
-        Render one layer on the given axes using METHOD_DISPATCH and the layer's
-        data/coordinates/style fields assembled earlier in self.layers setter.
-        This function now routes arguments based on the axes type:
-          - ternary axes (ax._type == 'tri'): methods expect (a,b,c, ...)
-              * profile_scatter additionally expects z -> (a,b,c,z, ...)
-          - rectangular axes (ax._type == 'rect'): methods expect (x,y, ...)
-        """
-        # 1) Resolve method
-        try: 
-            self.logger.debug(f"Drawing layer -> {layer_info['name']}")
-        except: 
-            pass 
-        method_key = str(layer_info.get("method", "scatter")).lower()
-        axes_type = getattr(ax, "_type", "any")
-
-        # Resolve YAML method key -> adapter callable (supports aliases / deprecations)
-        method, warn = resolve_callable(ax, method_key, axes_type=axes_type, strict=True)
-        if warn and self.logger:
-            try:
-                self.logger.warning(warn)
-            except Exception:
-                pass
-
-        # 2) Merge style (bundle default -> layer override)
-        # Style lookup uses the user-facing key; if alias used and no style found,
-        # fall back to the resolved matplotlib method name.
-        style = dict(self.style.get(method_key, {}))
-        if not style:
-            try:
-                # resolve_callable already mapped key -> mpl method name via registry
-                # so use the attribute name as a secondary lookup.
-                style = dict(self.style.get(getattr(method, "__name__", ""), {}))
-            except Exception:
-                pass
-        if layer_info.get("style", {}) is not None:
-            style.update(layer_info.get("style", {}))
-
-        if getattr(ax, "_type", None) == "tri":
-            df = self._ensure_pandas_data(layer_info["data"], reason=f"render:{layer_info.get('name', '')}")
-            layer_info["data"] = df
-            coor = layer_info.get("coor", {})
-
-            # Apply per-figure shared colorbar (lazy) if an axc exists
-            try:
-                style = self._cb_collect_and_attach(style, coor, method_key, df)
-                self.logger.debug("Successful loading colorbar style")
-            except Exception as _e:
-                if self.logger:
-                    self.logger.debug(f"colorbar lazy-attach failed: {_e}")
-            # Ternary coordinates required: left/right/bottom
-            requiredlbr = {"left", "right", "bottom"}
-            requiredxy  = {"x", "y"}
-            if not ((requiredlbr <= set(coor.keys())) or (requiredxy <= set(coor.keys()))):
-                raise ValueError("Ternary layer must define coordinates: {left, right, bottom} or {x, y} with exprs.")
-            for kk, vv in coor.items(): 
-                style[kk] = self._eval_series(df, vv)
-            if method_key in {"grid_profile", "grid_profiling"}:
-                style["__df__"] = df
-            return method(**style)
-
-        elif getattr(ax, "_type", None) == "rect":
-            df = self._ensure_pandas_data(layer_info["data"], reason=f"render:{layer_info.get('name', '')}")
-            layer_info["data"] = df
-            coor = layer_info.get("coor", {})
-            try:
-                style = self._cb_collect_and_attach(style, coor, method_key, df)
-                self.logger.debug("Successful loading colorbar style")
-            except Exception as _e:
-                if self.logger:
-                    self.logger.debug(f"colorbar lazy-attach failed: {_e}")
-                
-            if layer_info['method'] == "hist":
-                if isinstance(layer_info['data'], dict): 
-                    if "label" not in style.keys():
-                        style['label'] = []
-                    for kk, vv in coor.items():
-                        style[kk] = []
-                    for dn, ddf in df.items(): 
-                        style['label'].append(dn)
-                        for kk, vv in coor.items():
-                            style[kk].append( self._eval_series(ddf, vv) )
-                else: 
-                    for kk, vv in coor.items(): 
-                        style[kk] = self._eval_series(df, vv)
-                        
-                return method(**style)
-            # Generic x/y coordinates required
-            else:
-                if not ({"x", "y"} <= set(coor.keys())):
-                    raise ValueError("Rectangular layer must define coordinates: {x,y} with exprs.")
-
-                for kk, vv in coor.items():
-                    # style[kk] = self._eval_series(df, vv)
-                    # Mode 1：expr → DataFrame evaluation
-                    if isinstance(vv, dict) and "expr" in vv:
-                        if df is None:
-                            raise ValueError(
-                                f"Layer '{layer_info.get('name', '')}' defines expression-based "
-                                f"coordinate for '{kk}' but has no data source."
-                            )
-                        style[kk] = self._eval_series(df, vv)
-                    else:
-                        # Mode 2：(list/tuple/ndarray/scalar) 
-                        style[kk] = vv
-                if method_key in {"grid_profile", "grid_profiling"}:
-                    style["__df__"] = df
-                # if "norm" in style.keys():
-                #     style = self.load_norm(style)
-                return method(**style)
-
-        else:
-            # Unknown axes adapter type
-            raise ValueError(f"Axes '{ax}' has unknown _type='{getattr(ax, '_type', None)}'.")
+        return runtime_render_layer(self, ax, layer_info)
 
 
 

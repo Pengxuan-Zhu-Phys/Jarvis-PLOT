@@ -1,4 +1,6 @@
-# JarvisPLOT release helper
+#!/usr/bin/env zsh
+
+# Jarvis-PLOT release helper
 # Usage:
 #   jprel 1.0.2            # build + upload to PyPI using ~/.pypirc (repository = pypi)
 #   jprel 1.0.2 --tag      # also create local git tag (no push)
@@ -6,106 +8,122 @@
 #   jprel 1.0.2 -e         # refresh local editable install after release (clean old local records first)
 
 jprel () {
-  	set -euo pipefail
+  (
+    set -euo pipefail
 
-  if [[ $# -lt 1 ]]; then
-    echo "Usage: jprel <version> [--tag] [--dry] [-e|--editable]"
-    echo "Example: jprel 1.0.2 --tag -e"
-    return 2
-  fi
-
-  local ver="$1"; shift || true
-  local do_tag=0
-  local dry=0
-  local editable=0
-  local pkg_name="jarvisplot"
-
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --tag) do_tag=1 ;;
-      --dry) dry=1 ;;
-      -e|--editable) editable=1 ;;
-      *) echo "Unknown option: $1"; return 2 ;;
-    esac
-    shift
-  done
-
-  # ---- basic sanity checks ----
-  if [[ ! -f "pyproject.toml" ]]; then
-    echo "ERROR: pyproject.toml not found. Run this in your project root."
-    return 1
-  fi
-
-  echo "==> JarvisPLOT release: v${ver}"
-  echo "==> Python: $(python3 -V 2>/dev/null || true)"
-  echo "==> PWD: $(pwd)"
-
-  # ---- ensure tooling ----
-  python3 -m pip -q install -U build twine >/dev/null
-
-  # ---- clean old dists ----
-  echo "==> Cleaning dist/ build/ *.egg-info ..."
-  rm -rf dist build *.egg-info
-
-  # ---- (optional) bump version in pyproject.toml ----
-  # If you keep version in pyproject.toml as: version = "x.y.z"
-  # This will update it to the provided version (safe if it exists; no-op otherwise).
-  if grep -qE '^[[:space:]]*version[[:space:]]*=' pyproject.toml; then
-    echo "==> Updating pyproject.toml version -> ${ver}"
-    # macOS sed needs -i '' for in-place
-    sed -i '' -E "s/^([[:space:]]*version[[:space:]]*=[[:space:]]*\")([^\"]+)(\".*)$/\1${ver}\3/" pyproject.toml || true
-  else
-    echo "==> Note: version field not found in pyproject.toml (skip auto-bump)."
-  fi
-
-  # ---- build ----
-  echo "==> Building sdist + wheel ..."
-  python3 -m build
-
-  # ---- check ----
-  echo "==> Twine check ..."
-  python3 -m twine check dist/*
-
-  # ---- upload ----
-  if [[ ${dry} -eq 1 ]]; then
-    echo "==> DRY RUN: skip upload."
-  else
-    echo "==> Uploading to PyPI (using ~/.pypirc, repository=pypi) ..."
-    python3 -m twine upload -r pypi dist/*
-  fi
-
-  # ---- git tag (optional, local only) ----
-  if [[ ${do_tag} -eq 1 ]]; then
-    echo "==> Git status:"
-    git status --porcelain || true
-
-    echo "==> Committing version bump (if any) ..."
-    # Only commit if there are changes
-    if [[ -n "$(git status --porcelain)" ]]; then
-      git add pyproject.toml || true
-      git commit -m "Release v${ver}" || true
+    if [[ $# -lt 1 ]]; then
+      echo "Usage: jprel <version> [--tag] [--dry] [-e|--editable]"
+      echo "Example: jprel 1.0.2 --tag -e"
+      exit 2
     fi
 
-    echo "==> Creating local git tag (push disabled by policy) ..."
-    git tag -a "v${ver}" -m "JarvisPLOT v${ver}" || true
-  fi
+    local ver="$1"; shift || true
+    local do_tag=0
+    local dry=0
+    local editable=0
+    local dist_name="Jarvis-PLOT"
+    local legacy_dist_name="jarvisplot"
 
-  echo "==> Done: v${ver}"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --tag) do_tag=1 ;;
+        --dry) dry=1 ;;
+        -e|--editable) editable=1 ;;
+        *) echo "Unknown option: $1"; exit 2 ;;
+      esac
+      shift
+    done
 
-  # ---- optional editable reinstall (clean stale local records first) ----
-  if [[ ${editable} -eq 1 ]]; then
-    echo "==> Editable mode: cleaning old local install records for ${pkg_name} ..."
-    python3 -m pip uninstall -y "${pkg_name}" >/dev/null 2>&1 || true
-    python3 -m pip cache remove "${pkg_name}" >/dev/null 2>&1 || true
+    # ---- basic sanity checks ----
+    if [[ ! -f "pyproject.toml" ]]; then
+      echo "ERROR: pyproject.toml not found. Run this in your project root."
+      exit 1
+    fi
 
-    # Remove stale dist-info/egg-info/egg-link that can keep old versions visible in local metadata.
-    python3 - <<'PY'
+    echo "==> ${dist_name} release: v${ver}"
+    echo "==> Python: $(python3 -V 2>/dev/null || true)"
+    echo "==> PWD: $(pwd)"
+
+    # ---- ensure tooling ----
+    if ! python3 -m build --version >/dev/null 2>&1; then
+      echo "ERROR: python3 -m build is not available in the current environment."
+      echo "Install it first in your release environment, for example:"
+      echo "  python3 -m pip install build"
+      exit 1
+    fi
+    if ! python3 -m twine --version >/dev/null 2>&1; then
+      echo "ERROR: python3 -m twine is not available in the current environment."
+      echo "Install it first in your release environment, for example:"
+      echo "  python3 -m pip install twine"
+      exit 1
+    fi
+
+    # ---- clean old dists ----
+    echo "==> Cleaning dist/ build/ *.egg-info ..."
+    rm -rf dist build *.egg-info
+
+    # ---- (optional) bump version in pyproject.toml ----
+    # If you keep version in pyproject.toml as: version = "x.y.z"
+    # This will update it to the provided version (safe if it exists; no-op otherwise).
+    if grep -qE '^[[:space:]]*version[[:space:]]*=' pyproject.toml; then
+      echo "==> Updating pyproject.toml version -> ${ver}"
+      # macOS sed needs -i '' for in-place
+      sed -i '' -E "s/^([[:space:]]*version[[:space:]]*=[[:space:]]*\")([^\"]+)(\".*)$/\1${ver}\3/" pyproject.toml || true
+    else
+      echo "==> Note: version field not found in pyproject.toml (skip auto-bump)."
+    fi
+
+    # ---- build ----
+    echo "==> Building sdist + wheel ..."
+    python3 -m build
+
+    # ---- check ----
+    echo "==> Twine check ..."
+    python3 -m twine check dist/*
+
+    # ---- upload ----
+    if [[ ${dry} -eq 1 ]]; then
+      echo "==> DRY RUN: skip upload."
+    else
+      echo "==> Uploading to PyPI (using ~/.pypirc, repository=pypi) ..."
+      python3 -m twine upload -r pypi dist/*
+    fi
+
+    # ---- git tag (optional, local only) ----
+    if [[ ${do_tag} -eq 1 ]]; then
+      echo "==> Git status:"
+      git status --porcelain || true
+
+      echo "==> Committing version bump (if any) ..."
+      # Only commit if there are changes
+      if [[ -n "$(git status --porcelain)" ]]; then
+        git add pyproject.toml || true
+        git commit -m "Release v${ver}" || true
+      fi
+
+      echo "==> Creating local git tag (push disabled by policy) ..."
+      git tag -a "v${ver}" -m "${dist_name} v${ver}" || true
+    fi
+
+    echo "==> Done: v${ver}"
+
+    # ---- optional editable reinstall (clean stale local records first) ----
+    if [[ ${editable} -eq 1 ]]; then
+      echo "==> Editable mode: cleaning old local install records for ${dist_name} ..."
+      python3 -m pip uninstall -y "${dist_name}" >/dev/null 2>&1 || true
+      python3 -m pip uninstall -y "${legacy_dist_name}" >/dev/null 2>&1 || true
+      python3 -m pip cache remove "${dist_name}" >/dev/null 2>&1 || true
+      python3 -m pip cache remove "${legacy_dist_name}" >/dev/null 2>&1 || true
+
+      # Remove stale dist-info/egg-info/egg-link that can keep old versions visible in local metadata.
+      python3 - <<'PY'
 import pathlib
 import shutil
 import site
 import sysconfig
 
-pkg = "jarvisplot"
+dist_names = ("Jarvis-PLOT", "jarvisplot")
+normalized = {"jarvis_plot", "jarvisplot", "Jarvis_PLOT"}
 paths = set()
 for p in getattr(site, "getsitepackages", lambda: [])():
     if p:
@@ -118,13 +136,23 @@ for key in ("purelib", "platlib"):
     if p:
         paths.add(pathlib.Path(p))
 
-patterns = (
-    f"{pkg}-*.dist-info",
-    f"{pkg}.dist-info",
-    f"{pkg}-*.egg-info",
-    f"{pkg}.egg-info",
-    f"{pkg}.egg-link",
-)
+patterns = []
+for name in dist_names:
+    patterns.extend((
+        f"{name}-*.dist-info",
+        f"{name}.dist-info",
+        f"{name}-*.egg-info",
+        f"{name}.egg-info",
+        f"{name}.egg-link",
+    ))
+for name in normalized:
+    patterns.extend((
+        f"{name}-*.dist-info",
+        f"{name}.dist-info",
+        f"{name}-*.egg-info",
+        f"{name}.egg-info",
+        f"{name}.egg-link",
+    ))
 
 for base in paths:
     if not base.exists():
@@ -140,13 +168,19 @@ for base in paths:
                 pass
 PY
 
-    echo "==> Reinstall editable ${pkg_name} ..."
-    python3 -m pip install --no-deps -e .
-  fi
-
+      echo "==> Reinstall editable ${dist_name} ..."
+      python3 -m pip install --no-deps -e .
+    fi
+  )
 }
 
+_jprel_sourced=0
+if [[ -n "${ZSH_VERSION:-}" ]]; then
+  [[ "${ZSH_EVAL_CONTEXT:-}" == *:file ]] && _jprel_sourced=1
+elif [[ -n "${BASH_VERSION:-}" ]]; then
+  [[ "${BASH_SOURCE[0]}" != "$0" ]] && _jprel_sourced=1
+fi
 
-
-
-
+if [[ ${_jprel_sourced} -eq 0 ]]; then
+  jprel "$@"
+fi

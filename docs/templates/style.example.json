@@ -1,0 +1,28 @@
+{
+  "Frame": {
+    "figure": {
+      "figsize": [
+        10,
+        6
+      ]
+    },
+    "axes": {
+      "ax": {
+        "xscale": "linear",
+        "yscale": "linear"
+      },
+      "axc": {
+        "color": {
+          "scale": "linear",
+          "cmap": "viridis"
+        }
+      }
+    }
+  },
+  "Style": {
+    "scatter": {
+      "s": 10,
+      "alpha": 0.8
+    }
+  }
+}

@@ -4,8 +4,10 @@ This guide explains how to extend JarvisPLOT without breaking the 1.3.0 dataflow
 
 Read these documents first:
 
-- `docs/dev/ARCHITECTURE_OVERVIEW.md`
-- `docs/dev/DATAFLOW_ARCHITECTURE.md`
+- `docs/context/JARVIS_PLOT_CONTEXT.md`
+- `docs/context/CODE_MAP_JARVIS_PLOT.md`
+- `docs/design/ARCHITECTURE_OVERVIEW.md`
+- `docs/design/DATAFLOW_ARCHITECTURE.md`
 - `docs/dev/DEVELOPER_RULES.md`
 
 ## General Workflow
@@ -109,7 +111,7 @@ Do not:
 
 ## Adding a New Data Source
 
-New source backends belong in `jarvisplot/data_loader.py`.
+New source backends belong in `jarvisplot/data_loader.py`, with HDF5-specific policy helpers in `jarvisplot/data_loader_hdf5.py`.
 
 A source implementation should provide the same operational contract as `DataSet` does today:
 
@@ -135,7 +137,7 @@ Avoid:
 
 - `bin/SUSYRun2_EWMSSM.yaml` uses `load_whitelist: only_in_list`, `isvalid_policy: clean`, and repeated `share_data` names. That file demonstrates why source planning and named cache reuse matter.
 - `bin/EggBox_Dynesty_06.yaml` uses `share_data: gridprofXY`, which is a concrete example of cross-layer runtime reuse.
-- `grid_profile` in `jarvisplot/Figure/adapters.py` is the best reference for a custom rendering primitive that consumes a compact profiled table instead of the full source dataframe.
+- `grid_profile` in `jarvisplot/Figure/adapters_rect.py` is the best reference for a custom rendering primitive that consumes a compact profiled table instead of the full source dataframe.
 
 ## Recommended Verification
 
