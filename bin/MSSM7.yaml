@@ -1,0 +1,204 @@
+DataSet:
+# - dataset: MSSM7
+#   name: h5
+#   path: ./datas/MSSM7.hdf5
+#   type: hdf5
+#   columns:
+#     load_whitelist: only_in_list 
+#     isvalid_policy: clean
+#     rename:
+#     - source: "MSSM7/#MSSM7atQ_parameters @MSSM7atQ::primary_parameters::TanBeta"
+#       target: pTB
+#     - source: "MSSM7/#MSSM7atQ_parameters @MSSM7atQ::primary_parameters::mHd2"
+#       target: pMhd2
+#     - source: "MSSM7/#MSSM7atQ_parameters @MSSM7atQ::primary_parameters::mHu2"
+#       target: pMhu2
+#     - source: "MSSM7/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::M1 mass1"
+#       target: pM1
+#     - source: "MSSM7/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::M2 mass1"
+#       target: pM2
+#     - source: "MSSM7/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::Mu mass1"
+#       target: pMu
+#     - source: "MSSM7/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi+_1 Pole_Mass"
+#       target: mC1
+#     - source: "MSSM7/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi+_2 Pole_Mass"
+#       target: mC2
+#     - source: "MSSM7/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_1 Pole_Mass"
+#       target: mN1
+#     - source: "MSSM7/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_2 Pole_Mass"
+#       target: mN2
+#     - source: "MSSM7/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_3 Pole_Mass"
+#       target: mN3
+#     - source: "MSSM7/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::~chi0_4 Pole_Mass"
+#       target: mN4
+#     - source: "MSSM7/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::h0_1 Pole_Mass"
+#       target: mH1
+#     - source: "MSSM7/#sigma_SD_n @DarkBit::sigma_SD_n_simple"
+#       target: xsecSDn
+#     - source: "MSSM7/#sigma_SD_p @DarkBit::sigma_SD_p_simple"
+#       target: xsecSDp
+#     - source: "MSSM7/#sigma_SI_n @DarkBit::sigma_SI_n_simple"
+#       target: xsecSIn
+#     - source: "MSSM7/#sigma_SI_p @DarkBit::sigma_SI_p_simple"
+#       target: xsecSIp
+#     - source: "MSSM7/#RD_oh2 @DarkBit::RD_oh2_MicrOmegas"
+#       target: omegah2
+#     - source: "MSSM7/LogLike"
+#       target: LogL1
+#     - source: "MSSM7/New_LogLike"
+#       target: LogL2
+#   transform:
+#   - filter: (mH1 >= 115) & (mH1 <= 135) & (omegah2 > 0) & (np.log10(omegah2) >= -10) & (np.log10(omegah2) <= 10)
+#   - tocsv: ./datas/MSSM7_light.csv
+#   - to_parquet: ./datas/MSSM7_light.parquet
+- name: h5
+  path: ./datas/MSSM7_light.parquet
+  type: parquet 
+
+
+Figures:
+- name: pm1mu_ProfLogL
+  enable: true
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: $\mu~({\rm TeV})$
+        y: $M_1~({\rm TeV})$
+      xlim: [0, 8]
+      ylim: [-4, 4]
+      text:
+      - x: 0.75
+        y: 1.0016
+        s: MSSM7
+        ha: right
+        va: bottom
+        fontfamily: STIXGeneral
+        fontsize: x-small
+        transform: true
+    axc:
+      label:
+        ylabel: profile likelihood ratio $\Lambda = \mathcal{L} / \mathcal{L}_{\rm max} $
+      color:
+        cmap: gambit_cmap
+        vmin: 0
+        vmax: 1
+  layers:
+  - name: prof
+    data:
+    - source: h5
+      transform:
+      - sortby: LogL1
+      # - filter: LogL1 < -258.5
+      - profile:
+          bin: 200
+          coordinates:
+            x:
+              expr: pMu/1000
+              scale: linear
+              name: xx
+              lim: [0, 8]
+            y:
+              expr: pM1/1000
+              scale: linear
+              name: yy
+              lim: [-4, 4]
+            z:
+              expr: LogL1
+              scale: linear
+              name: z0
+          objective: max
+          grid_points: rect
+    share_data: pm1mu_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: np.exp(LogL1) / np.exp(-258.3)
+        # expr: np.exp(LogL1) / np.exp(np.max(LogL1))
+    style: {}
+
+- name: mN1mC1_ProfLogL
+  enable: true
+  style:
+  - gambit_2x1
+  - rectcmap
+  frame:
+    ax:
+      labels:
+        x: $m_{\tilde{\chi}_1^0}$ (GeV)
+        y: $m_{\tilde{\chi}_1^\pm}$ (GeV)
+      xlim: [0, 3500]
+      ylim: [0, 7000]
+      text:
+      - x: 0.75
+        y: 1.0016
+        s: MSSM7
+        ha: right
+        va: bottom
+        fontfamily: STIXGeneral
+        fontsize: x-small
+        transform: true
+    axc:
+      label:
+        ylabel: profile likelihood ratio $\Lambda = \mathcal{L} / \mathcal{L}_{\rm max} $
+      color:
+        cmap: gambit_cmap
+        vmin: 0
+        vmax: 1
+  layers:
+  - name: prof
+    data:
+    - source: h5
+      transform:
+      - sortby: LogL1
+      # - filter: LogL1 < -258.0 
+      - profile:
+          bin: 200
+          coordinates:
+            x:
+              expr: np.abs(mN1)
+              scale: linear
+              name: xx
+              lim: [0, 3500]
+            y:
+              expr: np.abs(mC1)
+              scale: linear
+              name: yy
+              lim: [0, 7000]
+            z:
+              expr: LogL1
+              scale: linear
+              name: z0
+          objective: max
+          grid_points: rect
+    share_data: pm1mu_profile
+    axes: ax
+    method: voronoi
+    coordinates:
+      x:
+        expr: xx
+      y:
+        expr: yy
+      z:
+        expr: np.exp(LogL1) / np.exp(-258.3)
+    style: {}
+
+
+
+output:
+  dir: /Users/p.zhu/Jarvis-Workshop/Jarvis-PLOT/Workshop/MSSM7
+  dpi: 400
+  formats:
+  - png
+  - pdf
+project:
+  name: SUSYRun2 for EWMSSM
+  workdir: /Users/p.zhu/Jarvis-Workshop/Jarvis-PLOT/Workshop
+version: 1.1

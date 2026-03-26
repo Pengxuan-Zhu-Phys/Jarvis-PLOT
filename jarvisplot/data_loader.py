@@ -64,6 +64,7 @@ class DataSet():
     def __init__(self):
         self._file: Optional[str]   = None
         self.path:  Optional[str]   = None 
+        self.rootpath: Optional[str] = None
         self._type:  Optional[str]  = None
         self.base:  Optional[str]   = None
         self.keys:  Optional[List[str]]  = None 
@@ -86,6 +87,7 @@ class DataSet():
        
     def setinfo(self, dtinfo, rootpath, eager: bool = False, cache=None):
         self.cache = cache
+        self.rootpath = str(rootpath) if rootpath is not None else None
         raw_path = str(dtinfo['path'])
         resolved = resolve_project_path(raw_path, base_dir=rootpath or ".")
         self.file = str(resolved)
@@ -142,6 +144,18 @@ class DataSet():
             except Exception as e:
                 if self.logger:
                     self.logger.warning(f"Dataset '{self.name}' lazy metadata failed: {e}")
+        elif self.type == "parquet":
+            if pl is not None:
+                try:
+                    scan = pl.scan_parquet(self.path)
+                    self.keys = list(scan.collect_schema().names())
+                    if self.logger:
+                        self.logger.debug(
+                            f"Dataset '{self.name}' registered in lazy mode (parquet columns={len(self.keys)})."
+                        )
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"Dataset '{self.name}' lazy metadata failed: {e}")
         else:
             if self.logger:
                 self.logger.debug(f"Dataset '{self.name}' registered in lazy mode.")
@@ -175,6 +189,8 @@ class DataSet():
             return self.data
         if self.type == "csv":
             self.load_csv()
+        elif self.type == "parquet":
+            self.load_parquet()
         elif self.type == "hdf5":
             self.load_hdf5()
         else:
@@ -240,6 +256,8 @@ class DataSet():
     def _summary_name(self) -> str:
         if self.type == "hdf5":
             return f" HDF5 loaded!\n\t name  -> {self.name}\n\t group -> {self.group}\n\t path  -> {self.path}"
+        if self.type == "parquet":
+            return f" Parquet loaded!\n\t name  -> {self.name}\n\t path  -> {self.path}"
         return f" CSV loaded!\n\t name  -> {self.name}\n\t path  -> {self.path}"
 
     def _debug_enabled(self) -> bool:
@@ -279,12 +297,18 @@ class DataSet():
         if self.data is not None:
             try:
                 if isinstance(self._materialized_manifest, dict):
-                    msg = self._materialized_summary(self._materialized_manifest)
+                    msg = self._materialized_summary(
+                        self._materialized_manifest,
+                        stats=self._materialized_numeric_bounds(),
+                    )
                 else:
                     msg = summary.dataframe_summary(self.data, name=self._summary_name())
             except Exception:
                 if isinstance(self._materialized_manifest, dict):
-                    msg = self._materialized_summary(self._materialized_manifest)
+                    msg = self._materialized_summary(
+                        self._materialized_manifest,
+                        stats=self._materialized_numeric_bounds(),
+                    )
                 else:
                     msg = f"Data backend: {type(self.data).__name__}"
             if self.cache is not None:
@@ -369,8 +393,11 @@ class DataSet():
     def _materialized_source_fingerprint(self):
         return hdf5.materialized_source_fingerprint(self)
 
-    def _materialized_summary(self, manifest: Dict[str, Any]) -> str:
-        return hdf5.materialized_summary(self, manifest)
+    def _materialized_summary(self, manifest: Dict[str, Any], stats: Optional[Dict[str, Dict[str, Any]]] = None) -> str:
+        return hdf5.materialized_summary(self, manifest, stats=stats)
+
+    def _materialized_numeric_bounds(self):
+        return runtime.materialized_numeric_bounds(self)
 
     @staticmethod
     def _sql_bool_ops(expr: Any) -> str:
@@ -430,6 +457,9 @@ class DataSet():
     def load_hdf5(self):
         return runtime.load_hdf5(self)
 
+    def load_parquet(self):
+        return runtime.load_parquet(self)
+
     def apply_is_valid_policy(self, kkeys): 
         if self.data is None:
             self.load(force=False)
@@ -473,7 +503,7 @@ class DataSet():
             sps = self.data.shape
             mask = self.data[isvalids].all(axis=1)
             self.data = self.data[mask]
-            self.logger.warning(
+            self.logger.info(
                 "DataSet Shape: \n\t Before filtering -> {}\n\t  After filtering -> {}".format(
                     sps, self.data.shape
                 )

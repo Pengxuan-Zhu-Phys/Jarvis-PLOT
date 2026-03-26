@@ -23,8 +23,15 @@ from .core_runtime import (
     plan_dataset_required_columns as runtime_plan_dataset_required_columns,
     prepare_project_layout as runtime_prepare_project_layout,
     prepare_usage_plan as runtime_prepare_usage_plan,
+    parse_hdf5_metadata_and_renew_yaml as runtime_parse_hdf5_metadata_and_renew_yaml,
     rename_hdf5_and_renew_yaml as runtime_rename_hdf5_and_renew_yaml,
 )
+
+
+def _format_console_record(record):
+    module = record["extra"].get("module", "No module")
+    message = str(record["message"]).replace("{", "{{").replace("}", "}}").replace("<", "\\<")
+    return f"\n\n<cyan>{module}</cyan> \n\t-> <green>{record['time']:MM-DD HH:mm:ss.SSS}</green> - [<level>{record['level']}</level>] >>> \n<level>{message}</level> "
 
 
 class JarvisPLOT():
@@ -53,7 +60,6 @@ class JarvisPLOT():
         self.load_cmaps()
 
         self.load_yaml()
-        self.prepare_project_layout()
 
         # sys.exit()
         if self.args.parse_data:
@@ -64,9 +70,10 @@ class JarvisPLOT():
             elif self.args.out is not None and self.args.inplace:
                 self.logger.error("Conflicting arguments: --out and --inplace. Please choose only one.")
                 sys.exit(2)
-            self.load_dataset(eager=True)
-            self.rename_hdf5_and_renew_yaml()
+            self.parse_hdf5_metadata_and_renew_yaml()
+            return
         else:
+            self.prepare_project_layout()
             self.load_dataset(eager=False)
             self.plan_dataset_required_columns()
             if self.shared is None:
@@ -316,7 +323,15 @@ class JarvisPLOT():
             except Exception:
                 pass
             return
-        self.parser_yaml(os.path.abspath(yaml_path))
+        resolved = os.path.abspath(yaml_path)
+        try:
+            self.parser_yaml(resolved)
+        except FileNotFoundError:
+            self.logger.error(f"YAML file not found: {resolved}")
+            sys.exit(2)
+        except OSError as e:
+            self.logger.error(f"Failed to open YAML file '{resolved}': {e}")
+            sys.exit(2)
 
     def init_logger(self) -> None:
         from datetime import datetime
@@ -335,8 +350,7 @@ class JarvisPLOT():
             return record["extra"].get("to_console", False)
 
         def custom_format(record):
-            module = record["extra"].get("module", "No module")
-            return f"\n\n<cyan>{module}</cyan> \n\t-> <green>{record['time']:MM-DD HH:mm:ss.SSS}</green> - [<level>{record['level']}</level>] >>> \n<level>{record['message']}</level> "
+            return _format_console_record(record)
 
         logger.add(
             sys.stdout,
@@ -368,3 +382,6 @@ class JarvisPLOT():
 
     def rename_hdf5_and_renew_yaml(self):
         return runtime_rename_hdf5_and_renew_yaml(self)
+
+    def parse_hdf5_metadata_and_renew_yaml(self):
+        return runtime_parse_hdf5_metadata_and_renew_yaml(self)

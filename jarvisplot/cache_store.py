@@ -62,6 +62,13 @@ class ProjectCache:
             except Exception:
                 pass
 
+    def _info(self, msg: str) -> None:
+        if self.logger:
+            try:
+                self.logger.info(msg)
+            except Exception:
+                pass
+
     @staticmethod
     def _load_json(path: Path, default: Dict[str, Any]) -> Dict[str, Any]:
         try:

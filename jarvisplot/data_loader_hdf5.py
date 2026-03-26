@@ -3,7 +3,9 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, List, Optional
 
-from .data_loader_summary import dataframe_summary_human_bytes
+import h5py
+
+from .data_loader_summary import dataframe_summary_human_bytes, format_table
 
 try:
     import polars as pl
@@ -118,6 +120,50 @@ def build_hdf5_whitelist(dataset) -> Optional[set[str]]:
     return with_isvalid
 
 
+def scan_hdf5_leaf_metadata(path: str, group: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Return lightweight metadata for leaf datasets without reading dataset bodies."""
+
+    def _walk(node, prefix: str = "") -> None:
+        for name, child in node.items():
+            child_path = f"{prefix}/{name}" if prefix else name
+            if isinstance(child, h5py.Dataset):
+                metadata.append(
+                    {
+                        "path": child_path,
+                        "shape": tuple(getattr(child, "shape", ()) or ()),
+                        "dtype": str(getattr(child, "dtype", "NA")),
+                    }
+                )
+            elif isinstance(child, h5py.Group):
+                _walk(child, child_path)
+
+    group_name = str(group).strip() if group is not None else ""
+    metadata: List[Dict[str, Any]] = []
+
+    try:
+        with h5py.File(path, "r") as h5f:
+            if group_name:
+                if group_name not in h5f:
+                    raise RuntimeError(f"HDF5 group '{group_name}' not found in '{path}'.")
+                root = h5f[group_name]
+                if not isinstance(root, h5py.Group):
+                    raise RuntimeError(f"HDF5 group '{group_name}' in '{path}' is not a group.")
+                _walk(root, group_name)
+            else:
+                _walk(h5f, "")
+    except FileNotFoundError as e:
+        raise RuntimeError(f"HDF5 file not found: {path}") from e
+    except OSError as e:
+        raise RuntimeError(f"Unable to open HDF5 file '{path}': {e}") from e
+
+    if not metadata:
+        if group_name:
+            raise RuntimeError(f"HDF5 group '{group_name}' in '{path}' contains no leaf datasets.")
+        raise RuntimeError(f"No leaf datasets found in HDF5 file '{path}'.")
+
+    return metadata
+
+
 def shape_token(df) -> str:
     import pandas as pd
 
@@ -169,7 +215,7 @@ def materialized_cache_key(dataset):
     return dataset.cache.cache_key({"kind": "hdf5-polars-materialized", "source": source_fp})
 
 
-def materialized_summary(dataset, manifest: Dict[str, Any]) -> str:
+def materialized_summary(dataset, manifest: Dict[str, Any], stats: Optional[Dict[str, Dict[str, Any]]] = None) -> str:
     rows = manifest.get("rows", "NA")
     cols = manifest.get("cols", len(manifest.get("columns", [])))
     parts = manifest.get("parts", 0)
@@ -187,6 +233,71 @@ def materialized_summary(dataset, manifest: Dict[str, Any]) -> str:
     if manifest.get("columns"):
         lines.append("=== Materialized Columns ===")
         lines.append(", ".join(str(c) for c in manifest.get("columns", [])))
+    if isinstance(stats, dict) and stats:
+        lines.append("=== Materialized Stats ===")
+        stat_rows = []
+        df = getattr(dataset, "data", None)
+        schema_names = None
+        schema_dtypes = {}
+        if pl is not None and isinstance(df, pl.LazyFrame):
+            try:
+                schema = df.collect_schema()
+                if hasattr(schema, "names"):
+                    schema_names = set(str(x) for x in schema.names())
+                elif isinstance(schema, dict):
+                    schema_names = set(str(x) for x in schema.keys())
+                    schema_dtypes = {str(k): str(v) for k, v in schema.items()}
+                elif hasattr(schema, "items"):
+                    schema_names = set(str(x) for x in schema.keys())
+                    schema_dtypes = {str(k): str(v) for k, v in schema.items()}
+            except Exception:
+                schema_names = set()
+        elif pl is not None and isinstance(df, pl.DataFrame):
+            try:
+                schema_names = set(str(x) for x in df.columns)
+            except Exception:
+                schema_names = set()
+        elif hasattr(df, "columns"):
+            try:
+                schema_names = set(str(x) for x in getattr(df, "columns", []))
+            except Exception:
+                schema_names = set()
+        for col in manifest.get("columns", []):
+            if col not in stats:
+                continue
+            bounds = stats.get(col, {})
+            dtype = "NA"
+            nonnull_text = "NA"
+            if pl is not None and isinstance(df, pl.LazyFrame):
+                dtype = schema_dtypes.get(col, "NA")
+            elif schema_names is not None and col in schema_names and hasattr(df, "__getitem__"):
+                series = df[col]
+                dtype = str(series.dtype)
+                try:
+                    nonnull_pct = (float(series.notna().sum()) / float(len(series)) * 100.0) if len(series) else 0.0
+                except Exception:
+                    nonnull_pct = 0.0
+                nonnull_text = f"{nonnull_pct:.1f}%"
+            else:
+                dtype = str(type(bounds.get("min", None)).__name__)
+            stat_rows.append(
+                (
+                    str(col),
+                    dtype,
+                    nonnull_text,
+                    bounds.get("min", None),
+                    bounds.get("max", None),
+                )
+            )
+
+        if stat_rows:
+            lines.append(
+                format_table(
+                    ["name", "dtype", "nonnull%", "[min]", "[max]"],
+                    stat_rows,
+                    aligns=["left", "left", "right", "right", "right"],
+                )
+            )
     return "\n".join(lines)
 def sql_bool_ops(expr: Any) -> str:
     return str(expr).replace("&&", " AND ").replace("||", " OR ")

@@ -29,9 +29,89 @@ from .data_loader_hdf5 import (
     shape_token,
     sql_bool_ops,
 )
-from .Figure.load_data import addcolumn, filter as filter_df, grid_profiling, profiling, sortby
+from .utils.pathing import resolve_project_path
+from .Figure.load_data import addcolumn, drop_columns, filter as filter_df, grid_profiling, keep_columns, profiling, sortby
 
 JP_ROW_IDX = "__jp_row_idx__"
+
+
+def _transform_requests_column_prune(transform) -> bool:
+    if not isinstance(transform, list):
+        return False
+    for trans in transform:
+        if not isinstance(trans, dict):
+            continue
+        if any(k in trans for k in ("select", "keep_columns", "drop_columns", "project")):
+            return True
+        cols = trans.get("columns")
+        if isinstance(cols, dict) and any(k in cols for k in ("keep", "drop", "select", "retain")):
+            return True
+    return False
+
+
+def _resolve_tocsv_target(dataset, target: Any) -> Path:
+    if isinstance(target, dict):
+        raw = target.get("path", target.get("file", target.get("target", target.get("value", ""))))
+    else:
+        raw = target
+    path = str(raw).strip()
+    if not path:
+        raise ValueError("tocsv requires a non-empty path")
+    base_dir = getattr(dataset, "rootpath", None) or getattr(dataset, "path", None) or "."
+    return resolve_project_path(path, base_dir=base_dir)
+
+
+def _resolve_toparquet_target(dataset, target: Any) -> Path:
+    return _resolve_tocsv_target(dataset, target)
+
+
+def _save_dataframe_csv(dataset, df, target: Any, stage: str) -> Path:
+    out_path = _resolve_tocsv_target(dataset, target)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(df, pd.DataFrame):
+        df.to_csv(out_path, index=False)
+    elif pl is not None and isinstance(df, pl.DataFrame):
+        df.write_csv(out_path)
+    elif pl is not None and isinstance(df, pl.LazyFrame):
+        df.collect().write_csv(out_path)
+    else:
+        pd.DataFrame(df).to_csv(out_path, index=False)
+    if dataset.logger:
+        dataset.logger.info(
+            "Saved transformed dataset to CSV:\n\t stage \t-> {}\n\t path \t-> {}".format(stage, out_path)
+        )
+    return out_path
+
+
+def _save_dataframe_parquet(dataset, df, target: Any, stage: str) -> Path:
+    out_path = _resolve_toparquet_target(dataset, target)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(df, pd.DataFrame):
+        try:
+            df.to_parquet(out_path, index=False)
+        except Exception:
+            if pl is None:
+                raise
+            pl.DataFrame(df).write_parquet(out_path)
+    elif pl is not None and isinstance(df, pl.DataFrame):
+        df.write_parquet(out_path)
+    elif pl is not None and isinstance(df, pl.LazyFrame):
+        df.collect().write_parquet(out_path)
+    else:
+        pd.DataFrame(df).to_parquet(out_path, index=False)
+    if dataset.logger:
+        dataset.logger.info(
+            "Saved transformed dataset to parquet:\n\t stage \t-> {}\n\t path \t-> {}".format(stage, out_path)
+        )
+    return out_path
+
+
+def _ensure_row_index_on_pandas(df: pd.DataFrame) -> pd.DataFrame:
+    if JP_ROW_IDX in df.columns:
+        return df
+    out = df.copy(deep=False)
+    out.insert(0, JP_ROW_IDX, np.arange(int(out.shape[0]), dtype=np.int64))
+    return out
 
 def apply_dataset_transform(dataset, stage: str = "dataset") -> None:
     """
@@ -107,6 +187,18 @@ def apply_dataset_transform(dataset, stage: str = "dataset") -> None:
             df = sortby(df, trans["sortby"], dataset.logger)
         elif "add_column" in trans:
             df = addcolumn(df, trans["add_column"], dataset.logger)
+        elif "keep_columns" in trans:
+            df = keep_columns(df, trans.get("keep_columns"), dataset.logger)
+        elif "drop_columns" in trans:
+            df = drop_columns(df, trans.get("drop_columns"), dataset.logger)
+        elif "tocsv" in trans:
+            if isinstance(df, pd.DataFrame):
+                df = _ensure_row_index_on_pandas(df)
+            _save_dataframe_csv(dataset, df, trans.get("tocsv"), stage=stage)
+        elif "to_parquet" in trans:
+            if isinstance(df, pd.DataFrame):
+                df = _ensure_row_index_on_pandas(df)
+            _save_dataframe_parquet(dataset, df, trans.get("to_parquet"), stage=stage)
 
         if prev_df is not df and isinstance(prev_df, pd.DataFrame):
             collect_prev = int(prev_df.shape[0]) >= 100_000
@@ -116,12 +208,7 @@ def apply_dataset_transform(dataset, stage: str = "dataset") -> None:
 
     dataset.data = df
     if isinstance(dataset.data, pd.DataFrame):
-        if JP_ROW_IDX not in dataset.data.columns:
-            dataset.data.insert(0, JP_ROW_IDX, np.arange(int(dataset.data.shape[0]), dtype=np.int64))
-        if isinstance(dataset.retained_columns, set) and dataset.retained_columns:
-            retained = [c for c in dataset.data.columns if c in dataset.retained_columns or c == JP_ROW_IDX]
-            if retained and len(retained) < int(dataset.data.shape[1]):
-                dataset.data = dataset.data.loc[:, retained].copy(deep=False)
+        dataset.data = _ensure_row_index_on_pandas(dataset.data)
     memtrace_checkpoint(
         dataset.logger,
         "dataset.transform.after",
@@ -139,6 +226,97 @@ def apply_dataset_transform(dataset, stage: str = "dataset") -> None:
                 dataset._shape_token(dataset.data),
             )
         )
+
+
+def materialized_numeric_bounds(dataset) -> Dict[str, Dict[str, Any]]:
+    manifest = getattr(dataset, "_materialized_manifest", None)
+    if isinstance(manifest, dict):
+        columns = [str(c) for c in manifest.get("columns", []) if str(c).strip()]
+    else:
+        columns = [str(c) for c in (getattr(dataset, "keys", None) or []) if str(c).strip()]
+
+    if not columns or dataset.data is None:
+        return {}
+
+    frame = dataset.data
+    if pl is not None and isinstance(frame, pl.LazyFrame):
+        try:
+            schema_cols = set(dataset._polars_schema_names(frame))
+            select_cols = [c for c in columns if c in schema_cols]
+            if not select_cols:
+                return {}
+            agg_exprs = []
+            for col in select_cols:
+                agg_exprs.append(pl.col(col).min().alias(f"{col}__min"))
+                agg_exprs.append(pl.col(col).max().alias(f"{col}__max"))
+            result = frame.select(agg_exprs).collect()
+            out: Dict[str, Dict[str, Any]] = {}
+            if result.height == 0:
+                return out
+            row = result.row(0, named=True)
+            for col in select_cols:
+                min_key = f"{col}__min"
+                max_key = f"{col}__max"
+                if min_key not in row or max_key not in row:
+                    continue
+                out[col] = {
+                    "min": row[min_key],
+                    "max": row[max_key],
+                }
+            return out
+        except Exception:
+            return {}
+
+    if pl is not None and isinstance(frame, pl.DataFrame):
+        try:
+            select_cols = [c for c in columns if c in frame.columns]
+            if not select_cols:
+                return {}
+            result = frame.select(
+                [
+                    pl.col(col).min().alias(f"{col}__min")
+                    for col in select_cols
+                ]
+                + [
+                    pl.col(col).max().alias(f"{col}__max")
+                    for col in select_cols
+                ]
+            )
+            if result.height == 0:
+                return {}
+            row = result.row(0, named=True)
+            out: Dict[str, Dict[str, Any]] = {}
+            for col in select_cols:
+                min_key = f"{col}__min"
+                max_key = f"{col}__max"
+                if min_key not in row or max_key not in row:
+                    continue
+                out[col] = {"min": row[min_key], "max": row[max_key]}
+            return out
+        except Exception:
+            return {}
+
+    if not isinstance(frame, pd.DataFrame):
+        return {}
+
+    stats: Dict[str, Dict[str, Any]] = {}
+    for col in columns:
+        if col not in frame.columns:
+            continue
+        series = frame[col]
+        if not pd.api.types.is_numeric_dtype(series):
+            continue
+        try:
+            arr = series.to_numpy(copy=False)
+            if getattr(arr, "size", 0) == 0:
+                continue
+            stats[col] = {
+                "min": float(np.nanmin(arr)),
+                "max": float(np.nanmax(arr)),
+            }
+        except Exception:
+            continue
+    return stats
 
 @staticmethod
 def _sql_bool_ops(expr: Any) -> str:
@@ -222,8 +400,20 @@ def _apply_dataset_transform_polars(
                 if not name or not expr:
                     raise ValueError("add_column requires non-empty name and expr")
                 lf = lf.with_columns(pl.sql_expr(dataset._sql_bool_ops(expr)).alias(name))
+            elif "keep_columns" in trans:
+                lf = keep_columns(lf, trans.get("keep_columns"), dataset.logger)
+            elif "drop_columns" in trans:
+                lf = drop_columns(lf, trans.get("drop_columns"), dataset.logger)
             elif "profile" in trans or "grid_profile" in trans:
                 return False
+            elif "tocsv" in trans:
+                if JP_ROW_IDX not in dataset._polars_schema_names(lf):
+                    lf = lf.with_row_index(JP_ROW_IDX)
+                _save_dataframe_csv(dataset, lf, trans.get("tocsv"), stage=stage)
+            elif "to_parquet" in trans:
+                if JP_ROW_IDX not in dataset._polars_schema_names(lf):
+                    lf = lf.with_row_index(JP_ROW_IDX)
+                _save_dataframe_parquet(dataset, lf, trans.get("to_parquet"), stage=stage)
             else:
                 return False
     except Exception as e:
@@ -241,11 +431,6 @@ def _apply_dataset_transform_polars(
     dataset._full_lazy_frame = lf_with_idx
 
     keep_cols = list(cols_after_transform)
-    if isinstance(dataset.retained_columns, set) and dataset.retained_columns:
-        retained = set(dataset.retained_columns)
-        retained.add(JP_ROW_IDX)
-        keep_cols = [c for c in cols_after_transform if c in retained]
-
     if materialize_to_pandas:
         manifest_rows = None
         manifest_bytes = None
@@ -524,7 +709,7 @@ def load_hdf5_materialized(dataset) -> None:
             chunk_rows = 10_000
 
         if dataset.logger:
-            dataset.logger.warning(
+            dataset.logger.info(
                 "HDF5 materialization START:\n\t name \t-> {}\n\t backend \t-> polars/parquet\n\t rows \t-> {}\n\t chunk_rows \t-> {}\n\t selected \t-> {}".format(
                     dataset.name,
                     total_rows,
@@ -596,7 +781,7 @@ def load_hdf5_materialized(dataset) -> None:
     dataset.cache.put_materialized_manifest(cache_key, manifest)
     dataset._activate_materialized_manifest(cache_key, manifest)
     if dataset.logger:
-        dataset.logger.warning(
+        dataset.logger.info(
             "HDF5 materialization DONE:\n\t name \t-> {}\n\t rows_out \t-> {}\n\t parts \t-> {}".format(
                 dataset.name,
                 manifest.get("rows", "NA"),
@@ -604,26 +789,82 @@ def load_hdf5_materialized(dataset) -> None:
             )
         )
 
+
+def load_parquet(dataset):
+    from .data_loader_summary import dataframe_summary
+
+    if dataset.logger:
+        dataset.logger.debug("Loading parquet from {}".format(dataset.path))
+
+    loaded = None
+    if pl is not None:
+        try:
+            parquet_df = pl.read_parquet(dataset.path)
+            try:
+                loaded = parquet_df.to_pandas()
+            except ModuleNotFoundError:
+                loaded = pd.DataFrame(parquet_df.to_dict(as_series=False))
+            dataset._data_backend = "pandas"
+        except Exception as e:
+            if dataset.logger:
+                dataset.logger.warning(f"Polars parquet load failed, fallback to pandas: {e}")
+            loaded = None
+
+    if loaded is None:
+        loaded = pd.read_parquet(dataset.path)
+        dataset._data_backend = "pandas"
+
+    dataset.data = loaded
+    if isinstance(dataset.data, pd.DataFrame):
+        dataset.keys = list(dataset.data.columns)
+    else:
+        dataset.keys = list(getattr(dataset.data, "columns", []))
+
+    dataset._apply_dataset_transform(stage="parquet")
+
+    summary_name = dataset._summary_name()
+    summary_msg = None
+    source_fp = dataset.fingerprint()
+    if dataset.cache is not None:
+        summary_msg = dataset.cache.get_summary(source_fp)
+
+    if summary_msg is None:
+        try:
+            summary_msg = dataframe_summary(dataset.data, name=summary_name)
+        except Exception:
+            summary_msg = f"Parquet loaded  {summary_name}\nDataFrame shape: {getattr(dataset.data, 'shape', ('NA', 'NA'))}"
+        if dataset.cache is not None:
+            dataset.cache.put_summary(source_fp, summary_msg)
+
+    dataset._emit_summary_text(summary_msg)
+
 def load_hdf5(dataset):
     from .data_loader_summary import dataframe_summary, print_hdf5_tree_ascii
+
+    def _emit_loaded_summary():
+        summary_msg = None
+        source_fp = dataset.fingerprint()
+        if dataset.cache is not None:
+            summary_msg = dataset.cache.get_summary(source_fp)
+        if summary_msg is None:
+            if isinstance(dataset.data, pd.DataFrame):
+                summary_msg = dataframe_summary(dataset.data, name=dataset._summary_name())
+            elif isinstance(dataset._materialized_manifest, dict):
+                summary_msg = dataset._materialized_summary(
+                    dataset._materialized_manifest,
+                    stats=dataset._materialized_numeric_bounds(),
+                )
+            if dataset.cache is not None and summary_msg is not None:
+                dataset.cache.put_summary(source_fp, summary_msg)
+        if summary_msg is not None:
+            dataset._emit_summary_text(summary_msg)
+        return summary_msg
 
     if pl is not None and dataset.cache is not None:
         try:
             dataset._load_hdf5_materialized()
+            _emit_loaded_summary()
             dataset._apply_dataset_transform(stage="hdf5")
-            summary_msg = None
-            source_fp = dataset.fingerprint()
-            if dataset.cache is not None:
-                summary_msg = dataset.cache.get_summary(source_fp)
-            if summary_msg is None:
-                if isinstance(dataset.data, pd.DataFrame):
-                    summary_msg = dataframe_summary(dataset.data, name=dataset._summary_name())
-                elif isinstance(dataset._materialized_manifest, dict):
-                    summary_msg = dataset._materialized_summary(dataset._materialized_manifest)
-                if dataset.cache is not None and summary_msg is not None:
-                    dataset.cache.put_summary(source_fp, summary_msg)
-            if summary_msg is not None:
-                dataset._emit_summary_text(summary_msg)
             return
         except Exception as e:
             if dataset.logger:
@@ -756,7 +997,7 @@ def load_hdf5(dataset):
             rename_entries = dataset._columns_dict().get("rename", [])
             rename_map = {}
             if isinstance(rename_entries, list) and rename_entries:
-                dataset.logger.warning("{}: Loading Columns Rename Map".format(dataset.name))
+                dataset.logger.info("{}: Loading Columns Rename Map".format(dataset.name))
                 for item in rename_entries:
                     if not isinstance(item, dict):
                         continue
@@ -852,19 +1093,8 @@ def load_hdf5(dataset):
                         )
                     )
 
+                _emit_loaded_summary()
                 dataset._apply_dataset_transform(stage="hdf5")
-
-                # Emit a pretty summary BEFORE returning
-                summary_name = dataset._summary_name()
-                source_fp = dataset.fingerprint()
-                summary_msg = None
-                if dataset.cache is not None:
-                    summary_msg = dataset.cache.get_summary(source_fp)
-                if summary_msg is None:
-                    summary_msg = dataframe_summary(dataset.data, name=summary_name)
-                    if dataset.cache is not None:
-                        dataset.cache.put_summary(source_fp, summary_msg)
-                dataset._emit_summary_text(summary_msg)
 
                 return  # IMPORTANT: stop here; avoid falling through to single-dataset path
             else:
@@ -896,15 +1126,6 @@ def load_hdf5(dataset):
             else:
                 dataset.data = pd.DataFrame(np.asarray(arr))
             dataset.keys = list(dataset.data.columns)
+            _emit_loaded_summary()
             dataset._apply_dataset_transform(stage="hdf5")
-            summary_name = dataset._summary_name()
-            source_fp = dataset.fingerprint()
-            summary_msg = None
-            if dataset.cache is not None:
-                summary_msg = dataset.cache.get_summary(source_fp)
-            if summary_msg is None:
-                summary_msg = dataframe_summary(dataset.data, name=summary_name)
-                if dataset.cache is not None:
-                    dataset.cache.put_summary(source_fp, summary_msg)
-            dataset._emit_summary_text(summary_msg)
             return

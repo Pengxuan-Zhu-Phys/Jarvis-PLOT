@@ -7,6 +7,7 @@ import yaml
 
 from .cache_store import ProjectCache
 from .data_loader import JP_ROW_IDX
+from .data_loader_hdf5 import scan_hdf5_leaf_metadata
 from .utils.pathing import resolve_project_path
 
 
@@ -130,7 +131,7 @@ def plan_dataset_required_columns(core) -> None:
         dts.set_required_columns(required if required else None, retained=retained if retained else None)
         if core.logger:
             sample = ", ".join(sorted(list(retained))[:12]) if retained else "<none>"
-            core.logger.warning(
+            core.logger.info(
                 "Dataset required columns planned:\n\t dataset \t-> {}\n\t required \t-> {}\n\t retained \t-> {}\n\t sample \t-> {}".format(
                     name,
                     len(required),
@@ -225,6 +226,85 @@ def rename_hdf5_and_renew_yaml(core):
             core.yaml.update_dataset(dt.name, {"columns": columns_payload})
             dt.rename_columns(vmap_dict)
             core.logger.debug(f"Dataset '{dt.name}' renamed columns -> {dt.keys}")
+
+    with open(core.args.out, "w", encoding="utf-8") as f1:
+        yaml.dump(
+            core.yaml.config,
+            f1,
+            Dumper=_QuotedDumper,
+            sort_keys=False,
+            default_flow_style=False,
+            indent=2,
+            allow_unicode=True,
+            width=100000,
+        )
+
+
+def parse_hdf5_metadata_and_renew_yaml(core):
+    def _as_quoted_str(value: Any) -> _QuotedString:
+        return _QuotedString(str(value))
+
+    def _normalize_whitelist_as_quoted(raw):
+        if isinstance(raw, list):
+            return [_as_quoted_str(v) for v in raw if v is not None and str(v).strip()]
+        if isinstance(raw, str):
+            sval = raw.strip()
+            if sval:
+                return _as_quoted_str(sval)
+        return []
+
+    for dcfg in core.yaml.config.get("DataSet", []):
+        if isinstance(dcfg, dict):
+            dcfg.pop("is_gambit", None)
+            dcfg.pop("columnmap", None)
+
+    for dcfg in core.yaml.config.get("DataSet", []):
+        if not isinstance(dcfg, dict):
+            continue
+        if str(dcfg.get("type", "")).strip().lower() != "hdf5":
+            continue
+
+        name = str(dcfg.get("name", "")).strip()
+        project_cfg = core.yaml.config.get("project", {})
+        if not isinstance(project_cfg, dict):
+            project_cfg = {}
+        workdir = project_cfg.get("workdir", core.yaml.dir)
+        path = resolve_project_path(str(dcfg.get("path", "")).strip(), base_dir=workdir or core.yaml.dir)
+        group = str(dcfg.get("dataset", "")).strip() or None
+        old_columns = dcfg.get("columns", {})
+        if not isinstance(old_columns, dict):
+            old_columns = {}
+
+        metadata = scan_hdf5_leaf_metadata(str(path), group=group)
+        usable = [item for item in metadata if not str(item.get("path", "")).endswith("_isvalid")]
+        if not usable:
+            raise RuntimeError(
+                "No usable leaf datasets found for HDF5 parse-data: "
+                f"dataset='{name}', path='{path}', group='{group or '<root>'}'."
+            )
+
+        vmap_list = []
+        for ii, item in enumerate(usable):
+            source = str(item["path"])
+            target = f"Var{ii}@{name}"
+            vmap_list.append(
+                {
+                    "source": _as_quoted_str(source),
+                    "target": target,
+                }
+            )
+
+        columns_payload = {}
+        for k, v in old_columns.items():
+            if k in {"rename", "load_whitelist"}:
+                continue
+            columns_payload[k] = v
+        columns_payload["rename"] = vmap_list
+
+        if "load_whitelist" in old_columns:
+            columns_payload["load_whitelist"] = _normalize_whitelist_as_quoted(old_columns.get("load_whitelist"))
+
+        core.yaml.update_dataset(name, {"columns": columns_payload})
 
     with open(core.args.out, "w", encoding="utf-8") as f1:
         yaml.dump(

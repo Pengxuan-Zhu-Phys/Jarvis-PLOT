@@ -6,6 +6,28 @@ from ..utils.expression import eval_dataframe_expression
 from .profile_runtime import eval_series, grid_profiling, profiling, _preprofiling
 
 
+def _normalize_column_list(spec):
+    if spec is None:
+        return []
+    if isinstance(spec, dict):
+        for key in ("columns", "keep", "drop", "select", "retain", "value"):
+            if key in spec:
+                return _normalize_column_list(spec.get(key))
+        return []
+    if isinstance(spec, str):
+        text = spec.strip()
+        return [text] if text else []
+    if isinstance(spec, (list, tuple, set)):
+        out = []
+        for item in spec:
+            sval = str(item).strip()
+            if sval:
+                out.append(sval)
+        return out
+    sval = str(spec).strip()
+    return [sval] if sval else []
+
+
 def filter(df, condition, logger):
     try:
         if isinstance(condition, bool):
@@ -55,6 +77,53 @@ def addcolumn(df, adds, logger):
             )
         )
         return df               
+
+
+def keep_columns(df, spec, logger):
+    try:
+        cols = _normalize_column_list(spec)
+        if not cols:
+            return df
+        if isinstance(df, pd.DataFrame):
+            keep = [c for c in cols if c in df.columns]
+            missing = [c for c in cols if c not in df.columns]
+            if missing and logger:
+                logger.warning(f"keep_columns missing columns ignored -> {missing}")
+            if not keep:
+                return df.iloc[0:0].copy()
+            return df.loc[:, keep].copy(deep=False)
+        if hasattr(df, "select"):
+            try:
+                return df.select(cols)
+            except Exception:
+                return df
+        return df
+    except Exception as e:
+        if logger:
+            logger.warning(f"keep_columns failed for spec={spec}: {e}")
+        return df
+
+
+def drop_columns(df, spec, logger):
+    try:
+        cols = _normalize_column_list(spec)
+        if not cols:
+            return df
+        if isinstance(df, pd.DataFrame):
+            existing = [c for c in cols if c in df.columns]
+            if not existing:
+                return df
+            return df.drop(columns=existing, errors="ignore")
+        if hasattr(df, "drop"):
+            try:
+                return df.drop(cols)
+            except Exception:
+                return df
+        return df
+    except Exception as e:
+        if logger:
+            logger.warning(f"drop_columns failed for spec={spec}: {e}")
+        return df
         
 def sortby(df, expr, logger):
     try:

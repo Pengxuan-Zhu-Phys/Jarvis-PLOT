@@ -8,7 +8,7 @@ JarvisPLOT 1.3.0 replaced the old wide-table pipeline with a three-table model. 
 
 | Table type | Where it exists in code | Purpose | Allowed width |
 | --- | --- | --- | --- |
-| Dataset Table | `DataSet.data` in `jarvisplot/data_loader.py` | Compact retained source data after dataset load and dataset-level transforms | Narrow, retained columns only |
+| Dataset Table | `DataSet.data` in `jarvisplot/data_loader.py` | Dataset load output after ordered dataset-level transforms | Narrow by explicit transform only |
 | Dataset Runtime | `jarvisplot/data_loader_runtime.py` | HDF5 runtime loading/materialization and dataset transform execution | Narrow, helper-owned |
 | Selection Table | Output of `DataPreprocessor.run_pipeline()` before demand enrichment | Input to `profile`, `preprofile`, and `grid_profile`; compact cache payload | Narrow, profiling columns plus current-layer demand |
 | Enriched Table | Output of `DataPreprocessor._enrich_for_demand()` and then `Figure.render_layer()` | Rendering, layer style evaluation, `share_data`, export-oriented use | Add only layer-requested columns |
@@ -21,7 +21,9 @@ Properties:
 
 - Created by `DataSet.load_csv()` or `DataSet.load_hdf5()`
 - Always includes `__jp_row_idx__` once the dataset becomes runtime-visible
-- Retains only `retained_columns`, which are planned in `JarvisPLOT.plan_dataset_required_columns()`
+- Follows the dataset `transform` list strictly in YAML order
+- Only explicit `keep_columns` / `drop_columns` steps prune columns
+- If no pruning step appears in `transform`, no implicit column pruning is applied
 - May originate from:
   - CSV loaded directly to pandas
   - HDF5 materialized to `.cache/materialized/<key>/part-*.parquet`, then exposed as a polars lazy scan before the pandas boundary
@@ -35,13 +37,15 @@ Properties:
 What must be in it:
 
 - `__jp_row_idx__`
-- dataset-transform outputs that later runtime stages depend on
-- any retained render columns already known up front
+- dataset-transform outputs produced by ordered `transform` steps
+- any columns explicitly preserved by `keep_columns`
+- any columns needed later by runtime stages before a later explicit pruning step
 
 What must not be in it by default:
 
 - every raw source column from a wide HDF5 group
 - columns that are only needed by unrelated layers
+- columns that have not been explicitly pruned by the transform list
 
 ## 2. Selection Table
 
@@ -141,5 +145,9 @@ flowchart TD
 
 - Plan column demand early in `core.py`.
 - Keep runtime caches compatible with narrow projections only.
+- Dataset-level `transform` is ordered; do not reorder steps during planning or execution.
+- `keep_columns` and `drop_columns` are the only explicit column-pruning steps.
+- `tocsv` and `to_parquet` execute at their position in the ordered transform list and export the dataframe state at that point.
+- If an export step is last, the runtime can avoid extra downstream transform work after the export.
 - If a new transform introduces new input or output columns, update the projection logic in both `core.py` and `Figure/preprocessor.py`.
 - If a new layer needs extra render columns, express that need in layer coordinates or style expressions so demand enrichment can discover it.

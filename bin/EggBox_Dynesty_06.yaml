@@ -1,21 +1,6 @@
 DataSet:
-- name: dynesty
-  path: ../DATABASE/dynesty_result.csv
-  type: csv
 - name: df_samples_0
-  path: ../DATABASE/samples.0.csv
-  type: csv
-- name: df_samples_1
-  path: ../DATABASE/samples.1.csv
-  type: csv
-- name: df_samples_2
-  path: ../DATABASE/samples.2.csv
-  type: csv
-- name: df_samples_3
-  path: ../DATABASE/samples.3.csv
-  type: csv
-- name: df_samples_4
-  path: ../DATABASE/samples.4.csv
+  path: ./outputs/EggBox_Bridson/DATABASE/samples.0.csv  
   type: csv
 
 Figures:
@@ -44,7 +29,7 @@ Figures:
   layers:
   - name: scatter
     data:
-    - source: [df_samples_0, df_samples_1, df_samples_2, df_samples_3, df_samples_4 ]
+    - source: df_samples_0 
       transform:
       - sortby: LogL
     axes: ax
@@ -85,7 +70,7 @@ Figures:
   layers:
   - name: scatter
     data:
-    - source: [df_samples_0, df_samples_1, df_samples_2, df_samples_3, df_samples_4 ]
+    - source: df_samples_0 
       transform: 
       - profile: 
           bin: 100 
@@ -157,7 +142,7 @@ Figures:
   layers:
   - name: scatter
     data:
-    - source: [df_samples_0, df_samples_1, df_samples_2, df_samples_3, df_samples_4 ]
+    - source: df_samples_0 
       transform: 
       - profile: 
           bin: 100 
@@ -229,7 +214,7 @@ Figures:
   layers:
   - name: grid_points
     data:
-    - source: [df_samples_0, df_samples_1, df_samples_2, df_samples_3, df_samples_4 ]
+    - source: df_samples_0 
       transform:
       - profile:
           method: grid
@@ -278,105 +263,105 @@ Figures:
 
 
 
-- name: dynesty_logL_vs_logX
-  enable: false
-  style:
-  - a4paper_2x1
-  - rect_5x1
-  frame:
-    ax0:
-      labels:
-        x: $-\ln(X)$
-        y: $N_{\mathrm{live}}$
-    ax1:
-      labels:
-        x: $-\ln(X)$
-        y: Likelihood
-    ax2:
-      labels:
-        x: $-\ln(X)$
-        y: 'Importance
+# - name: dynesty_logL_vs_logX
+#   enable: false
+#   style:
+#   - a4paper_2x1
+#   - rect_5x1
+#   frame:
+#     ax0:
+#       labels:
+#         x: $-\ln(X)$
+#         y: $N_{\mathrm{live}}$
+#     ax1:
+#       labels:
+#         x: $-\ln(X)$
+#         y: Likelihood
+#     ax2:
+#       labels:
+#         x: $-\ln(X)$
+#         y: 'Importance
 
-          weight PDF'
-    ax3:
-      labels:
-        x: $-\ln(X)$
-        y: Evidence
-    ax4:
-      labels:
-        x: $-\ln(X)$
-        y: Iters
-  layers:
-  - name: nlive
-    data:
-    - source: dynesty
-    axes: ax0
-    method: scatter
-    coordinates:
-      x:
-        expr: -log_PriorVolume
-      y:
-        expr: samples_nlive
-    style:
-      alpha: 0.7
-      zorder: 1
-  - name: loglike
-    data:
-    - source: dynesty
-    axes: ax1
-    method: scatter
-    coordinates:
-      x:
-        expr: -log_PriorVolume
-      y:
-        expr: np.exp(log_Like) / np.exp(np.max(log_Like))
-    style:
-      alpha: 0.7
-      zorder: 1
-  - name: 'Importance
+#           weight PDF'
+#     ax3:
+#       labels:
+#         x: $-\ln(X)$
+#         y: Evidence
+#     ax4:
+#       labels:
+#         x: $-\ln(X)$
+#         y: Iters
+#   layers:
+#   - name: nlive
+#     data:
+#     - source: dynesty
+#     axes: ax0
+#     method: scatter
+#     coordinates:
+#       x:
+#         expr: -log_PriorVolume
+#       y:
+#         expr: samples_nlive
+#     style:
+#       alpha: 0.7
+#       zorder: 1
+#   - name: loglike
+#     data:
+#     - source: dynesty
+#     axes: ax1
+#     method: scatter
+#     coordinates:
+#       x:
+#         expr: -log_PriorVolume
+#       y:
+#         expr: np.exp(log_Like) / np.exp(np.max(log_Like))
+#     style:
+#       alpha: 0.7
+#       zorder: 1
+#   - name: 'Importance
 
-      weight PDF'
-    data:
-    - source: dynesty
-    axes: ax2
-    method: scatter
-    coordinates:
-      x:
-        expr: -log_PriorVolume
-      y:
-        expr: np.exp(log_weight) / np.exp(np.max(log_weight))
-    style:
-      alpha: 0.7
-      zorder: 1
-  - name: logevidence
-    data:
-    - source: dynesty
-    axes: ax3
-    method: scatter
-    coordinates:
-      x:
-        expr: -log_PriorVolume
-      y:
-        expr: np.exp(log_Evidence)
-    style:
-      alpha: 0.7
-      zorder: 1
-  - name: iters
-    data:
-    - source: dynesty
-    axes: ax4
-    method: scatter
-    coordinates:
-      x:
-        expr: -log_PriorVolume
-      y:
-        expr: samples_it
-    style:
-      alpha: 0.7
-      zorder: 1
+#       weight PDF'
+#     data:
+#     - source: dynesty
+#     axes: ax2
+#     method: scatter
+#     coordinates:
+#       x:
+#         expr: -log_PriorVolume
+#       y:
+#         expr: np.exp(log_weight) / np.exp(np.max(log_weight))
+#     style:
+#       alpha: 0.7
+#       zorder: 1
+#   - name: logevidence
+#     data:
+#     - source: dynesty
+#     axes: ax3
+#     method: scatter
+#     coordinates:
+#       x:
+#         expr: -log_PriorVolume
+#       y:
+#         expr: np.exp(log_Evidence)
+#     style:
+#       alpha: 0.7
+#       zorder: 1
+#   - name: iters
+#     data:
+#     - source: dynesty
+#     axes: ax4
+#     method: scatter
+#     coordinates:
+#       x:
+#         expr: -log_PriorVolume
+#       y:
+#         expr: samples_it
+#     style:
+#       alpha: 0.7
+#       zorder: 1
 
 output:
-  dir: .
+  dir: ./images/EggBox_Bridson
   dpi: 400
   formats:
   - png
@@ -384,7 +369,7 @@ output:
 
 project:
   name: Example_Dynesty
-  workdir: /Users/p.zhu/Jarvis-Workshop/Jarvis-HEP/Results/EggBox_Dynesty_06/IMAGE
+  workdir: /Users/p.zhu/Jarvis-Workshop/Jarvis-Examples/Eggbox
 
 version: 0.3
 

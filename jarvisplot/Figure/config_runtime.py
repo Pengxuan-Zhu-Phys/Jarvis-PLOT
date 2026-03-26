@@ -39,11 +39,12 @@ def apply_figure_config(fig, info: Mapping) -> bool:
             return False
 
         if "style" in info:
-            fig.style = info["style"]
+            style_tokens = info["style"]
         else:
-            fig.style = ["a4paper_2x1"]
+            style_tokens = ["a4paper_2x1"]
+        fig.style = style_tokens
         fig.logger.debug("Figure style loaded")
-        if fig.style and "gambit" in str(fig.style[0]).lower():
+        if style_tokens and "gambit" in str(style_tokens[0]).lower():
             fig.mode = "gambit"
 
         if "frame" in info:

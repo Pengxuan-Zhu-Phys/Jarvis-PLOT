@@ -13,7 +13,7 @@ except Exception:
     pl = None
 
 from ..memtrace import memtrace_checkpoint, memtrace_object_inventory
-from .load_data import _preprofiling, addcolumn, filter as filter_df, grid_profiling, profiling, sortby
+from .load_data import _preprofiling, addcolumn, drop_columns, filter as filter_df, grid_profiling, keep_columns, profiling, sortby
 
 def resolve_source_data(preprocessor, source: Any, combine: str = "concat"):
     if isinstance(source, str):
@@ -130,7 +130,7 @@ def apply_transforms_impl(
                     method = str(profile_cfg.get("method", "bridson")).lower()
                     if "bin" in profile_cfg:
                         binv = profile_cfg.get("bin")
-                preprocessor._warn(
+                preprocessor._info(
                     "Runtime profile START:\n\t source \t-> {}\n\t step \t\t-> profile, \n\t method \t-> {}\n\t bin \t\t-> {}\n\t rows_before \t-> {}".format(
                         source_label or "<unknown>",
                         method,
@@ -183,7 +183,7 @@ def apply_transforms_impl(
                 profile_cfg = {"method": "grid"}
             before_rows = preprocessor._safe_nrows(df)
             binv = profile_cfg.get("bin", "default")
-            preprocessor._warn(
+            preprocessor._info(
                 "Runtime profile START: source \t-> {}\n\t step \t-> 'grid_profile,\n\t method \t-> 'grid',\n\t bin \t-> {},\n\t rows_before \t-> {}".format(
                     source_label or "<unknown>",
                     binv,
@@ -227,6 +227,10 @@ def apply_transforms_impl(
             df = sortby(df, trans["sortby"], preprocessor.logger)
         elif "add_column" in trans:
             df = addcolumn(df, trans["add_column"], preprocessor.logger)
+        elif "keep_columns" in trans:
+            df = keep_columns(df, trans.get("keep_columns"), preprocessor.logger)
+        elif "drop_columns" in trans:
+            df = drop_columns(df, trans.get("drop_columns"), preprocessor.logger)
 
         if prev_df is not df:
             collect_prev = preprocessor._should_collect_dataframe(prev_df)
@@ -384,7 +388,7 @@ def run_pipeline(preprocessor,
         src_label = preprocessor._runtime_source_label(source)
         if isinstance(source, str) and source in preprocessor._preprofile_alias_meta:
             meta = preprocessor._preprofile_alias_meta.get(source, {})
-            preprocessor._warn(
+            preprocessor._info(
                 "Runtime profile input:\n\t source \t-> {},\n uses preprofile alias:\n\t key \t\t-> {},\n\t origin \t-> {},\n\t cache_file \t-> {},\n\t rows_in \t-> {}.".format(
                     src_label,
                     meta.get("pre_key", "<unknown>")[:16] if isinstance(meta.get("pre_key"), str) else "<unknown>",
@@ -457,7 +461,7 @@ def run_pipeline(preprocessor,
                 cache_file = str((preprocessor.cache.data_dir / f"{key}.pkl").resolve())
             except Exception:
                 pass
-            preprocessor._warn(
+            preprocessor._info(
                 "Runtime profile cache STORE:\n\t source \t-> {},\n\t key \t\t-> {},\n\t cache_file \t-> {},\n\t rows \t\t-> {}.".format(
                     preprocessor._runtime_source_label(source),
                     key[:16],

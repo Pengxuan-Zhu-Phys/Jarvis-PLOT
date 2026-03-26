@@ -3128,7 +3128,7 @@ Figures:
     - source: h5
       transform:
       - profile:
-          bin: 150
+          bin: 200
           coordinates:
             x:
               expr: 0.5 * (np.abs(N13)**2 + np.abs(N14)**2) + np.abs(N12)**2
@@ -3299,7 +3299,7 @@ Figures:
         expr: LogLike_total
     style: {}
 output:
-  dir: ./SUSYRun2_EWMSSM_print
+  dir: ./SUSYRun2_EWMSSM_print_new
   dpi: 400
   formats:
   - png
