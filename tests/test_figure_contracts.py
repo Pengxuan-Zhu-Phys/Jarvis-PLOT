@@ -54,7 +54,7 @@ def test_console_record_formatter_escapes_braces():
     formatted = _format_console_record(record)
 
     assert "{{'registered': ['x'], 'failed': []}}" in formatted
-    assert "\\<string\\>" in formatted
+    assert "\\<string>" in formatted
 
 
 def test_apply_figure_config_uses_original_style_tokens_for_mode(monkeypatch):

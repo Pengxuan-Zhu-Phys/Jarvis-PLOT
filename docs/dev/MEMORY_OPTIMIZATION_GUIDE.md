@@ -27,10 +27,10 @@ The 1.3.0 pipeline moves memory pressure out of the hot path by narrowing tables
 
 Implemented mainly in `jarvisplot/data_loader.py`, `jarvisplot/data_loader_runtime.py`, and `jarvisplot/data_loader_hdf5.py`.
 
-- `JarvisPLOT.plan_dataset_required_columns()` computes `required_columns` and `retained_columns` before datasets are materialized.
+- `JarvisPLOT.plan_dataset_required_columns()` computes `required_columns` and the explicit column-prune intent before datasets are materialized.
 - HDF5 sources use `_build_hdf5_whitelist()` to avoid loading unrelated leaf datasets.
 - `jarvisplot/data_loader_runtime.py` owns `_load_hdf5_materialized()` and the HDF5 materialization path.
-- `jarvisplot/data_loader_runtime.py` keeps filter/sort/add-column work in polars when possible, then collects only the kept columns.
+- `jarvisplot/data_loader_runtime.py` keeps filter/sort/add-column work in polars when possible, then collects only the columns still required by the transform contract.
 
 Impact:
 
@@ -38,17 +38,17 @@ Impact:
 - fewer bytes reach pandas
 - less duplicate dataframe copying later
 
-### 2. Retained Column Planning
+### 2. Explicit Column Planning
 
 Implemented in `jarvisplot/core.py`.
 
 - Layer coordinates, style expressions, and transform expressions are scanned up front.
-- Dataset-level transform inputs and outputs are folded into the retained set.
+- Dataset-level transform inputs and outputs are folded into the required set.
 - `JP_ROW_IDX` is forced in so later enrichment can recover specific rows.
 
 Impact:
 
-- datasets retain the smallest safe working set
+- datasets keep the smallest safe working set without an implicit pruning layer
 - wide-table regressions become visible at planning time
 
 ### 3. Selection-Table Profiling
@@ -126,5 +126,6 @@ Current architectural position:
 ## Operational Notes
 
 - `columns.load_whitelist` and `columns.isvalid_policy` are part of the memory strategy, not just source parsing options.
+- `type: parquet` is a lightweight handoff format for already-pruned datasets, not a substitute for transform planning.
 - `JP_MEM_TRACE=1` is the supported way to validate memory behavior while changing the pipeline.
 - `--rebuild-cache` is useful when checking whether a change affects cold-cache behavior or demand fingerprints.

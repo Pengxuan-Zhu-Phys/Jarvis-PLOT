@@ -11,9 +11,9 @@ The main architectural constraint is deliberate: JarvisPLOT must keep a narrow, 
 | Module | Main responsibilities | Key entry points |
 | --- | --- | --- |
 | `jarvisplot/core.py` | Top-level orchestration: CLI setup, YAML load, workdir/cache init, dataset registration, required-column planning, prebuild pass, figure loop | `JarvisPLOT.init()`, `plan_dataset_required_columns()`, `prepare_project_layout()`, `prebuild_profile_pipelines()`, `plot()` |
-| `jarvisplot/data_loader.py` | CSV loading, dataset lifecycle, stable row ids, late row/column fetch, HDF5 call-through | `DataSet.load()`, `load_hdf5()`, `fetch_rows_columns()` |
+| `jarvisplot/data_loader.py` | CSV/Parquet loading, dataset lifecycle, stable row ids, late row/column fetch, HDF5 call-through | `DataSet.load()`, `load_hdf5()`, `load_parquet()`, `fetch_rows_columns()` |
 | `jarvisplot/data_loader_summary.py` | dataframe summary formatting and HDF5 tree diagnostics | `dataframe_summary()`, `print_hdf5_tree_ascii()` |
-| `jarvisplot/data_loader_runtime.py` | Runtime HDF5 loading/materialization and dataset transform execution | `load_hdf5()`, `load_hdf5_materialized()`, `apply_dataset_transform()` |
+| `jarvisplot/data_loader_runtime.py` | Runtime HDF5/Parquet loading, materialization, and dataset transform execution | `load_hdf5()`, `load_parquet()`, `load_hdf5_materialized()`, `apply_dataset_transform()` |
 | `jarvisplot/Figure/preprocessor.py` | Projection planning, preprofile prebuild, pipeline cache compatibility, demand-based enrichment | `DataPreprocessor.prebuild_profiles()`, `_runtime_projection()`, `_runtime_cache_columns()`, `_enrich_for_demand()` |
 | `jarvisplot/Figure/preprocessor_runtime.py` | Runtime source resolution and transform application | `resolve_source_data()`, `apply_transforms_impl()`, `run_pipeline()` |
 | `jarvisplot/Figure/figure.py` | Figure assembly, layer queueing, runtime data loading, `share_data` reuse, coordinate evaluation, adapter dispatch, rendering | `Figure.layers`, `load_layer_data()`, `render_layer()` |
@@ -40,7 +40,7 @@ Supporting infrastructure:
 2. `JarvisPLOT.load_dataset(eager=False)` registers each `DataSet` lazily in `DataContext`.
 3. `JarvisPLOT.plan_dataset_required_columns()` scans figure layers and transforms to decide:
    - which columns a dataset must be able to compute (`required_columns`)
-   - which columns it should retain in the compact dataset table (`retained_columns`)
+   - which columns are explicitly kept or dropped by ordered dataset transforms
 4. `DataPreprocessor.prebuild_profiles()` rewrites eligible first-profile transforms into cached `__jp_preprofile_<hash>` aliases so repeated profile-heavy layers do not repeat the same expensive reduction.
 5. Each `Figure` asks `DataPreprocessor.run_pipeline()` for layer data. That call:
    - resolves the source from `DataContext`
@@ -56,7 +56,7 @@ The runtime pipeline is intentionally narrow:
 
 ```mermaid
 flowchart LR
-    A["Source file<br/>CSV / HDF5"] --> B["Dataset planning<br/>required_columns + retained_columns"]
+    A["Source file<br/>CSV / HDF5 / Parquet"] --> B["Dataset planning<br/>required_columns + explicit prune"]
     B --> C["Lazy pushdown<br/>whitelist / rename / filter / sort / add_column"]
     C --> D["Collect"]
     D --> E["Compact dataset table<br/>DataSet.data + __jp_row_idx__"]
@@ -70,8 +70,8 @@ flowchart LR
 ### What each stage means in code
 
 - Dataset planning lives in `JarvisPLOT.plan_dataset_required_columns()`.
-- Lazy pushdown happens mainly in `DataSet._load_hdf5_materialized()` and `DataSet._apply_dataset_transform_polars()`.
-- The compact dataset table is the post-load `DataSet.data` object plus `__jp_row_idx__`.
+- Lazy pushdown happens mainly in `DataSet._load_hdf5_materialized()`, `DataSet._apply_dataset_transform_polars()`, and `DataSet.load_parquet()`.
+- The compact dataset table is the post-load `DataSet.data` object plus `__jp_row_idx__` after ordered transforms have run.
 - Selection-table projection is enforced by `DataPreprocessor._runtime_projection()`, `_runtime_cache_columns()`, and `_preprofile_base_projection()`.
 - Profiling is executed by `_preprofiling()`, `profiling()`, and `grid_profiling()` in `jarvisplot/Figure/profile_runtime.py`.
 - Layer-demand enrichment is performed by `DataPreprocessor._enrich_for_demand()` using `DataSet.fetch_rows_columns()`.
@@ -103,6 +103,6 @@ The critical rule is that runtime cache entries are not raw source snapshots. Th
 ## Architectural Invariants
 
 - `__jp_row_idx__` is the stable row identity used to reconnect narrow runtime payloads to retained dataset columns.
-- Dataset loading may be wide internally while scanning an HDF5 group, but the retained in-memory dataframe and runtime cache payload must be narrow.
+- Dataset loading may be wide internally while scanning an HDF5 group, but the in-memory dataframe and runtime cache payload must follow the explicit transform contract and stay narrow where possible.
 - Profiling is a data-reduction stage and should run on selection tables, not on full source tables.
 - Rendering is the only stage that is allowed to ask for additional display-only columns; if those columns are not already in the current narrow payload, row-id based enrichment supplies them.
