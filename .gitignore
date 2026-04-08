@@ -20,6 +20,7 @@ ENV/
 # VSCode / PyCharm project settings
 .vscode/
 .idea/
+.claude/
 
 # Build artifacts
 build/
