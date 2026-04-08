@@ -71,19 +71,18 @@ style:
 
 If you introduce a new config field that can contain expressions, update both:
 
-- `JarvisPLOT._collect_expr_columns()` in `jarvisplot/core.py`
+- `_collect_expr_columns()` in `jarvisplot/core_runtime.py`
 - `DataPreprocessor._layer_expr_columns()` or related projection helpers in `jarvisplot/Figure/preprocessor.py`
 
 If you do not update both sides, the layer may render only by accident on warm caches and will regress later.
 
 ## Adding a New Transform
 
-Transform behavior currently lives in two places:
+Transform behavior currently lives in three places:
 
 - execution primitives in `jarvisplot/Figure/load_data.py`
-- orchestration and projection logic in `jarvisplot/Figure/preprocessor.py`
-
-Dataset-level transforms also pass through `DataSet._apply_dataset_transform()` and, when possible, `DataSet._apply_dataset_transform_polars()`.
+- orchestration and projection logic in `jarvisplot/Figure/preprocessor.py` and `jarvisplot/Figure/preprocessor_runtime.py`
+- dataset-level transform execution in `jarvisplot/data_loader_runtime.py` (called through `DataSet._apply_dataset_transform()` and `DataSet._apply_dataset_transform_polars()`)
 
 Required checklist for a new transform:
 
@@ -141,7 +140,7 @@ Avoid:
 
 ## Recommended Verification
 
-This repository does not currently provide an automated test suite, so manual verification matters.
+This repository provides a contract-level test suite under `tests/` (data loader contracts, figure contracts, pathing contracts, template validation, etc.). Run those tests first, then follow up with manual verification for visual/rendering changes.
 
 For dataflow changes, run at least:
 
