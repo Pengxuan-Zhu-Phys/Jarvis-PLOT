@@ -30,9 +30,10 @@ There is no separate implemented scene parser or layout engine yet. Those are st
 - `jarvisplot/client.py`: `main()` entry point that boots `JarvisPLOT`
 - `jarvisplot/cli.py`: argparse bootstrap from `jarvisplot/cards/args.json`
 - `jarvisplot/core.py`: runtime init, YAML load, dataset registration, prebuild pass, figure loop
-- `jarvisplot/core_runtime.py`: project layout, dataset demand planning, usage plan, and YAML rewrite helpers
+- `jarvisplot/core_runtime.py`: project layout, expression analysis helpers (`_expr_symbols`, `_collect_expr_columns`, `_transform_columns`, etc.), dataset demand planning, usage plan, and YAML rewrite helpers
 - `jarvisplot/core_assets.py`: colormap, interpolator, and style bootstrap helpers used by `core.py`
 - `jarvisplot/config.py`: YAML path bookkeeping and dataset update helper; not a schema validator
+- `jarvisplot/memtrace.py`: opt-in memory tracing (`JP_MEM_TRACE`), RSS checkpoints, dataframe inventories
 
 ### Source loading and dataset shaping [implemented]
 
@@ -54,17 +55,17 @@ There is no separate implemented scene parser or layout engine yet. Those are st
 
 ### Figure runtime and rendering [implemented]
 
-- `jarvisplot/Figure/figure.py`: axis construction, layer binding, `savefig()`
-- `jarvisplot/Figure/config_runtime.py`: figure config ingestion from YAML dictionaries
-- `jarvisplot/Figure/layer_runtime.py`: layer data loading, runtime data retention, and render dispatch
+- `jarvisplot/Figure/figure.py`: axis construction, layer binding, coordinate evaluation, `savefig()`
+- `jarvisplot/Figure/config_runtime.py`: figure config ingestion from YAML dictionaries, style bundle resolution, `rcParams` setup
+- `jarvisplot/Figure/layer_runtime.py`: layer data loading, style merge, coordinate validation, expression evaluation, and render dispatch to adapters
 - `jarvisplot/Figure/adapters.py`: thin compatibility re-export for axis adapters
-- `jarvisplot/Figure/adapters_rect.py`: rectangular-axes drawing primitives, custom `grid_profile` / Voronoi / tripcolor behavior
+- `jarvisplot/Figure/adapters_rect.py`: rectangular-axes drawing primitives, custom `grid_profile` / Voronoi / tripcolor behavior (note: `grid_profile` contains ~210 lines of grid reconstruction logic coupled to `profile_runtime.py` `__grid_*` column output)
 - `jarvisplot/Figure/adapters_ternary.py`: ternary-axes drawing primitives and ternary render behavior
 - `jarvisplot/Figure/method_registry.py`: YAML `method` key to adapter callable resolution
 - `jarvisplot/Figure/style_runtime.py`: style family / variant resolution and frame/style bundle selection
 - `jarvisplot/Figure/helper.py`: clipping and geometry helpers used by adapters
 - `jarvisplot/Figure/layout_runtime.py`: axis-geometry helpers for numbered axes, ticks, and endpoint application
-- `jarvisplot/Figure/colorbar_runtime.py`: colorbar assembly helpers and frame-driven colorbar config lookup
+- `jarvisplot/Figure/colorbar_runtime.py`: colorbar assembly, frame-driven colorbar config lookup; note: accumulates shared state across layers via `fig.axc._cb`
 
 ### Style, assets, and shared utilities [implemented]
 
@@ -126,6 +127,14 @@ Do not hide these concerns inside `figure.py` or `adapters.py` when implementing
 - new expression helper -> `jarvisplot/inner_func.py`, `jarvisplot/utils/interpolator.py`, and `jarvisplot/utils/expression.py`
 - new path-resolution helper -> `jarvisplot/utils/pathing.py`
 - future semantic scene / flowchart runtime -> new owner module, not `figure.py`
+
+## Known Boundary Issues
+
+These are documented architectural issues that should be addressed over time:
+
+1. **grid_profile metadata coupling**: `profile_runtime.py` writes `__grid_*` columns that `adapters_rect.py` reads and reconstructs (~210 lines of grid reconstruction in the adapter). If profile column names change, adapters must change in sync. Consider extracting grid reconstruction to a helper in `profile_runtime.py`.
+
+2. **Colorbar state accumulation**: `colorbar_runtime.collect_and_attach_colorbar()` mutates shared `fig.axc._cb` across layers to track the union of all color ranges. This is intentional but should be documented in the function docstring.
 
 ## Boundary Warnings
 
