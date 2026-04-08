@@ -82,7 +82,7 @@ def test_apply_figure_config_uses_original_style_tokens_for_mode(monkeypatch):
         }
     }
 
-    ok = apply_figure_config(
+    result = apply_figure_config(
         fig,
         {
             "name": "fig",
@@ -92,8 +92,45 @@ def test_apply_figure_config_uses_original_style_tokens_for_mode(monkeypatch):
         },
     )
 
-    assert ok is True
+    assert result is True
     assert fig.mode == "gambit"
+
+
+def test_apply_figure_config_marks_disabled_figures():
+    fig = Figure()
+    fig.logger = _logger()
+
+    result = apply_figure_config(
+        fig,
+        {
+            "name": "fig",
+            "enable": False,
+        },
+    )
+
+    assert result is False
+    assert fig._setup_status == "disabled"
+    assert fig._setup_error is None
+
+
+def test_apply_figure_config_marks_setup_failures(monkeypatch):
+    monkeypatch.setattr(Figure, "load_axes", lambda self: None)
+
+    fig = Figure()
+    fig.logger = _logger()
+
+    result = apply_figure_config(
+        fig,
+        {
+            "name": "fig",
+            "frame": {},
+            "layers": [],
+        },
+    )
+
+    assert result is False
+    assert fig._setup_status == "failed"
+    assert isinstance(fig._setup_error, Exception)
 
 
 def test_colorbar_contract_uses_frame_color_config():
@@ -129,6 +166,68 @@ def test_colorbar_contract_uses_frame_color_config():
     assert fig.axc._cb["mode"] == "log"
     assert fig.axc._cb["vmin"] == 1.0
     assert fig.axc._cb["vmax"] == 10.0
+
+
+def test_colorbar_attachment_skips_plain_scatter_without_color_channel():
+    class DummyColorbarAxis:
+        def __init__(self):
+            self._cb = {
+                "cmap": "viridis",
+                "vmin": 1.0,
+                "vmax": 10.0,
+                "norm": mcolors.Normalize(vmin=1.0, vmax=10.0),
+                "levels": None,
+                "used": True,
+            }
+
+    fig = SimpleNamespace(
+        axes={"axc": DummyColorbarAxis()},
+        frame={"axc": {"color": {"scale": "linear", "cmap": "viridis"}}},
+        logger=_logger(),
+    )
+
+    out = collect_and_attach_colorbar(
+        fig,
+        style={"marker": "."},
+        coor={"x": {"expr": "x"}, "y": {"expr": "y"}},
+        method_key="scatter",
+        df=pd.DataFrame({"x": [1, 2], "y": [3, 4]}),
+    )
+
+    assert out == {"marker": "."}
+
+
+def test_colorbar_attachment_accepts_nullable_numeric_color_channel():
+    class DummyColorbarAxis:
+        def __init__(self):
+            self._cb = {
+                "cmap": None,
+                "vmin": None,
+                "vmax": None,
+                "norm": None,
+                "levels": None,
+                "used": False,
+            }
+
+    fig = SimpleNamespace(
+        axes={"axc": DummyColorbarAxis()},
+        frame={"axc": {"color": {"scale": "linear", "cmap": "viridis"}}},
+        logger=_logger(),
+    )
+
+    out = collect_and_attach_colorbar(
+        fig,
+        style={"marker": ".", "c": [1, None, 3]},
+        coor={"x": {"expr": "x"}, "y": {"expr": "y"}},
+        method_key="scatter",
+        df=pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
+    )
+
+    assert out["cmap"] == "viridis"
+    assert isinstance(out["norm"], mcolors.Normalize)
+    assert fig.axes["axc"]._cb["used"] is True
+    assert fig.axes["axc"]._cb["vmin"] == 1.0
+    assert fig.axes["axc"]._cb["vmax"] == 3.0
 
 
 def test_colorbar_log_scale_uses_positive_subset_for_limits():

@@ -5,8 +5,6 @@
 #   jprel 1.0.2            # build + upload to PyPI using ~/.pypirc (repository = pypi)
 #   jprel 1.0.2 --tag      # also create local git tag (no push)
 #   jprel 1.0.2 --dry      # build + twine check only, no upload
-#   jprel 1.0.2 -u         # build + upload + install local wheel into current pip env
-#   jprel 1.0.2 -e         # refresh local editable install after release (clean old local records first)
 
 jprel () {
   (
@@ -21,8 +19,8 @@ jprel () {
     local ver="$1"; shift || true
     local do_tag=0
     local dry=0
-    local editable=0
-    local update_local=0
+    local editable=1
+    local update_local=1
     local dist_name="Jarvis-PLOT"
     local legacy_dist_name="jarvisplot"
 
@@ -30,8 +28,6 @@ jprel () {
       case "$1" in
         --tag) do_tag=1 ;;
         --dry) dry=1 ;;
-        -e|--editable) editable=1 ;;
-        -u|--update-local) update_local=1 ;;
         *) echo "Unknown option: $1"; exit 2 ;;
       esac
       shift
@@ -90,24 +86,6 @@ jprel () {
     else
       echo "==> Uploading to PyPI (using ~/.pypirc, repository=pypi) ..."
       python3 -m twine upload -r pypi dist/*
-    fi
-
-    # ---- update local pip install from the freshly-built wheel ----
-    # Install from local dist/ immediately — no need to wait for PyPI propagation.
-    if [[ ${update_local} -eq 1 ]]; then
-      local wheel
-      wheel=$(ls dist/${dist_name//-/_}-${ver}-*.whl dist/${dist_name}-${ver}-*.whl 2>/dev/null | head -1)
-      if [[ -z "${wheel}" ]]; then
-        # Fallback: any wheel for this version
-        wheel=$(ls dist/*-${ver}-*.whl 2>/dev/null | head -1)
-      fi
-      if [[ -n "${wheel}" ]]; then
-        echo "==> Installing local wheel into current pip env: ${wheel}"
-        python3 -m pip install --force-reinstall --no-deps "${wheel}"
-        echo "==> Installed: $(python3 -m pip show ${dist_name} 2>/dev/null | grep ^Version || true)"
-      else
-        echo "WARNING: no wheel found in dist/ for v${ver}, skipping local install."
-      fi
     fi
 
     # ---- git tag (optional, local only) ----
