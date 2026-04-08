@@ -2,11 +2,35 @@ from __future__ import annotations
 
 from copy import deepcopy
 import gc
+from pathlib import Path
 
 import pandas as pd
 
 from .method_registry import resolve_callable
 from .colorbar_runtime import collect_and_attach_colorbar
+
+
+def _resolve_csv_export_path(fig, target):
+    if isinstance(target, dict):
+        raw = target.get("path", target.get("file", target.get("target", target.get("value", ""))))
+    else:
+        raw = target
+    path = str(raw).strip()
+    if not path:
+        raise ValueError("tocsv requires a non-empty path")
+    return Path(fig.load_path(path))
+
+
+def _save_dataframe_csv(fig, df, target):
+    out_path = _resolve_csv_export_path(fig, target)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(df, pd.DataFrame):
+        df.to_csv(out_path, index=False)
+    else:
+        pd.DataFrame(df).to_csv(out_path, index=False)
+    if fig.logger:
+        fig.logger.debug(f"Saved transformed dataframe to CSV -> {out_path}")
+    return out_path
 
 
 def load_layer_data(fig, layer):
@@ -148,6 +172,8 @@ def load_bool_df(fig, df, transform):
 
                 df = addcolumn(df, trans["add_column"], fig.logger)
                 fig.logger.debug("After Add-column -> {}".format(df.shape))
+            elif "tocsv" in trans.keys() or "to_csv" in trans.keys():
+                _save_dataframe_csv(fig, df, trans.get("tocsv", trans.get("to_csv")))
 
         return df
 

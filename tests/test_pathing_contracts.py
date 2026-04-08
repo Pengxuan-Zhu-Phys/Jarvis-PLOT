@@ -73,3 +73,28 @@ def test_load_bool_df_invalid_transform_logs_and_returns_input_df():
     assert out is df
     assert recorder.messages
     assert "illegal transform format" in recorder.messages[0]
+
+
+def test_load_bool_df_to_csv_writes_output(tmp_path):
+    fig = Figure()
+    fig.logger = _Recorder()
+    fig.preprocessor = None
+    fig._yaml_dir = str(tmp_path)
+
+    df = pd.DataFrame({"x": [1, 2, 3]})
+
+    out = fig.load_bool_df(
+        df,
+        [
+            {"add_column": {"name": "y", "expr": "x + 1"}},
+            {"to_csv": "./saved/fallback_export.csv"},
+            {"add_column": {"name": "z", "expr": "y + 1"}},
+        ],
+    )
+
+    out_csv = tmp_path / "saved" / "fallback_export.csv"
+    saved = pd.read_csv(out_csv)
+
+    assert out is df
+    assert list(saved.columns) == ["x", "y"]
+    assert list(out.columns) == ["x", "y", "z"]

@@ -94,6 +94,7 @@ class JarvisPLOT():
                 cache=self.cache,
                 dataset_registry=self.dataset_registry,
                 logger=self.logger,
+                base_dir=self.workdir or self.yaml.dir,
             )
             self.prebuild_profile_pipelines()
             self.prepare_usage_plan()

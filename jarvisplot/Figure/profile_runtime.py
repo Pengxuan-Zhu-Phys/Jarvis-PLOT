@@ -89,6 +89,132 @@ def _grid_edges(lo, hi, nbin, scale):
     return np.linspace(lo, hi, int(nbin) + 1)
 
 
+def grid_profile_mesh(
+    x,
+    y,
+    z,
+    df=None,
+    *,
+    grid_bin=None,
+    xlim=None,
+    ylim=None,
+    xscale="linear",
+    yscale="linear",
+    objective="max",
+    objective_from_style=False,
+):
+    """Reconstruct grid_profile pcolormesh inputs from compact table metadata."""
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    z = np.asarray(z, dtype=float)
+    objective = str(objective).lower()
+    xscale = str(xscale).lower()
+    yscale = str(yscale).lower()
+
+    ix = None
+    iy = None
+    cols = getattr(df, "columns", [])
+    if df is not None and ("__grid_ix__" in cols) and ("__grid_iy__" in cols):
+        try:
+            ix = np.asarray(df["__grid_ix__"], dtype=np.int32)
+            iy = np.asarray(df["__grid_iy__"], dtype=np.int32)
+            if "__grid_bin__" in cols and grid_bin is None:
+                grid_bin = int(np.asarray(df["__grid_bin__"])[0])
+            if "__grid_xmin__" in cols and "__grid_xmax__" in cols and xlim is None:
+                xlim = [
+                    float(np.asarray(df["__grid_xmin__"])[0]),
+                    float(np.asarray(df["__grid_xmax__"])[0]),
+                ]
+            if "__grid_ymin__" in cols and "__grid_ymax__" in cols and ylim is None:
+                ylim = [
+                    float(np.asarray(df["__grid_ymin__"])[0]),
+                    float(np.asarray(df["__grid_ymax__"])[0]),
+                ]
+            if "__grid_xscale__" in cols:
+                xscale = str(np.asarray(df["__grid_xscale__"])[0]).lower()
+            if "__grid_yscale__" in cols:
+                yscale = str(np.asarray(df["__grid_yscale__"])[0]).lower()
+            if (not objective_from_style) and ("__grid_objective__" in cols):
+                objective = str(np.asarray(df["__grid_objective__"])[0]).lower()
+        except Exception:
+            ix, iy = None, None
+
+    if grid_bin is None:
+        if ix is not None and ix.size > 0:
+            try:
+                grid_bin = int(max(np.nanmax(ix), np.nanmax(iy)) + 1)
+            except Exception:
+                grid_bin = None
+    if grid_bin is None:
+        grid_bin = max(1, int(np.sqrt(max(len(x), 1))))
+    grid_bin = max(int(grid_bin), 1)
+
+    if xlim is None:
+        xlim = _safe_minmax(x)
+    if ylim is None:
+        ylim = _safe_minmax(y)
+
+    n = min(len(x), len(y), len(z))
+    if n == 0:
+        return None
+    x = x[:n]
+    y = y[:n]
+    z = z[:n]
+
+    if ix is None or iy is None:
+        xn = _normalize_profile_axis(x, xlim, xscale)
+        yn = _normalize_profile_axis(y, ylim, yscale)
+        valid = np.isfinite(xn) & np.isfinite(yn)
+        if not np.any(valid):
+            return None
+        xv = np.clip(xn[valid], 0.0, 1.0 - 1e-12)
+        yv = np.clip(yn[valid], 0.0, 1.0 - 1e-12)
+        ix = (xv * grid_bin).astype(np.int32)
+        iy = (yv * grid_bin).astype(np.int32)
+        zv = z[valid]
+    else:
+        ix = np.asarray(ix, dtype=np.int32)[:n]
+        iy = np.asarray(iy, dtype=np.int32)[:n]
+        valid = np.isfinite(x) & np.isfinite(y) & np.isfinite(z)
+        valid &= np.isfinite(ix) & np.isfinite(iy)
+        if not np.any(valid):
+            return None
+        ix = ix[valid]
+        iy = iy[valid]
+        zv = z[valid]
+
+    try:
+        zkey = np.where(np.isfinite(zv), zv, np.inf if objective == "min" else -np.inf)
+        tmp = pd.DataFrame({"ix": ix, "iy": iy, "z": zv, "zkey": zkey})
+        if objective == "min":
+            loc = tmp.groupby(["ix", "iy"], sort=False)["zkey"].idxmin()
+        else:
+            loc = tmp.groupby(["ix", "iy"], sort=False)["zkey"].idxmax()
+        pick = tmp.loc[loc, ["ix", "iy", "z"]]
+        ix_u = np.asarray(pick["ix"], dtype=np.int32)
+        iy_u = np.asarray(pick["iy"], dtype=np.int32)
+        z_u = np.asarray(pick["z"], dtype=float)
+    except Exception:
+        ix_u = np.asarray(ix, dtype=np.int32)
+        iy_u = np.asarray(iy, dtype=np.int32)
+        z_u = np.asarray(zv, dtype=float)
+
+    x_edges = _grid_edges(xlim[0], xlim[1], grid_bin, xscale)
+    y_edges = _grid_edges(ylim[0], ylim[1], grid_bin, yscale)
+
+    in_range = (ix_u >= 0) & (ix_u < grid_bin) & (iy_u >= 0) & (iy_u < grid_bin)
+    if not np.any(in_range):
+        return None
+    ix_u = ix_u[in_range]
+    iy_u = iy_u[in_range]
+    z_u = z_u[in_range]
+
+    grid = np.full((grid_bin, grid_bin), np.nan, dtype=float)
+    if len(ix_u) > 0:
+        grid[iy_u, ix_u] = z_u
+    return x_edges, y_edges, np.ma.masked_invalid(grid)
+
+
 def grid_profiling(df, prof, logger):
     try:
         bin = int(prof.get("bin", 100) or 100)
