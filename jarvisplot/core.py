@@ -155,13 +155,18 @@ class JarvisPLOT():
                 figobj.print = True
 
             try:
-                if figobj.set(fig):
+                setup = figobj.set(fig)
+                if setup:
                     self.logger.warning(f"Succefully loading figure -> {figobj.name} setting")
                     figobj.plot()
                 else:
-                    self.logger.warning(
-                        f"Skip figure {fig.get('name', '<noname>')}: setup failed before plotting."
-                    )
+                    fig_name = figobj.name or fig.get("name", "<noname>")
+                    if getattr(figobj, "_setup_status", None) == "disabled":
+                        self.logger.warning(f"Skip figure {fig_name}: disabled in YAML.")
+                    else:
+                        self.logger.warning(
+                            f"Skip figure {fig_name}: setup failed before plotting."
+                        )
             except Exception as e:
                 self.logger.warning(f"Figure {fig.get('name', '<noname>')} failed: {e}")
                 continue

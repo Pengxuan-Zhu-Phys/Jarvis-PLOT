@@ -9,12 +9,12 @@ def apply_figure_config(fig, info: Mapping) -> bool:
     if not isinstance(info, Mapping):
         raise TypeError("from_dict expects a mapping/dict")
 
+    fig._setup_status = "pending"
+    fig._setup_error = None
+
     try:
-        changed = True
         if "name" in info:
             fig.name = info["name"]
-        else:
-            changed = False
 
         if "yaml_dir" in info:
             fig._yaml_dir = info.get("yaml_dir")
@@ -35,7 +35,7 @@ def apply_figure_config(fig, info: Mapping) -> bool:
 
         fig._enable = info.get("enable", True)
         if not fig._enable:
-            fig.logger.warning("Skip plot -> {}".format(fig.name))
+            fig._setup_status = "disabled"
             return False
 
         if "style" in info:
@@ -68,10 +68,9 @@ def apply_figure_config(fig, info: Mapping) -> bool:
 
         if "layers" in info:
             fig.layers = info["layers"]
-        else:
-            changed = False
 
-        return changed
+        fig._setup_status = "ok"
+        return True
     except Exception as e:
         if fig.logger:
             try:
@@ -85,4 +84,6 @@ def apply_figure_config(fig, info: Mapping) -> bool:
                 fig.logger.debug(traceback.format_exc())
             except Exception:
                 pass
+        fig._setup_status = "failed"
+        fig._setup_error = e
         return False

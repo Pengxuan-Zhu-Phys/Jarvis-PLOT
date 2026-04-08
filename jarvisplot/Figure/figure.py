@@ -106,6 +106,8 @@ class Figure:
         self._render_queue = []
         self._ctx       = None
         self._preprocessor = None
+        self._setup_status = "uninitialized"
+        self._setup_error = None
         # allow optional initialization from a dict
         if info:
             self.from_dict(info)
@@ -996,7 +998,7 @@ class Figure:
             
     # --- config ingestion ---
     def from_dict(self, info: Mapping) -> bool:
-        """Apply settings from a dict. Returns True if any field was set."""
+        """Apply settings from a dict. Returns True on successful setup."""
         return apply_figure_config(self, info)
 
 

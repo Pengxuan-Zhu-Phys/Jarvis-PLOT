@@ -77,6 +77,27 @@ def _coerce_scalar(v) -> Optional[float]:
     return None
 
 
+def _is_numeric_color_source(spec) -> bool:
+    """Return True when a color spec looks like numeric scalar/mapping data.
+
+    We treat expression dictionaries and numeric array-likes as color sources,
+    but ignore plain strings such as literal colors or colormap names.
+    """
+    if spec is None:
+        return False
+    if isinstance(spec, str):
+        return False
+    if isinstance(spec, Mapping):
+        return "expr" in spec
+    try:
+        arr = np.asarray(spec, dtype=float)
+    except Exception:
+        return False
+    if arr.size == 0:
+        return False
+    return bool(np.isfinite(arr).any())
+
+
 def _resolve_norm(nv, *, vmin=None, vmax=None, logger=None):
     if nv is None:
         return None
@@ -135,11 +156,22 @@ _COLORED_Z_METHODS = frozenset({
 
 def layer_uses_color(style: dict, coor: dict, method_key: str) -> bool:
     """Return True if this layer will need a colorbar."""
-    return (
-        bool(style.get("cmap"))
-        or ("c" in coor)
-        or (("z" in coor) and (method_key in _COLORED_Z_METHODS))
-    )
+    c_src = coor.get("c")
+    z_src = coor.get("z")
+
+    if _is_numeric_color_source(c_src):
+        return True
+    if method_key in _COLORED_Z_METHODS and _is_numeric_color_source(z_src):
+        return True
+
+    style_c = style.get("c")
+    style_z = style.get("z")
+    if _is_numeric_color_source(style_c):
+        return True
+    if method_key in _COLORED_Z_METHODS and _is_numeric_color_source(style_z):
+        return True
+
+    return False
 
 
 def collect_layer_color_range(df, coor: dict, style: dict, *, scale: str | None = None):
@@ -328,6 +360,9 @@ def collect_and_attach_colorbar(
       explicit frame.axc.color.vmin/vmax win; absent values fall back to
       the data-driven auto range.
     """
+    if not layer_uses_color(style, coor, method_key):
+        return style
+
     axc = fig.axes.get(cb_name)
     if axc is None or not hasattr(axc, "_cb"):
         return style
