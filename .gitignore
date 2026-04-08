@@ -38,5 +38,4 @@ test.py
 test02.py 
 
 # PyPI release files 
-pyproject.toml 
 jarvisplot.egg-info/
