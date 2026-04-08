@@ -23,11 +23,19 @@ from ..memtrace import memtrace_checkpoint, memtrace_object_inventory
 
 
 class DataPreprocessor:
-    def __init__(self, context, cache=None, dataset_registry: Optional[Dict[str, Any]] = None, logger=None):
+    def __init__(
+        self,
+        context,
+        cache=None,
+        dataset_registry: Optional[Dict[str, Any]] = None,
+        logger=None,
+        base_dir: Optional[Any] = None,
+    ):
         self.context = context
         self.cache = cache
         self.dataset_registry = dataset_registry or {}
         self.logger = logger
+        self.base_dir = base_dir
         self._emitted_sources = set()
         self._preprofile_alias_meta: Dict[str, Dict[str, Any]] = {}
         self._named_share_signatures: Dict[str, str] = {}
@@ -195,6 +203,30 @@ class DataPreprocessor:
                     }
                 )
         return sorted(out)
+
+    @staticmethod
+    def _transform_requests_csv_export(transform: Any) -> bool:
+        if not isinstance(transform, list):
+            return False
+        for step in transform:
+            if not isinstance(step, Mapping):
+                continue
+            if any(key in step for key in ("tocsv", "to_csv")):
+                return True
+        return False
+
+    def _layer_requests_csv_export(self, layer: Any) -> bool:
+        if not isinstance(layer, Mapping):
+            return False
+        entries = layer.get("data", [])
+        if not isinstance(entries, list):
+            return False
+        for entry in entries:
+            if not isinstance(entry, Mapping):
+                continue
+            if self._transform_requests_csv_export(entry.get("transform")):
+                return True
+        return False
 
     def _layer_expr_columns(self, obj: Any) -> List[str]:
         out: set[str] = set()
@@ -755,6 +787,9 @@ class DataPreprocessor:
         if not isinstance(meta, Mapping):
             return False, "meta-missing"
 
+        if self._transform_requests_csv_export(transform):
+            return False, "csv-export-step"
+
         expected_demand = self._demand_fingerprint(
             source,
             transform,
@@ -789,6 +824,9 @@ class DataPreprocessor:
     ):
         if not name or self.cache is None:
             return None
+        if self._layer_requests_csv_export(layer):
+            self._debug(f"Named share_data cache bypassed for CSV export layer -> {name}")
+            return None
         signature = self._layer_signature(layer)
         return self.load_named_layer_by_signature(name, signature, demand_columns=demand_columns)
 
@@ -814,6 +852,9 @@ class DataPreprocessor:
 
     def register_named_layer(self, name: Optional[str], layer: Mapping[str, Any]) -> bool:
         if not name or self.cache is None:
+            return False
+        if self._layer_requests_csv_export(layer):
+            self._debug(f"Named share_data registration bypassed for CSV export layer -> {name}")
             return False
         signature = self._layer_signature(layer)
         self._named_share_signatures[str(name)] = str(signature)
@@ -845,6 +886,9 @@ class DataPreprocessor:
         if not name or self.cache is None:
             return
         if not isinstance(data, pd.DataFrame):
+            return
+        if self._layer_requests_csv_export(layer):
+            self._debug(f"Skipping named share_data persistence for CSV export layer -> {name}")
             return
         signature = self._layer_signature(layer)
         self._named_share_signatures[str(name)] = str(signature)
@@ -1155,7 +1199,13 @@ class DataPreprocessor:
                 out = self._select_columns(out, task.get("base_projection"))
                 key = task["pre_key"]
                 rows = self._safe_nrows(out)
-                if bool(task.get("cache_flag", True)) and self.cache is not None and isinstance(out, pd.DataFrame):
+                cache_ready = (
+                    bool(task.get("cache_flag", True))
+                    and self.cache is not None
+                    and isinstance(out, pd.DataFrame)
+                    and not self._transform_requests_csv_export(task.get("pre_transform"))
+                )
+                if cache_ready:
                     pre_demand_fp = self._demand_fingerprint(
                         task.get("source"),
                         task.get("pre_transform"),
@@ -1178,7 +1228,7 @@ class DataPreprocessor:
                     )
 
                 alias = self._preprofile_alias_name(key)
-                self._register_preprofile_alias(alias, task, origin="rebuilt", rows=rows, cache_ready=True)
+                self._register_preprofile_alias(alias, task, origin="rebuilt", rows=rows, cache_ready=cache_ready)
                 prepared[key] = alias
                 miss += 1
                 out = None

@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import numpy as np
 import pandas as pd
 
 from jarvisplot.Figure.colorbar_runtime import collect_and_attach_colorbar
 from jarvisplot.Figure.config_runtime import apply_figure_config
 from jarvisplot.Figure.figure import Figure
 from jarvisplot.Figure.preprocessor import DataPreprocessor
+from jarvisplot.Figure.profile_runtime import grid_profile_mesh
 from jarvisplot.core import _format_console_record
 from jarvisplot.data_loader import JP_ROW_IDX
 
@@ -120,6 +122,47 @@ def test_colorbar_contract_uses_frame_color_config():
     assert fig.axc._cb["vmax"] == 10.0
 
 
+def test_grid_profile_mesh_reconstructs_from_grid_metadata():
+    df = pd.DataFrame(
+        {
+            "__grid_ix__": [0, 0, 1, 0, 1],
+            "__grid_iy__": [0, 0, 0, 1, 1],
+            "__grid_bin__": [2, 2, 2, 2, 2],
+            "__grid_xmin__": [0.0, 0.0, 0.0, 0.0, 0.0],
+            "__grid_xmax__": [2.0, 2.0, 2.0, 2.0, 2.0],
+            "__grid_ymin__": [0.0, 0.0, 0.0, 0.0, 0.0],
+            "__grid_ymax__": [2.0, 2.0, 2.0, 2.0, 2.0],
+            "__grid_xscale__": ["linear"] * 5,
+            "__grid_yscale__": ["linear"] * 5,
+            "__grid_objective__": ["max"] * 5,
+        }
+    )
+
+    mesh = grid_profile_mesh(
+        x=[0.25, 0.25, 1.25, 0.25, 1.25],
+        y=[0.25, 0.25, 0.25, 1.25, 1.25],
+        z=[1.0, 5.0, 3.0, 2.0, 4.0],
+        df=df,
+        xlim=[0.0, 2.0],
+        ylim=[0.0, 2.0],
+        xscale="linear",
+        yscale="linear",
+        objective="max",
+        objective_from_style=False,
+    )
+
+    assert mesh is not None
+    x_edges, y_edges, grid = mesh
+
+    assert np.allclose(x_edges, [0.0, 1.0, 2.0])
+    assert np.allclose(y_edges, [0.0, 1.0, 2.0])
+    assert grid.shape == (2, 2)
+    assert grid[0, 0] == 5.0
+    assert grid[0, 1] == 3.0
+    assert grid[1, 0] == 2.0
+    assert grid[1, 1] == 4.0
+
+
 def test_preprofile_identity_ignores_runtime_bin():
     dp = DataPreprocessor(context=None)
     cfg1 = {
@@ -152,6 +195,49 @@ def test_runtime_projection_includes_row_identity_and_demand():
     assert "b" in projection
     assert "c" in projection
     assert "style_expr" in projection
+
+
+def test_runtime_transform_to_csv_exports_and_bypasses_cache(tmp_path):
+    class _Cache:
+        def cache_key(self, payload):
+            return "cache-key"
+
+        def get_dataframe_meta(self, key):
+            raise AssertionError("cache lookup should be bypassed for CSV exports")
+
+        def get_dataframe(self, key):
+            raise AssertionError("cache lookup should be bypassed for CSV exports")
+
+        def put_dataframe(self, key, df, meta=None):
+            raise AssertionError("cache write should be bypassed for CSV exports")
+
+    source_df = pd.DataFrame({"x": [1, 2, 3]})
+    dp = DataPreprocessor(
+        context=SimpleNamespace(get=lambda source: source_df),
+        cache=_Cache(),
+        logger=_logger(),
+        base_dir=str(tmp_path),
+    )
+
+    out, key, from_cache = dp.run_pipeline(
+        "sample",
+        [
+            {"add_column": {"name": "y", "expr": "x * 2"}},
+            {"to_csv": "./saved/runtime_export.csv"},
+            {"add_column": {"name": "z", "expr": "y + 1"}},
+        ],
+        use_cache=True,
+        mode="runtime",
+    )
+
+    out_csv = tmp_path / "saved" / "runtime_export.csv"
+    saved = pd.read_csv(out_csv)
+
+    assert out is not None
+    assert key
+    assert from_cache is False
+    assert list(saved.columns) == ["x", "y"]
+    assert list(out.columns) == ["y", "z"]
 
 
 def test_prebuild_split_keeps_profile_identity_coordinates_only():

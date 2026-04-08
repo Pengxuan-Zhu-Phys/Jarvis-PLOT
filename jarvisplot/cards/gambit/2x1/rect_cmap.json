@@ -33,7 +33,7 @@
                     0.680,
                     0.775
                 ],
-                "facecolor": "#808080"
+                "facecolor": "black"
             },
             "axc": {
                 "rect": [
@@ -130,7 +130,7 @@
                 {
                     "x": 1.0, 
                     "y": 1.002, 
-                    "s": "GAMBIT 2.7",
+                    "s": "GAMBIT",
                     "ha":   "right",
                     "va":   "bottom", 
                     "color":    "black",

@@ -10,6 +10,7 @@ from matplotlib.axes import Axes
 from matplotlib.collections import PolyCollection
 #
 from .helper import _auto_clip, _mask_by_extend, voronoi_finite_polygons_2d, _clip_poly_to_rect
+from .profile_runtime import grid_profile_mesh
 
 
 # —— Basic Adapter: Forward to the underlying Axes, merge default parameters, perform automatic clipping ——
@@ -94,142 +95,26 @@ class StdAxesAdapter:
         xscale = str(kw.pop("xscale", self.ax.get_xscale())).lower()
         yscale = str(kw.pop("yscale", self.ax.get_yscale())).lower()
 
-        ix = None
-        iy = None
-        cols = getattr(df, "columns", [])
-        if df is not None and ("__grid_ix__" in cols) and ("__grid_iy__" in cols):
-            try:
-                ix = np.asarray(df["__grid_ix__"], dtype=np.int32)
-                iy = np.asarray(df["__grid_iy__"], dtype=np.int32)
-                if "__grid_bin__" in cols and grid_bin is None:
-                    grid_bin = int(np.asarray(df["__grid_bin__"])[0])
-                if "__grid_xmin__" in cols and "__grid_xmax__" in cols and xlim is None:
-                    xlim = [
-                        float(np.asarray(df["__grid_xmin__"])[0]),
-                        float(np.asarray(df["__grid_xmax__"])[0]),
-                    ]
-                if "__grid_ymin__" in cols and "__grid_ymax__" in cols and ylim is None:
-                    ylim = [
-                        float(np.asarray(df["__grid_ymin__"])[0]),
-                        float(np.asarray(df["__grid_ymax__"])[0]),
-                    ]
-                if "__grid_xscale__" in cols:
-                    xscale = str(np.asarray(df["__grid_xscale__"])[0]).lower()
-                if "__grid_yscale__" in cols:
-                    yscale = str(np.asarray(df["__grid_yscale__"])[0]).lower()
-                if (not objective_from_style) and ("__grid_objective__" in cols):
-                    objective = str(np.asarray(df["__grid_objective__"])[0]).lower()
-            except Exception:
-                ix, iy = None, None
-
-        if grid_bin is None:
-            if ix is not None and ix.size > 0:
-                try:
-                    grid_bin = int(max(np.nanmax(ix), np.nanmax(iy)) + 1)
-                except Exception:
-                    grid_bin = None
-        if grid_bin is None:
-            # fallback when metadata is absent
-            grid_bin = max(1, int(np.sqrt(max(len(x), 1))))
-        grid_bin = max(int(grid_bin), 1)
-
         if xlim is None:
             xlim = [float(self.ax.get_xlim()[0]), float(self.ax.get_xlim()[1])]
         if ylim is None:
             ylim = [float(self.ax.get_ylim()[0]), float(self.ax.get_ylim()[1])]
-
-        def _grid_edges(lo, hi, n, scale):
-            lo = float(lo)
-            hi = float(hi)
-            if str(scale).lower() == "log":
-                tiny = np.finfo(float).tiny
-                lo = max(lo, tiny)
-                hi = max(hi, lo * 10.0)
-                if hi == lo:
-                    hi = lo * 10.0
-                return np.geomspace(lo, hi, n + 1)
-            if hi == lo:
-                hi = lo + 1.0
-            return np.linspace(lo, hi, n + 1)
-
-        def _norm(arr, lim, scale):
-            arr = np.asarray(arr, dtype=float)
-            lo = float(lim[0])
-            hi = float(lim[1])
-            if str(scale).lower() == "log":
-                tiny = np.finfo(float).tiny
-                lo = max(lo, tiny)
-                hi = max(hi, lo * 10.0)
-                den = np.log(hi) - np.log(lo)
-                if den == 0:
-                    den = 1.0
-                arr = np.where(arr > 0, arr, np.nan)
-                return (np.log(arr) - np.log(lo)) / den
-            den = hi - lo
-            if den == 0:
-                den = 1.0
-            return (arr - lo) / den
-
-        n = min(len(x), len(y), len(z))
-        if n == 0:
+        mesh = grid_profile_mesh(
+            x,
+            y,
+            z,
+            df=df,
+            grid_bin=grid_bin,
+            xlim=xlim,
+            ylim=ylim,
+            xscale=xscale,
+            yscale=yscale,
+            objective=objective,
+            objective_from_style=objective_from_style,
+        )
+        if mesh is None:
             return []
-        x = x[:n]
-        y = y[:n]
-        z = z[:n]
-
-        if ix is None or iy is None:
-            xn = _norm(x, xlim, xscale)
-            yn = _norm(y, ylim, yscale)
-            valid = np.isfinite(xn) & np.isfinite(yn)
-            if not np.any(valid):
-                return []
-            xv = np.clip(xn[valid], 0.0, 1.0 - 1e-12)
-            yv = np.clip(yn[valid], 0.0, 1.0 - 1e-12)
-            ix = (xv * grid_bin).astype(np.int32)
-            iy = (yv * grid_bin).astype(np.int32)
-            zv = z[valid]
-        else:
-            ix = np.asarray(ix, dtype=np.int32)[:n]
-            iy = np.asarray(iy, dtype=np.int32)[:n]
-            valid = np.isfinite(x) & np.isfinite(y) & np.isfinite(z)
-            valid &= np.isfinite(ix) & np.isfinite(iy)
-            if not np.any(valid):
-                return []
-            ix = ix[valid]
-            iy = iy[valid]
-            zv = z[valid]
-
-        try:
-            import pandas as _pd
-            zkey = np.where(np.isfinite(zv), zv, np.inf if objective == "min" else -np.inf)
-            tmp = _pd.DataFrame({"ix": ix, "iy": iy, "z": zv, "zkey": zkey})
-            if objective == "min":
-                loc = tmp.groupby(["ix", "iy"], sort=False)["zkey"].idxmin()
-            else:
-                loc = tmp.groupby(["ix", "iy"], sort=False)["zkey"].idxmax()
-            pick = tmp.loc[loc, ["ix", "iy", "z"]]
-            ix_u = np.asarray(pick["ix"], dtype=np.int32)
-            iy_u = np.asarray(pick["iy"], dtype=np.int32)
-            z_u = np.asarray(pick["z"], dtype=float)
-        except Exception:
-            ix_u = np.asarray(ix, dtype=np.int32)
-            iy_u = np.asarray(iy, dtype=np.int32)
-            z_u = np.asarray(zv, dtype=float)
-
-        x_edges = _grid_edges(xlim[0], xlim[1], grid_bin, xscale)
-        y_edges = _grid_edges(ylim[0], ylim[1], grid_bin, yscale)
-
-        in_range = (ix_u >= 0) & (ix_u < grid_bin) & (iy_u >= 0) & (iy_u < grid_bin)
-        if not np.any(in_range):
-            return []
-        ix_u = ix_u[in_range]
-        iy_u = iy_u[in_range]
-        z_u = z_u[in_range]
-
-        grid = np.full((grid_bin, grid_bin), np.nan, dtype=float)
-        if len(ix_u) > 0:
-            grid[iy_u, ix_u] = z_u
-        grid = np.ma.masked_invalid(grid)
+        x_edges, y_edges, grid = mesh
 
         kw.setdefault("shading", "flat")
         if edgecolor is not None:

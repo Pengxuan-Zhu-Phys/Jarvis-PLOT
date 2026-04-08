@@ -33,6 +33,8 @@ DataSet:
 #       target: mN4
 #     - source: "MSSM7/#MSSM_spectrum @SpecBit::get_MSSM_spectrum_as_map::h0_1 Pole_Mass"
 #       target: mH1
+#     - source: "MSSM7/#mwimp @DarkBit::mwimp_generic"
+#       target: mWIMP
 #     - source: "MSSM7/#sigma_SD_n @DarkBit::sigma_SD_n_simple"
 #       target: xsecSDn
 #     - source: "MSSM7/#sigma_SD_p @DarkBit::sigma_SD_p_simple"
@@ -67,16 +69,16 @@ Figures:
       labels:
         x: $\mu~({\rm TeV})$
         y: $M_1~({\rm TeV})$
-      xlim: [0, 8]
+      xlim: [0, 6]
       ylim: [-4, 4]
       text:
-      - x: 0.75
+      - x: 0.
         y: 1.0016
         s: MSSM7
-        ha: right
+        ha: left
         va: bottom
         fontfamily: STIXGeneral
-        fontsize: x-small
+        fontsize: xx-small
         transform: true
     axc:
       label:
@@ -93,13 +95,13 @@ Figures:
       - sortby: LogL1
       # - filter: LogL1 < -258.5
       - profile:
-          bin: 200
+          bin: 60
           coordinates:
             x:
               expr: pMu/1000
               scale: linear
               name: xx
-              lim: [0, 8]
+              lim: [0, 6]
             y:
               expr: pM1/1000
               scale: linear
@@ -120,8 +122,8 @@ Figures:
       y:
         expr: yy
       z:
-        expr: np.exp(LogL1) / np.exp(-258.3)
-        # expr: np.exp(LogL1) / np.exp(np.max(LogL1))
+        # expr: np.exp(LogL1) / np.exp(-258.5)
+        expr: np.exp(LogL1) / np.exp(np.max(LogL1))
     style: {}
 
 - name: mN1mC1_ProfLogL
@@ -137,13 +139,13 @@ Figures:
       xlim: [0, 3500]
       ylim: [0, 7000]
       text:
-      - x: 0.75
+      - x: 0.
         y: 1.0016
         s: MSSM7
-        ha: right
+        ha: left
         va: bottom
         fontfamily: STIXGeneral
-        fontsize: x-small
+        fontsize: xx-small
         transform: true
     axc:
       label:
@@ -160,10 +162,10 @@ Figures:
       - sortby: LogL1
       # - filter: LogL1 < -258.0 
       - profile:
-          bin: 200
+          bin: 60
           coordinates:
             x:
-              expr: np.abs(mN1)
+              expr: np.abs(mWIMP)
               scale: linear
               name: xx
               lim: [0, 3500]
@@ -187,7 +189,9 @@ Figures:
       y:
         expr: yy
       z:
-        expr: np.exp(LogL1) / np.exp(-258.3)
+        # expr: np.exp(LogL1) / np.exp(-258.5)
+        expr: np.exp(LogL1) / np.exp(np.max(LogL1))
+
     style: {}
 
 

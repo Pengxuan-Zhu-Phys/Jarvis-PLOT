@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 import gc
+from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
@@ -13,7 +14,70 @@ except Exception:
     pl = None
 
 from ..memtrace import memtrace_checkpoint, memtrace_object_inventory
+from ..utils.pathing import resolve_project_path
 from .load_data import _preprofiling, addcolumn, drop_columns, filter as filter_df, grid_profiling, keep_columns, profiling, sortby
+
+
+def _csv_export_target(target: Any) -> Any:
+    if isinstance(target, Mapping):
+        return target.get("path", target.get("file", target.get("target", target.get("value", ""))))
+    return target
+
+
+def _resolve_csv_export_path(preprocessor, target: Any) -> Path:
+    raw = _csv_export_target(target)
+    path = str(raw).strip()
+    if not path:
+        raise ValueError("tocsv requires a non-empty path")
+    return resolve_project_path(path, base_dir=getattr(preprocessor, "base_dir", None))
+
+
+def _save_dataframe_csv(preprocessor, df, target: Any, *, stage: str, source_label: Optional[str] = None) -> Path:
+    out_path = _resolve_csv_export_path(preprocessor, target)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    rows = preprocessor._safe_nrows(df) if hasattr(preprocessor, "_safe_nrows") else None
+    memtrace_checkpoint(
+        preprocessor.logger,
+        "pipeline.csv_export.before",
+        df,
+        extra={
+            "source": source_label or "<unknown>",
+            "stage": stage,
+            "path": str(out_path),
+            "rows": rows if rows is not None else "NA",
+        },
+    )
+    memtrace_object_inventory(
+        preprocessor.logger,
+        "pipeline.csv_export.inventory",
+        {"df": df},
+        roles={"df": "csv export dataframe"},
+        min_bytes=64 * 1024 * 1024,
+    )
+    if isinstance(df, pd.DataFrame):
+        df.to_csv(out_path, index=False)
+    else:
+        pd.DataFrame(df).to_csv(out_path, index=False)
+    if preprocessor.logger:
+        preprocessor._info(
+            "Saved transformed dataframe to CSV:\n\t source \t-> {}\n\t stage \t-> {}\n\t path \t-> {}".format(
+                source_label or "<unknown>",
+                stage,
+                out_path,
+            )
+        )
+    memtrace_checkpoint(
+        preprocessor.logger,
+        "pipeline.csv_export.after",
+        df,
+        extra={
+            "source": source_label or "<unknown>",
+            "stage": stage,
+            "path": str(out_path),
+            "rows": rows if rows is not None else "NA",
+        },
+    )
+    return out_path
 
 def resolve_source_data(preprocessor, source: Any, combine: str = "concat"):
     if isinstance(source, str):
@@ -231,6 +295,14 @@ def apply_transforms_impl(
             df = keep_columns(df, trans.get("keep_columns"), preprocessor.logger)
         elif "drop_columns" in trans:
             df = drop_columns(df, trans.get("drop_columns"), preprocessor.logger)
+        elif "tocsv" in trans or "to_csv" in trans:
+            _save_dataframe_csv(
+                preprocessor,
+                df,
+                trans.get("tocsv", trans.get("to_csv")),
+                stage=profile_mode,
+                source_label=source_label,
+            )
 
         if prev_df is not df:
             collect_prev = preprocessor._should_collect_dataframe(prev_df)
@@ -271,7 +343,10 @@ def run_pipeline(preprocessor,
     projection = preprocessor._projection_list(projection)
     key = preprocessor._pipeline_key(source, effective_transform, combine=combine, mode=mode, projection=projection)
     runtime_mode = mode_lower == "runtime"
-    cache_enabled = bool(use_cache) and mode_lower != "preprofile-base"
+    export_requested = preprocessor._transform_requests_csv_export(effective_transform)
+    cache_enabled = bool(use_cache) and mode_lower != "preprofile-base" and not export_requested
+    if export_requested and bool(use_cache):
+        preprocessor._debug(f"Pipeline cache disabled for CSV export transform -> {key}")
     runtime_sig = preprocessor._runtime_profile_signature(effective_transform) if runtime_mode else None
     demand_fp = preprocessor._demand_fingerprint(
         source,
