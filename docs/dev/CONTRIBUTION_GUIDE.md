@@ -28,12 +28,13 @@ Read these documents first:
 
 There are two different layer changes.
 
-### A. Add a new YAML method alias
+### A. Add a new YAML method
 
-If the layer is only a new name for an existing drawing primitive:
+If the layer needs a drawing primitive:
 
 - update `jarvisplot/Figure/method_registry.py`
-- register the YAML key, aliases, and allowed axes types
+- register the canonical YAML key and allowed axes types
+- update YAML examples to use the canonical key directly; the runtime no longer accepts method aliases
 
 ### B. Add a new drawing primitive
 
@@ -42,11 +43,11 @@ If the layer needs new draw logic:
 - implement the method on:
   - `StdAxesAdapter` for rectangular axes
   - `TernaryAxesAdapter` for ternary axes
-- keep `Figure.render_layer()` as the routing point that prepares coordinates and style payloads
+- keep `jarvisplot/Figure/layer_runtime.py:render_layer()` as the routing point that prepares coordinates and style payloads
 
 Notes:
 
-- `Figure.render_layer()` already evaluates coordinate expressions into numpy arrays
+- `jarvisplot/Figure/layer_runtime.py:render_layer()` already evaluates coordinate expressions into numpy arrays
 - `grid_profile` is the current example of a custom adapter method that receives both arrays and the backing dataframe via `__df__`
 
 ### How a Layer Requests Columns
@@ -80,15 +81,15 @@ If you do not update both sides, the layer may render only by accident on warm c
 
 Transform behavior currently lives in three places:
 
-- execution primitives in `jarvisplot/Figure/load_data.py`
+- execution primitives in `jarvisplot/Figure/preprocessor_runtime.py`
 - orchestration and projection logic in `jarvisplot/Figure/preprocessor.py` and `jarvisplot/Figure/preprocessor_runtime.py`
-- dataset-level transform execution in `jarvisplot/data_loader_runtime.py` (called through `DataSet._apply_dataset_transform()` and `DataSet._apply_dataset_transform_polars()`)
+- dataset-level transform execution in `jarvisplot/data_loader_runtime.py` (called through `DataSet.load_csv()`, `DataSet.load_parquet()`, `DataSet.load_hdf5()`, and `jarvisplot/data_loader_runtime.py` helpers)
 
 Required checklist for a new transform:
 
 1. Implement the transform primitive.
-2. Add runtime handling in `DataPreprocessor._apply_transforms()`.
-3. If it is safe for lazy pushdown, add it to `DataSet._apply_dataset_transform_polars()`.
+2. Add runtime handling in `jarvisplot/Figure/preprocessor_runtime.py:apply_transforms_impl()`.
+3. If it is safe for lazy pushdown, add it to `jarvisplot/data_loader_runtime.py:_apply_dataset_transform_polars()`.
 4. Update input-column discovery.
 5. Update output-column discovery.
 6. Confirm that cached payloads still project correctly.

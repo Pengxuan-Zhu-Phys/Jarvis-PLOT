@@ -27,9 +27,9 @@ The 1.3.0 pipeline moves memory pressure out of the hot path by narrowing tables
 
 Implemented mainly in `jarvisplot/data_loader.py`, `jarvisplot/data_loader_runtime.py`, and `jarvisplot/data_loader_hdf5.py`.
 
-- `JarvisPLOT.plan_dataset_required_columns()` computes `required_columns` and the explicit column-prune intent before datasets are materialized.
-- HDF5 sources use `_build_hdf5_whitelist()` to avoid loading unrelated leaf datasets.
-- `jarvisplot/data_loader_runtime.py` owns `_load_hdf5_materialized()` and the HDF5 materialization path.
+- `jarvisplot/core_runtime.py:plan_dataset_required_columns()` computes `required_columns` and the explicit column-prune intent before datasets are materialized.
+- HDF5 sources use `build_hdf5_whitelist()` to avoid loading unrelated leaf datasets.
+- `jarvisplot/data_loader_runtime.py` owns `load_hdf5_materialized()` and the HDF5 materialization path.
 - `jarvisplot/data_loader_runtime.py` keeps filter/sort/add-column work in polars when possible, then collects only the columns still required by the transform contract.
 
 Impact:
@@ -53,7 +53,7 @@ Impact:
 
 ### 3. Selection-Table Profiling
 
-Implemented in `jarvisplot/Figure/preprocessor.py` and `jarvisplot/Figure/load_data.py`.
+Implemented in `jarvisplot/Figure/preprocessor.py` and `jarvisplot/Figure/preprocessor_runtime.py`.
 
 - `_runtime_projection()` keeps only transform inputs, transform outputs, `__jp_row_idx__`, and layer demand.
 - `_runtime_cache_columns()` trims the post-transform dataframe before cache storage.
@@ -106,13 +106,13 @@ The largest remaining boundary is the conversion from `polars` to `pandas`.
 
 Where it happens:
 
-- `jarvisplot/data_loader.py:polars_to_pandas_compat()`
-- `jarvisplot/Figure/preprocessor.py:_polars_to_pandas_compat()`
-- `jarvisplot/Figure/figure.py:_polars_to_pandas_compat()`
+- `jarvisplot/utils/dataframes.py:polars_to_pandas()`
+- `jarvisplot/Figure/preprocessor.py:_polars_to_pandas()`
+- `jarvisplot/Figure/figure.py:_polars_to_pandas()`
 
 Why it still exists:
 
-- transform primitives in `jarvisplot/Figure/load_data.py` are written against pandas and numpy semantics
+- transform primitives in `jarvisplot/Figure/preprocessor_runtime.py` are written against pandas and numpy semantics
 - coordinate evaluation uses pandas dataframe locals for Python expression evaluation
 - render adapters expect in-memory numpy arrays derived from pandas-backed columns
 - some cache payloads are stored with `DataFrame.to_pickle()`, which is pandas-specific

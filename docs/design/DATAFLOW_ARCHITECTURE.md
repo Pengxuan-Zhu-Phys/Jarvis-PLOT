@@ -10,7 +10,7 @@ JarvisPLOT 1.3.0 replaced the old wide-table pipeline with a three-table model. 
 | --- | --- | --- | --- |
 | Dataset Table | `DataSet.data` in `jarvisplot/data_loader.py` (runtime loading/materialization helpers in `jarvisplot/data_loader_runtime.py`) | Dataset load output after ordered dataset-level transforms | Narrow by explicit transform only |
 | Selection Table | Output of `DataPreprocessor.run_pipeline()` before demand enrichment | Input to `profile`, `preprofile`, and `grid_profile`; compact cache payload | Narrow, profiling columns plus current-layer demand |
-| Enriched Table | Output of `DataPreprocessor._enrich_for_demand()` and then `Figure.render_layer()` | Rendering, layer style evaluation, `share_data`, export-oriented use | Add only layer-requested columns |
+| Enriched Table | Output of `DataPreprocessor._enrich_for_demand()` and then `jarvisplot/Figure/layer_runtime.py:render_layer()` | Rendering, layer style evaluation, `share_data`, export-oriented use | Add only layer-requested columns |
 
 ## 1. Dataset Table
 
@@ -122,7 +122,7 @@ Properties:
 
 This table is appropriate for:
 
-- `Figure.render_layer()`
+- `jarvisplot/Figure/layer_runtime.py:render_layer()`
 - style expression evaluation
 - adapter methods that need a few extra columns at draw time
 - `share_data` reuse when the shared payload is a render-ready dataframe
@@ -137,7 +137,7 @@ flowchart TD
     B --> C["Cache<br/>.cache/data"]
     B --> D["Demand enrichment by __jp_row_idx__"]
     D --> E["Enriched Table<br/>render-only additions"]
-    E --> F["Figure.render_layer()"]
+    E --> F["jarvisplot/Figure/layer_runtime.py:render_layer()"]
 ```
 
 ## Guardrails

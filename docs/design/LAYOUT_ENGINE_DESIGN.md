@@ -21,7 +21,8 @@ It should not own rendering, source loading, or style selection.
 Layout behavior is currently implicit in:
 
 - `jarvisplot/Figure/figure.py`
-- `jarvisplot/Figure/adapters.py`
+- `jarvisplot/Figure/adapters_rect.py`
+- `jarvisplot/Figure/adapters_ternary.py`
 - `jarvisplot/Figure/adapters_rect.py`
 - `jarvisplot/Figure/adapters_ternary.py`
 - `jarvisplot/Figure/helper.py`

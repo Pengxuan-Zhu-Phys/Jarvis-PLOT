@@ -21,8 +21,8 @@ Key observations from the latest review:
 - `jarvisplot/core.py` now delegates most planning/layout policy to `jarvisplot/core_runtime.py`, but it still owns orchestration.
 - path resolution is now centralized, but the owners still need more boundary cleanup.
 - `eval()` has been centralized, but it is still a technical debt surface.
-- `jarvisplot/Figure/adapters.py` has been reduced to a compatibility facade; adapter-family logic now lives in `adapters_rect.py` and `adapters_ternary.py`.
-- `jarvisplot/Figure/load_data.py` has now been narrowed to transform primitives; profiling helpers live in `jarvisplot/Figure/profile_runtime.py`.
+- adapter-family logic now lives in `adapters_rect.py` and `adapters_ternary.py`.
+- `jarvisplot/Figure/preprocessor_runtime.py` now carries the transform primitives; profiling helpers live in `jarvisplot/Figure/profile_runtime.py`.
 - `jarvisplot/data_loader_hdf5.py` now owns HDF5 whitelist/rename policy helpers, while `jarvisplot/data_loader_runtime.py` owns runtime materialization/loading and dataset transform execution.
 - `jarvisplot/Figure/preprocessor_runtime.py` now owns runtime source resolution and transform execution.
 - flowchart / semantic-scene support is still spec-only and should not be treated as implemented runtime code yet.
@@ -53,21 +53,21 @@ These tasks are already done and should stay closed unless a future change reope
 - [x] `jarvisplot/data_loader.py`: finish the HDF5 fallback branch so it either materializes a dataframe or raises an explicit error.
 - [x] `jarvisplot/Figure/figure.py` and `jarvisplot/config.py`: remove runtime `print()` calls and replace bare `except:` blocks with logged, bounded fallbacks.
 - [x] `jarvisplot/Figure/figure.py`: make style fallback explicit; do not assume a non-existent `default` style card.
-- [x] `jarvisplot/Figure/figure.py`, `jarvisplot/Figure/load_data.py`, and `jarvisplot/utils/interpolator.py`: reduce `eval()` surfaces and centralize expression evaluation.
+- [x] `jarvisplot/Figure/figure.py`, `jarvisplot/Figure/preprocessor_runtime.py`, and `jarvisplot/utils/interpolator.py`: reduce `eval()` surfaces and centralize expression evaluation.
 - [x] `jarvisplot/utils/cmaps.py` and `jarvisplot/Figure/figure.py`: keep colormap registration single-sourced and observable.
-- [x] `jarvisplot/Figure/figure.py`: fix the invalid-transform error path in `load_bool_df()` so the failure message itself cannot crash.
+- [x] `jarvisplot/Figure/layer_runtime.py`: fix the invalid-transform error path in `load_bool_df()` so the failure message itself cannot crash.
 - [x] `jarvisplot/Figure/figure.py`, `jarvisplot/data_loader.py`, and `jarvisplot/core.py`: reduce path-resolution duplication and pick one owner for workdir-relative resolution.
 - [x] `jarvisplot/utils/expression.py`: constrain the centralized `eval()` surface further, or document the exact trusted-input assumption in the code owner map.
 
 ### P1 - boundary cleanup
 
 - [x] `jarvisplot/Figure/figure.py`: split the monolith into config ingestion, layout assembly, layer runtime, colorbar manager, and render dispatch.
-- [x] `jarvisplot/Figure/preprocessor.py` and `jarvisplot/Figure/load_data.py`: keep runtime transform execution in one owner; remove fallback duplication from `figure.py`.
+- [x] `jarvisplot/Figure/preprocessor.py` and `jarvisplot/Figure/preprocessor_runtime.py`: keep runtime transform execution in one owner; remove fallback duplication from `figure.py`.
 - [x] `jarvisplot/core.py`: separate orchestration from dataset planning and YAML rewrite policy.
 - [x] `jarvisplot/data_loader.py`: narrow the remaining CSV/source lifecycle and summary-emission glue; HDF5 policy/runtime now live in helper modules, and summary formatting now lives in `jarvisplot/data_loader_summary.py`.
 - [ ] `jarvisplot/Figure/data_pipelines.py`: document and narrow the `share_data` / usage-plan lifecycle so it stays a support layer, not a hidden runtime owner.
-- [x] `jarvisplot/Figure/load_data.py`: split transform primitives from profiling helpers into `jarvisplot/Figure/profile_runtime.py`.
-- [x] `jarvisplot/Figure/adapters.py`: split render primitives by family into `jarvisplot/Figure/adapters_rect.py` and `jarvisplot/Figure/adapters_ternary.py`.
+- [x] `jarvisplot/Figure/preprocessor_runtime.py`: split transform primitives from profiling helpers into `jarvisplot/Figure/profile_runtime.py`.
+- [x] split render primitives by family into `jarvisplot/Figure/adapters_rect.py` and `jarvisplot/Figure/adapters_ternary.py`.
 
 ### P1 - flowchart readiness
 
@@ -99,7 +99,7 @@ The following implementation items are now in place in the current tree:
 - expression evaluation is centralized through `jarvisplot/utils/expression.py`.
 - profiling algorithms and preprofiling helpers now live in `jarvisplot/Figure/profile_runtime.py`.
 - figure runtime helpers for layout and colorbar handling now live in `jarvisplot/Figure/layout_runtime.py` and `jarvisplot/Figure/colorbar_runtime.py`.
-- adapter-family implementations now live in `jarvisplot/Figure/adapters_rect.py` and `jarvisplot/Figure/adapters_ternary.py`, with `jarvisplot/Figure/adapters.py` as a facade.
+- adapter-family implementations now live in `jarvisplot/Figure/adapters_rect.py` and `jarvisplot/Figure/adapters_ternary.py`.
 - smoke tests cover style fallback, colorbar wiring, profile cache reuse, and template JSON parsing.
 - docs status labels are checked for consistency, including archive placement for historical notes.
 
