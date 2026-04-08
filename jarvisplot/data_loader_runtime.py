@@ -23,14 +23,14 @@ from .data_loader_hdf5 import (
     materialized_cache_key,
     materialized_source_fingerprint,
     materialized_summary,
-    path_aliases,
     polars_schema_names,
-    rename_source_by_alias,
     shape_token,
     sql_bool_ops,
 )
+from .utils.dataframes import polars_to_pandas
 from .utils.pathing import resolve_project_path
-from .Figure.load_data import addcolumn, drop_columns, filter as filter_df, grid_profiling, keep_columns, profiling, sortby
+from .Figure.preprocessor_runtime import add_column, drop_columns, filter_df, keep_columns, sort_by
+from .Figure.profile_runtime import grid_profiling, profiling
 
 JP_ROW_IDX = "__jp_row_idx__"
 
@@ -131,13 +131,15 @@ def apply_dataset_transform(dataset, stage: str = "dataset") -> None:
             )
         return
 
-    from .Figure.load_data import addcolumn, filter as filter_df, grid_profiling, profiling, sortby
+    from .Figure.preprocessor_runtime import add_column, filter_df, sort_by
+    from .Figure.profile_runtime import grid_profiling, profiling
 
     push_mode = str(os.getenv("JP_DATASET_POLARS_TRANSFORM", "auto")).strip().lower()
     use_polars_pushdown = push_mode not in {"0", "false", "no", "off", "disable", "disabled"}
     pushdown_keep_lazy = push_mode in {"lazy", "keep-lazy"}
     if use_polars_pushdown and pl is not None and isinstance(dataset.data, (pl.LazyFrame, pl.DataFrame)):
-        if dataset._apply_dataset_transform_polars(
+        if _apply_dataset_transform_polars(
+            dataset,
             stage=stage,
             materialize_to_pandas=(not pushdown_keep_lazy),
         ):
@@ -149,11 +151,11 @@ def apply_dataset_transform(dataset, stage: str = "dataset") -> None:
 
     if pl is not None and isinstance(dataset.data, pl.LazyFrame):
         dataset.logger.warning(f"Materializing polars LazyFrame for dataset transform -> {dataset.name}")
-        dataset.data = polars_to_pandas_compat(dataset.data, logger=dataset.logger, stage=f"dataset:{dataset.name}")
+        dataset.data = polars_to_pandas(dataset.data, logger=dataset.logger, stage=f"dataset:{dataset.name}")
         dataset._data_backend = "pandas"
     elif pl is not None and isinstance(dataset.data, pl.DataFrame):
         dataset.logger.warning(f"Materializing polars DataFrame for dataset transform -> {dataset.name}")
-        dataset.data = polars_to_pandas_compat(dataset.data, logger=dataset.logger, stage=f"dataset:{dataset.name}")
+        dataset.data = polars_to_pandas(dataset.data, logger=dataset.logger, stage=f"dataset:{dataset.name}")
         dataset._data_backend = "pandas"
 
     df = dataset.data
@@ -163,7 +165,7 @@ def apply_dataset_transform(dataset, stage: str = "dataset") -> None:
         df,
         extra={"dataset": dataset.name, "stage": stage},
     )
-    before_shape = dataset._shape_token(df)
+    before_shape = shape_token(df)
     for trans in dataset.transform:
         if not isinstance(trans, dict):
             if dataset.logger:
@@ -184,9 +186,9 @@ def apply_dataset_transform(dataset, stage: str = "dataset") -> None:
                 cfg = {"method": "grid"}
             df = grid_profiling(df, cfg, dataset.logger)
         elif "sortby" in trans:
-            df = sortby(df, trans["sortby"], dataset.logger)
+            df = sort_by(df, trans["sortby"], dataset.logger)
         elif "add_column" in trans:
-            df = addcolumn(df, trans["add_column"], dataset.logger)
+            df = add_column(df, trans["add_column"], dataset.logger)
         elif "keep_columns" in trans:
             df = keep_columns(df, trans.get("keep_columns"), dataset.logger)
         elif "drop_columns" in trans:
@@ -223,7 +225,7 @@ def apply_dataset_transform(dataset, stage: str = "dataset") -> None:
                 dataset.name,
                 stage,
                 before_shape,
-                dataset._shape_token(dataset.data),
+                shape_token(dataset.data),
             )
         )
 
@@ -241,7 +243,7 @@ def materialized_numeric_bounds(dataset) -> Dict[str, Dict[str, Any]]:
     frame = dataset.data
     if pl is not None and isinstance(frame, pl.LazyFrame):
         try:
-            schema_cols = set(dataset._polars_schema_names(frame))
+            schema_cols = set(polars_schema_names(frame))
             select_cols = [c for c in columns if c in schema_cols]
             if not select_cols:
                 return {}
@@ -318,25 +320,8 @@ def materialized_numeric_bounds(dataset) -> Dict[str, Dict[str, Any]]:
             continue
     return stats
 
-@staticmethod
-def _sql_bool_ops(expr: Any) -> str:
-    return str(expr).replace("&&", " AND ").replace("||", " OR ")
-
-@staticmethod
-def _polars_schema_names(lf) -> List[str]:
-    try:
-        schema = lf.collect_schema()
-        if hasattr(schema, "names"):
-            names = schema.names()
-            return [str(x) for x in names]
-        if isinstance(schema, dict):
-            return [str(x) for x in schema.keys()]
-    except Exception:
-        pass
-    return []
-
 def _apply_dataset_transform_polars(
-    self,
+    dataset,
     stage: str = "dataset",
     materialize_to_pandas: bool = True,
 ) -> bool:
@@ -348,7 +333,7 @@ def _apply_dataset_transform_polars(
         return False
 
     lf = dataset.data if isinstance(dataset.data, pl.LazyFrame) else dataset.data.lazy()
-    before_shape = dataset._shape_token(dataset.data)
+    before_shape = shape_token(dataset.data)
     memtrace_checkpoint(
         dataset.logger,
         "dataset.transform.before",
@@ -376,7 +361,7 @@ def _apply_dataset_transform_polars(
                     elif low in {"false", "f", "no", "n"}:
                         lf = lf.filter(pl.lit(False))
                     else:
-                        lf = lf.filter(pl.sql_expr(dataset._sql_bool_ops(s)))
+                        lf = lf.filter(pl.sql_expr(sql_bool_ops(s)))
                 else:
                     raise TypeError(
                         "unsupported filter condition type for polars pushdown: {}".format(type(condition))
@@ -385,12 +370,12 @@ def _apply_dataset_transform_polars(
                 expr = str(trans.get("sortby", "")).strip()
                 if not expr:
                     continue
-                cols = dataset._polars_schema_names(lf)
+                cols = polars_schema_names(lf)
                 if expr in cols:
                     lf = lf.sort(expr)
                 else:
                     skey = "__jp_sortkey__"
-                    lf = lf.with_columns(pl.sql_expr(dataset._sql_bool_ops(expr)).alias(skey)).sort(skey).drop(skey)
+                    lf = lf.with_columns(pl.sql_expr(sql_bool_ops(expr)).alias(skey)).sort(skey).drop(skey)
             elif "add_column" in trans:
                 adds = trans.get("add_column", {})
                 if not isinstance(adds, dict):
@@ -399,7 +384,7 @@ def _apply_dataset_transform_polars(
                 expr = str(adds.get("expr", "")).strip()
                 if not name or not expr:
                     raise ValueError("add_column requires non-empty name and expr")
-                lf = lf.with_columns(pl.sql_expr(dataset._sql_bool_ops(expr)).alias(name))
+                lf = lf.with_columns(pl.sql_expr(sql_bool_ops(expr)).alias(name))
             elif "keep_columns" in trans:
                 lf = keep_columns(lf, trans.get("keep_columns"), dataset.logger)
             elif "drop_columns" in trans:
@@ -407,11 +392,11 @@ def _apply_dataset_transform_polars(
             elif "profile" in trans or "grid_profile" in trans:
                 return False
             elif "tocsv" in trans:
-                if JP_ROW_IDX not in dataset._polars_schema_names(lf):
+                if JP_ROW_IDX not in polars_schema_names(lf):
                     lf = lf.with_row_index(JP_ROW_IDX)
                 _save_dataframe_csv(dataset, lf, trans.get("tocsv"), stage=stage)
             elif "to_parquet" in trans:
-                if JP_ROW_IDX not in dataset._polars_schema_names(lf):
+                if JP_ROW_IDX not in polars_schema_names(lf):
                     lf = lf.with_row_index(JP_ROW_IDX)
                 _save_dataframe_parquet(dataset, lf, trans.get("to_parquet"), stage=stage)
             else:
@@ -424,10 +409,10 @@ def _apply_dataset_transform_polars(
         return False
 
     lf_with_idx = lf
-    cols_after_transform = dataset._polars_schema_names(lf_with_idx)
+    cols_after_transform = polars_schema_names(lf_with_idx)
     if JP_ROW_IDX not in cols_after_transform:
         lf_with_idx = lf_with_idx.with_row_index(JP_ROW_IDX)
-        cols_after_transform = dataset._polars_schema_names(lf_with_idx)
+        cols_after_transform = polars_schema_names(lf_with_idx)
     dataset._full_lazy_frame = lf_with_idx
 
     keep_cols = list(cols_after_transform)
@@ -467,17 +452,17 @@ def _apply_dataset_transform_polars(
                 )
             )
         narrowed = lf_with_idx.select(keep_cols) if keep_cols else lf_with_idx
-        dataset.data = polars_to_pandas_compat(narrowed, logger=dataset.logger, stage=f"dataset:{dataset.name}.pushdown")
+        dataset.data = polars_to_pandas(narrowed, logger=dataset.logger, stage=f"dataset:{dataset.name}.pushdown")
         dataset._data_backend = "pandas"
         if isinstance(dataset.data, pd.DataFrame):
             dataset.keys = list(dataset.data.columns)
         else:
-            dataset.keys = dataset._polars_schema_names(narrowed)
+            dataset.keys = polars_schema_names(narrowed)
         engine_name = "polars->pandas"
     else:
         dataset.data = lf_with_idx.select(keep_cols) if keep_cols else lf_with_idx
         dataset._data_backend = "polars_lazy"
-        dataset.keys = dataset._polars_schema_names(dataset.data)
+        dataset.keys = polars_schema_names(dataset.data)
         engine_name = "polars"
     memtrace_checkpoint(
         dataset.logger,
@@ -492,7 +477,7 @@ def _apply_dataset_transform_polars(
                 stage,
                 engine_name,
                 before_shape,
-                dataset._shape_token(dataset.data),
+                shape_token(dataset.data),
             )
         )
     return True
@@ -534,13 +519,13 @@ def load_hdf5_materialized(dataset) -> None:
     if pl is None or dataset.cache is None:
         raise RuntimeError("polars materialized backend is unavailable.")
 
-    cache_key = dataset._materialized_cache_key()
+    cache_key = materialized_cache_key(dataset)
     if cache_key is None:
         raise RuntimeError("materialized cache key unavailable.")
 
     manifest = dataset.cache.get_materialized_manifest(cache_key)
     if isinstance(manifest, dict):
-        dataset._activate_materialized_manifest(cache_key, manifest)
+        activate_materialized_manifest(dataset, cache_key, manifest)
         memtrace_checkpoint(
             dataset.logger,
             "hdf5.materialized.cache_hit",
@@ -559,7 +544,7 @@ def load_hdf5_materialized(dataset) -> None:
                 yield from _iter_dataset_paths(v, path, whitelist=whitelist)
 
     def _rename_map_from_entries() -> Dict[str, str]:
-        rename_entries = dataset._columns_dict().get("rename", [])
+        rename_entries = columns_dict(dataset).get("rename", [])
         rename_map = {}
         if isinstance(rename_entries, list):
             for item in rename_entries:
@@ -569,7 +554,7 @@ def load_hdf5_materialized(dataset) -> None:
                 target = str(item.get("target", "")).strip()
                 if not source or not target:
                     continue
-                source_canon = dataset._canonical_dataset_path(source)
+                source_canon = canonical_dataset_path(dataset, source)
                 rename_map[source_canon] = target
                 rename_map[f"{source_canon}_isvalid"] = f"{target}_isvalid"
         return rename_map
@@ -640,7 +625,7 @@ def load_hdf5_materialized(dataset) -> None:
         group = f1[dataset.group]
         whitelist = None
         if not bool(getattr(dataset, "full_load", False)):
-            whitelist = dataset._build_hdf5_whitelist()
+            whitelist = build_hdf5_whitelist(dataset)
 
         dataset_paths = list(_iter_dataset_paths(group, prefix=dataset.group, whitelist=whitelist))
         if not dataset_paths:
@@ -701,7 +686,7 @@ def load_hdf5_materialized(dataset) -> None:
             bytes_per_row += 1
 
         total_rows = int(expected_rows or 0)
-        avail = dataset._available_memory_bytes()
+        avail = available_memory_bytes()
         target_bytes = max(64 * 1024 * 1024, int((avail or (512 * 1024 * 1024)) * 0.15))
         bytes_per_row = max(int(bytes_per_row), 1)
         chunk_rows = max(10_000, min(total_rows or 10_000, target_bytes // bytes_per_row))
@@ -773,13 +758,13 @@ def load_hdf5_materialized(dataset) -> None:
             "parts": len(parts),
             "part_files": parts,
             "bytes_total": bytes_total,
-            "source": dataset._materialized_source_fingerprint(),
+            "source": materialized_source_fingerprint(dataset),
             "group": dataset.group,
             "path": dataset.path,
         }
 
     dataset.cache.put_materialized_manifest(cache_key, manifest)
-    dataset._activate_materialized_manifest(cache_key, manifest)
+    activate_materialized_manifest(dataset, cache_key, manifest)
     if dataset.logger:
         dataset.logger.info(
             "HDF5 materialization DONE:\n\t name \t-> {}\n\t rows_out \t-> {}\n\t parts \t-> {}".format(
@@ -820,7 +805,7 @@ def load_parquet(dataset):
     else:
         dataset.keys = list(getattr(dataset.data, "columns", []))
 
-    dataset._apply_dataset_transform(stage="parquet")
+    apply_dataset_transform(dataset, stage="parquet")
 
     summary_name = dataset._summary_name()
     summary_msg = None
@@ -850,9 +835,10 @@ def load_hdf5(dataset):
             if isinstance(dataset.data, pd.DataFrame):
                 summary_msg = dataframe_summary(dataset.data, name=dataset._summary_name())
             elif isinstance(dataset._materialized_manifest, dict):
-                summary_msg = dataset._materialized_summary(
+                summary_msg = materialized_summary(
+                    dataset,
                     dataset._materialized_manifest,
-                    stats=dataset._materialized_numeric_bounds(),
+                    stats=materialized_numeric_bounds(dataset),
                 )
             if dataset.cache is not None and summary_msg is not None:
                 dataset.cache.put_summary(source_fp, summary_msg)
@@ -862,9 +848,9 @@ def load_hdf5(dataset):
 
     if pl is not None and dataset.cache is not None:
         try:
-            dataset._load_hdf5_materialized()
+            load_hdf5_materialized(dataset)
             _emit_loaded_summary()
-            dataset._apply_dataset_transform(stage="hdf5")
+            apply_dataset_transform(dataset, stage="hdf5")
             return
         except Exception as e:
             if dataset.logger:
@@ -972,7 +958,7 @@ def load_hdf5(dataset):
 
             whitelist = None
             if not bool(getattr(dataset, "full_load", False)):
-                whitelist = dataset._build_hdf5_whitelist()
+                whitelist = build_hdf5_whitelist(dataset)
                 if whitelist is not None:
                     dataset.logger.debug(
                         "HDF5 load_whitelist enabled -> {} paths".format(len(whitelist))
@@ -994,7 +980,7 @@ def load_hdf5(dataset):
             isvalid_paths = [p for p in dataset_paths if p.endswith("_isvalid")]
 
             # Step 1: parse columns config and finalize rename mapping first.
-            rename_entries = dataset._columns_dict().get("rename", [])
+            rename_entries = columns_dict(dataset).get("rename", [])
             rename_map = {}
             if isinstance(rename_entries, list) and rename_entries:
                 dataset.logger.info("{}: Loading Columns Rename Map".format(dataset.name))
@@ -1005,7 +991,7 @@ def load_hdf5(dataset):
                     target = str(item.get("target", "")).strip()
                     if not source or not target:
                         continue
-                    source_canon = dataset._canonical_dataset_path(source)
+                    source_canon = canonical_dataset_path(dataset, source)
                     rename_map[source_canon] = target
                     rename_map[f"{source_canon}_isvalid"] = f"{target}_isvalid"
 
@@ -1094,7 +1080,7 @@ def load_hdf5(dataset):
                     )
 
                 _emit_loaded_summary()
-                dataset._apply_dataset_transform(stage="hdf5")
+                apply_dataset_transform(dataset, stage="hdf5")
 
                 return  # IMPORTANT: stop here; avoid falling through to single-dataset path
             else:
@@ -1127,5 +1113,5 @@ def load_hdf5(dataset):
                 dataset.data = pd.DataFrame(np.asarray(arr))
             dataset.keys = list(dataset.data.columns)
             _emit_loaded_summary()
-            dataset._apply_dataset_transform(stage="hdf5")
+            apply_dataset_transform(dataset, stage="hdf5")
             return

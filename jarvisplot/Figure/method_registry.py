@@ -7,12 +7,12 @@ corresponding Matplotlib Axes methods.
 
 Why this exists:
 - Keep Figure/renderer code slim.
-- Provide a single place to add aliases / deprecations.
+- Provide a single place to add method keys.
 - Allow light validation by axes type (rect/tri).
 
 Design notes:
-- For backward compatibility, `METHOD_DISPATCH` remains a plain dict mapping
-  YAML keys to Matplotlib method names.
+- `METHOD_DISPATCH` remains the canonical YAML-facing mapping to Matplotlib
+  method names.
 - Prefer using `resolve_method(...)` for new code.
 """
 
@@ -23,7 +23,7 @@ from typing import Callable, Dict, Iterable, Optional, Set, Tuple
 
 
 # -----------------------------
-# Backward-compatible mapping
+# Canonical mapping
 # -----------------------------
 #
 # Keys here should be stable YAML-facing names.
@@ -68,7 +68,7 @@ METHOD_DISPATCH: Dict[str, str] = {
 
 
 # -----------------------------
-# Registry (new preferred API)
+# Registry
 # -----------------------------
 
 _ALLOWED_AX_TYPES = {"rect", "tri", "any"}
@@ -79,8 +79,6 @@ class MethodSpec:
     key: str
     mpl_method: str
     axes_types: Tuple[str, ...] = ("any",)
-    aliases: Tuple[str, ...] = ()
-    deprecated_aliases: Tuple[str, ...] = ()
 
 
 class MethodRegistry:
@@ -88,8 +86,6 @@ class MethodRegistry:
 
     def __init__(self) -> None:
         self._by_key: Dict[str, MethodSpec] = {}
-        self._alias_to_key: Dict[str, str] = {}
-        self._deprecated_alias_to_key: Dict[str, str] = {}
 
     def register(
         self,
@@ -97,8 +93,6 @@ class MethodRegistry:
         mpl_method: str,
         *,
         axes_types: Iterable[str] = ("any",),
-        aliases: Iterable[str] = (),
-        deprecated_aliases: Iterable[str] = (),
         overwrite: bool = False,
     ) -> None:
         k = normalize_method_key(key)
@@ -110,20 +104,8 @@ class MethodRegistry:
             key=k,
             mpl_method=mpl_method,
             axes_types=ax_types,
-            aliases=tuple(normalize_method_key(a) for a in aliases),
-            deprecated_aliases=tuple(normalize_method_key(a) for a in deprecated_aliases),
         )
         self._by_key[k] = spec
-
-        for a in spec.aliases:
-            if not overwrite and a in self._alias_to_key:
-                raise ValueError(f"alias already registered: {a}")
-            self._alias_to_key[a] = k
-
-        for a in spec.deprecated_aliases:
-            if not overwrite and a in self._deprecated_alias_to_key:
-                raise ValueError(f"deprecated alias already registered: {a}")
-            self._deprecated_alias_to_key[a] = k
 
     def resolve(
         self,
@@ -137,21 +119,13 @@ class MethodRegistry:
         Returns:
             (spec, warning)
 
-        warning is a string when a deprecated alias is used; otherwise None.
+        warning is always None.
         """
         k = normalize_method_key(key)
         ax_t = normalize_axes_type(axes_type)
 
-        warn: Optional[str] = None
-
         if k in self._by_key:
             spec = self._by_key[k]
-        elif k in self._alias_to_key:
-            spec = self._by_key[self._alias_to_key[k]]
-        elif k in self._deprecated_alias_to_key:
-            resolved = self._deprecated_alias_to_key[k]
-            spec = self._by_key[resolved]
-            warn = f"Method key '{k}' is deprecated; use '{spec.key}' instead."
         else:
             if strict:
                 raise KeyError(f"Unknown method key: '{key}'")
@@ -164,7 +138,7 @@ class MethodRegistry:
                 f"Allowed: {spec.axes_types}"
             )
 
-        return spec, warn
+        return spec, None
 
 
 def normalize_method_key(key: str) -> str:
@@ -184,7 +158,7 @@ REGISTRY = MethodRegistry()
 
 
 def _bootstrap_default_registry() -> None:
-    """Populate REGISTRY from METHOD_DISPATCH and known aliases."""
+    """Populate REGISTRY from METHOD_DISPATCH."""
 
     # --- core mapping from METHOD_DISPATCH
     for k, mpl in METHOD_DISPATCH.items():
@@ -193,51 +167,6 @@ def _bootstrap_default_registry() -> None:
             REGISTRY.register(k, mpl, axes_types=("tri", "any"), overwrite=True)
         else:
             REGISTRY.register(k, mpl, axes_types=("rect", "any"), overwrite=True)
-
-    # --- aliases / more user-friendly names
-    REGISTRY.register(
-        "line",
-        "plot",
-        axes_types=("rect", "any"),
-        aliases=("lines",),
-        deprecated_aliases=(),
-        overwrite=True,
-    )
-    REGISTRY.register(
-        "points",
-        "scatter",
-        axes_types=("rect", "any"),
-        aliases=("point", "scatterplot"),
-        overwrite=True,
-    )
-
-    # tri field convenience: allow explicit gouraud naming on same mpl method
-    REGISTRY.register(
-        "tripcolor_gouraud",
-        "tripcolor",
-        axes_types=("tri", "any"),
-        aliases=("tri_field", "tri_color"),
-        overwrite=True,
-    )
-
-    # Axes-space tri field (JarvisPLOT custom adapter method)
-    REGISTRY.register(
-        "tripcolor_axes",
-        "tripcolor_axes",
-        axes_types=("tri", "any"),
-        aliases=("tri_field_axes",),
-        overwrite=True,
-    )
-
-    # Data-preprocessed grid profile convenience key for layer.method
-    REGISTRY.register(
-        "grid_profile",
-        "grid_profile",
-        axes_types=("rect", "tri", "any"),
-        aliases=("grid_profiling",),
-        overwrite=True,
-    )
-
 
 _bootstrap_default_registry()
 

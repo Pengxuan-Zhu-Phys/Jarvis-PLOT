@@ -9,6 +9,7 @@ import pytest
 
 from jarvisplot.data_loader import DataSet
 from jarvisplot import data_loader_summary
+from jarvisplot import data_loader_hdf5
 from jarvisplot import data_loader_runtime
 
 try:
@@ -26,15 +27,65 @@ def _logger():
     )
 
 
-def test_dataset_setters_return_early_on_none():
+def _make_hdf5_source(tmp_path):
+    path = tmp_path / "sample.h5"
+    with h5py.File(path, "w") as h5:
+        h5.create_dataset("x", data=np.array([1.0, 2.0, 3.0], dtype=np.float64))
+    return path
+
+
+def _load_hdf5_dataset(tmp_path, transform):
+    path = _make_hdf5_source(tmp_path)
     ds = DataSet()
     ds.logger = _logger()
+    ds.setinfo(
+        {
+            "path": str(path),
+            "name": "sample",
+            "type": "hdf5",
+            "dataset": None,
+            "transform": transform,
+        },
+        rootpath=str(tmp_path),
+        eager=False,
+        cache=None,
+    )
+    return ds
+
+
+def _read_saved_table(path):
+    if path.suffix == ".parquet":
+        if pl is not None:
+            saved = pl.read_parquet(path)
+            return list(saved.columns), int(saved.height)
+        saved = pd.read_parquet(path)
+        return list(saved.columns), len(saved)
+
+    saved = pd.read_csv(path)
+    return list(saved.columns), len(saved)
+
+
+def test_dataset_setters_reset_derived_state_on_none(tmp_path):
+    ds = DataSet()
+    ds.logger = _logger()
+
+    ds.file = str(tmp_path / "sample.csv")
+    ds.type = "csv"
+
+    assert ds.path is not None
+    assert ds.base == "sample.csv"
+    assert ds._file is not None
+    assert ds._type == "csv"
 
     ds.file = None
     ds.type = None
 
     assert ds.file is None
     assert ds.type is None
+    assert ds.path is None
+    assert ds.base is None
+    assert ds._file is None
+    assert ds._type is None
 
 
 def test_hdf5_fallback_loads_single_dataset(tmp_path):
@@ -49,7 +100,8 @@ def test_hdf5_fallback_loads_single_dataset(tmp_path):
 
     data = ds.load()
 
-    assert data is ds.data
+    assert isinstance(data, pd.DataFrame)
+    pd.testing.assert_frame_equal(data, ds.data)
     assert list(ds.data.columns) == [0, 1]
     assert ds.keys == [0, 1]
 
@@ -84,7 +136,7 @@ def test_materialized_summary_includes_numeric_bounds():
     ds.data = pd.DataFrame({"a": [1.0, 3.0], "b": ["x", "y"], "c": [2, 5]})
 
     stats = data_loader_runtime.materialized_numeric_bounds(ds)
-    msg = ds._materialized_summary(ds._materialized_manifest, stats=stats)
+    msg = data_loader_hdf5.materialized_summary(ds, ds._materialized_manifest, stats=stats)
 
     assert stats == {"a": {"min": 1.0, "max": 3.0}, "c": {"min": 2.0, "max": 5.0}}
     assert "=== Materialized Stats ===" in msg
@@ -115,8 +167,8 @@ def test_dataframe_summary_table_uses_scientific_notation_and_uniqs():
     assert "[min]" in msg
     assert "[max]" in msg
     assert "uniq=2" in msg
-    assert "1e-07" in msg or "1e-07" in msg
-    assert "2e+07" in msg or "2e+07" in msg
+    assert "1e-07" in msg
+    assert "2e+07" in msg
     assert "0.0001128" in msg
 
 
@@ -169,24 +221,9 @@ def test_dataset_emit_summary_uses_warning_level(monkeypatch):
 
 
 def test_hdf5_summary_emitted_before_transform(tmp_path):
-    path = tmp_path / "sample.h5"
-    with h5py.File(path, "w") as h5:
-        h5.create_dataset("x", data=np.array([1.0, 2.0, 3.0], dtype=np.float64))
-
-    ds = DataSet()
-    ds.logger = _logger()
-    ds.setinfo(
-            {
-                "path": str(path),
-                "name": "sample",
-                "type": "hdf5",
-                "dataset": None,
-                "columns": {},
-                "transform": [{"add_column": {"name": "y", "expr": "x * 2"}}],
-            },
-        rootpath=str(tmp_path),
-        eager=False,
-        cache=None,
+    ds = _load_hdf5_dataset(
+        tmp_path,
+        [{"add_column": {"name": "y", "expr": "x * 2"}}],
     )
 
     emitted = []
@@ -200,150 +237,70 @@ def test_hdf5_summary_emitted_before_transform(tmp_path):
     assert "y" in ds.data.columns
 
 
-def test_hdf5_transform_tocsv_writes_output(tmp_path):
-    path = tmp_path / "sample.h5"
-    with h5py.File(path, "w") as h5:
-        h5.create_dataset("x", data=np.array([1.0, 2.0, 3.0], dtype=np.float64))
+HDF5_EXPORT_CASES = [
+    pytest.param(
+        [{"add_column": {"name": "y", "expr": "x * 2"}}, {"tocsv": "./saved/sample_transformed.csv"}],
+        [("sample_transformed.csv", ["__jp_row_idx__", "x", "y"], 3)],
+        ["y"],
+        id="tocsv-writes-output",
+    ),
+    pytest.param(
+        [
+            {"add_column": {"name": "y", "expr": "x * 2"}},
+            {"tocsv": "./saved/sample_prefix.csv"},
+            {"add_column": {"name": "z", "expr": "y + 1"}},
+        ],
+        [("sample_prefix.csv", ["__jp_row_idx__", "x", "y"], 3)],
+        ["y", "z"],
+        id="tocsv-executes-in-order",
+    ),
+    pytest.param(
+        [{"add_column": {"name": "y", "expr": "x * 2"}}, {"to_parquet": "./saved/sample_transformed.parquet"}],
+        [("sample_transformed.parquet", ["__jp_row_idx__", "x", "y"], 3)],
+        ["y"],
+        id="to-parquet-writes-output",
+    ),
+    pytest.param(
+        [
+            {"add_column": {"name": "y", "expr": "x * 2"}},
+            {"to_parquet": "./saved/sample_prefix.parquet"},
+            {"add_column": {"name": "z", "expr": "y + 1"}},
+        ],
+        [("sample_prefix.parquet", ["__jp_row_idx__", "x", "y"], 3)],
+        ["y", "z"],
+        id="to-parquet-executes-in-order",
+    ),
+    pytest.param(
+        [
+            {"add_column": {"name": "y", "expr": "x * 2"}},
+            {"tocsv": "./saved/sample_transformed.csv"},
+            {"to_parquet": "./saved/sample_transformed.parquet"},
+        ],
+        [
+            ("sample_transformed.csv", ["__jp_row_idx__", "x", "y"], 3),
+            ("sample_transformed.parquet", ["__jp_row_idx__", "x", "y"], 3),
+        ],
+        ["y"],
+        id="both-exports",
+    ),
+]
 
-    ds = DataSet()
-    ds.logger = _logger()
-    ds.setinfo(
-        {
-            "path": str(path),
-            "name": "sample",
-            "type": "hdf5",
-            "dataset": None,
-            "transform": [
-                {"add_column": {"name": "y", "expr": "x * 2"}},
-                {"tocsv": "./saved/sample_transformed.csv"},
-            ],
-        },
-        rootpath=str(tmp_path),
-        eager=False,
-        cache=None,
-    )
 
-    data_loader_runtime.load_hdf5(ds)
-
-    out_csv = tmp_path / "saved" / "sample_transformed.csv"
-    assert out_csv.exists()
-    saved = pd.read_csv(out_csv)
-    assert "y" in saved.columns
-    assert "x" in saved.columns
-    assert "y" in ds.data.columns
-
-
-def test_hdf5_transform_tocsv_executes_in_order(tmp_path):
-    path = tmp_path / "sample.h5"
-    with h5py.File(path, "w") as h5:
-        h5.create_dataset("x", data=np.array([1.0, 2.0, 3.0], dtype=np.float64))
-
-    ds = DataSet()
-    ds.logger = _logger()
-    ds.setinfo(
-        {
-            "path": str(path),
-            "name": "sample",
-            "type": "hdf5",
-            "dataset": None,
-            "transform": [
-                {"add_column": {"name": "y", "expr": "x * 2"}},
-                {"tocsv": "./saved/sample_prefix.csv"},
-                {"add_column": {"name": "z", "expr": "y + 1"}},
-            ],
-        },
-        rootpath=str(tmp_path),
-        eager=False,
-        cache=None,
-    )
+@pytest.mark.parametrize("transform, outputs, data_columns", HDF5_EXPORT_CASES)
+def test_hdf5_transform_exports(tmp_path, transform, outputs, data_columns):
+    ds = _load_hdf5_dataset(tmp_path, transform)
 
     data_loader_runtime.load_hdf5(ds)
 
-    out_csv = tmp_path / "saved" / "sample_prefix.csv"
-    assert out_csv.exists()
-    saved = pd.read_csv(out_csv)
-    assert "y" in saved.columns
-    assert "z" not in saved.columns
-    assert "z" in ds.data.columns
+    for filename, expected_columns, expected_rows in outputs:
+        out_path = tmp_path / "saved" / filename
+        assert out_path.exists()
+        columns, rows = _read_saved_table(out_path)
+        assert columns == expected_columns
+        assert rows == expected_rows
 
-
-def test_hdf5_transform_to_parquet_writes_output(tmp_path):
-    path = tmp_path / "sample.h5"
-    with h5py.File(path, "w") as h5:
-        h5.create_dataset("x", data=np.array([1.0, 2.0, 3.0], dtype=np.float64))
-
-    ds = DataSet()
-    ds.logger = _logger()
-    ds.setinfo(
-        {
-            "path": str(path),
-            "name": "sample",
-            "type": "hdf5",
-            "dataset": None,
-            "transform": [
-                {"add_column": {"name": "y", "expr": "x * 2"}},
-                {"to_parquet": "./saved/sample_transformed.parquet"},
-            ],
-        },
-        rootpath=str(tmp_path),
-        eager=False,
-        cache=None,
-    )
-
-    data_loader_runtime.load_hdf5(ds)
-
-    out_parquet = tmp_path / "saved" / "sample_transformed.parquet"
-    assert out_parquet.exists()
-    if pl is not None:
-        saved = pl.read_parquet(out_parquet)
-        assert "y" in saved.columns
-        assert "x" in saved.columns
-        assert saved.height == 3
-    else:
-        saved = pd.read_parquet(out_parquet)
-        assert "y" in saved.columns
-        assert "x" in saved.columns
-        assert len(saved) == 3
-    assert "y" in ds.data.columns
-
-
-def test_hdf5_transform_to_parquet_executes_in_order(tmp_path):
-    path = tmp_path / "sample.h5"
-    with h5py.File(path, "w") as h5:
-        h5.create_dataset("x", data=np.array([1.0, 2.0, 3.0], dtype=np.float64))
-
-    ds = DataSet()
-    ds.logger = _logger()
-    ds.setinfo(
-        {
-            "path": str(path),
-            "name": "sample",
-            "type": "hdf5",
-            "dataset": None,
-            "transform": [
-                {"add_column": {"name": "y", "expr": "x * 2"}},
-                {"to_parquet": "./saved/sample_prefix.parquet"},
-                {"add_column": {"name": "z", "expr": "y + 1"}},
-            ],
-        },
-        rootpath=str(tmp_path),
-        eager=False,
-        cache=None,
-    )
-
-    data_loader_runtime.load_hdf5(ds)
-
-    out_parquet = tmp_path / "saved" / "sample_prefix.parquet"
-    assert out_parquet.exists()
-    if pl is not None:
-        saved = pl.read_parquet(out_parquet)
-        assert "y" in saved.columns
-        assert "z" not in saved.columns
-    else:
-        saved = pd.read_parquet(out_parquet)
-        assert "y" in saved.columns
-        assert "z" not in saved.columns
-    assert "z" in ds.data.columns
+    for column in data_columns:
+        assert column in ds.data.columns
 
 
 def test_parquet_dataset_load_emits_summary(tmp_path):
@@ -362,55 +319,13 @@ def test_parquet_dataset_load_emits_summary(tmp_path):
 
     data = ds.load()
 
-    assert data is ds.data
+    assert isinstance(data, pd.DataFrame)
+    pd.testing.assert_frame_equal(data, ds.data)
     assert list(ds.data.columns) == ["x", "y"]
     assert ds.keys == ["x", "y"]
     assert emitted
     assert "Parquet loaded!" in emitted[0]
     assert "=== DataFrame Summary Table ===" in emitted[0]
-
-
-def test_hdf5_transform_tocsv_and_to_parquet_writes_both_outputs(tmp_path):
-    path = tmp_path / "sample.h5"
-    with h5py.File(path, "w") as h5:
-        h5.create_dataset("x", data=np.array([1.0, 2.0, 3.0], dtype=np.float64))
-
-    ds = DataSet()
-    ds.logger = _logger()
-    ds.setinfo(
-        {
-            "path": str(path),
-            "name": "sample",
-            "type": "hdf5",
-            "dataset": None,
-            "transform": [
-                {"add_column": {"name": "y", "expr": "x * 2"}},
-                {"tocsv": "./saved/sample_transformed.csv"},
-                {"to_parquet": "./saved/sample_transformed.parquet"},
-            ],
-        },
-        rootpath=str(tmp_path),
-        eager=False,
-        cache=None,
-    )
-
-    data_loader_runtime.load_hdf5(ds)
-
-    out_csv = tmp_path / "saved" / "sample_transformed.csv"
-    out_parquet = tmp_path / "saved" / "sample_transformed.parquet"
-    assert out_csv.exists()
-    assert out_parquet.exists()
-    saved_csv = pd.read_csv(out_csv)
-    assert "x" in saved_csv.columns
-    assert "y" in saved_csv.columns
-    if pl is not None:
-        saved_parquet = pl.read_parquet(out_parquet)
-        assert "x" in saved_parquet.columns
-        assert "y" in saved_parquet.columns
-    else:
-        saved_parquet = pd.read_parquet(out_parquet)
-        assert "x" in saved_parquet.columns
-        assert "y" in saved_parquet.columns
 
 
 def test_transform_does_not_prune_columns_without_explicit_crop():

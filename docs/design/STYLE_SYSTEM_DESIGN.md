@@ -20,8 +20,8 @@ It should not own data loading or layout placement.
 
 Style behavior is currently spread across:
 
-- `jarvisplot/core.py` for loading style bundles
-- `jarvisplot/core_assets.py` for bootstrap helpers
+- `jarvisplot/core.py` for wiring the loaded style bundle into the runtime
+- `jarvisplot/core_assets.py` for bootstrap helpers that return the loaded style bundle
 - `jarvisplot/Figure/figure.py` for figure/frame merge and per-layer style merge
 - `jarvisplot/Figure/style_runtime.py` for style family / variant resolution
 - `jarvisplot/cards/**` for bundle assets

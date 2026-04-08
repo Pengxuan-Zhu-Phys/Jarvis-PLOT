@@ -71,7 +71,7 @@ class StdAxesAdapter:
         df = kwargs.pop("__df__", None)
         kw = self._merge("grid_profile", kwargs)
 
-        # Keep compatibility with configs copied from tripcolor/scatter.
+        # Strip kwargs that are not used by grid_profile rendering.
         for k in ("shading", "levels", "extend", "space", "marker", "s", "c"):
             kw.pop(k, None)
 

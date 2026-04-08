@@ -13,10 +13,12 @@ import numpy as np
 import pandas as pd
 
 from jarvisplot.Figure import layer_runtime as layer_runtime_mod
+from jarvisplot.Figure import figure as figure_mod
 from jarvisplot.Figure.colorbar_runtime import collect_and_attach_colorbar
 from jarvisplot.Figure.config_runtime import apply_figure_config
 from jarvisplot.Figure.figure import Figure
 from jarvisplot.Figure.data_pipelines import DataContext, SharedContent
+from jarvisplot.Figure.method_registry import resolve_method
 from jarvisplot.Figure.preprocessor import DataPreprocessor
 from jarvisplot.Figure.profile_runtime import grid_profile_mesh
 from jarvisplot.core import _format_console_record
@@ -94,6 +96,8 @@ def test_apply_figure_config_uses_original_style_tokens_for_mode(monkeypatch):
 
     assert result is True
     assert fig.mode == "gambit"
+    assert fig._setup_status == "ok"
+    assert fig._setup_error is None
 
 
 def test_apply_figure_config_marks_disabled_figures():
@@ -131,6 +135,10 @@ def test_apply_figure_config_marks_setup_failures(monkeypatch):
     assert result is False
     assert fig._setup_status == "failed"
     assert isinstance(fig._setup_error, Exception)
+
+
+def test_figure_set_alias_removed():
+    assert not hasattr(Figure, "set")
 
 
 def test_colorbar_contract_uses_frame_color_config():
@@ -253,19 +261,16 @@ def test_colorbar_log_scale_uses_positive_subset_for_limits():
         df=pd.DataFrame({"z": [0.0, 1.0, 10.0]}),
     )
 
-    try:
-        fig._finalize_axc("axc")
+    fig._finalize_axc("axc")
 
-        assert isinstance(out["norm"], mcolors.LogNorm)
-        assert fig.axc._cb["mode"] == "log"
-        assert fig.axc._cb["vmin"] == 1.0
-        assert fig.axc._cb["vmax"] == 10.0
-        assert fig.axc.get_yscale() == "log"
-    finally:
-        plt.close(fig.fig)
+    assert isinstance(out["norm"], mcolors.LogNorm)
+    assert fig.axc._cb["mode"] == "log"
+    assert fig.axc._cb["vmin"] == 1.0
+    assert fig.axc._cb["vmax"] == 10.0
+    assert fig.axc.get_yscale() == "log"
 
 
-def test_colorbar_legacy_axis_scale_still_resolves_log_norm():
+def test_colorbar_legacy_axis_scale_is_ignored_without_color_scale():
     fig = Figure()
     fig.logger = _logger()
     fig.frame = {
@@ -274,6 +279,7 @@ def test_colorbar_legacy_axis_scale_still_resolves_log_norm():
             "label": {"ylabel": ""},
             "ticks": {},
             "yscale": "log",
+            "color": {"scale": "linear", "cmap": "viridis"},
         },
     }
     fig.fig = plt.figure(figsize=(2, 2))
@@ -289,9 +295,30 @@ def test_colorbar_legacy_axis_scale_still_resolves_log_norm():
     )
     fig._finalize_axc("axc")
 
-    assert isinstance(out["norm"], mcolors.LogNorm)
-    assert fig.axc._cb["mode"] == "log"
-    assert fig.axc.get_yscale() == "log"
+    assert isinstance(out["norm"], mcolors.Normalize)
+    assert not isinstance(out["norm"], mcolors.LogNorm)
+    assert fig.axc._cb["mode"] == "norm"
+    assert fig.axc.get_yscale() == "linear"
+
+
+@pytest.mark.parametrize(
+    "alias",
+    [
+        "line",
+        "lines",
+        "points",
+        "point",
+        "scatterplot",
+        "tri_field",
+        "tri_color",
+        "tri_field_axes",
+        "tripcolor_gouraud",
+        "grid_profiling",
+    ],
+)
+def test_removed_method_aliases_are_rejected(alias):
+    with pytest.raises(KeyError):
+        resolve_method(alias)
 
 
 def test_colorbar_finalize_allows_missing_label_config():
@@ -352,6 +379,51 @@ def test_render_layer_does_not_mutate_layer_data(monkeypatch, ax_type):
     assert layer_info["data"] is original_data
     assert out["x"] == (converted_data, "x")
     assert out["y"] == (converted_data, "y")
+
+
+def test_render_releases_layer_data_even_when_render_fails(monkeypatch):
+    fig = Figure()
+    fig.logger = _logger()
+    fig.axes = {}
+    fig._render_queue = [
+        (
+            SimpleNamespace(_type="rect"),
+            {
+                "name": "layer",
+                "data": pd.DataFrame({"x": [1.0]}),
+                "data_loaded": False,
+            },
+        )
+    ]
+
+    monkeypatch.setattr(Figure, "_prescan_colorbar_ranges", lambda self: None)
+
+    calls = []
+
+    def fake_load(fig_obj, layer_info):
+        calls.append("load")
+        layer_info["data_loaded"] = True
+        return layer_info["data"]
+
+    def fake_render(fig_obj, ax_obj, layer_info):
+        calls.append("render")
+        raise RuntimeError("boom")
+
+    def fake_release(fig_obj, layer_info):
+        calls.append("release")
+        layer_info["data"] = None
+        layer_info["data_loaded"] = False
+
+    monkeypatch.setattr(figure_mod, "runtime_load_layer_runtime_data", fake_load)
+    monkeypatch.setattr(figure_mod, "runtime_render_layer", fake_render)
+    monkeypatch.setattr(figure_mod, "runtime_release_layer_runtime_data", fake_release)
+
+    with pytest.raises(RuntimeError):
+        fig.render()
+
+    assert calls == ["load", "render", "release"]
+    assert fig._render_queue[0][1]["data_loaded"] is False
+    assert fig._render_queue[0][1]["data"] is None
 
 
 def test_prescan_release_does_not_consume_shared_sources():

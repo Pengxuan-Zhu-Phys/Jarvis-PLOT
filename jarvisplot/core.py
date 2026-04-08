@@ -1,19 +1,15 @@
 #!/usr/bin/env python3 
 
 from __future__ import annotations
-from pathlib import Path
 from typing import Optional, Dict
 from .cli import CLI
 from loguru import logger
 import os, sys
-import yaml
 from .config import ConfigLoader
-from .data_loader import DataSet, JP_ROW_IDX
+from .data_loader import DataSet
 import io
 from contextlib import redirect_stdout
-from .core_assets import load_cmaps as _load_cmaps
-from .core_assets import load_interpolators as _load_interpolators
-from .core_assets import load_styles as _load_styles
+from .core_assets import load_cmaps, load_interpolators, load_styles
 from .Figure.data_pipelines import SharedContent, DataContext
 from .cache_store import ProjectCache
 from .Figure.preprocessor import DataPreprocessor
@@ -23,7 +19,6 @@ from .core_runtime import (
     prepare_project_layout as runtime_prepare_project_layout,
     prepare_usage_plan as runtime_prepare_usage_plan,
     parse_hdf5_metadata_and_renew_yaml as runtime_parse_hdf5_metadata_and_renew_yaml,
-    rename_hdf5_and_renew_yaml as runtime_rename_hdf5_and_renew_yaml,
 )
 
 
@@ -35,16 +30,13 @@ def _format_console_record(record):
 
 class JarvisPLOT():
     def __init__(self) -> None:
-        self.variables  =   {}
         self.yaml       =   ConfigLoader()
         self.style      =   {}
-        self.profiles   =   {}
         self.cli        =   CLI()
         self.logger     =   None
         self.dataset: list[DataSet] = []
         self.shared     =   None
         self.ctx        =   None
-        self.interpolators = None
         self.workdir: Optional[str] = None
         self.cache: Optional[ProjectCache] = None
         self.dataset_registry: Dict[str, DataSet] = {}
@@ -56,7 +48,7 @@ class JarvisPLOT():
         # Initialize logger early
         self.init_logger()
 
-        self.load_cmaps()
+        load_cmaps(self.load_path, logger=self.logger)
 
         self.load_yaml()
 
@@ -69,12 +61,12 @@ class JarvisPLOT():
             elif self.args.out is not None and self.args.inplace:
                 self.logger.error("Conflicting arguments: --out and --inplace. Please choose only one.")
                 sys.exit(2)
-            self.parse_hdf5_metadata_and_renew_yaml()
+            runtime_parse_hdf5_metadata_and_renew_yaml(self)
             return
         else:
-            self.prepare_project_layout()
+            runtime_prepare_project_layout(self)
             self.load_dataset(eager=False)
-            self.plan_dataset_required_columns()
+            runtime_plan_dataset_required_columns(self)
             if self.shared is None:
                 self.shared = SharedContent(logger=self.logger)
             self.ctx = DataContext(self.shared)
@@ -87,7 +79,12 @@ class JarvisPLOT():
                 )
 
             # Register external functions (e.g. lazy-loaded interpolators) into the expression runtime.
-            self.load_interpolators()
+            load_interpolators(
+                self.yaml.config,
+                yaml_dir=self.yaml.dir,
+                shared=self.shared,
+                logger=self.logger,
+            )
             self.preprocessor = DataPreprocessor(
                 self.ctx,
                 cache=self.cache,
@@ -96,26 +93,10 @@ class JarvisPLOT():
                 base_dir=self.workdir or self.yaml.dir,
             )
             self.prebuild_profile_pipelines()
-            self.prepare_usage_plan()
+            runtime_prepare_usage_plan(self)
 
-            self.load_styles()
+            self.style = load_styles(self.load_path, logger=self.logger)
             self.plot()
-
-    def plan_dataset_required_columns(self) -> None:
-        return runtime_plan_dataset_required_columns(self)
-
-    def load_cmaps(self):
-        _load_cmaps(self)
-
-    def load_interpolators(self):
-        _load_interpolators(self)
-
-    def load_styles(self):
-        _load_styles(self)
-
-    def prepare_project_layout(self):
-        """Resolve workdir/output defaults and initialize local cache."""
-        return runtime_prepare_project_layout(self)
 
     def prebuild_profile_pipelines(self):
         """Traverse figures once and prebuild profile pipelines."""
@@ -132,11 +113,6 @@ class JarvisPLOT():
             )
         except Exception as e:
             self.logger.warning(f"Prebuild profile pipelines failed: {e}")
-
-    def prepare_usage_plan(self):
-        """Count how many times each shared source is consumed during plotting."""
-        return runtime_prepare_usage_plan(self)
-
 
     def load_path(self, path):
         return resolve_project_path(path)
@@ -155,7 +131,7 @@ class JarvisPLOT():
                 figobj.print = True
 
             try:
-                setup = figobj.set(fig)
+                setup = figobj.from_dict(fig)
                 if setup:
                     self.logger.warning(f"Succefully loading figure -> {figobj.name} setting")
                     figobj.plot()
@@ -241,9 +217,3 @@ class JarvisPLOT():
             dataset.full_load = bool(getattr(self.args, "parse_data", False))
             dataset.setinfo(dt, data_root, eager=eager, cache=self.cache)
             self.dataset.append(dataset)
-
-    def rename_hdf5_and_renew_yaml(self):
-        return runtime_rename_hdf5_and_renew_yaml(self)
-
-    def parse_hdf5_metadata_and_renew_yaml(self):
-        return runtime_parse_hdf5_metadata_and_renew_yaml(self)

@@ -14,8 +14,171 @@ except Exception:
     pl = None
 
 from ..memtrace import memtrace_checkpoint, memtrace_object_inventory
+from ..utils.expression import eval_dataframe_expression
 from ..utils.pathing import resolve_project_path
-from .load_data import _preprofiling, addcolumn, drop_columns, filter as filter_df, grid_profiling, keep_columns, profiling, sortby
+from .profile_runtime import _preprofiling, eval_series, grid_profiling, profiling
+
+
+def _normalize_column_list(spec):
+    if spec is None:
+        return []
+    if isinstance(spec, dict):
+        for key in ("columns", "keep", "drop", "select", "retain", "value"):
+            if key in spec:
+                return _normalize_column_list(spec.get(key))
+        return []
+    if isinstance(spec, str):
+        text = spec.strip()
+        return [text] if text else []
+    if isinstance(spec, (list, tuple, set)):
+        out = []
+        for item in spec:
+            sval = str(item).strip()
+            if sval:
+                out.append(sval)
+        return out
+    sval = str(spec).strip()
+    return [sval] if sval else []
+
+
+def filter_df(df, condition, logger):
+    try:
+        if isinstance(condition, bool):
+            return df.copy(deep=False) if condition else df.iloc[0:0].copy()
+        if isinstance(condition, (int, float)) and condition in (0, 1):
+            return df.copy(deep=False) if int(condition) == 1 else df.iloc[0:0].copy()
+
+        if isinstance(condition, str):
+            s = condition.strip()
+            low = s.lower()
+            if low in {"true", "t", "yes", "y"}:
+                return df.copy(deep=False)
+            if low in {"false", "f", "no", "n"}:
+                return df.iloc[0:0].copy()
+            s = s.replace("&&", " & ").replace("||", " | ")
+            condition = s
+        else:
+            raise TypeError(f"Unsupported condition type: {type(condition)}")
+
+        mask = eval_dataframe_expression(df, condition, logger=logger, allow_column=True)
+
+        if isinstance(mask, (bool, np.bool_, int, float)):
+            return df.copy(deep=False) if bool(mask) else df.iloc[0:0].copy()
+        if not isinstance(mask, pd.Series):
+            mask = pd.Series(mask, index=df.index)
+        mask = mask.astype(bool)
+        if bool(mask.all()):
+            return df.copy(deep=False)
+        return df[mask].copy()
+    except Exception as e:
+        logger.error(f"Errors when evaluating condition -> {condition}:\n\t{e}")
+        return pd.DataFrame(index=df.index).iloc[0:0].copy()
+
+
+def add_column(df, adds, logger):
+    try:
+        name = adds.get("name", False)
+        expr = adds.get("expr", False)
+        if not (name and expr):
+            logger.error("Error in loading add_column -> {}".format(adds))
+        value = eval_dataframe_expression(df, expr, logger=logger, allow_column=True)
+        df[name] = value
+        return df
+    except Exception as e:
+        logger.error(
+            "Errors when add new column -> {}:\n\t{}: {}".format(
+                adds, e.__class__.__name__, e
+            )
+        )
+        return df
+
+
+def keep_columns(df, spec, logger):
+    try:
+        cols = _normalize_column_list(spec)
+        if not cols:
+            return df
+        if isinstance(df, pd.DataFrame):
+            keep = [c for c in cols if c in df.columns]
+            missing = [c for c in cols if c not in df.columns]
+            if missing and logger:
+                logger.warning(f"keep_columns missing columns ignored -> {missing}")
+            if not keep:
+                return df.iloc[0:0].copy()
+            return df.loc[:, keep].copy(deep=False)
+        if hasattr(df, "select"):
+            try:
+                return df.select(cols)
+            except Exception:
+                return df
+        return df
+    except Exception as e:
+        if logger:
+            logger.warning(f"keep_columns failed for spec={spec}: {e}")
+        return df
+
+
+def drop_columns(df, spec, logger):
+    try:
+        cols = _normalize_column_list(spec)
+        if not cols:
+            return df
+        if isinstance(df, pd.DataFrame):
+            existing = [c for c in cols if c in df.columns]
+            if not existing:
+                return df
+            return df.drop(columns=existing, errors="ignore")
+        if hasattr(df, "drop"):
+            try:
+                return df.drop(cols)
+            except Exception:
+                return df
+        return df
+    except Exception as e:
+        if logger:
+            logger.warning(f"drop_columns failed for spec={spec}: {e}")
+        return df
+
+
+def sort_by(df, expr, logger):
+    try:
+        return sort_df_by_expr(df, expr, logger=logger)
+    except Exception as e:
+        logger.warning(f"sort_by failed for expr={expr}: {e}")
+        return df
+
+
+def sort_df_by_expr(df: pd.DataFrame, expr: str, logger) -> pd.DataFrame:
+    """
+    Sort the dataframe by evaluating the given expression.
+    The expression can be a column name or a valid expression understood by eval_series.
+    Returns a new DataFrame sorted ascending by the evaluated values.
+    """
+    if df is None or expr is None:
+        return df
+    try:
+        key = str(expr).strip()
+        if key in df.columns:
+            values = np.asarray(df[key].to_numpy(copy=False))
+            if values.ndim != 1 or values.shape[0] != int(df.shape[0]):
+                raise ValueError(
+                    "sort key length mismatch: "
+                    f"rows={int(df.shape[0])}, key_shape={getattr(values, 'shape', None)}"
+                )
+            order = np.argsort(values, kind="quicksort")
+            return df.iloc[order]
+
+        values = np.asarray(eval_series(df, {"expr": expr}, logger))
+        if values.ndim != 1 or values.shape[0] != int(df.shape[0]):
+            raise ValueError(
+                "sort expression output length mismatch: "
+                f"rows={int(df.shape[0])}, values={getattr(values, 'shape', None)}"
+            )
+        order = np.argsort(values, kind="quicksort")
+        return df.iloc[order]
+    except Exception as e:
+        logger.warning(f"LB: sort_by failed for expr={expr}: {e}")
+        return df
 
 
 def _csv_export_target(target: Any) -> Any:
@@ -288,9 +451,9 @@ def apply_transforms_impl(
                 },
             )
         elif "sortby" in trans:
-            df = sortby(df, trans["sortby"], preprocessor.logger)
+            df = sort_by(df, trans["sortby"], preprocessor.logger)
         elif "add_column" in trans:
-            df = addcolumn(df, trans["add_column"], preprocessor.logger)
+            df = add_column(df, trans["add_column"], preprocessor.logger)
         elif "keep_columns" in trans:
             df = keep_columns(df, trans.get("keep_columns"), preprocessor.logger)
         elif "drop_columns" in trans:
@@ -317,7 +480,7 @@ def apply_transforms_impl(
 
 def apply_transforms(preprocessor, df, transform: Optional[Sequence[Mapping[str, Any]]]):
     """Prebuild pass: execute profile step as lightweight _preprofiling."""
-    return preprocessor._apply_transforms(df, transform, profile_mode="preprofile")
+    return apply_transforms_impl(preprocessor, df, transform, profile_mode="preprofile")
 
 def apply_runtime_transforms(preprocessor,
     df,
@@ -325,7 +488,7 @@ def apply_runtime_transforms(preprocessor,
     source_label: Optional[str] = None,
 ):
     """Runtime pass: keep original profiling behavior."""
-    return preprocessor._apply_transforms(df, transform, profile_mode="runtime", source_label=source_label)
+    return apply_transforms_impl(preprocessor, df, transform, profile_mode="runtime", source_label=source_label)
 
 def run_pipeline(preprocessor,
     source: Any,
@@ -391,7 +554,7 @@ def run_pipeline(preprocessor,
                             preprocessor._safe_nrows(cached) if preprocessor._safe_nrows(cached) is not None else "NA",
                         )
                     )
-                preprocessor._emit_source_summary(source)
+                emit_source_summary(preprocessor, source)
                 preprocessor._debug(f"Pipeline cache HIT -> {key}")
                 memtrace_checkpoint(
                     preprocessor.logger,
@@ -437,7 +600,7 @@ def run_pipeline(preprocessor,
             if reason != "meta-missing":
                 preprocessor._debug(f"Pipeline cache INVALID ({reason}) -> {key}")
 
-    raw = preprocessor._resolve_source_data(source, combine=combine)
+    raw = resolve_source_data(preprocessor, source, combine=combine)
     if raw is None:
         return None, key, False
     raw = preprocessor._select_columns(raw, projection)

@@ -18,7 +18,7 @@ def ensure_numbered_rect_axes(fig, ax_name: str, kwgs: dict):
         raw_ax = fig.fig.add_axes(**kwgs)
         if isinstance(kwgs, dict) and ("facecolor" in kwgs):
             raw_ax.set_facecolor(kwgs["facecolor"])
-        from .adapters import StdAxesAdapter
+        from .adapters_rect import StdAxesAdapter
 
         adapter = StdAxesAdapter(raw_ax)
         adapter._type = "rect"
