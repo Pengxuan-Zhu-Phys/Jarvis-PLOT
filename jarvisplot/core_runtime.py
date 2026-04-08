@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any, Dict, Mapping, Set
 
@@ -9,6 +10,118 @@ from .cache_store import ProjectCache
 from .data_loader import JP_ROW_IDX
 from .data_loader_hdf5 import scan_hdf5_leaf_metadata
 from .utils.pathing import resolve_project_path
+
+
+# ---------------------------------------------------------------------------
+# Expression-analysis helpers (pure functions, no dependency on core object)
+# ---------------------------------------------------------------------------
+
+def _expr_symbols(expr: Any) -> Set[str]:
+    """Return the set of identifier tokens referenced in an expression string."""
+    if expr is None:
+        return set()
+    if isinstance(expr, (int, float, bool)):
+        return set()
+    text = str(expr).strip()
+    if not text:
+        return set()
+    toks = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", text))
+    ignore = {
+        "np", "math", "True", "False", "None",
+        "and", "or", "not", "in", "if", "else", "for", "lambda",
+        "abs", "min", "max", "sum", "len", "int", "float", "str", "bool",
+        "round", "sin", "cos", "tan", "exp", "log", "sqrt", "pi", "e",
+    }
+    return {t for t in toks if t not in ignore}
+
+
+def _profile_cfg_columns(cfg: Any) -> Set[str]:
+    """Return column names referenced in a profile/grid_profile coordinates block."""
+    out: Set[str] = set()
+    if not isinstance(cfg, Mapping):
+        return out
+    coors = cfg.get("coordinates", {})
+    if not isinstance(coors, Mapping):
+        return out
+    for axis_key, axis_cfg in coors.items():
+        axis_name = str(axis_key).strip()
+        if isinstance(axis_cfg, Mapping):
+            expr = axis_cfg.get("expr")
+            out.update(_expr_symbols(expr))
+            name = axis_cfg.get("name")
+            if isinstance(name, str) and name.strip():
+                out.add(name.strip())
+            elif axis_name in {"x", "y", "z", "left", "right", "bottom"}:
+                out.add(axis_name)
+        elif isinstance(axis_cfg, str):
+            out.update(_expr_symbols(axis_cfg))
+            if axis_name in {"x", "y", "z", "left", "right", "bottom"}:
+                out.add(axis_name)
+    return out
+
+
+def _collect_expr_columns(obj: Any, out: Set[str]) -> None:
+    """Recursively collect column names from expressions inside a config dict/list."""
+    if isinstance(obj, Mapping):
+        for k, v in obj.items():
+            key = str(k).strip().lower()
+            if key in {"expr", "filter", "sortby"}:
+                out.update(_expr_symbols(v))
+                continue
+            if key == "profile":
+                out.update(_profile_cfg_columns(v))
+                continue
+            if key == "grid_profile":
+                prof = dict(v) if isinstance(v, dict) else {}
+                prof.setdefault("method", "grid")
+                out.update(_profile_cfg_columns(prof))
+                continue
+            _collect_expr_columns(v, out)
+        return
+    if isinstance(obj, (list, tuple)):
+        for item in obj:
+            _collect_expr_columns(item, out)
+
+
+def _transform_columns(transform: Any) -> Set[str]:
+    """Return all column names referenced as inputs in a transform list."""
+    out: Set[str] = set()
+    if not isinstance(transform, list):
+        return out
+    for step in transform:
+        if not isinstance(step, Mapping):
+            continue
+        _collect_expr_columns(step, out)
+        if "add_column" in step:
+            add_cfg = step.get("add_column", {})
+            if isinstance(add_cfg, Mapping):
+                name = add_cfg.get("name")
+                if isinstance(name, str) and name.strip():
+                    out.add(name.strip())
+    return out
+
+
+def _transform_output_columns(transform: Any) -> Set[str]:
+    """Return column names produced as outputs by a transform list."""
+    out: Set[str] = set()
+    if not isinstance(transform, list):
+        return out
+    for step in transform:
+        if not isinstance(step, Mapping):
+            continue
+        if "add_column" in step:
+            add_cfg = step.get("add_column", {})
+            if isinstance(add_cfg, Mapping):
+                name = add_cfg.get("name")
+                if isinstance(name, str) and name.strip():
+                    out.add(name.strip())
+        if "profile" in step:
+            out.update(_profile_cfg_columns(step.get("profile", {})))
+        if "grid_profile" in step:
+            cfg = dict(step.get("grid_profile", {})) if isinstance(step.get("grid_profile"), dict) else {}
+            cfg.setdefault("method", "grid")
+            out.update(_profile_cfg_columns(cfg))
+    return out
 
 
 class _QuotedString(str):
@@ -60,13 +173,14 @@ def prepare_project_layout(core) -> None:
     core.logger.debug(f"Cache dir -> {core.cache.root}")
 
 
-def _layer_columns(core, layer: Any) -> Set[str]:
+def _layer_columns(layer: Any) -> Set[str]:
+    """Return column names referenced in a layer's coordinates, style, and data blocks."""
     out: Set[str] = set()
     if not isinstance(layer, Mapping):
         return out
-    core._collect_expr_columns(layer.get("coordinates", {}), out)
-    core._collect_expr_columns(layer.get("style", {}), out)
-    core._collect_expr_columns(layer.get("data", []), out)
+    _collect_expr_columns(layer.get("coordinates", {}), out)
+    _collect_expr_columns(layer.get("style", {}), out)
+    _collect_expr_columns(layer.get("data", []), out)
     return out
 
 
@@ -95,7 +209,7 @@ def plan_dataset_required_columns(core) -> None:
         for layer in layers:
             if not isinstance(layer, Mapping):
                 continue
-            layer_cols = _layer_columns(core, layer)
+            layer_cols = _layer_columns(layer)
             global_layer_cols.update(layer_cols)
             entries = layer.get("data", [])
             if not isinstance(entries, list):
@@ -104,7 +218,7 @@ def plan_dataset_required_columns(core) -> None:
                 if not isinstance(entry, Mapping):
                     continue
                 cols = set(layer_cols)
-                cols.update(core._transform_columns(entry.get("transform", None)))
+                cols.update(_transform_columns(entry.get("transform", None)))
                 src = entry.get("source")
                 if isinstance(src, str):
                     if src in demand:
@@ -121,8 +235,8 @@ def plan_dataset_required_columns(core) -> None:
     for name, dts in ds_names.items():
         cols = set(demand.get(name, set()))
         cols.add(JP_ROW_IDX)
-        dataset_inputs = core._transform_columns(getattr(dts, "transform", None))
-        dataset_outputs = core._transform_output_columns(getattr(dts, "transform", None))
+        dataset_inputs = _transform_columns(getattr(dts, "transform", None))
+        dataset_outputs = _transform_output_columns(getattr(dts, "transform", None))
         retained = set(cols)
         retained.update(dataset_outputs)
         retained.add(JP_ROW_IDX)

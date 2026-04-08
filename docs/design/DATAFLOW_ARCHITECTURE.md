@@ -8,8 +8,7 @@ JarvisPLOT 1.3.0 replaced the old wide-table pipeline with a three-table model. 
 
 | Table type | Where it exists in code | Purpose | Allowed width |
 | --- | --- | --- | --- |
-| Dataset Table | `DataSet.data` in `jarvisplot/data_loader.py` | Dataset load output after ordered dataset-level transforms | Narrow by explicit transform only |
-| Dataset Runtime | `jarvisplot/data_loader_runtime.py` | HDF5 runtime loading/materialization and dataset transform execution | Narrow, helper-owned |
+| Dataset Table | `DataSet.data` in `jarvisplot/data_loader.py` (runtime loading/materialization helpers in `jarvisplot/data_loader_runtime.py`) | Dataset load output after ordered dataset-level transforms | Narrow by explicit transform only |
 | Selection Table | Output of `DataPreprocessor.run_pipeline()` before demand enrichment | Input to `profile`, `preprofile`, and `grid_profile`; compact cache payload | Narrow, profiling columns plus current-layer demand |
 | Enriched Table | Output of `DataPreprocessor._enrich_for_demand()` and then `Figure.render_layer()` | Rendering, layer style evaluation, `share_data`, export-oriented use | Add only layer-requested columns |
 

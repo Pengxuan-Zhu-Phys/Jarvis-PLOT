@@ -36,19 +36,29 @@ Supporting infrastructure:
 
 ## Component Interaction
 
-1. `JarvisPLOT.init()` loads YAML, resolves `project.workdir`, and creates `ProjectCache` under `<workdir>/.cache/`.
-2. `JarvisPLOT.load_dataset(eager=False)` registers each `DataSet` lazily in `DataContext`.
-3. `JarvisPLOT.plan_dataset_required_columns()` scans figure layers and transforms to decide:
+1. `JarvisPLOT.init()` parses CLI args, initializes the logger, loads colormaps, and loads the user YAML.
+2. `JarvisPLOT.prepare_project_layout()` resolves `project.workdir` and creates `ProjectCache` under `<workdir>/.cache/`.
+3. `JarvisPLOT.load_dataset(eager=False)` registers each `DataSet` lazily (no data read yet).
+4. `JarvisPLOT.plan_dataset_required_columns()` scans figure layers and transforms to decide:
    - which columns a dataset must be able to compute (`required_columns`)
    - which columns are explicitly kept or dropped by ordered dataset transforms
-4. `DataPreprocessor.prebuild_profiles()` rewrites eligible first-profile transforms into cached `__jp_preprofile_<hash>` aliases so repeated profile-heavy layers do not repeat the same expensive reduction.
-5. Each `Figure` asks `DataPreprocessor.run_pipeline()` for layer data. That call:
-   - resolves the source from `DataContext`
-   - keeps only projected columns
-   - applies runtime transforms
-   - caches the narrow result
-   - enriches missing render-only columns on demand
-6. `Figure.render_layer()` evaluates coordinate expressions and dispatches to the rectangular or ternary adapter.
+5. `SharedContent` and `DataContext` are created; each `DataSet` is registered in `DataContext` with a lazy loader and a release callback.
+6. `JarvisPLOT.load_interpolators()` registers YAML `Functions` entries as lazy callables in the expression runtime.
+7. `DataPreprocessor` is created with the `DataContext`, `ProjectCache`, and dataset registry.
+8. `DataPreprocessor.prebuild_profiles()` rewrites eligible first-profile transforms into cached `__jp_preprofile_<hash>` aliases so repeated profile-heavy layers do not repeat the same expensive reduction.
+9. `JarvisPLOT.prepare_usage_plan()` counts how many times each shared source is consumed across all figures, enabling release-after-last-use.
+10. `JarvisPLOT.load_styles()` loads style bundles from `cards/` into `self.style`.
+11. `JarvisPLOT.plot()` iterates over YAML `Figures`. For each figure:
+    - creates a `Figure` instance and wires context, preprocessor, styles, and logger
+    - `Figure.set(fig_dict)` applies config, creates axes, and queues layers
+    - `Figure.plot()` runs `DataPreprocessor.run_pipeline()` per layer, then renders
+12. `DataPreprocessor.run_pipeline()` for each layer:
+    - resolves the source from `DataContext`
+    - keeps only projected columns
+    - applies runtime transforms
+    - caches the narrow result
+    - enriches missing render-only columns on demand
+13. `Figure.render_layer()` evaluates coordinate expressions and dispatches to the rectangular or ternary adapter.
 
 ## Runtime Dataflow
 
