@@ -43,11 +43,11 @@ Supporting infrastructure:
    - which columns a dataset must be able to compute (`required_columns`)
    - which columns are explicitly kept or dropped by ordered dataset transforms
 5. `SharedContent` and `DataContext` are created; each `DataSet` is registered in `DataContext` with a lazy loader and a release callback.
-6. `jarvisplot/core_assets.py:load_interpolators()` registers YAML `Functions` entries as lazy callables in the expression runtime.
+6. `jarvisplot/core_assets.py:load_interpolators()` registers lazy `InterpolatorManager` hooks for YAML `Functions` in the expression runtime.
 7. `DataPreprocessor` is created with the `DataContext`, `ProjectCache`, and dataset registry.
 8. `DataPreprocessor.prebuild_profiles()` rewrites eligible first-profile transforms into cached `__jp_preprofile_<hash>` aliases so repeated profile-heavy layers do not repeat the same expensive reduction.
 9. `jarvisplot/core_runtime.py:prepare_usage_plan()` counts how many times each shared source is consumed across all figures, enabling release-after-last-use.
-10. `jarvisplot/core_assets.py:load_styles()` loads style bundles from `cards/` into `self.style`.
+10. `jarvisplot/core_assets.py:load_styles()` returns the style bundle map from `cards/`, and `core.py` stores it on `self.style`.
 11. `JarvisPLOT.plot()` iterates over YAML `Figures`. For each figure:
     - creates a `Figure` instance and wires context, preprocessor, styles, and logger
     - `Figure.from_dict(fig_dict)` applies config, creates axes, and queues layers

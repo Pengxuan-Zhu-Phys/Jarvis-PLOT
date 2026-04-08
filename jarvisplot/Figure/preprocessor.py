@@ -17,9 +17,10 @@ except Exception:
     pl = None
 
 from ..data_loader import JP_ROW_IDX
-from .load_data import _preprofiling, addcolumn, filter as filter_df, grid_profiling, profiling, sortby
+from .profile_runtime import _preprofiling
 from . import preprocessor_runtime as runtime
 from ..memtrace import memtrace_checkpoint, memtrace_object_inventory
+from ..utils.dataframes import polars_to_pandas
 
 
 class DataPreprocessor:
@@ -421,33 +422,22 @@ class DataPreprocessor:
             return []
         return []
 
-    def _polars_to_pandas_compat(self, df: Any, reason: str = "runtime"):
+    def _polars_to_pandas(self, df: Any, reason: str = "runtime"):
         if pl is None:
             return df
-        if isinstance(df, pl.LazyFrame):
-            memtrace_checkpoint(self.logger, "pipeline.polars_collect.before", df, extra={"reason": reason})
-            self._info(f"Collecting polars LazyFrame -> {reason}")
-            df = df.collect()
-            memtrace_checkpoint(self.logger, "pipeline.polars_collect.after", df, extra={"reason": reason})
-        if isinstance(df, pl.DataFrame):
-            memtrace_checkpoint(self.logger, "pipeline.pandas_convert.before", df, extra={"reason": reason})
-            self._info(f"Converting polars DataFrame to pandas -> {reason}")
-            try:
-                out = df.to_pandas()
-            except ModuleNotFoundError:
-                self._warn(
-                    f"pyarrow unavailable during polars->pandas conversion; using dict fallback -> {reason}"
-                )
-                out = pd.DataFrame(df.to_dict(as_series=False))
-            memtrace_checkpoint(self.logger, "pipeline.pandas_convert.after", out, extra={"reason": reason})
-            return out
+        if isinstance(df, (pl.LazyFrame, pl.DataFrame)):
+            if isinstance(df, pl.LazyFrame):
+                self._info(f"Collecting polars LazyFrame -> {reason}")
+            else:
+                self._info(f"Converting polars DataFrame to pandas -> {reason}")
+            return polars_to_pandas(df, logger=self.logger, stage=f"pipeline:{reason}")
         return df
 
     def ensure_pandas(self, df: Any, reason: str = "runtime"):
         if pl is None:
             return df
         if isinstance(df, (pl.LazyFrame, pl.DataFrame)):
-            return self._polars_to_pandas_compat(df, reason=reason)
+            return self._polars_to_pandas(df, reason=reason)
         if isinstance(df, dict):
             return {kk: self.ensure_pandas(vv, reason=reason) for kk, vv in df.items()}
         return df
@@ -904,27 +894,6 @@ class DataPreprocessor:
         self.cache.put_named(name, signature, data)
         self._debug(f"Stored named dataset '{name}' into cache.")
 
-    def _resolve_source_data(self, source: Any, combine: str = "concat"):
-        return runtime.resolve_source_data(self, source, combine=combine)
-
-    def _emit_source_summary(self, source: Any) -> None:
-        return runtime.emit_source_summary(self, source)
-
-    def _apply_transforms(
-        self,
-        df,
-        transform: Optional[Sequence[Mapping[str, Any]]],
-        profile_mode: str = "runtime",
-        source_label: Optional[str] = None,
-    ):
-        return runtime.apply_transforms_impl(
-            self,
-            df,
-            transform,
-            profile_mode=profile_mode,
-            source_label=source_label,
-        )
-
     def apply_transforms(self, df, transform: Optional[Sequence[Mapping[str, Any]]]):
         return runtime.apply_transforms(self, df, transform)
 
@@ -1124,7 +1093,7 @@ class DataPreprocessor:
                     rows = meta.get("rows") if isinstance(meta, Mapping) else None
                     self._register_preprofile_alias(alias, task, origin="cache-hit", rows=rows, cache_ready=True)
                     prepared[key] = alias
-                    self._emit_source_summary(task.get("source"))
+                    runtime.emit_source_summary(self, task.get("source"))
                     logged_pairs = set()
                     for tgt in task.get("targets", []):
                         fig_name = str(tgt.get("figure_name", "<noname>"))

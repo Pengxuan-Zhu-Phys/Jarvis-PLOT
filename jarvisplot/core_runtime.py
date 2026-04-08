@@ -295,65 +295,6 @@ def prepare_usage_plan(core):
     )
 
 
-def rename_hdf5_and_renew_yaml(core):
-    def _as_quoted_str(value: Any) -> _QuotedString:
-        return _QuotedString(str(value))
-
-    def _normalize_whitelist_as_quoted(raw):
-        if isinstance(raw, list):
-            return [_as_quoted_str(v) for v in raw if v is not None and str(v).strip()]
-        if isinstance(raw, str):
-            sval = raw.strip()
-            if sval:
-                return _as_quoted_str(sval)
-        return []
-
-    for dcfg in core.yaml.config.get("DataSet", []):
-        if isinstance(dcfg, dict):
-            dcfg.pop("is_gambit", None)
-            dcfg.pop("columnmap", None)
-
-    for dt in core.dataset:
-        core.logger.warning("DataSet -> {}, type -> {}".format(dt.name, dt.type))
-        vmap_dict = {}
-        vmap_list = []
-        if dt.type == "hdf5":
-            old_columns = dt.columns if isinstance(dt.columns, dict) else {}
-            for ii, kk in enumerate(dt.keys):
-                vname = "Var{}@{}".format(ii, dt.name)
-                vmap_dict[kk] = vname
-                vmap_list.append({
-                    "source": _as_quoted_str(kk),
-                    "target": vname,
-                })
-            columns_payload = {}
-            if isinstance(old_columns, dict):
-                for k, v in old_columns.items():
-                    if k in {"rename", "load_whitelist"}:
-                        continue
-                    columns_payload[k] = v
-            columns_payload["rename"] = vmap_list
-
-            if isinstance(old_columns, dict) and "load_whitelist" in old_columns:
-                columns_payload["load_whitelist"] = _normalize_whitelist_as_quoted(old_columns.get("load_whitelist"))
-
-            core.yaml.update_dataset(dt.name, {"columns": columns_payload})
-            dt.rename_columns(vmap_dict)
-            core.logger.debug(f"Dataset '{dt.name}' renamed columns -> {dt.keys}")
-
-    with open(core.args.out, "w", encoding="utf-8") as f1:
-        yaml.dump(
-            core.yaml.config,
-            f1,
-            Dumper=_QuotedDumper,
-            sort_keys=False,
-            default_flow_style=False,
-            indent=2,
-            allow_unicode=True,
-            width=100000,
-        )
-
-
 def parse_hdf5_metadata_and_renew_yaml(core):
     def _as_quoted_str(value: Any) -> _QuotedString:
         return _QuotedString(str(value))

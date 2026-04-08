@@ -8,6 +8,7 @@ import os
 import pandas as pd 
 import numpy as np
 from .memtrace import memtrace_checkpoint, memtrace_enabled, memtrace_object_inventory
+from .utils.dataframes import polars_to_pandas
 from .utils.pathing import resolve_project_path
 from . import data_loader_hdf5 as hdf5
 from . import data_loader_summary as summary
@@ -18,47 +19,7 @@ try:
 except Exception:
     pl = None
 
-
 JP_ROW_IDX = "__jp_row_idx__"
-
-
-def polars_to_pandas_compat(frame, logger=None, stage: str = "dataset"):
-    if pl is None:
-        return frame
-    if isinstance(frame, pl.LazyFrame):
-        lazy_frame = frame
-        memtrace_checkpoint(logger, f"{stage}.polars_collect.before", frame)
-        frame = frame.collect()
-        memtrace_checkpoint(logger, f"{stage}.polars_collect.after", frame)
-        memtrace_object_inventory(
-            logger,
-            f"{stage}.polars_collect.inventory",
-            {"lazy_frame": lazy_frame, "collected": frame},
-            roles={
-                "lazy_frame": "lazy source plan",
-                "collected": "collected polars dataframe",
-            },
-            min_bytes=64 * 1024 * 1024,
-        )
-    if isinstance(frame, pl.DataFrame):
-        memtrace_checkpoint(logger, f"{stage}.pandas_convert.before", frame)
-        try:
-            out = frame.to_pandas()
-        except ModuleNotFoundError:
-            out = pd.DataFrame(frame.to_dict(as_series=False))
-        memtrace_checkpoint(logger, f"{stage}.pandas_convert.after", out)
-        memtrace_object_inventory(
-            logger,
-            f"{stage}.pandas_convert.inventory",
-            {"polars_df": frame, "pandas_df": out},
-            roles={
-                "polars_df": "polars dataframe before conversion",
-                "pandas_df": "converted pandas dataframe",
-            },
-            min_bytes=64 * 1024 * 1024,
-        )
-        return out
-    return frame
 
 class DataSet():
     def __init__(self):
@@ -231,7 +192,7 @@ class DataSet():
 
         missing = [c for c in cols if c not in out.columns]
         if missing and pl is not None and isinstance(self._full_lazy_frame, pl.LazyFrame):
-            schema = self._polars_schema_names(self._full_lazy_frame)
+            schema = hdf5.polars_schema_names(self._full_lazy_frame)
             miss_avail = [c for c in missing if c in schema]
             if miss_avail:
                 lf = self._full_lazy_frame.select([row_key] + miss_avail)
@@ -244,7 +205,7 @@ class DataSet():
                         total_rows = 0
                 if uniq.size > 0 and (total_rows <= 0 or uniq.size < total_rows):
                     lf = lf.filter(pl.col(row_key).is_in(pl.Series(name=row_key, values=uniq.tolist())))
-                pulled = polars_to_pandas_compat(lf, logger=self.logger, stage=f"dataset:{self.name}.lookup")
+                pulled = polars_to_pandas(lf, logger=self.logger, stage=f"dataset:{self.name}.lookup")
                 if isinstance(pulled, pd.DataFrame) and row_key in pulled.columns:
                     pulled = pulled.drop_duplicates(subset=[row_key], keep="last").set_index(row_key).reindex(order)
                     pulled.index = np.arange(int(pulled.shape[0]))
@@ -297,17 +258,19 @@ class DataSet():
         if self.data is not None:
             try:
                 if isinstance(self._materialized_manifest, dict):
-                    msg = self._materialized_summary(
+                    msg = hdf5.materialized_summary(
+                        self,
                         self._materialized_manifest,
-                        stats=self._materialized_numeric_bounds(),
+                        stats=runtime.materialized_numeric_bounds(self),
                     )
                 else:
                     msg = summary.dataframe_summary(self.data, name=self._summary_name())
             except Exception:
                 if isinstance(self._materialized_manifest, dict):
-                    msg = self._materialized_summary(
+                    msg = hdf5.materialized_summary(
+                        self,
                         self._materialized_manifest,
-                        stats=self._materialized_numeric_bounds(),
+                        stats=runtime.materialized_numeric_bounds(self),
                     )
                 else:
                     msg = f"Data backend: {type(self.data).__name__}"
@@ -364,63 +327,6 @@ class DataSet():
         if self.logger:
             self.logger.debug("Dataset -> {} is assigned as \n\t-> {}\ttype".format(self.base, self.type))
 
-    def _columns_dict(self) -> Dict[str, Any]:
-        return hdf5.columns_dict(self)
-
-    def _canonical_dataset_path(self, value: str) -> str:
-        return hdf5.canonical_dataset_path(self, value)
-
-    def _path_aliases(self, value: str) -> set[str]:
-        return hdf5.path_aliases(self, value)
-
-    def _rename_source_by_alias(self) -> Dict[str, str]:
-        return hdf5.rename_source_by_alias(self)
-
-    def _build_hdf5_whitelist(self) -> Optional[set[str]]:
-        return hdf5.build_hdf5_whitelist(self)
-
-    @staticmethod
-    def _shape_token(df) -> str:
-        return hdf5.shape_token(df)
-
-    @staticmethod
-    def _available_memory_bytes() -> Optional[int]:
-        return hdf5.available_memory_bytes()
-
-    def _materialized_cache_key(self):
-        return hdf5.materialized_cache_key(self)
-
-    def _materialized_source_fingerprint(self):
-        return hdf5.materialized_source_fingerprint(self)
-
-    def _materialized_summary(self, manifest: Dict[str, Any], stats: Optional[Dict[str, Dict[str, Any]]] = None) -> str:
-        return hdf5.materialized_summary(self, manifest, stats=stats)
-
-    def _materialized_numeric_bounds(self):
-        return runtime.materialized_numeric_bounds(self)
-
-    @staticmethod
-    def _sql_bool_ops(expr: Any) -> str:
-        return hdf5.sql_bool_ops(expr)
-
-    @staticmethod
-    def _polars_schema_names(lf) -> List[str]:
-        return hdf5.polars_schema_names(lf)
-
-    def _apply_dataset_transform(self, stage: str = "dataset") -> None:
-        return runtime.apply_dataset_transform(self, stage=stage)
-
-    def _apply_dataset_transform_polars(
-        self,
-        stage: str = "dataset",
-        materialize_to_pandas: bool = True,
-    ) -> bool:
-        return runtime.apply_dataset_transform_polars(
-            self,
-            stage=stage,
-            materialize_to_pandas=materialize_to_pandas,
-        )
-
     def load_csv(self):
         if self.type == "csv":
             if self.logger:
@@ -428,7 +334,7 @@ class DataSet():
 
             self.data = pd.read_csv(self.path)
             self.keys = list(self.data.columns)
-            self._apply_dataset_transform(stage="csv")
+            runtime.apply_dataset_transform(self, stage="csv")
 
             # Emit the same pretty summary used for HDF5 datasets
             summary_name = self._summary_name()
@@ -447,12 +353,6 @@ class DataSet():
                     self.cache.put_summary(source_fp, summary_msg)
 
             self._emit_summary_text(summary_msg)
-
-    def _activate_materialized_manifest(self, cache_key: str, manifest: Dict[str, Any]) -> None:
-        return runtime.activate_materialized_manifest(self, cache_key, manifest)
-
-    def _load_hdf5_materialized(self) -> None:
-        return runtime.load_hdf5_materialized(self)
 
     def load_hdf5(self):
         return runtime.load_hdf5(self)

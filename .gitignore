@@ -21,6 +21,7 @@ ENV/
 .vscode/
 .idea/
 .claude/
+github CI/
 
 # Build artifacts
 build/

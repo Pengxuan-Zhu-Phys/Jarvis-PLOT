@@ -21,8 +21,7 @@ def axc_color_config(frame: Mapping[str, Any], cb_name: str = "axc") -> dict:
     """Return normalized color config for a named colorbar axis.
 
     Reads frame[cb_name].color.  A value of None or the string "auto" means
-    auto-range from data.  Falls back to legacy frame[cb_name].xscale /
-    yscale when 'scale' is absent from the color block.
+    auto-range from data.
     """
     out: dict[str, Any] = {}
     cb_cfg = frame.get(cb_name, {}) if isinstance(frame, Mapping) else {}
@@ -49,12 +48,6 @@ def axc_color_config(frame: Mapping[str, Any], cb_name: str = "axc") -> dict:
                 pass                 # non-numeric treated as auto
 
     scale = color_cfg.get("scale", None)
-    if scale is None:
-        is_h = axc_is_horizontal(frame, cb_name)
-        if is_h:
-            scale = cb_cfg.get("xscale", cb_cfg.get("yscale", None))
-        else:
-            scale = cb_cfg.get("yscale", cb_cfg.get("xscale", None))
     if isinstance(scale, str):
         scale = scale.strip().lower()
         if scale:
@@ -150,7 +143,7 @@ _COLORED_Z_METHODS = frozenset({
     "tripcolor", "tripcolor_axes",
     "pcolor", "pcolormesh", "imshow",
     "voronoi", "voronoif",
-    "grid_profile", "grid_profiling",
+    "grid_profile",
 })
 
 

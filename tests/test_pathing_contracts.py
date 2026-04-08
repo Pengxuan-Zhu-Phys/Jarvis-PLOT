@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pandas as pd
 
 from jarvisplot.Figure.figure import Figure
+from jarvisplot.Figure.layer_runtime import load_bool_df
 from jarvisplot.core import JarvisPLOT
 from jarvisplot.data_loader import DataSet
 from jarvisplot.utils.pathing import resolve_project_path
@@ -67,10 +68,11 @@ def test_load_bool_df_invalid_transform_logs_and_returns_input_df():
     fig.preprocessor = None
 
     df = pd.DataFrame({"x": [1, 2, 3]})
+    expected = df.copy(deep=True)
 
-    out = fig.load_bool_df(df, {"filter": {"expr": "x > 1"}})
+    out = load_bool_df(fig, df, {"filter": {"expr": "x > 1"}})
 
-    assert out is df
+    pd.testing.assert_frame_equal(out, expected)
     assert recorder.messages
     assert "illegal transform format" in recorder.messages[0]
 
@@ -82,8 +84,10 @@ def test_load_bool_df_to_csv_writes_output(tmp_path):
     fig._yaml_dir = str(tmp_path)
 
     df = pd.DataFrame({"x": [1, 2, 3]})
+    expected = pd.DataFrame({"x": [1, 2, 3], "y": [2, 3, 4], "z": [3, 4, 5]})
 
-    out = fig.load_bool_df(
+    out = load_bool_df(
+        fig,
         df,
         [
             {"add_column": {"name": "y", "expr": "x + 1"}},
@@ -95,6 +99,6 @@ def test_load_bool_df_to_csv_writes_output(tmp_path):
     out_csv = tmp_path / "saved" / "fallback_export.csv"
     saved = pd.read_csv(out_csv)
 
-    assert out is df
+    pd.testing.assert_frame_equal(out, expected)
     assert list(saved.columns) == ["x", "y"]
     assert list(out.columns) == ["x", "y", "z"]

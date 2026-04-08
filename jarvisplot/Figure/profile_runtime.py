@@ -384,7 +384,7 @@ def profiling(df, prof, logger):
     mode = "bridson"
     if isinstance(prof, dict):
         mode = str(prof.get("method", "bridson")).lower()
-    if mode in {"grid", "grid_profile", "grid_profiling"}:
+    if mode in {"grid", "grid_profile"}:
         return grid_profiling(df, prof, logger)
     memtrace_checkpoint(
         logger,

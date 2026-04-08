@@ -14,7 +14,6 @@ import json
 import os
 
 import matplotlib as mpl
-import matplotlib.cm as mcm
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap, Colormap
 
 import inspect
@@ -24,7 +23,6 @@ def _register(name: str, cmap: Colormap, force: bool) -> bool:
     Try multiple registration paths depending on Matplotlib version:
       1) mpl.colormaps.register(...), passing 'name' and 'override' only if supported
       2) plt.register_cmap(name=..., cmap=...)
-      3) update legacy cm.cmap_d if present
     Returns True on success.
     """
     name = str(name)
@@ -67,16 +65,9 @@ def _register(name: str, cmap: Colormap, force: bool) -> bool:
             ok = True
         except Exception:
             ok = False
-    # Path 3: legacy dict
-    if not ok and hasattr(mcm, "cmap_d"):
-        try:
-            mcm.cmap_d[name] = cmap
-            ok = True
-        except Exception:
-            ok = False
     # final visibility sanity check
     try:
-        visible = (name in list(mpl.colormaps)) or (hasattr(mcm, "cmap_d") and name in mcm.cmap_d)
+        visible = name in list(mpl.colormaps)
     except Exception:
         visible = False
     return bool(ok and visible)
@@ -230,8 +221,6 @@ def register_from_json(json_path: Union[str, os.PathLike], force: bool = True) -
             base = mpl.colormaps.get(target)
         except Exception:
             base = None
-        if base is None and hasattr(mcm, "cmap_d"):
-            base = mcm.cmap_d.get(target)
         if base is None:
             fail.append(alias)
             err[alias] = f"alias target not found: {target}"
@@ -251,8 +240,6 @@ def list_available() -> List[str]:
     try:
         return list(mpl.colormaps)
     except Exception:
-        if hasattr(mcm, "cmap_d"):
-            return sorted(mcm.cmap_d.keys())
         return []
 
 __all__ = ["setup", "register_from_json", "list_available"]

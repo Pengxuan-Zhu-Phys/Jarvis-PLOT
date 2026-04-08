@@ -172,8 +172,8 @@ def update_funcs(funcs):
     funcs.update(_Inner_FCs)
 
     # Jarvis-Operas registered functions.
-    # Keep both symbolic/numeric views for compatibility, and provide
-    # namespace-style objects so plain `eval` can call `namespace.func(x)`.
+    # Keep both symbolic and numeric views, and provide namespace-style
+    # objects so plain `eval` can call `namespace.func(x)`.
     try:
         from jarvis_operas import build_sympy_dicts
 

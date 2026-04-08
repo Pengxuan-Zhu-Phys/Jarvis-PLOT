@@ -87,7 +87,6 @@ def test_parse_data_writes_yaml_from_metadata_only(tmp_path, monkeypatch):
         raise AssertionError("runtime load path should not be called for parse-data")
 
     monkeypatch.setattr(JarvisPLOT, "load_dataset", _fail)
-    monkeypatch.setattr(JarvisPLOT, "prepare_project_layout", _fail)
 
     app = JarvisPLOT()
     monkeypatch.setattr(app.cli.args, "parse_args", lambda: _make_parse_args(yaml_path, out_path))

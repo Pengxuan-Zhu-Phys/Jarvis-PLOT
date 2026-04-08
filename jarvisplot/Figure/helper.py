@@ -50,7 +50,7 @@ def plot_shapely_boundary(ax, geom, *, transform=None, **plot_kw):
         # 兜底：有时 boundary 可能给出别的类型
         try:
             b = geom.boundary
-            return _plot_shapely_boundary(ax, b, transform=transform, **plot_kw)
+            return plot_shapely_boundary(ax, b, transform=transform, **plot_kw)
         except Exception:
             return []
 

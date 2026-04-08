@@ -8,13 +8,12 @@ import pandas as pd
 import matplotlib as mpl
 from types import MethodType
 
-from .adapters import StdAxesAdapter, TernaryAxesAdapter
+from .adapters_rect import StdAxesAdapter
+from .adapters_ternary import TernaryAxesAdapter
 from .method_registry import resolve_callable
 from .style_runtime import resolve_style_bundle
 from .config_runtime import apply_figure_config
 from .layer_runtime import (
-    load_layer_data as runtime_load_layer_data,
-    load_bool_df as runtime_load_bool_df,
     load_layer_runtime_data as runtime_load_layer_runtime_data,
     release_layer_runtime_data as runtime_release_layer_runtime_data,
     render_layer as runtime_render_layer,
@@ -35,6 +34,7 @@ from .colorbar_runtime import (
     precompute_colorbar_cb,
 )
 from ..utils.expression import eval_dataframe_expression
+from ..utils.dataframes import polars_to_pandas
 from ..utils.pathing import resolve_project_path
 from ..memtrace import memtrace_checkpoint
 
@@ -63,7 +63,7 @@ class Figure:
         return axc_is_horizontal(self.frame)
 
     def _axc_color_config(self) -> dict:
-        """Return normalized frame.axc.color config with legacy fallbacks."""
+        """Return normalized frame.axc.color config."""
         return axc_color_config(self.frame)
 
     def _apply_axis_endpoints(self, ax_obj, axis_cfg: dict, which: str):
@@ -234,26 +234,11 @@ class Figure:
             return False
         return isinstance(obj, (pl.DataFrame, pl.LazyFrame))
 
-    def _polars_to_pandas_compat(self, data, reason: str = "render"):
+    def _polars_to_pandas(self, data, reason: str = "render"):
         if pl is None:
             return data
-        if isinstance(data, pl.LazyFrame):
-            memtrace_checkpoint(self.logger, "figure.polars_collect.before", data, extra={"reason": reason})
-            self.logger.debug(f"Collecting polars LazyFrame for pandas step -> {reason}")
-            data = data.collect()
-            memtrace_checkpoint(self.logger, "figure.polars_collect.after", data, extra={"reason": reason})
-        if isinstance(data, pl.DataFrame):
-            memtrace_checkpoint(self.logger, "figure.pandas_convert.before", data, extra={"reason": reason})
-            self.logger.debug(f"Materializing polars DataFrame for pandas step -> {reason}")
-            try:
-                out = data.to_pandas()
-            except ModuleNotFoundError:
-                self.logger.warning(
-                    f"pyarrow unavailable during polars->pandas conversion; using dict fallback -> {reason}"
-                )
-                out = pd.DataFrame(data.to_dict(as_series=False))
-            memtrace_checkpoint(self.logger, "figure.pandas_convert.after", out, extra={"reason": reason})
-            return out
+        if isinstance(data, (pl.LazyFrame, pl.DataFrame)):
+            return polars_to_pandas(data, logger=self.logger, stage=f"figure:{reason}")
         return data
 
     def _source_refs_from_layer(self, layer) -> list[str]:
@@ -275,7 +260,7 @@ class Figure:
         if pl is None:
             return data
         if isinstance(data, (pl.LazyFrame, pl.DataFrame)):
-            return self._polars_to_pandas_compat(data, reason=reason)
+            return self._polars_to_pandas(data, reason=reason)
         if isinstance(data, dict):
             return {kk: self._ensure_pandas_data(vv, reason=reason) for kk, vv in data.items()}
         return data
@@ -312,21 +297,6 @@ class Figure:
         if not registered:
             self.context.update(share_name, data)
 
-    def _load_layer_runtime_data(self, layer_info):
-        return runtime_load_layer_runtime_data(self, layer_info)
-
-    def _release_layer_runtime_data(self, layer_info, consume_sources: bool = True):
-        return runtime_release_layer_runtime_data(self, layer_info, consume_sources=consume_sources)
-                        
-    def load_layer_data(self, layer):
-        return runtime_load_layer_data(self, layer)
-               
-         
-    def load_bool_df(self, df, transform):
-        return runtime_load_bool_df(self, df, transform)
-                         
-         
-            
     @property    
     def axlogo(self):
         return self.axes['axlogo']
@@ -659,7 +629,7 @@ class Figure:
                 continue
 
             # Load data (pipeline cache hit on second call in render loop)
-            self._load_layer_runtime_data(ly)
+            runtime_load_layer_runtime_data(self, ly)
             df = ly.get("data")
             if df is not None:
                 df = self._ensure_pandas_data(df, reason="prescan:colorbar")
@@ -668,7 +638,7 @@ class Figure:
                 if lo is not None or hi is not None:
                     cb_ranges.setdefault(cb_name, []).append((lo, hi))
             # Release immediately to preserve memory profile
-            self._release_layer_runtime_data(ly, consume_sources=False)
+            runtime_release_layer_runtime_data(self, ly, consume_sources=False)
 
         # Build _cb for each colorbar that has data
         for cb_name, ranges in cb_ranges.items():
@@ -931,9 +901,11 @@ class Figure:
         self._prescan_colorbar_ranges()
 
         for ax, ly in self._render_queue:
-            self._load_layer_runtime_data(ly)
-            self.render_layer(ax, ly)
-            self._release_layer_runtime_data(ly)
+            runtime_load_layer_runtime_data(self, ly)
+            try:
+                runtime_render_layer(self, ax, ly)
+            finally:
+                runtime_release_layer_runtime_data(self, ly)
 
         for ax_name, ax in self.axes.items():
             # mark drawn after all layers on this axes
@@ -996,16 +968,9 @@ class Figure:
         """
         return apply_manual_ticks(self, ax_obj, which, ticks_cfg)
             
-    # --- config ingestion ---
     def from_dict(self, info: Mapping) -> bool:
         """Apply settings from a dict. Returns True on successful setup."""
         return apply_figure_config(self, info)
-
-
-    # Backward-compatible alias if other code still calls `set(info)`
-
-    def set(self, info: Mapping) -> bool:
-        return self.from_dict(info)
     
     def load_path(self, path, base_dir=None):
         """Resolve a path string.
@@ -1041,13 +1006,6 @@ class Figure:
 
 
 
-
-    def render_layer(self, ax, layer_info):
-        return runtime_render_layer(self, ax, layer_info)
-
-
-
-    
 
     # def auto_clip(artists, ax, clip_obj=None, transform=None):
 def auto_clip(artists, ax):

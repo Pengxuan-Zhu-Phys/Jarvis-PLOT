@@ -24,9 +24,10 @@ def _status_line(path: Path) -> str | None:
 
 
 def test_docs_status_labels_are_consistent() -> None:
-    docs_root = Path("docs")
+    docs_root = Path(__file__).resolve().parents[1] / "docs"
     assert docs_root.exists()
 
+    seen_status = False
     for path in docs_root.rglob("*.md"):
         if path.name == "README.md":
             continue
@@ -34,6 +35,7 @@ def test_docs_status_labels_are_consistent() -> None:
         if status is None:
             continue
 
+        seen_status = True
         assert status in ALLOWED_STATUSES, f"Unexpected status '{status}' in {path}"
 
         if status == "historical":
@@ -44,3 +46,5 @@ def test_docs_status_labels_are_consistent() -> None:
             assert "/docs/roadmap/" in f"/{path.as_posix()}/", (
                 f"Active backlog doc should live in docs/roadmap: {path}"
             )
+
+    assert seen_status, "No docs status labels found under docs/"

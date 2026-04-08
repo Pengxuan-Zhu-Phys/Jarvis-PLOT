@@ -4,10 +4,14 @@ from copy import deepcopy
 import gc
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
+from .preprocessor_runtime import add_column, filter_df, sort_by
+from .profile_runtime import grid_profiling, profiling
 from .method_registry import resolve_callable
 from .colorbar_runtime import collect_and_attach_colorbar
+from .interp_natural_neighbor import resolve_backend
 
 
 def _resolve_csv_export_path(fig, target):
@@ -31,6 +35,216 @@ def _save_dataframe_csv(fig, df, target):
     if fig.logger:
         fig.logger.debug(f"Saved transformed dataframe to CSV -> {out_path}")
     return out_path
+
+
+def _coerce_positive_int(value, default: int) -> int:
+    try:
+        n = int(value)
+        if n > 0:
+            return n
+    except Exception:
+        pass
+    return int(default)
+
+
+def _resolve_interp_grid_size(interp_cfg: dict | None, x_size: int, y_size: int) -> tuple[int, int]:
+    default_n = max(64, int(round(np.sqrt(max(int(x_size), int(y_size), 1)) * 4.0)))
+    if not isinstance(interp_cfg, dict):
+        return default_n, default_n
+
+    base = interp_cfg.get("bin", interp_cfg.get("resolution", default_n))
+    nx = interp_cfg.get("nx", interp_cfg.get("xbin", base))
+    ny = interp_cfg.get("ny", interp_cfg.get("ybin", base))
+
+    grid_cfg = interp_cfg.get("grid", None)
+    if isinstance(grid_cfg, dict):
+        nx = grid_cfg.get("nx", grid_cfg.get("xbin", nx))
+        ny = grid_cfg.get("ny", grid_cfg.get("ybin", ny))
+
+    return _coerce_positive_int(nx, default_n), _coerce_positive_int(ny, default_n)
+
+
+def _resolve_query_axis(
+    ax,
+    axis_name: str,
+    values,
+    *,
+    npts: int,
+    interp_cfg: dict | None = None,
+    logger=None,
+):
+    values = np.asarray(values, dtype=float).reshape(-1)
+    scale = str(ax.get_xscale() if axis_name == "x" else ax.get_yscale()).lower()
+
+    bounds = None
+    if isinstance(interp_cfg, dict):
+        bounds = interp_cfg.get(f"{axis_name}lim", None)
+
+    if bounds is None:
+        try:
+            bounds = ax.get_xlim() if axis_name == "x" else ax.get_ylim()
+        except Exception:
+            bounds = None
+
+    finite = values[np.isfinite(values)]
+    if bounds is None:
+        if finite.size:
+            lo = float(np.min(finite))
+            hi = float(np.max(finite))
+        else:
+            lo, hi = 0.0, 1.0
+    else:
+        try:
+            lo = float(bounds[0])
+            hi = float(bounds[1])
+        except Exception:
+            lo, hi = 0.0, 1.0
+
+    if not np.isfinite(lo) or not np.isfinite(hi):
+        if finite.size:
+            lo = float(np.min(finite))
+            hi = float(np.max(finite))
+        else:
+            lo, hi = 0.0, 1.0
+
+    if lo == hi:
+        if scale == "log" and lo > 0:
+            hi = lo * 10.0
+        else:
+            hi = lo + 1.0
+
+    if scale == "log":
+        positive = finite[finite > 0]
+        if lo <= 0 or hi <= 0:
+            if positive.size:
+                lo = float(np.min(positive))
+                hi = float(np.max(positive))
+            else:
+                if logger:
+                    logger.warning(
+                        f"natural_neighbor: {axis_name}-axis is log-scaled but has no positive "
+                        "finite bounds; falling back to a linear grid"
+                    )
+                return np.linspace(lo, hi, npts)
+        lo = max(lo, np.finfo(float).tiny)
+        hi = max(hi, lo * 10.0)
+        return np.geomspace(lo, hi, npts)
+
+    return np.linspace(lo, hi, npts)
+
+
+def _build_contour_query_grid(ax, x, y, *, interp_cfg: dict | None = None, logger=None):
+    nx, ny = _resolve_interp_grid_size(interp_cfg, np.size(x), np.size(y))
+    xq = _resolve_query_axis(ax, "x", x, npts=nx, interp_cfg=interp_cfg, logger=logger)
+    yq = _resolve_query_axis(ax, "y", y, npts=ny, interp_cfg=interp_cfg, logger=logger)
+    return np.meshgrid(xq, yq)
+
+
+def _log_natural_neighbor_diagnostics(logger, diag) -> None:
+    if logger is None or diag is None:
+        return
+    try:
+        if getattr(diag, "degenerate_input", False):
+            logger.warning("natural_neighbor: input data are too sparse or degenerate for full interpolation")
+        if getattr(diag, "all_nan_cores", False):
+            logger.warning("natural_neighbor: all input z cores are NaN")
+        if getattr(diag, "masked_by_nan", 0):
+            logger.warning(
+                "natural_neighbor: {} query points were masked because a contributing core is NaN".format(
+                    int(getattr(diag, "masked_by_nan", 0))
+                )
+            )
+        if getattr(diag, "outside_hull", 0):
+            logger.debug(
+                "natural_neighbor: {} query points lie outside the convex hull".format(
+                    int(getattr(diag, "outside_hull", 0))
+                )
+            )
+        if getattr(diag, "exact_hits", 0):
+            logger.debug(
+                "natural_neighbor: {} query points matched an input core exactly".format(
+                    int(getattr(diag, "exact_hits", 0))
+                )
+            )
+        if getattr(diag, "cavity_triangles", 0):
+            logger.debug(
+                "natural_neighbor: visited {} cavity triangles".format(
+                    int(getattr(diag, "cavity_triangles", 0))
+                )
+            )
+        if getattr(diag, "site_cells_built", 0):
+            logger.debug(
+                "natural_neighbor: built {} clipped site cells".format(
+                    int(getattr(diag, "site_cells_built", 0))
+                )
+            )
+        build_seconds = getattr(diag, "build_seconds", None)
+        eval_seconds = getattr(diag, "eval_seconds", None)
+        if isinstance(build_seconds, (int, float)) and build_seconds > 0:
+            logger.debug(f"natural_neighbor: build time {float(build_seconds):.4f}s")
+        if isinstance(eval_seconds, (int, float)) and eval_seconds > 0:
+            logger.debug(f"natural_neighbor: eval time {float(eval_seconds):.4f}s")
+    except Exception:
+        pass
+
+
+def _prepare_contour_args(fig, ax, method_key: str, style: dict, coor: dict):
+    """Prepare positional contour/contourf args and remove interpolation config."""
+    interp_cfg = style.pop("interp", None)
+    interp_cfg = dict(interp_cfg) if isinstance(interp_cfg, dict) else None
+
+    x = np.asarray(coor.get("x"), dtype=float)
+    y = np.asarray(coor.get("y"), dtype=float)
+    z = np.asarray(coor.get("z"), dtype=float)
+
+    # Already-gridded inputs should pass straight through.
+    if x.ndim == 2 and y.ndim == 2 and z.ndim == 2 and x.shape == y.shape == z.shape:
+        return (x, y, np.ma.masked_invalid(z)), style
+
+    if x.ndim == 1 and y.ndim == 1 and z.ndim == 2:
+        if z.shape == (y.size, x.size):
+            return (x, y, np.ma.masked_invalid(z)), style
+        if z.shape == (x.size, y.size):
+            return (x, y, np.ma.masked_invalid(z.T)), style
+        raise ValueError(
+            f"{method_key} expects Z to have shape (len(y), len(x)) or the transpose when X/Y are 1D"
+        )
+
+    if interp_cfg is None:
+        raise ValueError(
+            f"{method_key} requires gridded X/Y/Z inputs or style.interp.method: natural_neighbor"
+        )
+
+    backend_name = str(interp_cfg.get("method", "natural_neighbor")).strip()
+    nan_policy = str(interp_cfg.get("nan_policy", "strict"))
+    diagnostics = bool(interp_cfg.get("diagnostics", False))
+    backend_options = interp_cfg.get("backend_options", None)
+    X, Y = _build_contour_query_grid(ax, x, y, interp_cfg=interp_cfg, logger=getattr(fig, "logger", None))
+    try:
+        backend = resolve_backend(backend_name)
+    except Exception as exc:
+        raise ValueError(f"Unsupported contour interpolation backend: {backend_name!r}") from exc
+    Z = backend(
+        x,
+        y,
+        z,
+        X,
+        Y,
+        nan_policy=nan_policy,
+        diagnostics=diagnostics,
+        backend_options=backend_options,
+    )
+    _log_natural_neighbor_diagnostics(getattr(fig, "logger", None), getattr(backend, "last_diagnostics", None))
+    Z = np.asarray(Z, dtype=float)
+
+    if not np.isfinite(Z).any():
+        if getattr(fig, "logger", None):
+            fig.logger.warning(
+                f"natural_neighbor returned only NaNs for layer '{getattr(fig, 'name', '<noname>')}'"
+            )
+        return None, style
+
+    return (X, Y, np.ma.masked_invalid(Z)), style
 
 
 def load_layer_data(fig, layer):
@@ -82,11 +296,11 @@ def load_layer_data(fig, layer):
                                 dt = deepcopy(fig.context.get(srcitem))
                                 dsrc.append(dt)
                             dfsrcs = pd.concat(dsrc, ignore_index=False)
-                            dt = fig.load_bool_df(dfsrcs, ds.get("transform", None))
+                            dt = load_bool_df(fig, dfsrcs, ds.get("transform", None))
                             dts.append(dt)
                         elif fig.context.get(src) is not None:
                             dt = deepcopy(fig.context.get(src))
-                            dt = fig.load_bool_df(dt, ds.get("transform", None))
+                            dt = load_bool_df(fig, dt, ds.get("transform", None))
                             dts.append(dt)
                 else:
                     fig.logger.error("DataSet -> {} not specified".format(src))
@@ -118,7 +332,7 @@ def load_layer_data(fig, layer):
                             dt = None
                         else:
                             dt = deepcopy(fig.context.get(src))
-                            dt = fig.load_bool_df(dt, ds.get("transform", None))
+                            dt = load_bool_df(fig, dt, ds.get("transform", None))
                     if dt is not None:
                         dts[label] = dt
                 else:
@@ -142,18 +356,12 @@ def load_bool_df(fig, df, transform):
             fig.logger.debug("Applying the transform ... ")
             if "filter" in trans.keys():
                 fig.logger.debug("Before filtering -> {}".format(df.shape))
-                from .load_data import filter
-
-                df = filter(df, trans["filter"], fig.logger)
+                df = filter_df(df, trans["filter"], fig.logger)
                 fig.logger.debug("After filtering -> {}".format(df.shape))
             elif "profile" in trans.keys():
-                from .load_data import profiling
-
                 df = profiling(df, trans["profile"], fig.logger)
                 fig.logger.debug("After profiling -> {}".format(df.shape))
             elif "grid_profile" in trans.keys():
-                from .load_data import grid_profiling
-
                 cfg = trans.get("grid_profile", {})
                 if isinstance(cfg, dict):
                     cfg = cfg.copy()
@@ -163,14 +371,10 @@ def load_bool_df(fig, df, transform):
                 df = grid_profiling(df, cfg, fig.logger)
                 fig.logger.debug("After grid profiling -> {}".format(df.shape))
             elif "sortby" in trans.keys():
-                from .load_data import sortby
-
-                df = sortby(df, trans["sortby"], fig.logger)
+                df = sort_by(df, trans["sortby"], fig.logger)
                 fig.logger.debug("After sortby -> {}".format(df.shape))
             elif "add_column" in trans.keys():
-                from .load_data import addcolumn
-
-                df = addcolumn(df, trans["add_column"], fig.logger)
+                df = add_column(df, trans["add_column"], fig.logger)
                 fig.logger.debug("After Add-column -> {}".format(df.shape))
             elif "tocsv" in trans.keys() or "to_csv" in trans.keys():
                 _save_dataframe_csv(fig, df, trans.get("tocsv", trans.get("to_csv")))
@@ -258,7 +462,7 @@ def render_layer(fig, ax, layer_info):
             raise ValueError("Ternary layer must define coordinates: {left, right, bottom} or {x, y} with exprs.")
         for kk, vv in coor.items():
             style[kk] = fig._eval_series(df, vv)
-        if method_key in {"grid_profile", "grid_profiling"}:
+        if method_key == "grid_profile":
             style["__df__"] = df
         return method(**style)
 
@@ -273,6 +477,7 @@ def render_layer(fig, ax, layer_info):
                 fig.logger.debug(f"colorbar lazy-attach failed: {_e}")
 
         if method_key == "hist":
+            style.pop("interp", None)
             if isinstance(df, dict):
                 if "label" not in style.keys():
                     style["label"] = []
@@ -287,6 +492,28 @@ def render_layer(fig, ax, layer_info):
                     style[kk] = fig._eval_series(df, vv)
 
             return method(**style)
+        if method_key in {"contour", "contourf"}:
+            contour_coor = {}
+            for kk in ("x", "y", "z"):
+                if kk not in coor:
+                    raise ValueError(
+                        f"Rectangular {method_key} layer must define coordinates: {{x, y, z}}"
+                    )
+                vv = coor[kk]
+                if isinstance(vv, dict) and "expr" in vv:
+                    if df is None:
+                        raise ValueError(
+                            f"Layer '{layer_info.get('name', '')}' defines expression-based "
+                            f"coordinate for '{kk}' but has no data source."
+                        )
+                    contour_coor[kk] = fig._eval_series(df, vv)
+                else:
+                    contour_coor[kk] = vv
+
+            contour_args, style = _prepare_contour_args(fig, ax.ax if hasattr(ax, "ax") else ax, method_key, style, contour_coor)
+            if contour_args is None:
+                return []
+            return method(*contour_args, **style)
         else:
             if not ({"x", "y"} <= set(coor.keys())):
                 raise ValueError("Rectangular layer must define coordinates: {x,y} with exprs.")
@@ -301,8 +528,9 @@ def render_layer(fig, ax, layer_info):
                     style[kk] = fig._eval_series(df, vv)
                 else:
                     style[kk] = vv
-            if method_key in {"grid_profile", "grid_profiling"}:
+            if method_key == "grid_profile":
                 style["__df__"] = df
+            style.pop("interp", None)
             return method(**style)
 
     else:
