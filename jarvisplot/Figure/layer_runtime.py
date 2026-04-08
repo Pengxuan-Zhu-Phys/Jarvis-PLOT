@@ -195,23 +195,24 @@ def load_layer_runtime_data(fig, layer_info):
     return data
 
 
-def release_layer_runtime_data(fig, layer_info):
+def release_layer_runtime_data(fig, layer_info, consume_sources: bool = True):
     layer_info["data"] = None
     layer_info["data_loaded"] = False
 
-    share_name = layer_info.get("share_name")
-    if share_name and fig.context is not None and fig.context.remaining_uses(share_name) <= 0:
-        fig.context.invalidate(share_name)
+    if consume_sources:
+        share_name = layer_info.get("share_name")
+        if share_name and fig.context is not None and fig.context.remaining_uses(share_name) <= 0:
+            fig.context.invalidate(share_name)
 
-    if fig.context is not None:
-        for ref in layer_info.get("source_refs", []):
-            remain = fig.context.consume(ref)
-            if remain > 0 and fig.preprocessor is not None:
-                try:
-                    if fig.preprocessor.should_release_between_uses(ref):
-                        fig.context.invalidate(ref)
-                except Exception as e:
-                    fig.logger.debug(f"transient source release failed for '{ref}': {e}")
+        if fig.context is not None:
+            for ref in layer_info.get("source_refs", []):
+                remain = fig.context.consume(ref)
+                if remain > 0 and fig.preprocessor is not None:
+                    try:
+                        if fig.preprocessor.should_release_between_uses(ref):
+                            fig.context.invalidate(ref)
+                    except Exception as e:
+                        fig.logger.debug(f"transient source release failed for '{ref}': {e}")
     gc.collect()
 
 
