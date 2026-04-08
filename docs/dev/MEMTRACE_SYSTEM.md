@@ -58,7 +58,7 @@ By default it only logs objects estimated at `>= 64 MiB`.
 
 Main probes:
 
-- `jarvisplot/data_loader.py:polars_to_pandas_compat()`
+- `jarvisplot/utils/dataframes.py:polars_to_pandas()`
 - `jarvisplot/data_loader_runtime.py:apply_dataset_transform()`
 - `jarvisplot/data_loader_runtime.py:apply_dataset_transform_polars()`
 - `jarvisplot/data_loader_runtime.py:activate_materialized_manifest()`

@@ -29,8 +29,8 @@ For `grid_profile`, the method is usually treated as grid-style reduction.
 
 ## Current Owner
 
-- `jarvisplot/Figure/load_data.py` contains the reduction algorithms
-- `jarvisplot/Figure/preprocessor.py` owns projection, cache identity, and prebuild/runtime behavior
+- `jarvisplot/Figure/profile_runtime.py` contains the reduction algorithms
+- `jarvisplot/Figure/preprocessor.py` and `jarvisplot/Figure/preprocessor_runtime.py` own projection, cache identity, and prebuild/runtime behavior
 - `jarvisplot/data_loader.py` applies dataset-level profile transforms
 
 ## Boundary Rule

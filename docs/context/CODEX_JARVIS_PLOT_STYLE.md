@@ -7,10 +7,9 @@ This file is my own hard policy for editing Jarvis-PLOT quickly but safely.
 Priority order:
 
 1. correctness
-2. backward compatibility
-3. debuggability
-4. performance
-5. elegance
+2. debuggability
+3. performance
+4. elegance
 
 
 ## 1) 明令禁止 (MUST NOT)
@@ -34,10 +33,11 @@ Priority order:
 - Forbidden for production flow.
 - Use logger (`debug/info/warning/error`) only.
 
-### 1.4 Breaking YAML interface without compatibility layer
+### 1.4 Breaking YAML interface
 
-- Forbidden to remove old keys directly.
-- Must provide compatibility window and explicit precedence rules.
+- Do not add new compatibility layers for removed YAML keys.
+- If a YAML key changes, update the canonical schema, docs, tests, and examples in the same patch.
+- Temporary bridges are allowed only when they are explicitly time-boxed and removed immediately after migration.
 
 ### 1.5 Implicit mutation of caller-owned objects
 
@@ -71,7 +71,7 @@ Priority order:
 - Avoid deep nested `dict.get(...).get(...)` in many places.
 - Prefer normalized config object per stage.
 
-### 2.3 Repeated logic across `Figure` and `load_data`
+### 2.3 Repeated logic across `Figure` and `preprocessor_runtime`
 
 - Avoid copying same expression-eval and transform routines.
 - Reuse centralized helpers.
@@ -92,7 +92,7 @@ Priority order:
 
 ## 3) Required Change Checklist (Every PR/patch)
 
-1. Confirm YAML compatibility impact.
+1. Confirm YAML contract impact.
 2. Confirm cache identity impact.
 3. Verify at least one real YAML from `bin/` still runs/loads.
 4. Run syntax checks for touched modules.
@@ -108,7 +108,7 @@ Priority order:
 ### 4.1 Colorbar rules
 
 - Single source of truth is `frame.axc.color`.
-- Layer `style.cmap/vmin/vmax/norm` is compatibility fallback only.
+- Layer `style.cmap/vmin/vmax/norm` are layer kwargs, not the colorbar contract.
 
 ### 4.2 Style card rules
 
@@ -148,7 +148,7 @@ Priority order:
 A change is done only if:
 
 - runtime behavior is clear and documented
-- legacy YAML does not silently break
+- canonical YAML contracts fail loudly when violated
 - log messages explain fallback behavior
 - cache correctness is preserved
 - local context docs remain up to date

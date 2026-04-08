@@ -36,4 +36,4 @@ Where:
 
 Keep colorbar defaults explicit. `frame.axc.color` is the preferred source of truth.
 
-Layer-level style keys are compatibility fallback, not the primary contract.
+Layer-level style keys are layer kwargs; `frame.axc.color` is the colorbar contract.

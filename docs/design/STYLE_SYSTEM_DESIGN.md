@@ -36,7 +36,7 @@ The current implementation effectively uses this order:
 1. bundle defaults
 2. frame overrides
 3. layer overrides
-4. render-time compatibility fallback
+4. render-time style resolution
 
 That order should stay explicit.
 

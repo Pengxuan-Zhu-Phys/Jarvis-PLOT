@@ -10,7 +10,8 @@ Current code does not have a separate layer-type registry.
 The real dispatch path is method-based and lives in:
 
 - `jarvisplot/Figure/method_registry.py`
-- `jarvisplot/Figure/adapters.py`
+- `jarvisplot/Figure/adapters_rect.py`
+- `jarvisplot/Figure/adapters_ternary.py`
 
 ## Current Reality
 

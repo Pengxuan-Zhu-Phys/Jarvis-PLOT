@@ -42,7 +42,7 @@ Current stable product facts:
 - input surfaces: YAML figure configs, style cards, dataset configs, scene-oriented JSON (`spec only`)
 - current data pipeline primitives: `filter`, `add_column`, `sortby`, `profile`, `grid_profile`
 - expensive profile work is split across prebuild and runtime phases
-- transform primitives live in `jarvisplot/Figure/load_data.py`; profiling helpers live in `jarvisplot/Figure/profile_runtime.py`
+- transform primitives live in `jarvisplot/Figure/preprocessor_runtime.py`; profiling helpers live in `jarvisplot/Figure/profile_runtime.py`
 - dataset summary helpers live in `jarvisplot/data_loader_summary.py`
 - dataset-level runtime helpers live in `jarvisplot/data_loader_runtime.py`; pipeline runtime helpers live in `jarvisplot/Figure/preprocessor_runtime.py`
 - runtime artifacts: output images plus workdir-local cache under `.cache/`
@@ -90,12 +90,13 @@ Current ownership snapshot:
   - `jarvisplot/data_loader.py`
   - `jarvisplot/data_loader_summary.py`
   - `jarvisplot/data_loader_runtime.py`
-  - `jarvisplot/Figure/load_data.py`
+  - `jarvisplot/Figure/preprocessor_runtime.py`
   - `docs/specs/SCENE_JSON_SCHEMA.md`
 - layout engine:
   - `jarvisplot/Figure/figure.py`
   - `jarvisplot/Figure/helper.py`
-  - `jarvisplot/Figure/adapters.py`
+  - `jarvisplot/Figure/adapters_rect.py`
+  - `jarvisplot/Figure/adapters_ternary.py`
   - `jarvisplot/Figure/layer_runtime.py`
   - `docs/design/LAYOUT_ENGINE_DESIGN.md`
 - style and profile system:
@@ -112,7 +113,8 @@ Current ownership snapshot:
   - `jarvisplot/Figure/figure.py`
   - `jarvisplot/Figure/config_runtime.py`
   - `jarvisplot/Figure/layer_runtime.py`
-  - `jarvisplot/Figure/adapters.py`
+  - `jarvisplot/Figure/adapters_rect.py`
+  - `jarvisplot/Figure/adapters_ternary.py`
   - `jarvisplot/Figure/adapters_rect.py`
   - `jarvisplot/Figure/adapters_ternary.py`
   - `jarvisplot/Figure/method_registry.py`
@@ -137,7 +139,7 @@ Normal runtime flow:
 6. `jarvisplot/Figure/preprocessor.py` prepares transform and profile pipelines
 7. `jarvisplot/Figure/figure.py` builds axes and scene state for each figure
 8. `jarvisplot/Figure/method_registry.py` resolves draw methods
-9. `jarvisplot/Figure/adapters.py` executes backend-specific drawing
+9. `jarvisplot/Figure/adapters_rect.py` and `jarvisplot/Figure/adapters_ternary.py` execute backend-specific drawing
 10. output is written through figure save/render paths
 
 ## 7. Flowchart Migration Context
@@ -173,7 +175,7 @@ For flowcharts, treat the upstream payload as semantic scene data, not pre-rende
 - Prefer extending existing runtime owners before adding new framework layers.
 - Preserve the current prebuild/runtime pipeline split when changing `profile` or `grid_profile` behavior.
 - Cache changes must keep `.cache/data`, `.cache/named`, and `.cache/summary` semantics coherent.
-- `frame.axc.color` is the preferred colorbar source of truth; layer-level color keys are compatibility fallback.
+- `frame.axc.color` is the preferred colorbar source of truth; layer-level color keys remain layer kwargs, not colorbar configuration.
 - Style keys should be explicit and backed by card definitions; do not invent implicit defaults.
 - Do not add new unsafe eval surfaces; existing eval paths are already a technical debt area.
 - If transform semantics change, update cache identity assumptions in the same change.

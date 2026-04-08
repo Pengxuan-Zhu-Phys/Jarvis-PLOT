@@ -48,7 +48,7 @@ There is no separate implemented scene parser or layout engine yet. Those are st
 
 - `jarvisplot/Figure/preprocessor.py`: demand projection, cache identity, preprofile split, named `share_data` persistence
 - `jarvisplot/Figure/preprocessor_runtime.py`: source resolution, runtime transform execution, pipeline cache flow
-- `jarvisplot/Figure/load_data.py`: primitive transform functions (`filter`, `addcolumn`, `sortby`)
+- `jarvisplot/Figure/preprocessor_runtime.py`: primitive transform functions (`filter_df`, `add_column`, `sort_by`, `keep_columns`, `drop_columns`)
 - `jarvisplot/Figure/profile_runtime.py`: `profile` / `grid_profile` implementations and profile prebuild helpers
 - `jarvisplot/inner_func.py`: eval namespace injection for expression helpers
 - `jarvisplot/utils/interpolator.py`: lazy YAML `Functions` loader and callable registry
@@ -58,7 +58,8 @@ There is no separate implemented scene parser or layout engine yet. Those are st
 - `jarvisplot/Figure/figure.py`: axis construction, layer binding, coordinate evaluation, `savefig()`
 - `jarvisplot/Figure/config_runtime.py`: figure config ingestion from YAML dictionaries, style bundle resolution, `rcParams` setup
 - `jarvisplot/Figure/layer_runtime.py`: layer data loading, style merge, coordinate validation, expression evaluation, and render dispatch to adapters
-- `jarvisplot/Figure/adapters.py`: thin compatibility re-export for axis adapters
+- `jarvisplot/Figure/adapters_rect.py`: rectangular-axes adapter implementations
+- `jarvisplot/Figure/adapters_ternary.py`: ternary-axes adapter implementations
 - `jarvisplot/Figure/adapters_rect.py`: rectangular-axes drawing primitives, custom `grid_profile` / Voronoi / tripcolor behavior (note: `grid_profile` contains ~210 lines of grid reconstruction logic coupled to `profile_runtime.py` `__grid_*` column output)
 - `jarvisplot/Figure/adapters_ternary.py`: ternary-axes drawing primitives and ternary render behavior
 - `jarvisplot/Figure/method_registry.py`: YAML `method` key to adapter callable resolution
@@ -88,9 +89,9 @@ These modules are real owners, but they still mix concerns that should stay sepa
 - `jarvisplot/Figure/figure.py`: config ingestion, axes building, layer runtime, colorbar coordination, and backend dispatch in one class
 - `jarvisplot/Figure/preprocessor.py`: transform projection, cache compatibility, and preprofile rewriting
 - `jarvisplot/Figure/preprocessor_runtime.py`: runtime execution and source resolution helpers
-- `jarvisplot/Figure/load_data.py`: transform primitives only
 - `jarvisplot/Figure/profile_runtime.py`: profiling algorithms and preprofiling helpers
-- `jarvisplot/Figure/adapters.py`: compatibility layer that still groups the rect/ternary adapter entry points
+- `jarvisplot/Figure/preprocessor_runtime.py`: transform primitives and runtime transform helpers
+- `jarvisplot/Figure/adapters_rect.py` and `jarvisplot/Figure/adapters_ternary.py`: adapter-family entry points
 - `jarvisplot/Figure/adapters_rect.py` and `jarvisplot/Figure/adapters_ternary.py`: adapter-family owners, but still share helper utilities
 - `jarvisplot/config.py`: config state holder, not a validator or schema owner
 
@@ -109,7 +110,7 @@ These concepts exist in docs, but they do not yet have a dedicated runtime owner
 
 Track the remaining implementation work for these missing owners in `docs/roadmap/IMPLEMENTATION_ROADMAP.md`.
 
-Do not hide these concerns inside `figure.py` or `adapters.py` when implementing future flowchart support.
+Do not hide these concerns inside `figure.py` or the adapter modules when implementing future flowchart support.
 
 ## Where To Put Common Changes
 
@@ -118,7 +119,7 @@ Do not hide these concerns inside `figure.py` or `adapters.py` when implementing
 - new summary formatting or HDF5 tree diagnostic helper -> `jarvisplot/data_loader_summary.py`
 - new HDF5 policy helper -> `jarvisplot/data_loader_hdf5.py` and `jarvisplot/data_loader_runtime.py`
 - new dataset transform/runtime helper -> `jarvisplot/data_loader_runtime.py` and `jarvisplot/data_loader.py`
-- new transform primitive -> `jarvisplot/Figure/load_data.py` and `jarvisplot/Figure/preprocessor_runtime.py`
+- new transform primitive -> `jarvisplot/Figure/preprocessor_runtime.py` and `jarvisplot/data_loader_runtime.py`
 - new profile helper -> `jarvisplot/Figure/profile_runtime.py` and `jarvisplot/Figure/preprocessor_runtime.py`
 - new pipeline/runtime helper -> `jarvisplot/Figure/preprocessor_runtime.py` and `jarvisplot/Figure/preprocessor.py`
 - new render primitive -> `jarvisplot/Figure/adapters_rect.py`, `jarvisplot/Figure/adapters_ternary.py`, and `jarvisplot/Figure/method_registry.py`
