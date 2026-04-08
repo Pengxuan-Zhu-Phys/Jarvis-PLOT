@@ -27,7 +27,14 @@ from .layout_runtime import (
     has_manual_ticks,
     is_numbered_ax,
 )
-from .colorbar_runtime import axc_color_config, axc_is_horizontal, collect_and_attach_colorbar
+from .colorbar_runtime import (
+    axc_color_config,
+    axc_is_horizontal,
+    collect_and_attach_colorbar,
+    collect_layer_color_range,
+    layer_uses_color,
+    precompute_colorbar_cb,
+)
 from ..utils.expression import eval_dataframe_expression
 from ..utils.pathing import resolve_project_path
 from ..memtrace import memtrace_checkpoint
@@ -215,6 +222,7 @@ class Figure:
             info['coor'] = layer['coordinates']
             info['method'] = layer.get("method", "scatter")
             info['style'] = layer.get("style", {})
+            info['colorbar'] = layer.get("colorbar", "axc")
             ax.layers.append(info)
             self._render_queue.append((ax, info))
             self.logger.debug("Successfully loaded layer -> {}".format(info["name"]))
@@ -516,85 +524,159 @@ class Figure:
     @axc.setter
     def axc(self, kwgs):
         if "axc" not in self.axes.keys():
-            axc = self.fig.add_axes(**kwgs)
-            axc._cb = {
-                "mode":  "auto",     # auto|linear|log|diverging
-                "levels": None,
-                "label": None,
-                "vmin": None, "vmax": None,
-                "norm": None,
-                "used": False
-            }
-            self.axes["axc"] = axc
-        else:
-            if not self.axc._cb.get("used"):
-                return
+            # Creation: initialise axes and empty _cb state
+            self._init_axc_axes("axc", kwgs)
 
-            # Build mappable for the colorbar
-            mappable = mpl.cm.ScalarMappable(
-                cmap=self.axc._cb.get("cmap") or mpl.rcParams.get("image.cmap", "rainbow"),
-                norm=self.axc._cb.get("norm")
-            )
-            mappable.set_array([])
-            ticks_cfg = self.frame.get('axc', {}).get('ticks', {})
-            if not isinstance(ticks_cfg, dict):
-                ticks_cfg = {}
+    # ------------------------------------------------------------------
+    # Named colorbar axes support  (axc2, axc_mass, axc_logL, …)
+    # ------------------------------------------------------------------
 
-            if not self._axc_is_horizontal():
-                cbar = self.fig.colorbar(mappable, cax=self.axc)
-                cbar.minorticks_on()
-                if (self.axc._cb.get('vmin') is not None) and (self.axc._cb.get('vmax') is not None):
-                    self.axc.set_ylim(self.axc._cb['vmin'], self.axc._cb['vmax'])
+    def _init_axc_axes(self, name: str, kwgs: dict) -> None:
+        """Create a named colorbar axes and attach an empty _cb state dict."""
+        if name in self.axes:
+            return
+        axc_obj = self.fig.add_axes(**kwgs)
+        axc_obj._cb = {
+            "mode":   "auto",
+            "levels": None,
+            "vmin":   None,
+            "vmax":   None,
+            "norm":   None,
+            "cmap":   None,
+            "used":   False,
+        }
+        self.axes[name] = axc_obj
+        if self.logger:
+            self.logger.debug(f"Created named colorbar axes -> {name}")
 
-                if str(self.axc._cb.get('mode', 'auto')).lower() == 'log':
-                    from matplotlib.ticker import LogLocator
-                    self.axc.yaxis.set_minor_locator(LogLocator(subs='auto'))
-                else:
-                    from matplotlib.ticker import AutoMinorLocator
-                    self.axc.yaxis.set_minor_locator(AutoMinorLocator())
+    def _finalize_axc(self, name: str) -> None:
+        """Draw the colorbar for a named axc* axes using its pre-built _cb state."""
+        axc_obj = self.axes.get(name)
+        if axc_obj is None or not hasattr(axc_obj, "_cb"):
+            return
+        if not axc_obj._cb.get("used"):
+            return
 
-                _tp = ticks_cfg.get('ticks_position', 'right')
-                self.axc.yaxis.set_ticks_position(_tp)
-                self.axc.yaxis.set_label_position('left' if _tp == 'left' else 'right')
+        cb_frame = self.frame.get(name, {})
+        is_h = axc_is_horizontal(self.frame, name)
+        ticks_cfg = cb_frame.get("ticks", {}) if isinstance(cb_frame, dict) else {}
+        if not isinstance(ticks_cfg, dict):
+            ticks_cfg = {}
 
-                self.axc.tick_params(**ticks_cfg.get('both', {}))
-                self.axc.tick_params(**ticks_cfg.get('major', {}))
-                self.axc.tick_params(**ticks_cfg.get('minor', {}))
+        mappable = mpl.cm.ScalarMappable(
+            cmap=axc_obj._cb.get("cmap") or mpl.rcParams.get("image.cmap", "rainbow"),
+            norm=axc_obj._cb.get("norm"),
+        )
+        mappable.set_array([])
 
-                self.axc.set_ylabel(**self.frame.get('axc', {}).get('label', {}))
-                if self.frame.get('axc', {}).get('ylabel_coords'):
-                    self.axc.yaxis.set_label_coords(
-                        self.frame['axc']['ylabel_coords']['x'],
-                        self.frame['axc']['ylabel_coords']['y']
-                    )
-                self._apply_manual_ticks(self.axc, 'y', ticks_cfg.get('y', {}))
-                self.logger.debug("Loaded colorbar axes -> axc")
+        if not is_h:
+            cbar = self.fig.colorbar(mappable, cax=axc_obj)
+            cbar.minorticks_on()
+            if axc_obj._cb.get("vmin") is not None and axc_obj._cb.get("vmax") is not None:
+                axc_obj.set_ylim(axc_obj._cb["vmin"], axc_obj._cb["vmax"])
+            if str(axc_obj._cb.get("mode", "auto")).lower() == "log":
+                from matplotlib.ticker import LogLocator
+                axc_obj.yaxis.set_minor_locator(LogLocator(subs="auto"))
             else:
-                # Horizontal colorbar: drive everything from x-axis
-                cbar = self.fig.colorbar(mappable, cax=self.axc, orientation="horizontal")
-                cbar.minorticks_on()
-                if (self.axc._cb.get('vmin') is not None) and (self.axc._cb.get('vmax') is not None):
-                    self.axc.set_xlim(self.axc._cb['vmin'], self.axc._cb['vmax'])
+                from matplotlib.ticker import AutoMinorLocator
+                axc_obj.yaxis.set_minor_locator(AutoMinorLocator())
+            _tp = ticks_cfg.get("ticks_position", "right")
+            axc_obj.yaxis.set_ticks_position(_tp)
+            axc_obj.yaxis.set_label_position("left" if _tp == "left" else "right")
+            axc_obj.tick_params(**ticks_cfg.get("both", {}))
+            axc_obj.tick_params(**ticks_cfg.get("major", {}))
+            axc_obj.tick_params(**ticks_cfg.get("minor", {}))
+            label_cfg = cb_frame.get("label", {}) if isinstance(cb_frame, dict) else {}
+            if not isinstance(label_cfg, dict):
+                label_cfg = {}
+            if label_cfg:
+                label_kwargs = dict(label_cfg)
+                label_text = label_kwargs.pop("ylabel", "")
+                axc_obj.set_ylabel(label_text if label_text is not None else "", **label_kwargs)
+            ylabel_coords = cb_frame.get("ylabel_coords") if isinstance(cb_frame, dict) else None
+            if ylabel_coords:
+                axc_obj.yaxis.set_label_coords(ylabel_coords["x"], ylabel_coords["y"])
+            self._apply_manual_ticks(axc_obj, "y", ticks_cfg.get("y", {}))
+        else:
+            cbar = self.fig.colorbar(mappable, cax=axc_obj, orientation="horizontal")
+            cbar.minorticks_on()
+            if axc_obj._cb.get("vmin") is not None and axc_obj._cb.get("vmax") is not None:
+                axc_obj.set_xlim(axc_obj._cb["vmin"], axc_obj._cb["vmax"])
+            if str(axc_obj._cb.get("mode", "auto")).lower() == "log":
+                from matplotlib.ticker import LogLocator
+                axc_obj.xaxis.set_minor_locator(LogLocator(subs="auto"))
+            else:
+                from matplotlib.ticker import AutoMinorLocator
+                axc_obj.xaxis.set_minor_locator(AutoMinorLocator())
+            _tp = ticks_cfg.get("ticks_position", "top")
+            axc_obj.xaxis.set_ticks_position(_tp)
+            axc_obj.xaxis.set_label_position("top" if _tp == "top" else "bottom")
+            axc_obj.tick_params(**ticks_cfg.get("both", {}))
+            axc_obj.tick_params(**ticks_cfg.get("major", {}))
+            axc_obj.tick_params(**ticks_cfg.get("minor", {}))
+            label_cfg = cb_frame.get("label", {}) if isinstance(cb_frame, dict) else {}
+            if not isinstance(label_cfg, dict):
+                label_cfg = {}
+            if cb_frame.get("isxlabel") and label_cfg:
+                label_kwargs = dict(label_cfg)
+                label_text = label_kwargs.pop("xlabel", "")
+                axc_obj.set_xlabel(label_text if label_text is not None else "", **label_kwargs)
+            self._apply_manual_ticks(axc_obj, "x", ticks_cfg.get("x", {}))
 
-                if str(self.axc._cb.get('mode', 'auto')).lower() == 'log':
-                    from matplotlib.ticker import LogLocator
-                    self.axc.xaxis.set_minor_locator(LogLocator(subs='auto'))
-                else:
-                    from matplotlib.ticker import AutoMinorLocator
-                    self.axc.xaxis.set_minor_locator(AutoMinorLocator())
+        if self.logger:
+            self.logger.debug(f"Finalized colorbar axes -> {name}")
 
-                _tp = ticks_cfg.get('ticks_position', 'top')
-                self.axc.xaxis.set_ticks_position(_tp)
-                self.axc.xaxis.set_label_position('top' if _tp == 'top' else 'bottom')
+    # ------------------------------------------------------------------
+    # Colorbar pre-scan (called at the start of render())
+    # ------------------------------------------------------------------
 
-                self.axc.tick_params(**ticks_cfg.get('both', {}))
-                self.axc.tick_params(**ticks_cfg.get('major', {}))
-                self.axc.tick_params(**ticks_cfg.get('minor', {}))
-                if self.frame.get('axc', {}).get('isxlabel'):
-                    self.axc.set_xlabel(**self.frame.get('axc', {}).get('label', {}))
-                self._apply_manual_ticks(self.axc, 'x', ticks_cfg.get('x', {}))
+    def _prescan_colorbar_ranges(self) -> None:
+        """Pre-scan all coloured layers to build _cb for every axc* axes.
 
+        For each colorbar axis that has at least one bound layer:
+        1. Load the layer data (DataPreprocessor cache makes this cheap).
+        2. Collect the colour-channel data range.
+        3. Release the data immediately (memory profile unchanged).
+        4. Resolve vmin/vmax from frame config + data ranges, validate,
+           and build the norm object via precompute_colorbar_cb().
 
+        After this call all _cb dicts are fully populated and treated as
+        read-only during the main render loop.
+        """
+        cb_ranges: dict[str, list] = {}
+
+        for ax, ly in self._render_queue:
+            cb_name = ly.get("colorbar", "axc")
+            if cb_name not in self.axes:
+                continue
+
+            coor = ly.get("coor", {})
+            style = dict(ly.get("style") or {})
+            method_key = str(ly.get("method", "scatter")).lower()
+
+            if not layer_uses_color(style, coor, method_key):
+                continue
+
+            # Load data (pipeline cache hit on second call in render loop)
+            self._load_layer_runtime_data(ly)
+            df = ly.get("data")
+            if df is not None:
+                df = self._ensure_pandas_data(df, reason="prescan:colorbar")
+                lo, hi = collect_layer_color_range(df, coor, style)
+                if lo is not None or hi is not None:
+                    cb_ranges.setdefault(cb_name, []).append((lo, hi))
+            # Release immediately to preserve memory profile
+            self._release_layer_runtime_data(ly)
+
+        # Build _cb for each colorbar that has data
+        for cb_name, ranges in cb_ranges.items():
+            axc_obj = self.axes.get(cb_name)
+            if axc_obj is None or not hasattr(axc_obj, "_cb"):
+                continue
+            color_cfg = axc_color_config(self.frame, cb_name)
+            axc_obj._cb.update(
+                precompute_colorbar_cb(color_cfg, ranges, logger=self.logger)
+            )
 
 
 
@@ -794,6 +876,9 @@ class Figure:
                 self.axtri  = kws
             elif ax == "axc":
                 self.axc    = kws
+            elif ax.startswith("axc") and len(ax) > 3:
+                # named secondary colorbar axes: axc2, axc_mass, axc_logL, …
+                self._init_axc_axes(ax, kws)
             elif ax == "ax":
                 self.ax     = kws
             elif self._is_numbered_ax(ax):
@@ -837,6 +922,12 @@ class Figure:
                 "layers": len(self._render_queue),
             },
         )
+
+        # Pre-scan: collect colour ranges and build _cb for all axc* axes
+        # before any layer is rendered.  This makes colorbar limits fully
+        # determined by frame config + data — never by render order.
+        self._prescan_colorbar_ranges()
+
         for ax, ly in self._render_queue:
             self._load_layer_runtime_data(ly)
             self.render_layer(ax, ly)
@@ -856,9 +947,14 @@ class Figure:
                 if self.logger:
                     self.logger.warning(f"Legend draw failed on axes '{name}': {e}")
 
-        # finalize colorbar lazily (only if any colored layer appeared)
-        if "axc" in self.axes:
-            self.axc = True 
+        # Finalize all colorbar axes (axc and any named axc*)
+        for name in list(self.axes.keys()):
+            if name == "axc" or (name.startswith("axc") and len(name) > 3):
+                try:
+                    self._finalize_axc(name)
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"Colorbar finalize failed on '{name}': {e}")
 
         # ---- Finalize axes that want it ----
         for name, ax in self.axes.items():
@@ -868,10 +964,11 @@ class Figure:
                     self._apply_auto_ticks(ax, 'x')
                 if not self._has_manual_ticks('ax', 'y'):
                     self._apply_auto_ticks(ax, 'y')
-            elif name == 'axc':
-                axc_tick_axis = 'x' if self._axc_is_horizontal() else 'y'
-                if not self._has_manual_ticks('axc', axc_tick_axis):
-                    self._apply_auto_ticks(ax, axc_tick_axis)
+            elif name == "axc" or (name.startswith("axc") and len(name) > 3):
+                axc_tick_axis = 'x' if axc_is_horizontal(self.frame, name) else 'y'
+                if not self._has_manual_ticks(name, axc_tick_axis):
+                    self._apply_auto_ticks(self.axes[name], axc_tick_axis)
+                continue  # already handled above, skip finalize below
             if getattr(ax, 'needs_finalize', True) and hasattr(ax, 'finalize'):
                 try:
                     ax.finalize()

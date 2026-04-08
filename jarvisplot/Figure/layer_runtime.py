@@ -240,12 +240,13 @@ def render_layer(fig, ax, layer_info):
     if layer_info.get("style", {}) is not None:
         style.update(layer_info.get("style", {}))
 
+    cb_name = layer_info.get("colorbar", "axc")
+
     if getattr(ax, "_type", None) == "tri":
         df = fig._ensure_pandas_data(layer_info["data"], reason=f"render:{layer_info.get('name', '')}")
-        layer_info["data"] = df
         coor = layer_info.get("coor", {})
         try:
-            style = collect_and_attach_colorbar(fig, style, coor, method_key, df)
+            style = collect_and_attach_colorbar(fig, style, coor, method_key, df, cb_name=cb_name)
             fig.logger.debug("Successful loading colorbar style")
         except Exception as _e:
             if fig.logger:
@@ -262,17 +263,16 @@ def render_layer(fig, ax, layer_info):
 
     elif getattr(ax, "_type", None) == "rect":
         df = fig._ensure_pandas_data(layer_info["data"], reason=f"render:{layer_info.get('name', '')}")
-        layer_info["data"] = df
         coor = layer_info.get("coor", {})
         try:
-            style = collect_and_attach_colorbar(fig, style, coor, method_key, df)
+            style = collect_and_attach_colorbar(fig, style, coor, method_key, df, cb_name=cb_name)
             fig.logger.debug("Successful loading colorbar style")
         except Exception as _e:
             if fig.logger:
                 fig.logger.debug(f"colorbar lazy-attach failed: {_e}")
 
-        if layer_info["method"] == "hist":
-            if isinstance(layer_info["data"], dict):
+        if method_key == "hist":
+            if isinstance(df, dict):
                 if "label" not in style.keys():
                     style["label"] = []
                 for kk, vv in coor.items():
