@@ -16,6 +16,7 @@ from jarvisplot.Figure import layer_runtime as layer_runtime_mod
 from jarvisplot.Figure.colorbar_runtime import collect_and_attach_colorbar
 from jarvisplot.Figure.config_runtime import apply_figure_config
 from jarvisplot.Figure.figure import Figure
+from jarvisplot.Figure.data_pipelines import DataContext, SharedContent
 from jarvisplot.Figure.preprocessor import DataPreprocessor
 from jarvisplot.Figure.profile_runtime import grid_profile_mesh
 from jarvisplot.core import _format_console_record
@@ -252,6 +253,32 @@ def test_render_layer_does_not_mutate_layer_data(monkeypatch, ax_type):
     assert layer_info["data"] is original_data
     assert out["x"] == (converted_data, "x")
     assert out["y"] == (converted_data, "y")
+
+
+def test_prescan_release_does_not_consume_shared_sources():
+    shared = SharedContent(logger=None)
+    ctx = DataContext(shared)
+    ctx.set_usage_plan({"porfXY": 1, "alias": 1})
+    ctx.update("porfXY", pd.DataFrame({"x": [1.0]}))
+
+    fig = SimpleNamespace(
+        context=ctx,
+        preprocessor=SimpleNamespace(should_release_between_uses=lambda *_args, **_kwargs: True, logger=_logger()),
+        logger=_logger(),
+    )
+    layer_info = {
+        "data": pd.DataFrame({"x": [1.0]}),
+        "data_loaded": True,
+        "share_name": "porfXY",
+        "source_refs": ["alias"],
+    }
+
+    layer_runtime_mod.release_layer_runtime_data(fig, layer_info, consume_sources=False)
+
+    assert layer_info["data"] is None
+    assert ctx.remaining_uses("porfXY") == 1
+    assert ctx.remaining_uses("alias") == 1
+    assert isinstance(ctx.get("porfXY"), pd.DataFrame)
 
 
 def test_grid_profile_mesh_reconstructs_from_grid_metadata():

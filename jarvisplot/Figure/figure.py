@@ -313,8 +313,8 @@ class Figure:
     def _load_layer_runtime_data(self, layer_info):
         return runtime_load_layer_runtime_data(self, layer_info)
 
-    def _release_layer_runtime_data(self, layer_info):
-        return runtime_release_layer_runtime_data(self, layer_info)
+    def _release_layer_runtime_data(self, layer_info, consume_sources: bool = True):
+        return runtime_release_layer_runtime_data(self, layer_info, consume_sources=consume_sources)
                         
     def load_layer_data(self, layer):
         return runtime_load_layer_data(self, layer)
@@ -666,7 +666,7 @@ class Figure:
                 if lo is not None or hi is not None:
                     cb_ranges.setdefault(cb_name, []).append((lo, hi))
             # Release immediately to preserve memory profile
-            self._release_layer_runtime_data(ly)
+            self._release_layer_runtime_data(ly, consume_sources=False)
 
         # Build _cb for each colorbar that has data
         for cb_name, ranges in cb_ranges.items():
