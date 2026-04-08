@@ -2,9 +2,17 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import matplotlib
+import pytest
+
+matplotlib.use("Agg")
+
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from jarvisplot.Figure import layer_runtime as layer_runtime_mod
 from jarvisplot.Figure.colorbar_runtime import collect_and_attach_colorbar
 from jarvisplot.Figure.config_runtime import apply_figure_config
 from jarvisplot.Figure.figure import Figure
@@ -120,6 +128,130 @@ def test_colorbar_contract_uses_frame_color_config():
     assert fig.axc._cb["mode"] == "log"
     assert fig.axc._cb["vmin"] == 1.0
     assert fig.axc._cb["vmax"] == 10.0
+
+
+def test_colorbar_log_scale_uses_positive_subset_for_limits():
+    fig = Figure()
+    fig.logger = _logger()
+    fig.frame = {
+        "figure": {"figsize": (2, 2)},
+        "axc": {
+            "label": {"ylabel": ""},
+            "ticks": {},
+            "color": {"scale": "log", "cmap": "viridis"},
+        },
+    }
+    fig.fig = plt.figure(figsize=(2, 2))
+    fig.axes = {}
+    fig.axc = {"rect": [0.1, 0.1, 0.2, 0.8]}
+
+    out = collect_and_attach_colorbar(
+        fig,
+        style={},
+        coor={"z": {"expr": "z"}},
+        method_key="voronoi",
+        df=pd.DataFrame({"z": [0.0, 1.0, 10.0]}),
+    )
+
+    try:
+        fig._finalize_axc("axc")
+
+        assert isinstance(out["norm"], mcolors.LogNorm)
+        assert fig.axc._cb["mode"] == "log"
+        assert fig.axc._cb["vmin"] == 1.0
+        assert fig.axc._cb["vmax"] == 10.0
+        assert fig.axc.get_yscale() == "log"
+    finally:
+        plt.close(fig.fig)
+
+
+def test_colorbar_legacy_axis_scale_still_resolves_log_norm():
+    fig = Figure()
+    fig.logger = _logger()
+    fig.frame = {
+        "figure": {"figsize": (2, 2)},
+        "axc": {
+            "label": {"ylabel": ""},
+            "ticks": {},
+            "yscale": "log",
+        },
+    }
+    fig.fig = plt.figure(figsize=(2, 2))
+    fig.axes = {}
+    fig.axc = {"rect": [0.1, 0.1, 0.2, 0.8]}
+
+    out = collect_and_attach_colorbar(
+        fig,
+        style={},
+        coor={"z": {"expr": "z"}},
+        method_key="voronoi",
+        df=pd.DataFrame({"z": [1.0, 5.0, 10.0]}),
+    )
+    fig._finalize_axc("axc")
+
+    assert isinstance(out["norm"], mcolors.LogNorm)
+    assert fig.axc._cb["mode"] == "log"
+    assert fig.axc.get_yscale() == "log"
+
+
+def test_colorbar_finalize_allows_missing_label_config():
+    fig = Figure()
+    fig.logger = _logger()
+    fig.frame = {
+        "figure": {"figsize": (2, 2)},
+        "axc": {
+            "ticks": {},
+            "color": {"scale": "log", "cmap": "viridis"},
+        },
+    }
+    fig.fig = plt.figure(figsize=(2, 2))
+    fig.axes = {}
+    fig.axc = {"rect": [0.1, 0.1, 0.2, 0.8]}
+
+    out = collect_and_attach_colorbar(
+        fig,
+        style={},
+        coor={"z": {"expr": "z"}},
+        method_key="voronoi",
+        df=pd.DataFrame({"z": [1.0, 5.0, 10.0]}),
+    )
+    fig._finalize_axc("axc")
+
+    assert isinstance(out["norm"], mcolors.LogNorm)
+    assert fig.axc._cb["mode"] == "log"
+    assert fig.axc.get_yscale() == "log"
+
+
+@pytest.mark.parametrize("ax_type", ["rect", "tri"])
+def test_render_layer_does_not_mutate_layer_data(monkeypatch, ax_type):
+    original_data = object()
+    converted_data = object()
+
+    fig = SimpleNamespace(
+        logger=_logger(),
+        style={},
+        _ensure_pandas_data=lambda data, reason="render": converted_data,
+        _eval_series=lambda data, spec: (data, spec["expr"]),
+    )
+    ax = SimpleNamespace(_type=ax_type)
+    layer_info = {
+        "name": "layer",
+        "method": "scatter",
+        "data": original_data,
+        "coor": {"x": {"expr": "x"}, "y": {"expr": "y"}},
+    }
+
+    def dummy_method(**kwargs):
+        return kwargs
+
+    monkeypatch.setattr(layer_runtime_mod, "resolve_callable", lambda *args, **kwargs: (dummy_method, None))
+    monkeypatch.setattr(layer_runtime_mod, "collect_and_attach_colorbar", lambda *args, **kwargs: args[1])
+
+    out = layer_runtime_mod.render_layer(fig, ax, layer_info)
+
+    assert layer_info["data"] is original_data
+    assert out["x"] == (converted_data, "x")
+    assert out["y"] == (converted_data, "y")
 
 
 def test_grid_profile_mesh_reconstructs_from_grid_metadata():

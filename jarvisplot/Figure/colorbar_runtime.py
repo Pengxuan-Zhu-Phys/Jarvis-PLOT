@@ -142,7 +142,7 @@ def layer_uses_color(style: dict, coor: dict, method_key: str) -> bool:
     )
 
 
-def collect_layer_color_range(df, coor: dict, style: dict):
+def collect_layer_color_range(df, coor: dict, style: dict, *, scale: str | None = None):
     """Extract (data_min, data_max) for the colour channel of a single layer.
 
     Returns (None, None) when no finite data is available.
@@ -162,6 +162,8 @@ def collect_layer_color_range(df, coor: dict, style: dict):
     try:
         arr = np.asarray(arr, dtype=float)
         arr = arr[np.isfinite(arr)]
+        if str(scale or "").strip().lower() == "log":
+            arr = arr[arr > 0]
         if arr.size == 0:
             return None, None
         return float(np.min(arr)), float(np.max(arr))
@@ -329,6 +331,31 @@ def collect_and_attach_colorbar(
     axc = fig.axes.get(cb_name)
     if axc is None or not hasattr(axc, "_cb"):
         return style
+
+    if not isinstance(axc._cb, dict):
+        axc._cb = {
+            "mode": "auto",
+            "levels": None,
+            "vmin": None,
+            "vmax": None,
+            "norm": None,
+            "cmap": None,
+            "used": False,
+        }
+
+    if not axc._cb.get("used"):
+        frame = getattr(fig, "frame", {})
+        color_cfg = axc_color_config(frame, cb_name)
+        data_range = collect_layer_color_range(
+            df,
+            coor,
+            style,
+            scale=color_cfg.get("scale"),
+        )
+        if data_range != (None, None):
+            axc._cb.update(
+                precompute_colorbar_cb(color_cfg, [data_range], logger=getattr(fig, "logger", None))
+            )
 
     if not axc._cb.get("used"):
         return style

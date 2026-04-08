@@ -30,7 +30,6 @@ from .layout_runtime import (
 from .colorbar_runtime import (
     axc_color_config,
     axc_is_horizontal,
-    collect_and_attach_colorbar,
     collect_layer_color_range,
     layer_uses_color,
     precompute_colorbar_cb,
@@ -662,7 +661,8 @@ class Figure:
             df = ly.get("data")
             if df is not None:
                 df = self._ensure_pandas_data(df, reason="prescan:colorbar")
-                lo, hi = collect_layer_color_range(df, coor, style)
+                color_cfg = axc_color_config(self.frame, cb_name)
+                lo, hi = collect_layer_color_range(df, coor, style, scale=color_cfg.get("scale"))
                 if lo is not None or hi is not None:
                     cb_ranges.setdefault(cb_name, []).append((lo, hi))
             # Release immediately to preserve memory profile
@@ -1035,9 +1035,6 @@ class Figure:
             fillna=set.get("fillna", None),
         )
         return np.asarray(arr)
-
-    def _cb_collect_and_attach(self, style: dict, coor: dict, method_key: str, df: pd.DataFrame) -> dict:
-        return collect_and_attach_colorbar(self, style, coor, method_key, df)
 
 
 
