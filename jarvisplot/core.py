@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 from pathlib import Path
-from typing import Optional, Any, Dict, Set, Mapping
+from typing import Optional, Dict
 from .cli import CLI
 from loguru import logger
 import os, sys
 import yaml
-import re
 from .config import ConfigLoader
 from .data_loader import DataSet, JP_ROW_IDX
 import io
@@ -101,149 +100,6 @@ class JarvisPLOT():
 
             self.load_styles()
             self.plot()
-
-    @staticmethod
-    def _expr_symbols(expr: Any) -> Set[str]:
-        if expr is None:
-            return set()
-        if isinstance(expr, (int, float, bool)):
-            return set()
-        text = str(expr).strip()
-        if not text:
-            return set()
-        toks = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", text))
-        ignore = {
-            "np",
-            "math",
-            "True",
-            "False",
-            "None",
-            "and",
-            "or",
-            "not",
-            "in",
-            "if",
-            "else",
-            "for",
-            "lambda",
-            "abs",
-            "min",
-            "max",
-            "sum",
-            "len",
-            "int",
-            "float",
-            "str",
-            "bool",
-            "round",
-            "sin",
-            "cos",
-            "tan",
-            "exp",
-            "log",
-            "sqrt",
-            "pi",
-            "e",
-        }
-        return {t for t in toks if t not in ignore}
-
-    def _profile_cfg_columns(self, cfg: Any) -> Set[str]:
-        out: Set[str] = set()
-        if not isinstance(cfg, Mapping):
-            return out
-        coors = cfg.get("coordinates", {})
-        if not isinstance(coors, Mapping):
-            return out
-        for axis_key, axis_cfg in coors.items():
-            axis_name = str(axis_key).strip()
-            if isinstance(axis_cfg, Mapping):
-                expr = axis_cfg.get("expr")
-                out.update(self._expr_symbols(expr))
-                name = axis_cfg.get("name")
-                if isinstance(name, str) and name.strip():
-                    out.add(name.strip())
-                elif axis_name in {"x", "y", "z", "left", "right", "bottom"}:
-                    out.add(axis_name)
-            elif isinstance(axis_cfg, str):
-                out.update(self._expr_symbols(axis_cfg))
-                if axis_name in {"x", "y", "z", "left", "right", "bottom"}:
-                    out.add(axis_name)
-        return out
-
-    def _collect_expr_columns(self, obj: Any, out: Set[str]) -> None:
-        if isinstance(obj, Mapping):
-            for k, v in obj.items():
-                key = str(k).strip().lower()
-                if key in {"expr", "filter", "sortby"}:
-                    out.update(self._expr_symbols(v))
-                    continue
-                if key == "profile":
-                    out.update(self._profile_cfg_columns(v))
-                    continue
-                if key == "grid_profile":
-                    prof = v if isinstance(v, Mapping) else {}
-                    if isinstance(prof, dict):
-                        prof = dict(prof)
-                    else:
-                        prof = {}
-                    prof.setdefault("method", "grid")
-                    out.update(self._profile_cfg_columns(prof))
-                    continue
-                self._collect_expr_columns(v, out)
-            return
-        if isinstance(obj, (list, tuple)):
-            for item in obj:
-                self._collect_expr_columns(item, out)
-
-    def _transform_columns(self, transform: Any) -> Set[str]:
-        out: Set[str] = set()
-        if not isinstance(transform, list):
-            return out
-        for step in transform:
-            if not isinstance(step, Mapping):
-                continue
-            self._collect_expr_columns(step, out)
-            if "add_column" in step:
-                add_cfg = step.get("add_column", {})
-                if isinstance(add_cfg, Mapping):
-                    name = add_cfg.get("name")
-                    if isinstance(name, str) and name.strip():
-                        out.add(name.strip())
-        return out
-
-    def _transform_output_columns(self, transform: Any) -> Set[str]:
-        out: Set[str] = set()
-        if not isinstance(transform, list):
-            return out
-        for step in transform:
-            if not isinstance(step, Mapping):
-                continue
-            if "add_column" in step:
-                add_cfg = step.get("add_column", {})
-                if isinstance(add_cfg, Mapping):
-                    name = add_cfg.get("name")
-                    if isinstance(name, str) and name.strip():
-                        out.add(name.strip())
-            if "profile" in step:
-                out.update(self._profile_cfg_columns(step.get("profile", {})))
-            if "grid_profile" in step:
-                cfg = step.get("grid_profile", {})
-                if isinstance(cfg, dict):
-                    cfg = dict(cfg)
-                else:
-                    cfg = {}
-                cfg.setdefault("method", "grid")
-                out.update(self._profile_cfg_columns(cfg))
-        return out
-
-    def _layer_columns(self, layer: Any) -> Set[str]:
-        out: Set[str] = set()
-        if not isinstance(layer, Mapping):
-            return out
-        self._collect_expr_columns(layer.get("coordinates", {}), out)
-        self._collect_expr_columns(layer.get("style", {}), out)
-        self._collect_expr_columns(layer.get("data", []), out)
-        return out
 
     def plan_dataset_required_columns(self) -> None:
         return runtime_plan_dataset_required_columns(self)

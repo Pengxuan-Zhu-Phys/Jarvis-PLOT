@@ -6,10 +6,10 @@ Status: implemented
 
 Jarvis-PLOT runtime can be viewed as four stacked layers:
 
-1. Orchestration layer (`core.py`)
-2. Data pipeline layer (`data_loader.py` + `data_loader_summary.py` + `data_loader_hdf5.py` + `preprocessor.py` + `load_data.py` + `profile_runtime.py`)
-3. Render layer (`figure.py` + `adapters.py` + `adapters_rect.py` + `adapters_ternary.py` + `method_registry.py`)
-4. Asset/config layer (`cards/*.json` + user YAML in `bin/`)
+1. Orchestration layer (`core.py` + `core_runtime.py` + `core_assets.py` + `config.py` + `cli.py`)
+2. Data pipeline layer (`data_loader.py` + `data_loader_runtime.py` + `data_loader_hdf5.py` + `data_loader_summary.py` + `cache_store.py` + `Figure/preprocessor.py` + `Figure/preprocessor_runtime.py` + `Figure/load_data.py` + `Figure/profile_runtime.py` + `Figure/data_pipelines.py`)
+3. Render layer (`Figure/figure.py` + `Figure/config_runtime.py` + `Figure/layer_runtime.py` + `Figure/adapters.py` + `Figure/adapters_rect.py` + `Figure/adapters_ternary.py` + `Figure/method_registry.py` + `Figure/style_runtime.py` + `Figure/layout_runtime.py` + `Figure/colorbar_runtime.py` + `Figure/helper.py`)
+4. Asset/config layer (`cards/*.json` + `Figure/cards/*.json` + `utils/cmaps.py` + `utils/pathing.py` + `utils/expression.py` + `utils/interpolator.py` + `inner_func.py` + user YAML in `bin/`)
 
 
 ## 2) Figure Lifecycle Contract
@@ -42,8 +42,12 @@ For each figure item in YAML:
 - `sortby`
 - `profile`
 - `grid_profile`
+- `keep_columns`
+- `drop_columns`
+- `tocsv`
+- `to_parquet`
 
-Order is authoritative; transforms run sequentially.
+Order is authoritative; transforms run sequentially. `keep_columns` and `drop_columns` are the only explicit column-pruning steps. `tocsv` and `to_parquet` export the dataframe state at their position in the ordered list.
 
 ### Prebuild vs Runtime
 
