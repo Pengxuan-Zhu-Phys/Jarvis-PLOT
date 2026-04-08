@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "JarvisPLOT"
+version = "1.3.5"
+description = "Jarvis-PLOT: YAML-driven plotting engine"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "loguru",
+  "pyyaml",
+  "jsonschema",
+  "Jarvis-Operas>=1.1.4",
+  "numpy",
+  "pandas",
+  "polars",
+  "matplotlib",
+  "h5py",
+  "sympy",
+  "scipy",
+  "shapely",
+  "deepmerge"
+]
+
+[project.scripts]
+jplot = "jarvisplot.client:main"
+
+[tool.setuptools.package-data]
+jarvisplot = [
+  "cards/**/*",
+  "Figure/cards/**/*",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["jarvisplot*"]
