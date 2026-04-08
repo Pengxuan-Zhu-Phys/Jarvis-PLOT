@@ -95,7 +95,7 @@ Figures:
       - sortby: LogL1
       # - filter: LogL1 < -258.5
       - profile:
-          bin: 60
+          bin: 150
           coordinates:
             x:
               expr: pMu/1000
@@ -122,8 +122,8 @@ Figures:
       y:
         expr: yy
       z:
-        # expr: np.exp(LogL1) / np.exp(-258.5)
-        expr: np.exp(LogL1) / np.exp(np.max(LogL1))
+        expr: np.exp(LogL1) / np.exp(-258.5)
+        # expr: np.exp(LogL1) / np.exp(np.max(LogL1))
     style: {}
 
 - name: mN1mC1_ProfLogL
@@ -162,7 +162,7 @@ Figures:
       - sortby: LogL1
       # - filter: LogL1 < -258.0 
       - profile:
-          bin: 60
+          bin: 150
           coordinates:
             x:
               expr: np.abs(mWIMP)
@@ -189,8 +189,8 @@ Figures:
       y:
         expr: yy
       z:
-        # expr: np.exp(LogL1) / np.exp(-258.5)
-        expr: np.exp(LogL1) / np.exp(np.max(LogL1))
+        expr: np.exp(LogL1) / np.exp(-258.5)
+        # expr: np.exp(LogL1) / np.exp(np.max(LogL1))
 
     style: {}
 
