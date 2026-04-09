@@ -83,6 +83,11 @@ class NaturalNeighborDiagnostics:
     masked_by_nan: int = 0
     all_nan_cores: bool = False
     degenerate_input: bool = False
+    exact_duplicate_groups: int = 0
+    near_duplicate_groups: int = 0
+    merged_points: int = 0
+    nominal_point_spacing: float = 0.0
+    vertex_tolerance: float = 0.0
     interpolator_ready: bool = False
 
 
@@ -104,36 +109,67 @@ def _as_grid_float(arr: Any, *, name: str) -> np.ndarray:
     return out
 
 
-def _dedupe_coordinates(coords: np.ndarray, values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def _dedupe_coordinates(
+    coords: np.ndarray, values: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, int, int]:
     """Collapse exact duplicate (x, y) coordinates.
 
     Strict NaN handling:
     - if any duplicate value is NaN, the consolidated value is NaN.
-    - if duplicate finite values disagree, keep the first finite value and warn.
+    - duplicate finite values are merged using their mean value.
     """
     if coords.size == 0:
-        return coords, values
+        return coords, values, 0, 0
 
-    uniq, inverse = np.unique(coords, axis=0, return_inverse=True)
-    out = np.empty(uniq.shape[0], dtype=float)
+    groups: dict[tuple[float, float], list[int]] = {}
+    order: list[tuple[float, float]] = []
+    for idx, pt in enumerate(np.asarray(coords, dtype=float).reshape(-1, 2)):
+        key = (float(pt[0]), float(pt[1]))
+        if key not in groups:
+            groups[key] = [int(idx)]
+            order.append(key)
+        else:
+            groups[key].append(int(idx))
 
-    for idx in range(uniq.shape[0]):
-        group = values[inverse == idx]
+    uniq = np.empty((len(order), 2), dtype=float)
+    out = np.empty(len(order), dtype=float)
+    exact_duplicate_groups = 0
+    exact_duplicate_points = 0
+
+    for out_idx, key in enumerate(order):
+        group_idx = groups[key]
+        group = values[np.asarray(group_idx, dtype=int)]
+        uniq[out_idx] = coords[int(group_idx[0])]
         if group.size == 0:
-            out[idx] = np.nan
+            out[out_idx] = np.nan
             continue
         if np.isnan(group).any():
-            out[idx] = np.nan
+            out[out_idx] = np.nan
             continue
-        first = float(group[0])
-        if group.size > 1 and not np.allclose(group, first, rtol=0.0, atol=1e-12):
-            _warn(
-                "natural_neighbor: duplicate coordinates with conflicting finite z values "
-                "were collapsed by keeping the first value"
-            )
-        out[idx] = first
+        out[out_idx] = float(np.mean(group))
+        if len(group_idx) > 1:
+            exact_duplicate_groups += 1
+            exact_duplicate_points += len(group_idx) - 1
 
-    return uniq, out
+    return uniq, out, exact_duplicate_groups, exact_duplicate_points
+
+
+def _estimate_nominal_spacing(coords: np.ndarray) -> float:
+    if coords.size == 0 or coords.shape[0] < 2:
+        return 1.0
+    try:
+        tree = cKDTree(coords)
+        dists, _ = tree.query(coords, k=2)
+        nn = np.asarray(dists[:, 1], dtype=float)
+        finite = nn[np.isfinite(nn) & (nn > 0)]
+        if finite.size == 0:
+            return 1.0
+        spacing = float(np.median(finite))
+        if np.isfinite(spacing) and spacing > 0:
+            return spacing
+    except Exception:
+        pass
+    return 1.0
 
 
 def _effective_scale(coords: np.ndarray) -> float:
@@ -157,14 +193,23 @@ class NaturalNeighborInterpolator:
     stable so a true backend can replace it later.
     """
 
-    def __init__(self, x, y, z, *, nan_policy: str = "strict"):
+    def __init__(
+        self,
+        x,
+        y,
+        z,
+        *,
+        nan_policy: str = "strict",
+        backend_options: Optional[dict[str, Any]] = None,
+    ):
         self.nan_policy = self._normalize_nan_policy(nan_policy)
+        self.backend_options = dict(backend_options or {})
         self.diagnostics = NaturalNeighborDiagnostics(nan_policy=self.nan_policy)
 
         self._coords: Optional[np.ndarray] = None
         self._values: Optional[np.ndarray] = None
         self._tree: Any = None
-        self._exact_tol: float = 0.0
+        self._vertex_tol: float = 0.0
         self._tri: Any = None
         self._simplex_has_nan: Optional[np.ndarray] = None
         self._value_interpolator: Any = None
@@ -213,7 +258,46 @@ class NaturalNeighborInterpolator:
         coords = np.column_stack([x[finite_xy], y[finite_xy]])
         values = z[finite_xy]
 
-        coords, values = _dedupe_coordinates(coords, values)
+        coords, values, exact_duplicate_groups, exact_duplicate_points = _dedupe_coordinates(
+            coords, values
+        )
+        self.diagnostics.exact_duplicate_groups = int(exact_duplicate_groups)
+        self.diagnostics.merged_points = int(exact_duplicate_points)
+
+        scale = _effective_scale(coords)
+        nominal_spacing = self.backend_options.get("nominal_point_spacing", None)
+        if nominal_spacing is None:
+            nominal_spacing = _estimate_nominal_spacing(coords)
+        try:
+            nominal_spacing = float(nominal_spacing)
+        except Exception:
+            nominal_spacing = 1.0
+        if not np.isfinite(nominal_spacing) or nominal_spacing <= 0:
+            nominal_spacing = scale
+        self._vertex_tol = float(
+            self.backend_options.get(
+                "vertex_tol",
+                max(nominal_spacing / 1.0e5, 64.0 * np.finfo(float).eps * scale),
+            )
+        )
+        if not np.isfinite(self._vertex_tol) or self._vertex_tol <= 0:
+            self._vertex_tol = max(nominal_spacing / 1.0e5, 64.0 * np.finfo(float).eps * scale)
+
+        try:
+            from .interp_natural_neighbor_exact import _merge_near_duplicates as _merge_near_duplicates_exact
+        except Exception:
+            _merge_near_duplicates_exact = None
+
+        if _merge_near_duplicates_exact is not None:
+            coords, values, near_duplicate_groups, near_duplicate_points = _merge_near_duplicates_exact(
+                coords, values, self._vertex_tol
+            )
+        else:
+            near_duplicate_groups = 0
+            near_duplicate_points = 0
+        self.diagnostics.near_duplicate_groups = int(near_duplicate_groups)
+        self.diagnostics.merged_points += int(near_duplicate_points)
+
         self._coords = coords
         self._values = values
 
@@ -221,10 +305,10 @@ class NaturalNeighborInterpolator:
         finite_value_mask = np.isfinite(values)
         self.diagnostics.unique_finite_points = int(np.count_nonzero(finite_value_mask))
         self.diagnostics.all_nan_cores = bool(coords.size > 0 and not np.any(finite_value_mask))
+        self.diagnostics.nominal_point_spacing = float(nominal_spacing)
+        self.diagnostics.vertex_tolerance = float(self._vertex_tol)
 
         self._tree = cKDTree(coords)
-        scale = _effective_scale(coords)
-        self._exact_tol = max(64.0 * np.finfo(float).eps * scale, np.finfo(float).eps)
 
         if self.diagnostics.all_nan_cores:
             self.diagnostics.implementation = "exact-core-only"
@@ -304,7 +388,7 @@ class NaturalNeighborInterpolator:
 
         # Exact site hits take precedence and preserve core values exactly.
         dist, idx = self._tree.query(pts, k=1)
-        exact_mask = np.isfinite(dist) & (dist <= self._exact_tol)
+        exact_mask = np.isfinite(dist) & (dist < self._vertex_tol)
         if np.any(exact_mask):
             out[exact_mask] = self._values[idx[exact_mask]]
         self.diagnostics.exact_hits = int(np.count_nonzero(exact_mask))
@@ -359,7 +443,13 @@ def natural_neighbor_approx_interpolate(
     diagnostics: bool = False,
     backend_options: Optional[dict[str, Any]] = None,
 ) -> np.ndarray:
-    interp = NaturalNeighborApproxInterpolator(x, y, z, nan_policy=nan_policy)
+    interp = NaturalNeighborApproxInterpolator(
+        x,
+        y,
+        z,
+        nan_policy=nan_policy,
+        backend_options=backend_options,
+    )
     result = interp.evaluate(X, Y)
     natural_neighbor_approx_interpolate.last_diagnostics = interp.diagnostics
     return result

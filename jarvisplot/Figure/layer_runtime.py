@@ -148,6 +148,32 @@ def _log_natural_neighbor_diagnostics(logger, diag) -> None:
             logger.warning("natural_neighbor: input data are too sparse or degenerate for full interpolation")
         if getattr(diag, "all_nan_cores", False):
             logger.warning("natural_neighbor: all input z cores are NaN")
+        exact_duplicate_groups = getattr(diag, "exact_duplicate_groups", 0)
+        near_duplicate_groups = getattr(diag, "near_duplicate_groups", 0)
+        merged_points = getattr(diag, "merged_points", 0)
+        if any(int(v) for v in (exact_duplicate_groups, near_duplicate_groups, merged_points)):
+            logger.debug(
+                "natural_neighbor: merged {} exact-duplicate groups, {} near-duplicate groups, {} points merged".format(
+                    int(exact_duplicate_groups),
+                    int(near_duplicate_groups),
+                    int(merged_points),
+                )
+            )
+        nominal_spacing = getattr(diag, "nominal_point_spacing", None)
+        if isinstance(nominal_spacing, (int, float)) and nominal_spacing > 0:
+            logger.debug(
+                "natural_neighbor: nominal point spacing {:.6g}".format(float(nominal_spacing))
+            )
+        vertex_tolerance = getattr(diag, "vertex_tolerance", None)
+        if isinstance(vertex_tolerance, (int, float)) and vertex_tolerance > 0:
+            logger.debug(
+                "natural_neighbor: vertex tolerance {:.6g}".format(float(vertex_tolerance))
+            )
+        boundary_tolerance = getattr(diag, "boundary_tolerance", None)
+        if isinstance(boundary_tolerance, (int, float)) and boundary_tolerance > 0:
+            logger.debug(
+                "natural_neighbor: boundary tolerance {:.6g}".format(float(boundary_tolerance))
+            )
         if getattr(diag, "masked_by_nan", 0):
             logger.warning(
                 "natural_neighbor: {} query points were masked because a contributing core is NaN".format(
@@ -172,10 +198,18 @@ def _log_natural_neighbor_diagnostics(logger, diag) -> None:
                     int(getattr(diag, "cavity_triangles", 0))
                 )
             )
-        if getattr(diag, "site_cells_built", 0):
+        area_of_embedded_polygon = getattr(diag, "area_of_embedded_polygon", None)
+        if isinstance(area_of_embedded_polygon, (int, float)) and area_of_embedded_polygon != 0:
             logger.debug(
-                "natural_neighbor: built {} clipped site cells".format(
-                    int(getattr(diag, "site_cells_built", 0))
+                "natural_neighbor: area of embedded polygon {:.6f}".format(
+                    float(area_of_embedded_polygon)
+                )
+            )
+        barycentric_coordinate_deviation = getattr(diag, "barycentric_coordinate_deviation", None)
+        if isinstance(barycentric_coordinate_deviation, (int, float)) and barycentric_coordinate_deviation != 0:
+            logger.debug(
+                "natural_neighbor: barycentric coordinate deviation {:.6e}".format(
+                    float(barycentric_coordinate_deviation)
                 )
             )
         build_seconds = getattr(diag, "build_seconds", None)
@@ -245,6 +279,51 @@ def _prepare_contour_args(fig, ax, method_key: str, style: dict, coor: dict):
         return None, style
 
     return (X, Y, np.ma.masked_invalid(Z)), style
+
+
+def _prepare_jpcontour_style(
+    fig,
+    method_key: str,
+    style: dict,
+    coor: dict,
+    df,
+    layer_name: str = "",
+    coord_keys: tuple[str, ...] | None = None,
+    required_keys: tuple[str, ...] = (),
+    include_diagnostics: bool = False,
+):
+    """Prepare scattered jpcontour/jpcontourf/jpfield kwargs and map style.interp."""
+    call_style = dict(style)
+    interp_cfg = call_style.pop("interp", None)
+    interp_cfg = dict(interp_cfg) if isinstance(interp_cfg, dict) else None
+    if interp_cfg is not None:
+        call_style.setdefault("interp_method", interp_cfg.get("method", "natural_neighbor"))
+        for key in ("bin", "nx", "ny", "xlim", "ylim", "nan_policy", "backend_options"):
+            if key in interp_cfg and key not in call_style:
+                call_style[key] = interp_cfg[key]
+        if include_diagnostics and "diagnostics" in interp_cfg and "diagnostics" not in call_style:
+            call_style["diagnostics"] = bool(interp_cfg.get("diagnostics", False))
+
+    coords = {}
+    items = coor.items() if coord_keys is None else ((kk, coor[kk]) for kk in coord_keys if kk in coor)
+    for kk, vv in items:
+        if isinstance(vv, dict) and "expr" in vv:
+            if df is None:
+                raise ValueError(
+                    f"Layer '{layer_name}' defines expression-based "
+                    f"coordinate for '{kk}' but has no data source."
+                )
+            coords[kk] = fig._eval_series(df, vv)
+        else:
+            coords[kk] = vv
+
+    for kk in required_keys:
+        if kk not in coords:
+            required_list = ", ".join(required_keys) if required_keys else "required coordinates"
+            raise ValueError(f"{method_key} layer must define coordinates: {{{required_list}}}")
+
+    call_style.update(coords)
+    return call_style
 
 
 def load_layer_data(fig, layer):
@@ -464,6 +543,19 @@ def render_layer(fig, ax, layer_info):
             style[kk] = fig._eval_series(df, vv)
         if method_key == "grid_profile":
             style["__df__"] = df
+        if method_key in {"jpcontour", "jpcontourf", "jpfield"}:
+            jp_kwargs = _prepare_jpcontour_style(
+                fig,
+                method_key,
+                style,
+                coor,
+                df,
+                layer_name=str(layer_info.get("name", "")),
+                coord_keys=None,
+                required_keys=("z",),
+                include_diagnostics=method_key in {"jpcontour", "jpcontourf"},
+            )
+            return method(**jp_kwargs)
         return method(**style)
 
     elif getattr(ax, "_type", None) == "rect":
@@ -492,6 +584,19 @@ def render_layer(fig, ax, layer_info):
                     style[kk] = fig._eval_series(df, vv)
 
             return method(**style)
+        if method_key in {"jpcontour", "jpcontourf", "jpfield"}:
+            jp_kwargs = _prepare_jpcontour_style(
+                fig,
+                method_key,
+                style,
+                coor,
+                df,
+                layer_name=str(layer_info.get("name", "")),
+                coord_keys=("x", "y", "z"),
+                required_keys=("x", "y", "z"),
+                include_diagnostics=method_key in {"jpcontour", "jpcontourf"},
+            )
+            return method(**jp_kwargs)
         if method_key in {"contour", "contourf"}:
             contour_coor = {}
             for kk in ("x", "y", "z"):

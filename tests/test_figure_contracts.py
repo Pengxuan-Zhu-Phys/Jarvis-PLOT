@@ -238,6 +238,101 @@ def test_colorbar_attachment_accepts_nullable_numeric_color_channel():
     assert fig.axes["axc"]._cb["vmax"] == 3.0
 
 
+def test_colorbar_attachment_treats_jpcontourf_like_contour():
+    class DummyColorbarAxis:
+        def __init__(self):
+            self._cb = {
+                "cmap": None,
+                "vmin": None,
+                "vmax": None,
+                "norm": None,
+                "levels": None,
+                "used": False,
+            }
+
+    fig = SimpleNamespace(
+        axes={"axc": DummyColorbarAxis()},
+        frame={"axc": {"color": {"scale": "linear", "cmap": "viridis"}}},
+        logger=_logger(),
+    )
+
+    out = collect_and_attach_colorbar(
+        fig,
+        style={},
+        coor={"z": {"expr": "z"}},
+        method_key="jpcontourf",
+        df=pd.DataFrame({"z": [1.0, 2.0, 4.0]}),
+    )
+
+    assert out["cmap"] == "viridis"
+    assert fig.axes["axc"]._cb["used"] is True
+    assert fig.axes["axc"]._cb["levels"] is not None
+
+
+def test_colorbar_attachment_leaves_explicit_contour_colors_alone():
+    class DummyColorbarAxis:
+        def __init__(self):
+            self._cb = {
+                "cmap": None,
+                "vmin": None,
+                "vmax": None,
+                "norm": None,
+                "levels": None,
+                "used": False,
+            }
+
+    fig = SimpleNamespace(
+        axes={"axc": DummyColorbarAxis()},
+        frame={"axc": {"color": {"scale": "linear", "cmap": "viridis"}}},
+        logger=_logger(),
+    )
+
+    out = collect_and_attach_colorbar(
+        fig,
+        style={"colors": "white", "linewidths": 1.0},
+        coor={"z": {"expr": "z"}},
+        method_key="jpcontourf",
+        df=pd.DataFrame({"z": [1.0, 2.0, 4.0]}),
+    )
+
+    assert out["colors"] == "white"
+    assert out["linewidths"] == 1.0
+    assert "cmap" not in out
+    assert "norm" not in out
+    assert fig.axes["axc"]._cb["used"] is False
+
+
+def test_colorbar_attachment_treats_jpfield_like_a_z_mappable_field():
+    class DummyColorbarAxis:
+        def __init__(self):
+            self._cb = {
+                "cmap": None,
+                "vmin": None,
+                "vmax": None,
+                "norm": None,
+                "levels": None,
+                "used": False,
+            }
+
+    fig = SimpleNamespace(
+        axes={"axc": DummyColorbarAxis()},
+        frame={"axc": {"color": {"scale": "linear", "cmap": "viridis"}}},
+        logger=_logger(),
+    )
+
+    out = collect_and_attach_colorbar(
+        fig,
+        style={},
+        coor={"z": {"expr": "z"}},
+        method_key="jpfield",
+        df=pd.DataFrame({"z": [1.0, 2.0, 4.0]}),
+    )
+
+    assert out["cmap"] == "viridis"
+    assert fig.axes["axc"]._cb["used"] is True
+    assert fig.axes["axc"]._cb["levels"] is None
+
+
 def test_colorbar_log_scale_uses_positive_subset_for_limits():
     fig = Figure()
     fig.logger = _logger()

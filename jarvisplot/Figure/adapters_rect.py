@@ -5,12 +5,14 @@ from typing import Any, Dict, Optional
 import numpy as np
 import os
 import json
+import warnings
 
 from matplotlib.axes import Axes
 from matplotlib.collections import PolyCollection
 #
 from .helper import _auto_clip, _mask_by_extend, voronoi_finite_polygons_2d, _clip_poly_to_rect
 from .profile_runtime import grid_profile_mesh
+from .interp_natural_neighbor import resolve_backend
 
 
 # —— Basic Adapter: Forward to the underlying Axes, merge default parameters, perform automatic clipping ——
@@ -51,6 +53,308 @@ class StdAxesAdapter:
         base = dict(self._defaults.get(method, {}))
         base.update(kwargs or {})
         return base
+
+    @staticmethod
+    def _coerce_positive_int(value, default: int) -> int:
+        try:
+            n = int(value)
+            if n > 0:
+                return n
+        except Exception:
+            pass
+        return int(default)
+
+    def _resolve_jpcontour_axis(self, axis_name: str, values, *, npts: int, bounds=None):
+        values = np.asarray(values, dtype=float).reshape(-1)
+        finite = values[np.isfinite(values)]
+
+        try:
+            scale = str(self.ax.get_xscale() if axis_name == "x" else self.ax.get_yscale()).lower()
+        except Exception:
+            scale = "linear"
+
+        if bounds is None:
+            if finite.size:
+                lo = float(np.min(finite))
+                hi = float(np.max(finite))
+            else:
+                try:
+                    lo, hi = self.ax.get_xlim() if axis_name == "x" else self.ax.get_ylim()
+                    lo = float(lo)
+                    hi = float(hi)
+                except Exception:
+                    lo, hi = 0.0, 1.0
+        else:
+            try:
+                lo = float(bounds[0])
+                hi = float(bounds[1])
+            except Exception:
+                lo, hi = 0.0, 1.0
+
+        if not np.isfinite(lo) or not np.isfinite(hi):
+            if finite.size:
+                lo = float(np.min(finite))
+                hi = float(np.max(finite))
+            else:
+                lo, hi = 0.0, 1.0
+
+        if lo == hi:
+            if scale == "log" and lo > 0:
+                hi = lo * 10.0
+            else:
+                hi = lo + 1.0
+
+        if scale == "log":
+            positive = finite[finite > 0]
+            if lo <= 0 or hi <= 0:
+                if positive.size:
+                    lo = float(np.min(positive))
+                    hi = float(np.max(positive))
+                else:
+                    warnings.warn(
+                        f"jpcontour: {axis_name}-axis is log-scaled but has no positive finite values; "
+                        "falling back to a linear grid",
+                        RuntimeWarning,
+                        stacklevel=3,
+                    )
+                    return np.linspace(lo, hi, npts)
+            lo = max(lo, np.finfo(float).tiny)
+            hi = max(hi, lo * 10.0)
+            return np.geomspace(lo, hi, npts)
+
+        return np.linspace(lo, hi, npts)
+
+    def _normalize_jpfield_axis(self, axis_name: str, values, *, bounds=None):
+        """Map data coordinates onto axes-fraction coordinates in [0, 1].
+
+        This is used by jpfield so interpolation and rendering both happen in
+        the axes transform frame, avoiding mixed log/linear geometry.
+        """
+        values = np.asarray(values, dtype=float).reshape(-1)
+        out = np.full(values.shape, np.nan, dtype=float)
+
+        try:
+            scale = str(self.ax.get_xscale() if axis_name == "x" else self.ax.get_yscale()).lower()
+        except Exception:
+            scale = "linear"
+
+        if bounds is None:
+            try:
+                bounds = self.ax.get_xlim() if axis_name == "x" else self.ax.get_ylim()
+            except Exception:
+                bounds = None
+
+        if bounds is None:
+            finite = values[np.isfinite(values)]
+            if finite.size:
+                lo = float(np.min(finite))
+                hi = float(np.max(finite))
+            else:
+                lo, hi = 0.0, 1.0
+        else:
+            try:
+                lo = float(bounds[0])
+                hi = float(bounds[1])
+            except Exception:
+                lo, hi = 0.0, 1.0
+
+        if not np.isfinite(lo) or not np.isfinite(hi):
+            finite = values[np.isfinite(values)]
+            if finite.size:
+                lo = float(np.min(finite))
+                hi = float(np.max(finite))
+            else:
+                lo, hi = 0.0, 1.0
+
+        if lo == hi:
+            if scale == "log" and lo > 0:
+                hi = lo * 10.0
+            else:
+                hi = lo + 1.0
+
+        if scale == "log":
+            positive = values[np.isfinite(values) & (values > 0)]
+            if lo <= 0 or hi <= 0:
+                if positive.size:
+                    lo = float(np.min(positive))
+                    hi = float(np.max(positive))
+                else:
+                    warnings.warn(
+                        f"jpfield: {axis_name}-axis is log-scaled but has no positive finite values; "
+                        "rendering an empty field in axes-fraction space",
+                        RuntimeWarning,
+                        stacklevel=3,
+                    )
+                    return out
+            lo = max(lo, np.finfo(float).tiny)
+            hi = max(hi, lo * 10.0)
+            den = np.log(hi) - np.log(lo)
+            if den == 0:
+                den = 1.0
+            valid = np.isfinite(values) & (values > 0)
+            out[valid] = (np.log(values[valid]) - np.log(lo)) / den
+            return out
+
+        den = hi - lo
+        if den == 0:
+            den = 1.0
+        valid = np.isfinite(values)
+        out[valid] = (values[valid] - lo) / den
+        return out
+
+    def _build_jpfield_grid(
+        self,
+        x,
+        y,
+        *,
+        bin: int = 128,
+        nx: Optional[int] = None,
+        ny: Optional[int] = None,
+        xlim=None,
+        ylim=None,
+    ):
+        x = np.asarray(x, dtype=float).reshape(-1)
+        y = np.asarray(y, dtype=float).reshape(-1)
+        if x.shape[0] != y.shape[0]:
+            raise ValueError("x and y must have the same length")
+
+        nx_eff = self._coerce_positive_int(nx if nx is not None else bin, 128)
+        ny_eff = self._coerce_positive_int(ny if ny is not None else bin, 128)
+        x_norm = self._normalize_jpfield_axis("x", x, bounds=xlim)
+        y_norm = self._normalize_jpfield_axis("y", y, bounds=ylim)
+        xq = np.linspace(0.0, 1.0, nx_eff)
+        yq = np.linspace(0.0, 1.0, ny_eff)
+        X, Y = np.meshgrid(xq, yq)
+        return X, Y, x_norm, y_norm
+
+    def _interpolate_jpfield_grid(
+        self,
+        x,
+        y,
+        z,
+        *,
+        interp_method: str = "natural_neighbor",
+        bin: int = 128,
+        nx: Optional[int] = None,
+        ny: Optional[int] = None,
+        xlim=None,
+        ylim=None,
+        nan_policy: str = "strict",
+        backend_options: Optional[dict[str, Any]] = None,
+    ):
+        x = np.asarray(x, dtype=float).reshape(-1)
+        y = np.asarray(y, dtype=float).reshape(-1)
+        z = np.asarray(z, dtype=float).reshape(-1)
+        if x.shape[0] != y.shape[0] or x.shape[0] != z.shape[0]:
+            raise ValueError("x, y, and z must have the same length")
+
+        X, Y, x_norm, y_norm = self._build_jpfield_grid(
+            x,
+            y,
+            bin=bin,
+            nx=nx,
+            ny=ny,
+            xlim=xlim,
+            ylim=ylim,
+        )
+        try:
+            backend = resolve_backend(interp_method)
+        except Exception as exc:
+            raise ValueError(
+                f"Unsupported jpfield interpolation backend: {interp_method!r}"
+            ) from exc
+        Z = backend(
+            x_norm,
+            y_norm,
+            z,
+            X,
+            Y,
+            nan_policy=nan_policy,
+            backend_options=backend_options,
+        )
+        return X, Y, np.asarray(Z, dtype=float)
+
+    def _build_jpcontour_grid(
+        self,
+        x,
+        y,
+        *,
+        bin: int = 128,
+        nx: Optional[int] = None,
+        ny: Optional[int] = None,
+        xlim=None,
+        ylim=None,
+    ):
+        x = np.asarray(x, dtype=float).reshape(-1)
+        y = np.asarray(y, dtype=float).reshape(-1)
+        if x.shape[0] != y.shape[0]:
+            raise ValueError("x and y must have the same length")
+
+        if xlim is None:
+            try:
+                xlim = self.ax.get_xlim()
+            except Exception:
+                xlim = None
+        if ylim is None:
+            try:
+                ylim = self.ax.get_ylim()
+            except Exception:
+                ylim = None
+
+        nx_eff = self._coerce_positive_int(nx if nx is not None else bin, 128)
+        ny_eff = self._coerce_positive_int(ny if ny is not None else bin, 128)
+        xq = self._resolve_jpcontour_axis("x", x, npts=nx_eff, bounds=xlim)
+        yq = self._resolve_jpcontour_axis("y", y, npts=ny_eff, bounds=ylim)
+        return np.meshgrid(xq, yq)
+
+    def _interpolate_jpcontour_grid(
+        self,
+        x,
+        y,
+        z,
+        *,
+        interp_method: str = "natural_neighbor",
+        bin: int = 128,
+        nx: Optional[int] = None,
+        ny: Optional[int] = None,
+        xlim=None,
+        ylim=None,
+        nan_policy: str = "strict",
+        diagnostics: bool = False,
+        backend_options: Optional[dict[str, Any]] = None,
+    ):
+        x = np.asarray(x, dtype=float).reshape(-1)
+        y = np.asarray(y, dtype=float).reshape(-1)
+        z = np.asarray(z, dtype=float).reshape(-1)
+        if x.shape[0] != y.shape[0] or x.shape[0] != z.shape[0]:
+            raise ValueError("x, y, and z must have the same length")
+
+        X, Y = self._build_jpcontour_grid(
+            x,
+            y,
+            bin=bin,
+            nx=nx,
+            ny=ny,
+            xlim=xlim,
+            ylim=ylim,
+        )
+        try:
+            backend = resolve_backend(interp_method)
+        except Exception as exc:
+            raise ValueError(
+                f"Unsupported jpcontour interpolation backend: {interp_method!r}"
+            ) from exc
+        Z = backend(
+            x,
+            y,
+            z,
+            X,
+            Y,
+            nan_policy=nan_policy,
+            diagnostics=diagnostics,
+            backend_options=backend_options,
+        )
+        return X, Y, np.asarray(Z, dtype=float)
 
     # —— Common method forwarding (add as needed) ——
     def scatter(self, **kwargs):
@@ -176,6 +480,146 @@ class StdAxesAdapter:
     def contourf(self, *args, **kwargs):
         kw = self._merge("contourf", kwargs)
         artists = self.ax.contourf(*args, **kw)
+        return _auto_clip(artists, self.ax, self._clip_path)
+
+    def jpcontour(
+        self,
+        x,
+        y,
+        z,
+        *args,
+        interp_method: str = "natural_neighbor",
+        bin: int = 128,
+        nx: Optional[int] = None,
+        ny: Optional[int] = None,
+        xlim=None,
+        ylim=None,
+        nan_policy: str = "strict",
+        diagnostics: bool = False,
+        backend_options: Optional[dict[str, Any]] = None,
+        **kwargs,
+    ):
+        kw = self._merge("contour", kwargs)
+        X, Y, Z = self._interpolate_jpcontour_grid(
+            x,
+            y,
+            z,
+            interp_method=interp_method,
+            bin=bin,
+            nx=nx,
+            ny=ny,
+            xlim=xlim,
+            ylim=ylim,
+            nan_policy=nan_policy,
+            diagnostics=diagnostics,
+            backend_options=backend_options,
+        )
+        artists = self.ax.contour(X, Y, np.ma.masked_invalid(Z), *args, **kw)
+        return _auto_clip(artists, self.ax, self._clip_path)
+
+    def jpcontourf(
+        self,
+        x,
+        y,
+        z,
+        *args,
+        interp_method: str = "natural_neighbor",
+        bin: int = 500,
+        nx: Optional[int] = None,
+        ny: Optional[int] = None,
+        xlim=None,
+        ylim=None,
+        nan_policy: str = "strict",
+        diagnostics: bool = False,
+        backend_options: Optional[dict[str, Any]] = None,
+        **kwargs,
+    ):
+        kw = self._merge("contourf", kwargs)
+        X, Y, Z = self._interpolate_jpcontour_grid(
+            x,
+            y,
+            z,
+            interp_method=interp_method,
+            bin=bin,
+            nx=nx,
+            ny=ny,
+            xlim=xlim,
+            ylim=ylim,
+            nan_policy=nan_policy,
+            diagnostics=diagnostics,
+            backend_options=backend_options,
+        )
+        artists = self.ax.contourf(X, Y, np.ma.masked_invalid(Z), *args, **kw)
+        return _auto_clip(artists, self.ax, self._clip_path)
+
+    def jpfield(
+        self,
+        x,
+        y,
+        z,
+        *args,
+        interp_method: str = "natural_neighbor",
+        bin: int = 128,
+        nx: Optional[int] = None,
+        ny: Optional[int] = None,
+        xlim=None,
+        ylim=None,
+        nan_policy: str = "strict",
+        backend_options: Optional[dict[str, Any]] = None,
+        shading: str = "auto",
+        **kwargs,
+    ):
+        """Scattered-data field plot.
+
+        Interpolates scattered x/y/z samples onto a regular grid in axes-fraction
+        space, then renders the result with pcolormesh(transform=ax.transAxes).
+        The plot is drawn from explicit cell edges so raster backends do not
+        introduce a half-cell seam.
+        Undefined regions remain masked. Contour-only kwargs such as levels /
+        colors / extend are ignored.
+        """
+        kw = self._merge("pcolormesh", kwargs)
+        for k in ("levels", "extend", "locator", "corner_mask", "colors", "linestyles"):
+            kw.pop(k, None)
+        kw.pop("shading", None)
+        kw.pop("transform", None)
+        X, Y, Z = self._interpolate_jpfield_grid(
+            x,
+            y,
+            z,
+            interp_method=interp_method,
+            bin=bin,
+            nx=nx,
+            ny=ny,
+            xlim=xlim,
+            ylim=ylim,
+            nan_policy=nan_policy,
+            backend_options=backend_options,
+        )
+        X = np.asarray(X, dtype=float)
+        Y = np.asarray(Y, dtype=float)
+        Z = np.ma.masked_invalid(np.asarray(Z, dtype=float))
+        if str(shading).lower() in {"auto", "flat"}:
+            ny, nx = Z.shape
+            xe = np.linspace(0.0, 1.0, nx + 1)
+            ye = np.linspace(0.0, 1.0, ny + 1)
+            X, Y = np.meshgrid(xe, ye)
+            shading = "flat"
+        else:
+            shading = str(shading)
+        kw.setdefault("edgecolors", "none")
+        kw.setdefault("linewidth", 0.0)
+        kw.setdefault("antialiased", False)
+        kw.setdefault("snap", True)
+        artists = self.ax.pcolormesh(
+            X,
+            Y,
+            Z,
+            *args,
+            transform=self.ax.transAxes,
+            shading=shading,
+            **kw,
+        )
         return _auto_clip(artists, self.ax, self._clip_path)
 
     def imshow(self, *args, **kwargs):

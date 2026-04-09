@@ -31,6 +31,9 @@ from typing import Callable, Dict, Iterable, Optional, Set, Tuple
 #
 # NOTE:
 # - "tripcolor" / "tricontourf" / "triplot" are tri-axes friendly.
+# - "jpcontour" / "jpcontourf" / "jpfield" are JarvisPLOT adapter-native
+#   scattered-data interpolation wrappers and are exposed on both rect and
+#   ternary adapters.
 # - Most others are standard rect axes methods.
 #
 METHOD_DISPATCH: Dict[str, str] = {
@@ -52,6 +55,9 @@ METHOD_DISPATCH: Dict[str, str] = {
     "pcolor":       "pcolor",
     "contour":      "contour",
     "contourf":     "contourf",
+    "jpcontour":    "jpcontour",
+    "jpcontourf":   "jpcontourf",
+    "jpfield":      "jpfield",
     "grid_profile": "grid_profile",
 
     # tri related
@@ -162,6 +168,9 @@ def _bootstrap_default_registry() -> None:
 
     # --- core mapping from METHOD_DISPATCH
     for k, mpl in METHOD_DISPATCH.items():
+        if k in {"jpcontour", "jpcontourf", "jpfield"}:
+            REGISTRY.register(k, mpl, axes_types=("rect", "tri", "any"), overwrite=True)
+            continue
         # tri-specific methods
         if k.startswith("tri") or k in {"triplot"}:
             REGISTRY.register(k, mpl, axes_types=("tri", "any"), overwrite=True)
