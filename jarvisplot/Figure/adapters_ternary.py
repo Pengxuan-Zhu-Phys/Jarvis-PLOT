@@ -87,3 +87,24 @@ class TernaryAxesAdapter(StdAxesAdapter):
         return super().tricontourf(**kwargs)
         # else:
         #     raise ValueError("scatter() needs either (a,b,c) or (x,y) inputs")
+
+    def jpcontour(self, *args, **kwargs):
+        if {"left", "right", "bottom"}.issubset(kwargs.keys()):
+            x, y = self._lbr_to_xy(kwargs.pop("left"), kwargs.pop("right"), kwargs.pop("bottom"))
+            kwargs["x"] = x
+            kwargs["y"] = y
+        return super().jpcontour(*args, **kwargs)
+
+    def jpcontourf(self, *args, **kwargs):
+        if {"left", "right", "bottom"}.issubset(kwargs.keys()):
+            x, y = self._lbr_to_xy(kwargs.pop("left"), kwargs.pop("right"), kwargs.pop("bottom"))
+            kwargs["x"] = x
+            kwargs["y"] = y
+        return super().jpcontourf(*args, **kwargs)
+
+    def jpfield(self, *args, **kwargs):
+        if {"left", "right", "bottom"}.issubset(kwargs.keys()):
+            x, y = self._lbr_to_xy(kwargs.pop("left"), kwargs.pop("right"), kwargs.pop("bottom"))
+            kwargs["x"] = x
+            kwargs["y"] = y
+        return super().jpfield(*args, **kwargs)

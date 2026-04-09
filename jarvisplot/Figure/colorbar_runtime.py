@@ -140,10 +140,16 @@ def _resolve_norm(nv, *, vmin=None, vmax=None, logger=None):
 
 _COLORED_Z_METHODS = frozenset({
     "contour", "contourf", "tricontour", "tricontourf",
+    "jpcontour", "jpcontourf", "jpfield",
     "tripcolor", "tripcolor_axes",
     "pcolor", "pcolormesh", "imshow",
     "voronoi", "voronoif",
     "grid_profile",
+})
+
+_CONTOUR_LIKE_METHODS = frozenset({
+    "contour", "contourf", "tricontour", "tricontourf",
+    "jpcontour", "jpcontourf",
 })
 
 
@@ -356,6 +362,21 @@ def collect_and_attach_colorbar(
     if not layer_uses_color(style, coor, method_key):
         return style
 
+    # If the layer already declares an explicit contour color, do not inject a
+    # colormap.  Matplotlib treats `colors` and `cmap` as mutually exclusive for
+    # contour-style artists, and overlay layers often want a fixed line color
+    # while another layer owns the shared colorbar.
+    if method_key in _CONTOUR_LIKE_METHODS and (
+        "colors" in style or "color" in style
+    ):
+        s = dict(style)
+        s.pop("cmap", None)
+        s.pop("norm", None)
+        s.pop("vmin", None)
+        s.pop("vmax", None)
+        s.pop("mode", None)
+        return s
+
     axc = fig.axes.get(cb_name)
     if axc is None or not hasattr(axc, "_cb"):
         return style
@@ -405,7 +426,7 @@ def collect_and_attach_colorbar(
 
     # Contour levels (lazily generated on first contour layer, then reused)
     if (
-        method_key in ("contour", "contourf", "tricontour", "tricontourf")
+        method_key in ("contour", "contourf", "tricontour", "tricontourf", "jpcontour", "jpcontourf")
         and axc._cb.get("levels") is None
         and axc._cb.get("vmin") is not None
         and axc._cb.get("vmax") is not None

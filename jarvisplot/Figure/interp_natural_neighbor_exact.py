@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
 """Exact 2D Sibson natural-neighbor interpolation backend.
 
-The interpolant is built from Voronoi geometry:
-- natural neighbors are discovered through Delaunay cavity traversal,
-- query cells are formed with exact half-plane clipping,
-- weights are stolen-area fractions from clipped Voronoi polygons,
-- NaN-valued cores propagate strictly and outside-hull queries return NaN.
+This implementation follows the same Bowyer-Watson cavity and Sibson
+weight construction used by Tinfour:
+- natural neighbors are found by Delaunay cavity traversal,
+- weights are computed from the exact area-difference formula
+  (wXY - wThiessen),
+- coincident and near-coincident cores are merged with a MeanValue rule
+  and a Tinfour-style vertex tolerance,
+- query points outside the convex hull return NaN,
+- NaN-valued natural neighbors propagate strictly.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 import time
 import warnings
 from typing import Any, Callable, Optional
@@ -58,8 +63,15 @@ class NaturalNeighborExactDiagnostics:
     all_nan_cores: bool = False
     degenerate_input: bool = False
     degenerate_queries: int = 0
+    exact_duplicate_groups: int = 0
+    near_duplicate_groups: int = 0
+    merged_points: int = 0
+    nominal_point_spacing: float = 0.0
+    vertex_tolerance: float = 0.0
+    boundary_tolerance: float = 0.0
     cavity_triangles: int = 0
-    site_cells_built: int = 0
+    area_of_embedded_polygon: float = 0.0
+    barycentric_coordinate_deviation: float = 0.0
     interpolator_ready: bool = False
     build_seconds: float = 0.0
     eval_seconds: float = 0.0
@@ -90,31 +102,147 @@ def _normalize_nan_policy(nan_policy: str) -> str:
     raise ValueError("nan_policy must be one of {'strict', 'propagate', 'mask'}")
 
 
-def _dedupe_coordinates(coords: np.ndarray, values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Collapse exact duplicate coordinates while preserving strict NaN semantics."""
+def _dedupe_coordinates(
+    coords: np.ndarray, values: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, int, int]:
+    """Collapse exact duplicate coordinates while preserving strict NaN semantics.
+
+    Tinfour's default coincident-vertex resolution rule is MeanValue, so
+    duplicate cores are averaged here before triangulation.
+    """
     if coords.size == 0:
-        return coords, values
+        return coords, values, 0, 0
 
-    uniq, inverse = np.unique(coords, axis=0, return_inverse=True)
-    out = np.empty(uniq.shape[0], dtype=float)
+    groups: dict[tuple[float, float], list[int]] = {}
+    order: list[tuple[float, float]] = []
+    for idx, pt in enumerate(np.asarray(coords, dtype=float).reshape(-1, 2)):
+        key = (float(pt[0]), float(pt[1]))
+        if key not in groups:
+            groups[key] = [int(idx)]
+            order.append(key)
+        else:
+            groups[key].append(int(idx))
 
-    for idx in range(uniq.shape[0]):
-        group = values[inverse == idx]
+    uniq = np.empty((len(order), 2), dtype=float)
+    out = np.empty(len(order), dtype=float)
+    exact_duplicate_groups = 0
+    exact_duplicate_points = 0
+
+    for out_idx, key in enumerate(order):
+        group_idx = groups[key]
+        group = values[np.asarray(group_idx, dtype=int)]
+        uniq[out_idx] = coords[int(group_idx[0])]
         if group.size == 0:
-            out[idx] = np.nan
+            out[out_idx] = np.nan
             continue
         if np.isnan(group).any():
-            out[idx] = np.nan
+            out[out_idx] = np.nan
             continue
-        first = float(group[0])
-        if group.size > 1 and not np.allclose(group, first, rtol=0.0, atol=1e-12):
-            _warn(
-                "natural_neighbor: duplicate coordinates with conflicting finite z values "
-                "were collapsed by keeping the first value"
-            )
-        out[idx] = first
+        out[out_idx] = float(np.mean(group))
+        if len(group_idx) > 1:
+            exact_duplicate_groups += 1
+            exact_duplicate_points += len(group_idx) - 1
 
-    return uniq, out
+    return uniq, out, exact_duplicate_groups, exact_duplicate_points
+
+
+def _estimate_nominal_spacing(coords: np.ndarray) -> float:
+    """Estimate nominal spacing from the median nearest-neighbor distance."""
+    coords = np.asarray(coords, dtype=float).reshape(-1, 2)
+    if coords.shape[0] < 2:
+        return 1.0
+    try:
+        tree = cKDTree(coords)
+        dists, _ = tree.query(coords, k=2)
+        nn = np.asarray(dists[:, 1], dtype=float)
+        finite = nn[np.isfinite(nn) & (nn > 0)]
+        if finite.size == 0:
+            return 1.0
+        spacing = float(np.median(finite))
+        if np.isfinite(spacing) and spacing > 0:
+            return spacing
+    except Exception:
+        pass
+    return 1.0
+
+
+def _merge_near_duplicates(
+    coords: np.ndarray,
+    values: np.ndarray,
+    merge_tol: float,
+) -> tuple[np.ndarray, np.ndarray, int, int]:
+    """Merge points whose separation is within the Tinfour-style vertex tolerance."""
+    coords = np.asarray(coords, dtype=float).reshape(-1, 2)
+    values = np.asarray(values, dtype=float).reshape(-1)
+    n = coords.shape[0]
+    if n < 2 or not np.isfinite(merge_tol) or merge_tol <= 0:
+        return coords, values, 0, 0
+
+    try:
+        tree = cKDTree(coords)
+    except Exception:
+        return coords, values, 0, 0
+
+    parent = np.arange(n, dtype=int)
+    rank = np.zeros(n, dtype=int)
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = int(parent[i])
+        return int(i)
+
+    def union(i: int, j: int) -> None:
+        ri = find(i)
+        rj = find(j)
+        if ri == rj:
+            return
+        if rank[ri] < rank[rj]:
+            parent[ri] = rj
+        elif rank[ri] > rank[rj]:
+            parent[rj] = ri
+        else:
+            parent[rj] = ri
+            rank[ri] += 1
+
+    for i in range(n):
+        neigh = tree.query_ball_point(coords[i], merge_tol)
+        for j in neigh:
+            j = int(j)
+            if j > i:
+                d2 = float(np.sum((coords[j] - coords[i]) ** 2))
+                if d2 < merge_tol * merge_tol:
+                    union(i, j)
+
+    grouped: dict[int, list[int]] = {}
+    for i in range(n):
+        root = find(i)
+        grouped.setdefault(root, []).append(i)
+
+    if len(grouped) == n:
+        return coords, values, 0, 0
+
+    ordered_roots = sorted(grouped.keys(), key=lambda root: grouped[root][0])
+    merged_coords = np.empty((len(ordered_roots), 2), dtype=float)
+    merged_values = np.empty(len(ordered_roots), dtype=float)
+    merged_groups = 0
+    merged_points = 0
+
+    for out_idx, root in enumerate(ordered_roots):
+        idxs = np.asarray(grouped[root], dtype=int)
+        merged_coords[out_idx] = coords[int(idxs[0])]
+        vals = values[idxs]
+        if vals.size == 0:
+            merged_values[out_idx] = np.nan
+        elif np.isnan(vals).any():
+            merged_values[out_idx] = np.nan
+        else:
+            merged_values[out_idx] = float(np.mean(vals))
+        if idxs.size > 1:
+            merged_groups += 1
+            merged_points += int(idxs.size - 1)
+
+    return merged_coords, merged_values, merged_groups, merged_points
 
 
 def _effective_scale(coords: np.ndarray) -> float:
@@ -167,88 +295,13 @@ def _ensure_ccw(poly: np.ndarray) -> np.ndarray:
     return poly
 
 
-def _polygon_halfspace_from_edge(p0: np.ndarray, p1: np.ndarray) -> tuple[np.ndarray, float]:
-    """Return the left-of-edge half-space for a CCW polygon edge."""
-    v = np.asarray(p1, dtype=float) - np.asarray(p0, dtype=float)
-    a = np.array([v[1], -v[0]], dtype=float)
-    b = float(v[1] * p0[0] - v[0] * p0[1])
-    return a, b
-
-
-def _bisector_halfspace(center: np.ndarray, neighbor: np.ndarray) -> tuple[np.ndarray, float]:
-    """Half-space of points closer to `center` than `neighbor`."""
-    center = np.asarray(center, dtype=float)
-    neighbor = np.asarray(neighbor, dtype=float)
-    a = neighbor - center
-    b = 0.5 * (float(np.dot(neighbor, neighbor)) - float(np.dot(center, center)))
-    return a, b
-
-
-def _clip_polygon_halfspace(poly: np.ndarray, a: np.ndarray, b: float, tol: float) -> np.ndarray:
-    """Sutherland-Hodgman clipping against the half-space a·x <= b."""
-    poly = np.asarray(poly, dtype=float)
-    if poly.size == 0:
-        return np.empty((0, 2), dtype=float)
-    poly = poly.reshape(-1, 2)
-    if poly.shape[0] == 0:
-        return np.empty((0, 2), dtype=float)
-
-    values = poly @ a - b
-    inside = values <= tol
-    if not np.any(inside):
-        return np.empty((0, 2), dtype=float)
-
-    result: list[np.ndarray] = []
-
-    def _intersect(p0: np.ndarray, p1: np.ndarray, f0: float, f1: float) -> np.ndarray:
-        denom = f0 - f1
-        if abs(denom) <= tol:
-            return np.asarray(p0, dtype=float)
-        t = f0 / denom
-        return np.asarray(p0, dtype=float) + t * (np.asarray(p1, dtype=float) - np.asarray(p0, dtype=float))
-
-    prev = poly[-1]
-    prev_f = float(values[-1])
-    prev_in = prev_f <= tol
-
-    for curr, curr_f in zip(poly, values):
-        curr_f = float(curr_f)
-        curr_in = curr_f <= tol
-        if curr_in:
-            if not prev_in:
-                result.append(_intersect(prev, curr, prev_f, curr_f))
-            result.append(np.asarray(curr, dtype=float))
-        elif prev_in:
-            result.append(_intersect(prev, curr, prev_f, curr_f))
-        prev = curr
-        prev_f = curr_f
-        prev_in = curr_in
-
-    if not result:
-        return np.empty((0, 2), dtype=float)
-    return _clean_polygon(np.asarray(result, dtype=float), tol)
-
-
-def _polygon_intersection_convex(subject: np.ndarray, clipper: np.ndarray, tol: float) -> np.ndarray:
-    subject = np.asarray(subject, dtype=float)
-    clipper = np.asarray(clipper, dtype=float)
-    if subject.size == 0 or clipper.size == 0:
-        return np.empty((0, 2), dtype=float)
-    subject = subject.reshape(-1, 2)
-    clipper = clipper.reshape(-1, 2)
-    if subject.shape[0] < 3 or clipper.shape[0] < 3:
-        return np.empty((0, 2), dtype=float)
-
-    poly = subject
-    for p0, p1 in zip(clipper, np.roll(clipper, -1, axis=0)):
-        a, b = _polygon_halfspace_from_edge(p0, p1)
-        poly = _clip_polygon_halfspace(poly, a, b, tol)
-        if poly.size == 0:
-            return np.empty((0, 2), dtype=float)
-    return _clean_polygon(poly, tol)
-
-
-def _points_in_convex_polygon(points: np.ndarray, poly: np.ndarray, tol: float) -> np.ndarray:
+def _points_in_convex_polygon(
+    points: np.ndarray,
+    poly: np.ndarray,
+    tol: float,
+    *,
+    strict: bool = False,
+) -> np.ndarray:
     points = np.asarray(points, dtype=float).reshape(-1, 2)
     poly = np.asarray(poly, dtype=float)
     if poly.size == 0:
@@ -269,7 +322,10 @@ def _points_in_convex_polygon(points: np.ndarray, poly: np.ndarray, tol: float) 
     for p0, p1 in zip(poly, np.roll(poly, -1, axis=0)):
         edge = p1 - p0
         cross = edge[0] * (points[:, 1] - p0[1]) - edge[1] * (points[:, 0] - p0[0])
-        inside &= cross >= -tol
+        if strict:
+            inside &= cross > tol
+        else:
+            inside &= cross >= -tol
         if not np.any(inside):
             return inside
     return inside
@@ -309,10 +365,13 @@ def _triangle_circumcenters(points: np.ndarray, simplices: np.ndarray) -> tuple[
 class NaturalNeighborExactInterpolator:
     """Exact 2D Sibson natural-neighbor interpolator.
 
-    The local natural-neighbor cavity is found from Delaunay triangle
-    circumcircle tests. The actual weights come from exact Voronoi geometry:
-    we build the query cell with half-plane clipping and take stolen-area
-    fractions against the original clipped Voronoi cells.
+    The query flow mirrors Tinfour's natural-neighbor implementation:
+    1. locate the Bowyer-Watson cavity by circumcircle tests,
+    2. extract the boundary cycle of natural neighbors,
+    3. evaluate exact Sibson weights using the wXY - wThiessen area formula.
+
+    Co-location snapping and point merging follow Tinfour's vertex-tolerance
+    philosophy rather than an epsilon-only equality test.
     """
 
     def __init__(
@@ -342,10 +401,12 @@ class NaturalNeighborExactInterpolator:
         self._simplex_neighbors: Optional[np.ndarray] = None
         self._circumcenters: Optional[np.ndarray] = None
         self._circumradius2: Optional[np.ndarray] = None
-        self._site_cell_cache: dict[int, np.ndarray] = {}
+        self._vertex_to_simplices: list[np.ndarray] = []
+        self._ordered_vertex_simplices: list[np.ndarray] = []
 
+        self._vertex_tol: float = 0.0
+        self._boundary_tol: float = 0.0
         self._exact_tol: float = 0.0
-        self._halfspace_tol: float = 0.0
         self._area_tol: float = 0.0
         self._circumcircle_tol: float = 0.0
 
@@ -387,7 +448,68 @@ class NaturalNeighborExactInterpolator:
 
         coords = np.column_stack([x[finite_xy], y[finite_xy]])
         values = z[finite_xy]
-        coords, values = _dedupe_coordinates(coords, values)
+        coords, values, exact_duplicate_groups, exact_duplicate_points = _dedupe_coordinates(coords, values)
+        self.diagnostics.exact_duplicate_groups = int(exact_duplicate_groups)
+        self.diagnostics.merged_points = int(exact_duplicate_points)
+
+        scale = _effective_scale(coords)
+        scale = max(scale, 1.0)
+        nominal_spacing = self.backend_options.get("nominal_point_spacing", None)
+        if nominal_spacing is None:
+            nominal_spacing = _estimate_nominal_spacing(coords)
+        try:
+            nominal_spacing = float(nominal_spacing)
+        except Exception:
+            nominal_spacing = 1.0
+        if not np.isfinite(nominal_spacing) or nominal_spacing <= 0:
+            nominal_spacing = scale
+        self.diagnostics.nominal_point_spacing = float(nominal_spacing)
+
+        self._vertex_tol = float(
+            self.backend_options.get(
+                "vertex_tol",
+                max(nominal_spacing / 1.0e5, 64.0 * np.finfo(float).eps * scale),
+            )
+        )
+        if not np.isfinite(self._vertex_tol) or self._vertex_tol <= 0:
+            self._vertex_tol = max(nominal_spacing / 1.0e5, 64.0 * np.finfo(float).eps * scale)
+        self._exact_tol = float(
+            self.backend_options.get(
+                "geometry_tol",
+                max(64.0 * np.finfo(float).eps * scale, 1e-12 * scale),
+            )
+        )
+        if not np.isfinite(self._exact_tol) or self._exact_tol <= 0:
+            self._exact_tol = max(64.0 * np.finfo(float).eps * scale, 1e-12 * scale)
+        self._boundary_tol = float(
+            self.backend_options.get(
+                "boundary_tol",
+                max(64.0 * np.finfo(float).eps * scale, self._exact_tol * 1.0e-2),
+            )
+        )
+        if not np.isfinite(self._boundary_tol) or self._boundary_tol <= 0:
+            self._boundary_tol = max(64.0 * np.finfo(float).eps * scale, self._exact_tol * 1.0e-2)
+        self._area_tol = float(
+            self.backend_options.get(
+                "area_tol",
+                max(64.0 * np.finfo(float).eps * scale * scale, 1e-12 * scale * scale),
+            )
+        )
+        self._circumcircle_tol = float(
+            self.backend_options.get(
+                "circumcircle_tol",
+                self.backend_options.get(
+                    "halfspace_tol",
+                    max(64.0 * np.finfo(float).eps * scale * scale, 1e-12 * scale * scale),
+                ),
+            )
+        )
+
+        coords, values, near_duplicate_groups, near_duplicate_points = _merge_near_duplicates(
+            coords, values, self._vertex_tol
+        )
+        self.diagnostics.near_duplicate_groups = int(near_duplicate_groups)
+        self.diagnostics.merged_points += int(near_duplicate_points)
 
         self._coords = coords
         self._values = values
@@ -396,30 +518,8 @@ class NaturalNeighborExactInterpolator:
         finite_value_mask = np.isfinite(values)
         self.diagnostics.unique_finite_points = int(np.count_nonzero(finite_value_mask))
         self.diagnostics.all_nan_cores = bool(coords.size > 0 and not np.any(finite_value_mask))
-
-        scale = _effective_scale(coords)
-        scale = max(scale, 1.0)
-        self._exact_tol = float(
-            self.backend_options.get(
-                "exact_tol",
-                max(64.0 * np.finfo(float).eps * scale, 1e-12 * scale),
-            )
-        )
-        self._halfspace_tol = float(
-            self.backend_options.get(
-                "halfspace_tol",
-                max(64.0 * np.finfo(float).eps * scale * scale, 1e-12 * scale * scale),
-            )
-        )
-        self._area_tol = float(
-            self.backend_options.get(
-                "area_tol",
-                max(64.0 * np.finfo(float).eps * scale * scale, 1e-12 * scale * scale),
-            )
-        )
-        self._circumcircle_tol = float(
-            self.backend_options.get("circumcircle_tol", self._halfspace_tol)
-        )
+        self.diagnostics.vertex_tolerance = float(self._vertex_tol)
+        self.diagnostics.boundary_tolerance = float(self._boundary_tol)
 
         self._tree = cKDTree(coords)
 
@@ -450,6 +550,29 @@ class NaturalNeighborExactInterpolator:
                 self._circumcenters, self._circumradius2 = _triangle_circumcenters(
                     coords, self._tri.simplices
                 )
+                self._vertex_to_simplices = [[] for _ in range(coords.shape[0])]
+                for simplex_idx, simplex in enumerate(self._tri.simplices):
+                    for vertex_idx in simplex:
+                        self._vertex_to_simplices[int(vertex_idx)].append(int(simplex_idx))
+                self._vertex_to_simplices = [
+                    np.asarray(indices, dtype=int) if indices else np.empty((0,), dtype=int)
+                    for indices in self._vertex_to_simplices
+                ]
+                self._ordered_vertex_simplices = []
+                for vertex_idx, simplex_ids in enumerate(self._vertex_to_simplices):
+                    if simplex_ids.size == 0:
+                        self._ordered_vertex_simplices.append(np.empty((0,), dtype=int))
+                        continue
+                    centers = self._circumcenters[simplex_ids]
+                    if not np.isfinite(centers).all():
+                        self._ordered_vertex_simplices.append(np.empty((0,), dtype=int))
+                        self.diagnostics.degenerate_input = True
+                        _warn("natural_neighbor: degenerate triangles produced invalid circumcenters")
+                        continue
+                    origin = coords[int(vertex_idx)]
+                    angles = np.arctan2(centers[:, 1] - origin[1], centers[:, 0] - origin[0])
+                    order = np.argsort(angles, kind="mergesort")
+                    self._ordered_vertex_simplices.append(np.asarray(simplex_ids[order], dtype=int))
             else:
                 self._tri = None
         except QhullError as exc:
@@ -459,13 +582,14 @@ class NaturalNeighborExactInterpolator:
             self._simplex_neighbors = None
             self._circumcenters = None
             self._circumradius2 = None
+            self._vertex_to_simplices = []
+            self._ordered_vertex_simplices = []
             self.diagnostics.degenerate_input = True
             _warn(f"natural_neighbor: Delaunay triangulation failed: {exc}")
 
         if self._tri is None or self._hull_polygon is None:
             self.diagnostics.degenerate_input = True
-            if self._coords is not None and self._coords.size:
-                self.diagnostics.interpolator_ready = True
+            self.diagnostics.interpolator_ready = False
             return
 
         self.diagnostics.interpolator_ready = True
@@ -477,7 +601,74 @@ class NaturalNeighborExactInterpolator:
         pts = np.asarray(pts, dtype=float).reshape(-1, 2)
         if self._hull_polygon is None:
             return np.zeros(pts.shape[0], dtype=bool)
-        return _points_in_convex_polygon(pts, self._hull_polygon, self._exact_tol)
+        return _points_in_convex_polygon(pts, self._hull_polygon, self._boundary_tol, strict=True)
+
+    def _cavity_boundary_cycle(self, q: np.ndarray, cavity_idx: np.ndarray) -> Optional[np.ndarray]:
+        if self._tri is None or self._simplex_neighbors is None or self._coords is None:
+            return None
+
+        cavity_set = {int(s) for s in np.asarray(cavity_idx, dtype=int).reshape(-1)}
+        boundary_edges: list[tuple[int, int]] = []
+        seen_edges: set[tuple[int, int]] = set()
+
+        for simplex_idx in cavity_set:
+            simplex = np.asarray(self._tri.simplices[int(simplex_idx)], dtype=int)
+            neighbors = np.asarray(self._simplex_neighbors[int(simplex_idx)], dtype=int)
+            for local_vertex in range(3):
+                nb = int(neighbors[local_vertex])
+                if nb >= 0 and nb in cavity_set:
+                    continue
+                edge = tuple(sorted(tuple(int(v) for v in np.delete(simplex, local_vertex))))
+                if edge not in seen_edges:
+                    seen_edges.add(edge)
+                    boundary_edges.append(edge)
+
+        if len(boundary_edges) < 3:
+            return None
+
+        adjacency: dict[int, list[int]] = {}
+        for u, v in boundary_edges:
+            adjacency.setdefault(u, []).append(v)
+            adjacency.setdefault(v, []).append(u)
+
+        if any(len(neigh) != 2 for neigh in adjacency.values()):
+            return None
+
+        def _angle(v_idx: int) -> float:
+            p = self._coords[int(v_idx)]
+            return math.atan2(float(p[1] - q[1]), float(p[0] - q[0]))
+
+        start = min(adjacency, key=_angle)
+        cycle = [int(start)]
+        prev: Optional[int] = None
+        curr = int(start)
+
+        guard = 0
+        limit = len(adjacency) + 2
+        while True:
+            neigh = adjacency[curr]
+            if prev is None:
+                next_v = int(neigh[0])
+            else:
+                next_v = int(neigh[0] if neigh[0] != prev else neigh[1])
+            if next_v == start:
+                break
+            cycle.append(next_v)
+            prev, curr = curr, next_v
+            guard += 1
+            if guard > limit:
+                return None
+
+        cycle_arr = np.asarray(cycle, dtype=int)
+        if cycle_arr.size < 3:
+            return None
+
+        poly = self._coords[cycle_arr]
+        if abs(_polygon_area(poly)) <= self._area_tol:
+            return None
+        if _polygon_area(poly) < 0:
+            cycle_arr = cycle_arr[::-1].copy()
+        return cycle_arr
 
     def _find_simplex(self, q: np.ndarray) -> int:
         if self._tri is None:
@@ -498,8 +689,13 @@ class NaturalNeighborExactInterpolator:
         dist2 = float(np.sum((np.asarray(q, dtype=float) - center) ** 2))
         return dist2 <= float(radius2) + self._circumcircle_tol
 
-    def _natural_neighbor_sites(self, q: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        simplex = self._find_simplex(q)
+    def _natural_neighbor_sites(
+        self,
+        q: np.ndarray,
+        *,
+        start_simplex: Optional[int] = None,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        simplex = self._find_simplex(q) if start_simplex is None else int(start_simplex)
         if simplex < 0 or self._simplex_neighbors is None or self._tri is None:
             return np.empty((0,), dtype=int), np.empty((0,), dtype=int)
 
@@ -522,162 +718,243 @@ class NaturalNeighborExactInterpolator:
             return np.empty((0,), dtype=int), np.empty((0,), dtype=int)
 
         cavity_idx = np.fromiter(sorted(cavity), dtype=int)
-        neighbors = np.unique(self._tri.simplices[cavity_idx].ravel())
-        return neighbors.astype(int, copy=False), cavity_idx
+        boundary_cycle = self._cavity_boundary_cycle(q, cavity_idx)
+        if boundary_cycle is None:
+            return np.empty((0,), dtype=int), cavity_idx
+        return boundary_cycle.astype(int, copy=False), cavity_idx
 
-    def _site_cell(self, site_idx: int) -> np.ndarray:
-        cached = self._site_cell_cache.get(int(site_idx))
-        if cached is not None:
-            return cached
+    @staticmethod
+    def _cross2d(u: np.ndarray, v: np.ndarray) -> float:
+        return float(u[0] * v[1] - v[0] * u[1])
 
-        if self._hull_polygon is None or self._coords is None or self._neighbor_indptr is None:
-            poly = np.empty((0, 2), dtype=float)
-            self._site_cell_cache[int(site_idx)] = poly
-            return poly
+    def _circumcenter_relative(self, a: np.ndarray, b: np.ndarray, c: np.ndarray) -> np.ndarray:
+        ax = float(a[0])
+        ay = float(a[1])
+        bx = float(b[0])
+        by = float(b[1])
+        cx = float(c[0])
+        cy = float(c[1])
 
-        poly = np.asarray(self._hull_polygon, dtype=float).copy()
-        center = self._coords[int(site_idx)]
-        start = int(self._neighbor_indptr[int(site_idx)])
-        stop = int(self._neighbor_indptr[int(site_idx) + 1])
-        neighbors = np.asarray(self._neighbor_indices[start:stop], dtype=int)
+        d = 2.0 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
+        if not np.isfinite(d) or abs(d) <= self._area_tol:
+            return np.array([np.nan, np.nan], dtype=float)
+        ux = (
+            (ax * ax + ay * ay) * (by - cy)
+            + (bx * bx + by * by) * (cy - ay)
+            + (cx * cx + cy * cy) * (ay - by)
+        ) / d
+        uy = (
+            (ax * ax + ay * ay) * (cx - bx)
+            + (bx * bx + by * by) * (ax - cx)
+            + (cx * cx + cy * cy) * (bx - ax)
+        ) / d
+        if not np.isfinite(ux) or not np.isfinite(uy):
+            return np.array([np.nan, np.nan], dtype=float)
+        return np.array([ux, uy], dtype=float)
 
-        for nb in neighbors:
-            if nb < 0 or nb == site_idx:
+    def _simplex_has_edge(self, simplex_idx: int, a: int, b: int) -> bool:
+        if self._tri is None:
+            return False
+        simplex = np.asarray(self._tri.simplices[int(simplex_idx)], dtype=int)
+        return bool(np.any(simplex == int(a)) and np.any(simplex == int(b)))
+
+    def _incident_simplex_with_edge(
+        self,
+        vertex_idx: int,
+        other_idx: int,
+        cavity_set: set[int],
+        q: np.ndarray,
+    ) -> Optional[int]:
+        if not self._vertex_to_simplices:
+            return None
+        for simplex_idx in self._vertex_to_simplices[int(vertex_idx)]:
+            simplex_id = int(simplex_idx)
+            if simplex_id not in cavity_set:
                 continue
-            a, b = _bisector_halfspace(center, self._coords[int(nb)])
-            poly = _clip_polygon_halfspace(poly, a, b, self._halfspace_tol)
-            if poly.size == 0:
-                break
+            if not self._simplex_has_edge(simplex_id, vertex_idx, other_idx):
+                continue
+            if self._circumcircle_contains(simplex_id, q):
+                return simplex_id
+        return None
 
-        poly = _clean_polygon(poly, self._exact_tol)
-        if poly.shape[0] >= 3 and abs(_polygon_area(poly)) > self._area_tol:
-            poly = _ensure_ccw(poly)
-        else:
-            poly = np.empty((0, 2), dtype=float)
+    def _ordered_cavity_simplices_for_vertex(
+        self,
+        vertex_idx: int,
+        left_idx: int,
+        right_idx: int,
+        cavity_set: set[int],
+        q: np.ndarray,
+    ) -> Optional[list[int]]:
+        if not self._ordered_vertex_simplices:
+            return None
+        ordered = self._ordered_vertex_simplices[int(vertex_idx)]
+        if ordered.size == 0:
+            return None
 
-        if poly.size == 0:
-            # Fallback to all sites for rare degeneracies.
-            poly = np.asarray(self._hull_polygon, dtype=float).copy()
-            for nb in range(self._coords.shape[0]):
-                if nb == site_idx:
-                    continue
-                a, b = _bisector_halfspace(center, self._coords[int(nb)])
-                poly = _clip_polygon_halfspace(poly, a, b, self._halfspace_tol)
-                if poly.size == 0:
-                    break
-            poly = _clean_polygon(poly, self._exact_tol)
-            if poly.shape[0] >= 3 and abs(_polygon_area(poly)) > self._area_tol:
-                poly = _ensure_ccw(poly)
-            else:
-                poly = np.empty((0, 2), dtype=float)
+        start = self._incident_simplex_with_edge(vertex_idx, left_idx, cavity_set, q)
+        end = self._incident_simplex_with_edge(vertex_idx, right_idx, cavity_set, q)
+        if start is None or end is None:
+            return None
 
-        self._site_cell_cache[int(site_idx)] = poly
-        self.diagnostics.site_cells_built += 1
-        return poly
+        start_pos_arr = np.flatnonzero(ordered == int(start))
+        end_pos_arr = np.flatnonzero(ordered == int(end))
+        if start_pos_arr.size == 0 or end_pos_arr.size == 0:
+            return None
+        start_pos = int(start_pos_arr[0])
+        end_pos = int(end_pos_arr[0])
 
-    def _query_point(self, q: np.ndarray) -> float:
+        def _walk(step: int) -> Optional[list[int]]:
+            chain: list[int] = []
+            pos = start_pos
+            limit = ordered.size + 1
+            while True:
+                simplex_id = int(ordered[pos])
+                if simplex_id not in cavity_set:
+                    return None
+                if not self._circumcircle_contains(simplex_id, q):
+                    return None
+                chain.append(simplex_id)
+                if pos == end_pos:
+                    return chain if chain else None
+                pos = (pos + step) % ordered.size
+                limit -= 1
+                if limit <= 0:
+                    return None
+
+        # The cavity block can wrap around the angle discontinuity in the
+        # per-vertex circular ordering. Try both traversal directions and keep
+        # whichever one stays fully inside the cavity.
+        chain = _walk(+1)
+        if chain is not None:
+            return chain
+        chain = _walk(-1)
+        if chain is not None:
+            return chain
+        return None
+
+    def _query_point(
+        self,
+        q: np.ndarray,
+        *,
+        simplex: Optional[int] = None,
+        skip_exact_hit: bool = False,
+        skip_hull_check: bool = False,
+    ) -> float:
         assert self._coords is not None and self._values is not None
 
         q = np.asarray(q, dtype=float).reshape(2)
 
-        dist, idx = self._tree.query(q, k=1)
-        if np.isfinite(dist) and dist <= self._exact_tol:
-            return float(self._values[int(idx)])
+        if not skip_exact_hit:
+            dist, idx = self._tree.query(q, k=1)
+            if np.isfinite(dist) and dist < self._vertex_tol:
+                return float(self._values[int(idx)])
 
         if self._hull_polygon is None or self._tri is None:
             self.diagnostics.degenerate_queries += 1
             return np.nan
 
-        if not self._point_in_hull(q.reshape(1, 2))[0]:
+        if (not skip_hull_check) and (not self._point_in_hull(q.reshape(1, 2))[0]):
             return np.nan
 
-        neighbors, cavity_idx = self._natural_neighbor_sites(q)
+        neighbors, cavity_idx = self._natural_neighbor_sites(q, start_simplex=simplex)
         self.diagnostics.cavity_triangles += int(cavity_idx.size)
         if neighbors.size == 0:
             self.diagnostics.degenerate_queries += 1
             return np.nan
 
-        q_cell = np.asarray(self._hull_polygon, dtype=float).copy()
-        for nb in neighbors:
-            a, b = _bisector_halfspace(q, self._coords[int(nb)])
-            q_cell = _clip_polygon_halfspace(q_cell, a, b, self._halfspace_tol)
-            if q_cell.size == 0:
-                break
-
-        q_cell = _clean_polygon(q_cell, self._exact_tol)
-        if q_cell.shape[0] < 3 or abs(_polygon_area(q_cell)) <= self._area_tol:
-            # Rare fallback: clip against all sites, which is exact but slower.
-            q_cell = np.asarray(self._hull_polygon, dtype=float).copy()
-            for nb in range(self._coords.shape[0]):
-                a, b = _bisector_halfspace(q, self._coords[int(nb)])
-                q_cell = _clip_polygon_halfspace(q_cell, a, b, self._halfspace_tol)
-                if q_cell.size == 0:
-                    break
-            q_cell = _clean_polygon(q_cell, self._exact_tol)
-
-        if q_cell.shape[0] < 3 or abs(_polygon_area(q_cell)) <= self._area_tol:
+        cavity_set = {int(i) for i in np.asarray(cavity_idx, dtype=int).reshape(-1)}
+        if neighbors.size < 3:
             self.diagnostics.degenerate_queries += 1
             return np.nan
 
-        q_area = abs(_polygon_area(q_cell))
-        if not np.isfinite(q_area) or q_area <= self._area_tol:
-            self.diagnostics.degenerate_queries += 1
-            return np.nan
-
-        def _accumulate(site_ids, q_poly: np.ndarray) -> tuple[float, float, bool, int]:
-            weighted = 0.0
-            area_sum = 0.0
-            finite_count = 0
-            saw_nan = False
-
-            for nb in site_ids:
-                site_val = float(self._values[int(nb)])
-                site_poly = self._site_cell(int(nb))
-                if site_poly.size == 0:
-                    continue
-                inter = _polygon_intersection_convex(q_poly, site_poly, self._halfspace_tol)
-                area = abs(_polygon_area(inter))
-                if not np.isfinite(area) or area <= self._area_tol:
-                    continue
-                if np.isnan(site_val):
-                    saw_nan = True
-                    break
-                weighted += area * site_val
-                area_sum += area
-                finite_count += 1
-
-            return weighted, area_sum, saw_nan, finite_count
-
-        weighted, area_sum, saw_nan, finite_count = _accumulate(neighbors, q_cell)
-        if saw_nan:
+        neighbor_values = self._values[np.asarray(neighbors, dtype=int)]
+        if np.isnan(neighbor_values).any():
             self.diagnostics.masked_by_nan += 1
             return np.nan
 
-        area_mismatch = abs(area_sum - q_area) > max(self._area_tol, 1e-10 * q_area)
-        if finite_count == 0 or area_mismatch:
-            q_cell = np.asarray(self._hull_polygon, dtype=float).copy()
-            for nb in range(self._coords.shape[0]):
-                a, b = _bisector_halfspace(q, self._coords[int(nb)])
-                q_cell = _clip_polygon_halfspace(q_cell, a, b, self._halfspace_tol)
-                if q_cell.size == 0:
-                    break
-            q_cell = _clean_polygon(q_cell, self._exact_tol)
-            if q_cell.shape[0] < 3 or abs(_polygon_area(q_cell)) <= self._area_tol:
-                self.diagnostics.degenerate_queries += 1
-                return np.nan
-            q_area = abs(_polygon_area(q_cell))
-            if not np.isfinite(q_area) or q_area <= self._area_tol:
-                self.diagnostics.degenerate_queries += 1
-                return np.nan
-            weighted, area_sum, saw_nan, finite_count = _accumulate(range(self._coords.shape[0]), q_cell)
-            if saw_nan:
-                self.diagnostics.masked_by_nan += 1
-                return np.nan
-            if finite_count == 0 or abs(area_sum - q_area) > max(self._area_tol, 1e-10 * q_area):
+        n_edge = int(neighbors.size)
+        weights = np.zeros(n_edge, dtype=float)
+        w_sum = 0.0
+        q0 = q.reshape(2)
+
+        for i0 in range(n_edge):
+            i_prev = (i0 - 1) % n_edge
+            i1 = i0
+            i_next = (i0 + 1) % n_edge
+
+            a_idx = int(neighbors[i_prev])
+            b_idx = int(neighbors[i1])
+            c_idx = int(neighbors[i_next])
+
+            a = self._coords[a_idx] - q0
+            b = self._coords[b_idx] - q0
+            c = self._coords[c_idx] - q0
+            if not np.isfinite(a).all() or not np.isfinite(b).all() or not np.isfinite(c).all():
                 self.diagnostics.degenerate_queries += 1
                 return np.nan
 
-        return float(weighted / q_area)
+            mid_ab = 0.5 * (a + b)
+            mid_bc = 0.5 * (b + c)
+            c0 = self._circumcenter_relative(a, b, np.zeros(2, dtype=float))
+            c1 = self._circumcenter_relative(b, c, np.zeros(2, dtype=float))
+            if not np.isfinite(c0).all() or not np.isfinite(c1).all():
+                self.diagnostics.degenerate_queries += 1
+                return np.nan
+
+            cavity_chain = self._ordered_cavity_simplices_for_vertex(
+                b_idx, a_idx, c_idx, cavity_set, q0
+            )
+            if cavity_chain is None:
+                self.diagnostics.degenerate_queries += 1
+                return np.nan
+
+            if self._circumcenters is None:
+                self.diagnostics.degenerate_queries += 1
+                return np.nan
+
+            c3 = self._circumcenters[int(cavity_chain[0])] - q0
+            if not np.isfinite(c3).all():
+                self.diagnostics.degenerate_queries += 1
+                return np.nan
+
+            w_xy = self._cross2d(mid_ab, c0) + self._cross2d(c0, c1) + self._cross2d(c1, mid_bc)
+            w_thiessen = self._cross2d(mid_ab, c3)
+            prev_center = c3
+            for simplex_id in cavity_chain[1:]:
+                curr_center = self._circumcenters[int(simplex_id)] - q0
+                if not np.isfinite(curr_center).all():
+                    self.diagnostics.degenerate_queries += 1
+                    return np.nan
+                w_thiessen += self._cross2d(prev_center, curr_center)
+                prev_center = curr_center
+            w_thiessen += self._cross2d(prev_center, mid_bc)
+
+            w_delta = w_xy - w_thiessen
+            if not np.isfinite(w_delta):
+                self.diagnostics.degenerate_queries += 1
+                return np.nan
+            weights[i1] = w_delta
+            w_sum += w_delta
+
+        if not np.isfinite(w_sum) or abs(w_sum) <= self._area_tol:
+            self.diagnostics.degenerate_queries += 1
+            return np.nan
+
+        weights /= w_sum
+        self.diagnostics.area_of_embedded_polygon = float(w_sum / 2.0)
+
+        x_sum = 0.0
+        y_sum = 0.0
+        for weight, nb in zip(weights, neighbors):
+            v = self._coords[int(nb)]
+            x_sum += float(weight) * (float(v[0]) - q0[0])
+            y_sum += float(weight) * (float(v[1]) - q0[1])
+        self.diagnostics.barycentric_coordinate_deviation = float(
+            math.sqrt(x_sum * x_sum + y_sum * y_sum)
+        )
+
+        weighted = float(np.dot(weights, neighbor_values))
+        return weighted
 
     def evaluate(self, X, Y):
         X = _as_grid_float(X, name="X")
@@ -700,8 +977,13 @@ class NaturalNeighborExactInterpolator:
             return out.reshape(X.shape)
 
         eval_start = time.perf_counter()
+        if self._tri is None or self._hull_polygon is None:
+            self.diagnostics.degenerate_queries = int(pts.shape[0])
+            self.diagnostics.eval_seconds = float(time.perf_counter() - eval_start)
+            return out.reshape(X.shape)
+
         dist, idx = self._tree.query(pts, k=1)
-        exact_mask = np.isfinite(dist) & (dist <= self._exact_tol)
+        exact_mask = np.isfinite(dist) & (dist < self._vertex_tol)
         if np.any(exact_mask):
             out[exact_mask] = self._values[np.asarray(idx[exact_mask], dtype=int)]
         self.diagnostics.exact_hits = int(np.count_nonzero(exact_mask))
@@ -721,8 +1003,27 @@ class NaturalNeighborExactInterpolator:
             self.diagnostics.eval_seconds = float(time.perf_counter() - eval_start)
             return out.reshape(X.shape)
 
-        for flat_idx in inside_idx:
-            val = self._query_point(pts[int(flat_idx)])
+        inside_pts = pts[inside_idx]
+        simplex = self._tri.find_simplex(inside_pts, tol=self._exact_tol)
+        bad_simplex = simplex < 0
+        if np.any(bad_simplex):
+            brute = self._tri.find_simplex(
+                inside_pts[bad_simplex],
+                tol=self._exact_tol,
+                bruteforce=True,
+            )
+            simplex = np.asarray(simplex, dtype=int)
+            simplex[bad_simplex] = np.asarray(brute, dtype=int)
+        else:
+            simplex = np.asarray(simplex, dtype=int)
+
+        for flat_idx, simplex_idx in zip(inside_idx, simplex, strict=False):
+            val = self._query_point(
+                pts[int(flat_idx)],
+                simplex=int(simplex_idx),
+                skip_exact_hit=True,
+                skip_hull_check=True,
+            )
             out[int(flat_idx)] = val
 
         self.diagnostics.eval_seconds = float(time.perf_counter() - eval_start)
