@@ -48,7 +48,7 @@ def _coerce_positive_int(value, default: int) -> int:
 
 
 def _resolve_interp_grid_size(interp_cfg: dict | None, x_size: int, y_size: int) -> tuple[int, int]:
-    default_n = max(64, int(round(np.sqrt(max(int(x_size), int(y_size), 1)) * 4.0)))
+    default_n = 500
     if not isinstance(interp_cfg, dict):
         return default_n, default_n
 

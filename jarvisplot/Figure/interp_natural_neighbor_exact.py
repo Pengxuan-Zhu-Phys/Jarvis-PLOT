@@ -534,6 +534,8 @@ class NaturalNeighborExactInterpolator:
                     self._hull_polygon = None
                     self.diagnostics.degenerate_input = True
                     _warn("natural_neighbor: convex hull is degenerate")
+                    self.diagnostics.interpolator_ready = False
+                    return
             else:
                 self._hull_polygon = None
                 self.diagnostics.degenerate_input = True
@@ -541,6 +543,8 @@ class NaturalNeighborExactInterpolator:
             self._hull_polygon = None
             self.diagnostics.degenerate_input = True
             _warn(f"natural_neighbor: convex hull construction failed: {exc}")
+            self.diagnostics.interpolator_ready = False
+            return
 
         try:
             if coords.shape[0] >= 3:
