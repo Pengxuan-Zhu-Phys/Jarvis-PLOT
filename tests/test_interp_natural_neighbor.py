@@ -186,7 +186,8 @@ def test_exact_backend_returns_nan_for_collinear_input():
     X = np.array([[1.0]])
     Y = np.array([[0.0]])
 
-    Z = natural_neighbor_exact_interpolate(x, y, z, X, Y)
+    with pytest.warns(RuntimeWarning):
+        Z = natural_neighbor_exact_interpolate(x, y, z, X, Y)
 
     assert np.isnan(Z[0, 0])
     diag = natural_neighbor_exact_interpolate.last_diagnostics
