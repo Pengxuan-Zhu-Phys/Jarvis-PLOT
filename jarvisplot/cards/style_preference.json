@@ -6,6 +6,7 @@
         "Ternary": "&JP/jarvisplot/cards/a4paper/2x1/ternary.json",
         "rect": "&JP/jarvisplot/cards/a4paper/2x1/rect.json",
         "rect_5x1": "&JP/jarvisplot/cards/a4paper/2x1/rect5x1.json",
+        "dynesty_runplot": "&JP/jarvisplot/cards/a4paper/2x1/dynesty_runplot.json",
         "TernaryCmap": "&JP/jarvisplot/cards/a4paper/2x1/ternary_cmap.json",
         "rectcmap": "&JP/jarvisplot/cards/a4paper/2x1/rect_cmap.json"
     },

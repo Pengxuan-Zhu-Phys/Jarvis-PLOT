@@ -52,6 +52,38 @@ def test_style_family_single_token_uses_available_variant():
     assert fig.style["marker"] == "o"
 
 
+def test_style_bundle_can_provide_default_layers(monkeypatch):
+    def fake_load_axes(self):
+        self.axes["ax"] = SimpleNamespace(layers=[])
+
+    monkeypatch.setattr(Figure, "load_axes", fake_load_axes)
+
+    fig = Figure()
+    fig.logger = _logger()
+    fig.jpstyles = {
+        "family": {
+            "dynesty_runplot": {
+                "Frame": {"figure": {"figsize": (1, 1)}, "axes": {"ax": {"rect": [0, 0, 1, 1]}}},
+                "Style": {"dynesty_runplot": {"kde": True}},
+                "Layers": [
+                    {
+                        "name": "default",
+                        "data": [{"source": "dynesty"}],
+                        "axes": "ax",
+                        "method": "dynesty_runplot",
+                    }
+                ],
+            }
+        }
+    }
+
+    result = apply_figure_config(fig, {"name": "fig", "style": ["family", "dynesty_runplot"]})
+
+    assert result is True
+    assert len(fig._render_queue) == 1
+    assert fig._render_queue[0][1]["method"] == "dynesty_runplot"
+
+
 def test_console_record_formatter_escapes_braces():
     class _Time:
         def __format__(self, spec):
@@ -474,6 +506,65 @@ def test_render_layer_does_not_mutate_layer_data(monkeypatch, ax_type):
     assert layer_info["data"] is original_data
     assert out["x"] == (converted_data, "x")
     assert out["y"] == (converted_data, "y")
+
+
+def test_dynesty_runplot_uses_kde_resampling_grid():
+    raw_fig, raw_axes = plt.subplots(4, 1)
+    df = pd.DataFrame(
+        {
+            "log_PriorVolume": np.linspace(-0.01, -5.0, 80),
+            "log_Like": np.linspace(-12.0, 0.0, 80),
+            "log_weight": np.full(80, -2.5 - np.log(80.0)),
+            "log_Evidence": np.linspace(-18.0, -2.5, 80),
+            "log_Evidence_err": np.full(80, 0.05),
+            "samples_nlive": np.full(80, 50),
+            "samples_it": np.arange(80),
+        }
+    )
+    fig = SimpleNamespace(
+        axes={f"ax{i}": ax for i, ax in enumerate(raw_axes)},
+        logger=_logger(),
+        style={},
+        _ensure_pandas_data=lambda data, reason="render": data,
+    )
+    layer_info = {
+        "name": "dynesty",
+        "method": "dynesty_runplot",
+        "data": df,
+        "coor": {},
+        "style": {
+            "axes": ["ax0", "ax1", "ax2", "ax3"],
+            "nkde": 37,
+            "seed": 1,
+            "scatter_panels": ["nlive"],
+            "overlay_scatter_panels": ["likelihood", "importance", "evidence"],
+            "importance_scatter_normalize": "pdf_peak",
+            "ylim_factor": 1.3,
+            "lnz_error_levels": [1],
+            "evidence_summary": True,
+        },
+    }
+
+    layer_runtime_mod.render_layer(fig, raw_axes[0], layer_info)
+
+    assert len(raw_axes[0].lines) == 0
+    assert len(raw_axes[0].collections) == 1
+    assert len(raw_axes[1].lines[0].get_xdata()) == 80
+    assert len(raw_axes[1].collections) == 1
+    assert len(raw_axes[2].lines[0].get_xdata()) == 37
+    assert len(raw_axes[2].collections) == 1
+    importance_offsets = raw_axes[2].collections[0].get_offsets()
+    np.testing.assert_allclose(
+        np.max(importance_offsets[:, 1]),
+        np.max(raw_axes[2].lines[0].get_ydata()),
+    )
+    assert len(raw_axes[3].collections) == 2
+    assert len(raw_axes[3].lines) == 2
+    assert "±" in raw_axes[3].texts[0].get_text()
+    np.testing.assert_allclose(raw_axes[2].lines[0].get_ydata().max(), 0.2, rtol=0.25)
+    np.testing.assert_allclose(raw_axes[1].get_ylim(), (0.0, 1.3))
+    np.testing.assert_allclose(raw_axes[2].get_ylim()[1], 1.3 * raw_axes[2].lines[0].get_ydata().max())
+    plt.close(raw_fig)
 
 
 def test_render_releases_layer_data_even_when_render_fails(monkeypatch):

@@ -1,6 +1,6 @@
 # STYLE_SCHEMA
 
-Status: spec only
+Status: partial
 
 ## Purpose
 
@@ -17,7 +17,8 @@ The current bundle shape is effectively:
 ```json
 {
   "Frame": {},
-  "Style": {}
+  "Style": {},
+  "Layers": []
 }
 ```
 
@@ -25,11 +26,19 @@ Where:
 
 - `Frame` describes figure and axes configuration
 - `Style` describes method defaults and render-time style values
+- `Layers` is optional and provides default figure layers when the YAML figure
+  does not define `layers`
+
+`Layers` is intended for complete reusable plot formats such as
+`dynesty_runplot`, where the style card owns the standard axes, labels, and
+method layer. YAML-level `layers` still takes precedence when present.
 
 ## Current Owner
 
 - `jarvisplot/core.py` loads the bundle map
-- `jarvisplot/Figure/figure.py` applies the figure and layer merge
+- `jarvisplot/Figure/style_runtime.py` resolves the bundle payload
+- `jarvisplot/Figure/figure.py` applies frame/style defaults and stores optional default layers
+- `jarvisplot/Figure/config_runtime.py` applies YAML `layers` or falls back to style-card `Layers`
 - `jarvisplot/cards/**` stores the actual JSON files
 
 ## Boundary Rule

@@ -59,6 +59,7 @@ METHOD_DISPATCH: Dict[str, str] = {
     "jpcontourf":   "jpcontourf",
     "jpfield":      "jpfield",
     "grid_profile": "grid_profile",
+    "dynesty_runplot": "dynesty_runplot",
 
     # tri related
     "tripcolor":    "tripcolor",
