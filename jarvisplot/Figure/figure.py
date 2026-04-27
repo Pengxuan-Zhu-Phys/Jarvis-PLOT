@@ -11,7 +11,7 @@ from types import MethodType
 from .adapters_rect import StdAxesAdapter
 from .adapters_ternary import TernaryAxesAdapter
 from .method_registry import resolve_callable
-from .style_runtime import resolve_style_bundle
+from .style_runtime import resolve_style_bundle_payload
 from .config_runtime import apply_figure_config
 from .layer_runtime import (
     load_layer_runtime_data as runtime_load_layer_runtime_data,
@@ -92,6 +92,7 @@ class Figure:
         self._name: Optional[str]       = None
         self._jpstyles: Optional[dict]  = None
         self._style: Optional[dict]     = {}
+        self._default_layers = []
         self.print      = False
         self.mode       = "Jarvis"
         # self._jpdatas:  Optional[list]  =   []
@@ -178,9 +179,10 @@ class Figure:
         if len(value) not in (1, 2):
             self.logger.error("Undefined style -> {}".format(value))
             raise TypeError
-        family, selected, frame, style = resolve_style_bundle(self.jpstyles, value)
-        self._frame = frame
-        self._style = style
+        family, selected, bundle = resolve_style_bundle_payload(self.jpstyles, value)
+        self._frame = deepcopy(bundle["Frame"])
+        self._style = deepcopy(bundle["Style"])
+        self._default_layers = deepcopy(bundle.get("Layers", []))
         if self.logger:
             self.logger.debug("Style: [{} : {}] used for figure -> {}".format(family, selected, self.name))
     
@@ -220,7 +222,7 @@ class Figure:
             info['source_refs'] = self._source_refs_from_layer(layer)
             info['share_name'] = layer.get("share_data")
             info['combine'] = layer.get("combine", "concat")
-            info['coor'] = layer['coordinates']
+            info['coor'] = layer.get("coordinates", {})
             info['method'] = layer.get("method", "scatter")
             info['style'] = layer.get("style", {})
             info['colorbar'] = layer.get("colorbar", "axc")

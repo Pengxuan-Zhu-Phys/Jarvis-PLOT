@@ -12,6 +12,7 @@ from .profile_runtime import grid_profiling, profiling
 from .method_registry import resolve_callable
 from .colorbar_runtime import collect_and_attach_colorbar
 from .interp_natural_neighbor import resolve_backend
+from .dynesty_runtime import render_dynesty_runplot
 
 
 def _resolve_csv_export_path(fig, target):
@@ -506,6 +507,16 @@ def render_layer(fig, ax, layer_info):
     except Exception:
         pass
     method_key = str(layer_info.get("method", "scatter")).lower()
+    if method_key == "dynesty_runplot":
+        df = fig._ensure_pandas_data(
+            layer_info["data"],
+            reason=f"render:{layer_info.get('name', '')}",
+        )
+        style = dict(fig.style.get(method_key, {}))
+        if layer_info.get("style", {}) is not None:
+            style.update(layer_info.get("style", {}))
+        return render_dynesty_runplot(fig, df, style)
+
     axes_type = getattr(ax, "_type", "any")
 
     method, warn = resolve_callable(ax, method_key, axes_type=axes_type, strict=True)

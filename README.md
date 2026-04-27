@@ -68,6 +68,29 @@ jplot ./bin/SUSYRun2_GEWMSSM.yaml
 
 > **Note:** The data file paths inside the YAML files must be updated to match your local setup.
 
+### Example: Dynesty Runplot
+
+Jarvis-PLOT includes a reusable dynesty runplot format. With a dataset named
+`dynesty`, the figure can use the built-in card without writing axes or layer
+details:
+
+```yaml
+DataSet:
+- name: dynesty
+  path: path/to/dynesty_result.csv
+  type: csv
+
+Figures:
+- name: dynesty_logL_vs_logX
+  enable: true
+  style:
+  - a4paper_2x1
+  - dynesty_runplot
+```
+
+See `docs/specs/DYNESTY_RUNPLOT.md` for the default axes, KDE, scatter overlay,
+and evidence summary behavior.
+
 ---
 
 ## Notes

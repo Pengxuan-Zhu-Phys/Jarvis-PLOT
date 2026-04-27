@@ -58,6 +58,7 @@ There is no separate implemented scene parser or layout engine yet. Those are st
 - `jarvisplot/Figure/figure.py`: axis construction, layer binding, coordinate evaluation, `savefig()`
 - `jarvisplot/Figure/config_runtime.py`: figure config ingestion from YAML dictionaries, style bundle resolution, `rcParams` setup
 - `jarvisplot/Figure/layer_runtime.py`: layer data loading, style merge, coordinate validation, expression evaluation, and render dispatch to adapters
+- `jarvisplot/Figure/dynesty_runtime.py`: specialized dynesty `runplot` renderer and default panel semantics
 - `jarvisplot/Figure/adapters_rect.py`: rectangular-axes adapter implementations
 - `jarvisplot/Figure/adapters_ternary.py`: ternary-axes adapter implementations
 - `jarvisplot/Figure/adapters_rect.py`: rectangular-axes drawing primitives, custom `grid_profile` / Voronoi / tripcolor behavior (note: `grid_profile` contains ~210 lines of grid reconstruction logic coupled to `profile_runtime.py` `__grid_*` column output)
@@ -123,6 +124,7 @@ Do not hide these concerns inside `figure.py` or the adapter modules when implem
 - new profile helper -> `jarvisplot/Figure/profile_runtime.py` and `jarvisplot/Figure/preprocessor_runtime.py`
 - new pipeline/runtime helper -> `jarvisplot/Figure/preprocessor_runtime.py` and `jarvisplot/Figure/preprocessor.py`
 - new render primitive -> `jarvisplot/Figure/adapters_rect.py`, `jarvisplot/Figure/adapters_ternary.py`, and `jarvisplot/Figure/method_registry.py`
+- new multi-axes domain renderer -> a focused runtime helper under `jarvisplot/Figure/`, `jarvisplot/Figure/method_registry.py`, and a style card under `jarvisplot/cards/**`
 - new style bundle or asset -> `jarvisplot/cards/**`, `jarvisplot/utils/cmaps.py`, and if needed `jarvisplot/core.py`
 - new shared-data behavior -> `jarvisplot/Figure/data_pipelines.py` and `jarvisplot/Figure/preprocessor.py`
 - new expression helper -> `jarvisplot/inner_func.py`, `jarvisplot/utils/interpolator.py`, and `jarvisplot/utils/expression.py`

@@ -10,6 +10,7 @@ Use these docs when you need to know what a valid scene, style, profile, or laye
 
 - `SCENE_JSON_SCHEMA.md`: spec-only semantic scene contract for Jarvis-PLOT
 - `STYLE_SCHEMA.md`: spec-only style contract
+- `DYNESTY_RUNPLOT.md`: implemented reusable dynesty runplot format
 - `PROFILE_SCHEMA.md`: spec-only profile contract
 - `LAYER_TYPE_REGISTRY.md`: spec-only layer/method registry contract
 

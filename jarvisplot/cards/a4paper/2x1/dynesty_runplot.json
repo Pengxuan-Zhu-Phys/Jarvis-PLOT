@@ -1,0 +1,165 @@
+{
+  "Frame": {
+    "figure": {
+      "figsize": [3.3, 5.5]
+    },
+    "axes": {
+      "axlogo": {
+        "rect": [0.01, 0.006, 0.06, 0.036],
+        "frameon": false,
+        "yticks": [],
+        "xticks": [],
+        "xlim": [0, 1024],
+        "ylim": [1024, 0]
+      },
+      "ax0": { "rect": [0.195, 0.806, 0.790, 0.174] },
+      "ax1": { "rect": [0.195, 0.632, 0.790, 0.174] },
+      "ax2": { "rect": [0.195, 0.458, 0.790, 0.174] },
+      "ax3": { "rect": [0.195, 0.284, 0.790, 0.174] },
+      "ax4": { "rect": [0.195, 0.110, 0.790, 0.174] }
+    },
+    "ax0": {
+      "ticks": {
+        "both": { "labelsize": 6, "direction": "in", "labelfontfamily": "sans", "top": true, "left": true, "right": true, "bottom": true, "labelbottom": false, "which": "both" },
+        "major": { "which": "major", "length": 4, "width": 0.4, "color": "black" },
+        "minor": { "which": "minor", "length": 2, "width": 0.4, "color": "black" }
+      },
+      "labels": {
+        "x": "$-\\ln X$",
+        "y": "$N_{\\mathrm{live}}$",
+        "xlabel": { "loc": "right", "fontsize": 12, "fontfamily": "STIXGeneral" },
+        "ylabel": { "loc": "top", "fontsize": 12, "fontfamily": "STIXGeneral" }
+      }
+    },
+    "ax1": {
+      "ticks": {
+        "both": { "labelsize": 6, "direction": "in", "labelfontfamily": "sans", "top": true, "left": true, "right": true, "bottom": true, "labelbottom": false, "which": "both" },
+        "major": { "which": "major", "length": 4, "width": 0.4, "color": "black" },
+        "minor": { "which": "minor", "length": 2, "width": 0.4, "color": "black" }
+      },
+      "labels": {
+        "x": "$-\\ln X$",
+        "y": "Likelihood",
+        "xlabel": { "loc": "right", "fontsize": 12, "fontfamily": "STIXGeneral" },
+        "ylabel": { "loc": "top", "fontsize": 12, "fontfamily": "STIXGeneral" }
+      },
+      "text": [
+        {
+          "x": 0.02,
+          "y": 0.94,
+          "s": "Normalize to the maximum value",
+          "ha": "left",
+          "va": "top",
+          "fontsize": 7,
+          "fontfamily": "STIXGeneral",
+          "transform": true
+        }
+      ]
+    },
+    "ax2": {
+      "ticks": {
+        "both": { "labelsize": 6, "direction": "in", "labelfontfamily": "sans", "top": true, "left": true, "right": true, "bottom": true, "labelbottom": false, "which": "both" },
+        "major": { "which": "major", "length": 4, "width": 0.4, "color": "black" },
+        "minor": { "which": "minor", "length": 2, "width": 0.4, "color": "black" }
+      },
+      "labels": {
+        "x": "$-\\ln X$",
+        "y": "Importance\nweight PDF",
+        "xlabel": { "loc": "right", "fontsize": 12, "fontfamily": "STIXGeneral" },
+        "ylabel": { "loc": "top", "fontsize": 12, "fontfamily": "STIXGeneral" }
+      }
+    },
+    "ax3": {
+      "ticks": {
+        "both": { "labelsize": 6, "direction": "in", "labelfontfamily": "sans", "top": true, "left": true, "right": true, "bottom": true, "labelbottom": false, "which": "both" },
+        "major": { "which": "major", "length": 4, "width": 0.4, "color": "black" },
+        "minor": { "which": "minor", "length": 2, "width": 0.4, "color": "black" }
+      },
+      "labels": {
+        "x": "$-\\ln X$",
+        "y": "Evidence",
+        "xlabel": { "loc": "right", "fontsize": 12, "fontfamily": "STIXGeneral" },
+        "ylabel": { "loc": "top", "fontsize": 12, "fontfamily": "STIXGeneral" }
+      }
+    },
+    "ax4": {
+      "ticks": {
+        "both": { "labelsize": 6, "direction": "in", "labelfontfamily": "sans", "top": true, "left": true, "right": true, "bottom": true, "which": "both" },
+        "major": { "which": "major", "length": 4, "width": 0.4, "color": "black" },
+        "minor": { "which": "minor", "length": 2, "width": 0.4, "color": "black" }
+      },
+      "labels": {
+        "x": "$-\\ln X$",
+        "y": "Iters",
+        "xlabel": { "loc": "right", "fontsize": 12, "fontfamily": "STIXGeneral" },
+        "ylabel": { "loc": "top", "fontsize": 12, "fontfamily": "STIXGeneral" }
+      }
+    },
+    "axlogo": {
+      "file": "&JP/jarvisplot/cards/icons/JarvisHEP.png",
+      "text": [
+        { "x": 1.0, "y": 0.0, "s": "Jarvis-HEP", "ha": "left", "va": "bottom", "fontfamily": "Fira code", "fontsize": "x-small", "fontstyle": "normal", "fontweight": "bold" },
+        { "x": 1.0, "y": 0.9, "s": "  Powered by", "ha": "left", "va": "top", "color": "black", "fontfamily": "Fira code", "fontsize": "xx-small", "fontstyle": "normal", "fontweight": "normal" }
+      ]
+    }
+  },
+  "Style": {
+    "dynesty_runplot": {
+      "axes": ["ax0", "ax1", "ax2", "ax3", "ax4"],
+      "kde": true,
+      "nkde": 1000,
+      "lnz_error": true,
+      "lnz_error_levels": [1],
+      "evidence_summary": true,
+      "evidence_summary_fmt": "{value:.3g} ± {error:.2g}",
+      "evidence_summary_line_kwargs": {
+        "color": "#8a8a8a",
+        "linewidth": 0.8,
+        "alpha": 0.55,
+        "zorder": 2
+      },
+      "evidence_summary_text_kwargs": {
+        "x": 0.04,
+        "xytext": [0, -8],
+        "ha": "left",
+        "va": "top",
+        "fontsize": 7,
+        "fontfamily": "STIXGeneral",
+        "color": "black"
+      },
+      "ylim_factor": 1.3,
+      "scatter_panels": ["nlive", "iters"],
+      "overlay_scatter_panels": ["likelihood", "importance", "evidence"],
+      "importance_scatter_normalize": "pdf_peak",
+      "set_labels": false,
+      "color": "#A2CF6E",
+      "linewidth": 0.8,
+      "alpha": 1.0,
+      "zorder": 3,
+      "scatter_kwargs": {
+        "color": "#4050B5",
+        "marker": ".",
+        "s": 0.6,
+        "alpha": 0.8,
+        "zorder": 2
+      },
+      "overlay_scatter_kwargs": {
+        "color": "#4050B5",
+        "marker": ".",
+        "s": 0.4,
+        "alpha": 0.18,
+        "zorder": 1
+      }
+    }
+  },
+  "Layers": [
+    {
+      "name": "dynesty_runplot",
+      "data": [
+        { "source": "dynesty" }
+      ],
+      "axes": "ax0",
+      "method": "dynesty_runplot"
+    }
+  ]
+}

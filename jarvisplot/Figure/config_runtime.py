@@ -68,6 +68,8 @@ def apply_figure_config(fig, info: Mapping) -> bool:
 
         if "layers" in info:
             fig.layers = info["layers"]
+        elif getattr(fig, "_default_layers", None):
+            fig.layers = fig._default_layers
 
         fig._setup_status = "ok"
         return True

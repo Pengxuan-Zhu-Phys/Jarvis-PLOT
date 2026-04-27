@@ -5,16 +5,11 @@ from copy import deepcopy
 from typing import Any, Mapping, Tuple
 
 
-PREFERRED_STYLE_VARIANTS = ("rect", "Ternary", "rect_5x1", "rectcmap", "TernaryCmap")
+PREFERRED_STYLE_VARIANTS = ("rect", "Ternary", "rect_5x1", "dynesty_runplot", "rectcmap", "TernaryCmap")
 
 
-def resolve_style_bundle(jpstyles: Mapping[str, Any], value) -> Tuple[str, str, dict, dict]:
-    """
-    Resolve a style token list into concrete Frame/Style payloads.
-
-    Returns:
-        (family_name, variant_name, frame_dict, style_dict)
-    """
+def resolve_style_bundle_payload(jpstyles: Mapping[str, Any], value) -> Tuple[str, str, dict]:
+    """Resolve style tokens to a full bundle payload."""
     if len(value) == 2:
         family_name = value[0]
         variant_name = value[1]
@@ -31,6 +26,18 @@ def resolve_style_bundle(jpstyles: Mapping[str, Any], value) -> Tuple[str, str, 
         bundle = family[variant_name]
     else:
         raise TypeError("Style tokens must contain one family or family+variant")
+
+    return family_name, variant_name, deepcopy(bundle)
+
+
+def resolve_style_bundle(jpstyles: Mapping[str, Any], value) -> Tuple[str, str, dict, dict]:
+    """
+    Resolve a style token list into concrete Frame/Style payloads.
+
+    Returns:
+        (family_name, variant_name, frame_dict, style_dict)
+    """
+    family_name, variant_name, bundle = resolve_style_bundle_payload(jpstyles, value)
 
     return (
         family_name,
