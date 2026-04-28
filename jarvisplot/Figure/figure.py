@@ -47,6 +47,97 @@ except Exception:
     pl = None
 
 
+_JPLOT_VERSION_CACHE = None
+
+
+def _resolve_jplot_version() -> str:
+    """Return the source/package version used for figure metadata."""
+    global _JPLOT_VERSION_CACHE
+    if _JPLOT_VERSION_CACHE is not None:
+        return _JPLOT_VERSION_CACHE
+
+    pyproject = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "pyproject.toml")
+    )
+    try:
+        with open(pyproject, "r", encoding="utf-8") as handle:
+            in_project = False
+            for line in handle:
+                stripped = line.strip()
+                if stripped == "[project]":
+                    in_project = True
+                    continue
+                if in_project and stripped.startswith("["):
+                    break
+                if in_project and stripped.startswith("version"):
+                    _JPLOT_VERSION_CACHE = stripped.split("=", 1)[1].strip().strip('"').strip("'")
+                    return _JPLOT_VERSION_CACHE
+    except Exception:
+        pass
+
+    try:
+        from importlib.metadata import version as pkg_version
+
+        for dist_name in ("Jarvis-PLOT", "JarvisPLOT", "jarvisplot"):
+            try:
+                _JPLOT_VERSION_CACHE = pkg_version(dist_name)
+                return _JPLOT_VERSION_CACHE
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    _JPLOT_VERSION_CACHE = "0.0.0"
+    return _JPLOT_VERSION_CACHE
+
+
+def _savefig_metadata(fmt: str, extra=None) -> dict:
+    """Build backend-friendly figure metadata for savefig."""
+    version = _resolve_jplot_version()
+    creator = "Jarvis-PLOT, powered by Jarvis-HEP"
+    version_text = f"Jarvis-PLOT version: {version}"
+    provenance_text = f"{creator}; {version_text}"
+    fmt_key = str(fmt or "").lower().lstrip(".")
+    metadata = {
+        "Creator": creator,
+        "Title": "Jarvis-PLOT figure",
+        "Author": "Jarvis-PLOT",
+    }
+
+    if fmt_key in {"pdf", "ps", "eps"}:
+        metadata["Subject"] = provenance_text
+        metadata["Keywords"] = f"Jarvis-PLOT; Jarvis-HEP; {version_text}"
+    else:
+        metadata["Software"] = "Jarvis-PLOT"
+        metadata["Description"] = provenance_text
+        metadata["Comment"] = provenance_text
+        metadata["Jarvis-PLOT version"] = version
+
+    if isinstance(extra, dict):
+        metadata.update(extra)
+    return metadata
+
+
+def _write_png_metadata(path: str, metadata: dict) -> None:
+    try:
+        from PIL import Image, PngImagePlugin
+    except Exception:
+        return
+    try:
+        image = Image.open(path)
+        pnginfo = PngImagePlugin.PngInfo()
+        for key, value in (metadata or {}).items():
+            if value is None:
+                continue
+            pnginfo.add_text(str(key), str(value))
+        save_kwargs = {"pnginfo": pnginfo}
+        if "dpi" in image.info:
+            save_kwargs["dpi"] = image.info["dpi"]
+        image.save(path, **save_kwargs)
+    except Exception:
+        return
+
+
 class Figure:
     def _is_numbered_ax(self, name: str) -> bool:
         """Return True iff name matches ax<NUMBER>, e.g. ax1, ax2, ax10."""
@@ -99,6 +190,7 @@ class Figure:
         self._logger    = None
         self._frame     = {}
         self._outinfo   = {}
+        self._output_metadata = {}
         self._yaml_dir  = None  # directory of the active YAML file (used to resolve relative paths)
         self.axes       = {}
         self.debug      = False
@@ -134,11 +226,13 @@ class Figure:
     
     @config.setter
     def config(self, infos):
-        self.dir = self.load_path(infos['output'].get("dir", "."), base_dir=self._yaml_dir)
+        output = infos.get("output", {})
+        self.dir = self.load_path(output.get("dir", "."), base_dir=self._yaml_dir)
         if not os.path.exists(self.dir):
             os.makedirs(self.dir)
-        self.fmts   = infos['output'].get("formats", ['png'])
-        self.dpi    = infos['output'].get('dpi', 600)
+        self.fmts = output.get("formats", ["png"])
+        self.dpi = output.get("dpi", 600)
+        self._output_metadata = output.get("metadata", {}) if isinstance(output.get("metadata", {}), dict) else {}
 
     @property
     def jpstyles(self) -> Optional[dict]: 
@@ -835,7 +929,13 @@ class Figure:
                     )
             except Exception:
                 pass 
-            self.fig.savefig(spf, dpi=self.dpi)
+            metadata = _savefig_metadata(fmt, self._output_metadata)
+            try:
+                self.fig.savefig(spf, dpi=self.dpi, metadata=metadata)
+            except (TypeError, ValueError):
+                self.fig.savefig(spf, dpi=self.dpi)
+            if str(fmt).lower().lstrip(".") == "png":
+                _write_png_metadata(spf, metadata)
 
     def load_axes(self):
         for ax, kws in self.frame['axes'].items():

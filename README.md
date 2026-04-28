@@ -97,6 +97,7 @@ and evidence summary behavior.
 
 - Figures are saved automatically to the output paths defined in the YAML configuration.
 - Common output formats include PNG and PDF (backend-dependent).
+- Saved figures include file metadata such as `Creator: Jarvis-PLOT, powered by Jarvis-HEP` and `Jarvis-PLOT version: X.Y.Z`; the PNG `Description` also includes both fields for macOS Finder compatibility.
 - Jarvis-PLOT works in headless environments (SSH, batch jobs) without any GUI backend.
 
 ---

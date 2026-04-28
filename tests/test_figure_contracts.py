@@ -84,6 +84,57 @@ def test_style_bundle_can_provide_default_layers(monkeypatch):
     assert fig._render_queue[0][1]["method"] == "dynesty_runplot"
 
 
+def test_savefig_writes_creator_and_version_metadata(tmp_path):
+    calls = []
+
+    class DummyFigure:
+        def savefig(self, path, *, dpi=None, metadata=None):
+            calls.append((path, dpi, metadata))
+
+    fig = Figure()
+    fig.logger = _logger()
+    fig.name = "plot"
+    fig.dir = str(tmp_path)
+    fig.fmts = ["png", "pdf"]
+    fig.dpi = 123
+    fig.fig = DummyFigure()
+    fig._output_metadata = {}
+
+    fig.savefig()
+
+    assert calls[0][2]["Creator"] == "Jarvis-PLOT, powered by Jarvis-HEP"
+    assert calls[0][2]["Description"].startswith("Jarvis-PLOT, powered by Jarvis-HEP; Jarvis-PLOT version: ")
+    assert calls[0][2]["Comment"] == calls[0][2]["Description"]
+    assert calls[0][2]["Jarvis-PLOT version"]
+    assert calls[1][2]["Creator"] == "Jarvis-PLOT, powered by Jarvis-HEP"
+    assert calls[1][2]["Subject"].startswith("Jarvis-PLOT, powered by Jarvis-HEP; Jarvis-PLOT version: ")
+
+
+def test_savefig_png_contains_metadata_text_chunks(tmp_path):
+    from PIL import Image
+
+    raw_fig, raw_ax = plt.subplots()
+    raw_ax.plot([0.0, 1.0], [0.0, 1.0])
+
+    fig = Figure()
+    fig.logger = _logger()
+    fig.name = "plot"
+    fig.dir = str(tmp_path)
+    fig.fmts = ["png"]
+    fig.dpi = 80
+    fig.fig = raw_fig
+    fig._output_metadata = {}
+
+    fig.savefig()
+    plt.close(raw_fig)
+
+    info = Image.open(tmp_path / "plot.png").info
+    assert info["Creator"] == "Jarvis-PLOT, powered by Jarvis-HEP"
+    assert info["Description"].startswith("Jarvis-PLOT, powered by Jarvis-HEP; Jarvis-PLOT version: ")
+    assert info["Comment"] == info["Description"]
+    assert info["Jarvis-PLOT version"]
+
+
 def test_console_record_formatter_escapes_braces():
     class _Time:
         def __format__(self, spec):
