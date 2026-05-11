@@ -41,13 +41,16 @@ For each figure item in YAML:
 - `add_column`
 - `sortby`
 - `profile`
-- `grid_profile`
+- `make_density_core`
+- `make_interp_2d`
 - `keep_columns`
 - `drop_columns`
-- `tocsv`
+- `to_csv`
 - `to_parquet`
 
-Order is authoritative; transforms run sequentially. `keep_columns` and `drop_columns` are the only explicit column-pruning steps. `tocsv` and `to_parquet` export the dataframe state at their position in the ordered list.
+Computed columns are expressed with `add_column`; `expression` is not a standalone transform type.
+
+Order is authoritative; transforms run sequentially. `keep_columns` and `drop_columns` are the only explicit column-pruning steps. `to_csv` and `to_parquet` export the dataframe state at their position in the ordered list. The canonical transform reference is `docs/specs/TRANSFORMS.md`.
 
 ### Prebuild vs Runtime
 
@@ -137,7 +140,7 @@ frame:
 
 - expensive hotspots:
   - HDF5 flatten/merge
-  - runtime `profile/grid_profile`
+  - runtime `profile`
   - dense Voronoi operations (`scipy` + `shapely`)
 - safest optimization order:
   1. prefilter data early

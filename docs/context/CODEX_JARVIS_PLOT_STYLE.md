@@ -137,7 +137,7 @@ Priority order:
 3. split `data_loader.py` into source loading and summary emission helpers; keep transform/runtime handling in `data_loader_runtime.py` and HDF5 policy in `data_loader_hdf5.py`
 4. replace ad-hoc dict contracts with typed schema/dataclasses for frame/layer color config
 5. add minimal automated regression tests for:
-  - profile/grid_profile cache reuse
+  - profile cache reuse
   - colorbar scale/limits
   - style fallback resolution
   - path-resolution behavior on a real YAML input

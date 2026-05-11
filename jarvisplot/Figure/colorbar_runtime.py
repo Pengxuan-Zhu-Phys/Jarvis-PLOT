@@ -144,7 +144,6 @@ _COLORED_Z_METHODS = frozenset({
     "tripcolor", "tripcolor_axes",
     "pcolor", "pcolormesh", "imshow",
     "voronoi", "voronoif",
-    "grid_profile",
 })
 
 _CONTOUR_LIKE_METHODS = frozenset({

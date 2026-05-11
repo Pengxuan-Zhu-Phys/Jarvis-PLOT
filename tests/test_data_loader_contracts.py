@@ -239,20 +239,20 @@ def test_hdf5_summary_emitted_before_transform(tmp_path):
 
 HDF5_EXPORT_CASES = [
     pytest.param(
-        [{"add_column": {"name": "y", "expr": "x * 2"}}, {"tocsv": "./saved/sample_transformed.csv"}],
+        [{"add_column": {"name": "y", "expr": "x * 2"}}, {"to_csv": "./saved/sample_transformed.csv"}],
         [("sample_transformed.csv", ["__jp_row_idx__", "x", "y"], 3)],
         ["y"],
-        id="tocsv-writes-output",
+        id="to-csv-writes-output",
     ),
     pytest.param(
         [
             {"add_column": {"name": "y", "expr": "x * 2"}},
-            {"tocsv": "./saved/sample_prefix.csv"},
+            {"to_csv": "./saved/sample_prefix.csv"},
             {"add_column": {"name": "z", "expr": "y + 1"}},
         ],
         [("sample_prefix.csv", ["__jp_row_idx__", "x", "y"], 3)],
         ["y", "z"],
-        id="tocsv-executes-in-order",
+        id="to-csv-executes-in-order",
     ),
     pytest.param(
         [{"add_column": {"name": "y", "expr": "x * 2"}}, {"to_parquet": "./saved/sample_transformed.parquet"}],
@@ -273,7 +273,7 @@ HDF5_EXPORT_CASES = [
     pytest.param(
         [
             {"add_column": {"name": "y", "expr": "x * 2"}},
-            {"tocsv": "./saved/sample_transformed.csv"},
+            {"to_csv": "./saved/sample_transformed.csv"},
             {"to_parquet": "./saved/sample_transformed.parquet"},
         ],
         [

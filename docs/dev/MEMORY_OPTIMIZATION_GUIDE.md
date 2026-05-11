@@ -62,7 +62,7 @@ Implemented in `jarvisplot/Figure/preprocessor.py` and `jarvisplot/Figure/prepro
 
 Impact:
 
-- `profile`, `preprofile`, and `grid_profile` operate on selection tables instead of full datasets
+- `profile` and `preprofile` operate on selection tables instead of full datasets
 - runtime caches store compact payloads
 
 ### 4. Narrow Cache Payloads

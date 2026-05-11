@@ -40,7 +40,8 @@ Current stable product facts:
 - primary orchestrator: `jarvisplot/core.py`
 - current main renderer: Matplotlib-based figure rendering
 - input surfaces: YAML figure configs, style cards, dataset configs, scene-oriented JSON (`spec only`)
-- current data pipeline primitives: `filter`, `add_column`, `sortby`, `profile`, `grid_profile`
+- current data pipeline transforms: `filter`, `add_column`, `sortby`, `profile`, `make_density_core`, `make_interp_2d`, `keep_columns`, `drop_columns`, `to_csv`, `to_parquet`
+- computed columns use `add_column`; there is no standalone `type: expression` transform
 - expensive profile work is split across prebuild and runtime phases
 - transform primitives live in `jarvisplot/Figure/preprocessor_runtime.py`; profiling helpers live in `jarvisplot/Figure/profile_runtime.py`
 - dataset summary helpers live in `jarvisplot/data_loader_summary.py`
@@ -173,7 +174,7 @@ For flowcharts, treat the upstream payload as semantic scene data, not pre-rende
 
 - Keep ownership explicit across the semantic input -> layout -> style -> render stack.
 - Prefer extending existing runtime owners before adding new framework layers.
-- Preserve the current prebuild/runtime pipeline split when changing `profile` or `grid_profile` behavior.
+- Preserve the current prebuild/runtime pipeline split when changing `profile` behavior.
 - Cache changes must keep `.cache/data`, `.cache/named`, and `.cache/summary` semantics coherent.
 - `frame.axc.color` is the preferred colorbar source of truth; layer-level color keys remain layer kwargs, not colorbar configuration.
 - Style keys should be explicit and backed by card definitions; do not invent implicit defaults.

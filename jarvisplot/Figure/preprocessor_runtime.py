@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import gc
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
@@ -16,7 +15,17 @@ except Exception:
 from ..memtrace import memtrace_checkpoint, memtrace_object_inventory
 from ..utils.expression import eval_dataframe_expression
 from ..utils.pathing import resolve_project_path
-from .profile_runtime import _preprofiling, eval_series, grid_profiling, profiling
+from .density_cell_runtime import (
+    density_cell,
+    density_cell_config,
+    is_density_cell_transform,
+)
+from .interp_2d_runtime import (
+    interp_2d_config,
+    is_interp_2d_transform,
+    make_interp_2d,
+)
+from .profile_runtime import _preprofiling, eval_series, profiling
 
 
 def _normalize_column_list(spec):
@@ -191,7 +200,7 @@ def _resolve_csv_export_path(preprocessor, target: Any) -> Path:
     raw = _csv_export_target(target)
     path = str(raw).strip()
     if not path:
-        raise ValueError("tocsv requires a non-empty path")
+        raise ValueError("to_csv requires a non-empty path")
     return resolve_project_path(path, base_dir=getattr(preprocessor, "base_dir", None))
 
 
@@ -401,54 +410,39 @@ def apply_transforms_impl(
                         "bin": binv,
                     },
                 )
-        elif "grid_profile" in trans:
-            profile_cfg = trans.get("grid_profile", {})
-            if isinstance(profile_cfg, Mapping):
-                profile_cfg = deepcopy(profile_cfg)
-                profile_cfg.setdefault("method", "grid")
-            else:
-                profile_cfg = {"method": "grid"}
+        elif is_density_cell_transform(trans):
+            cfg = density_cell_config(trans)
             before_rows = preprocessor._safe_nrows(df)
-            binv = profile_cfg.get("bin", "default")
             preprocessor._info(
-                "Runtime profile START: source \t-> {}\n\t step \t-> 'grid_profile,\n\t method \t-> 'grid',\n\t bin \t-> {},\n\t rows_before \t-> {}".format(
+                "Density cell START:\n\t source \t-> {}\n\t rows_before \t-> {}".format(
                     source_label or "<unknown>",
-                    binv,
                     before_rows if before_rows is not None else "NA",
                 )
             )
-            memtrace_checkpoint(
-                preprocessor.logger,
-                "pipeline.grid_profile.before",
-                df,
-                extra={
-                    "source": source_label or "<unknown>",
-                    "mode": profile_mode,
-                    "bin": binv,
-                },
-            )
-            df = grid_profiling(df, profile_cfg, preprocessor.logger)
+            df = density_cell(df, cfg, preprocessor.logger)
             after_rows = preprocessor._safe_nrows(df)
-            delta = "NA"
-            if before_rows is not None and after_rows is not None:
-                delta = after_rows - before_rows
             preprocessor._warn(
-                "Runtime profile DONE: \n\t source \t-> {}\n\tstep \t-> 'grid_profile,\n\t method \t-> 'grid',\n\t bin \t\t-> {}\n\t rows_after \t-> {},\n\t delta \t->".format(
+                "Density cell DONE:\n\t source \t-> {}\n\t rows_after \t-> {}".format(
                     source_label or "<unknown>",
-                    binv,
                     after_rows if after_rows is not None else "NA",
-                    delta,
                 )
             )
-            memtrace_checkpoint(
-                preprocessor.logger,
-                "pipeline.grid_profile.after",
-                df,
-                extra={
-                    "source": source_label or "<unknown>",
-                    "mode": profile_mode,
-                    "bin": binv,
-                },
+        elif is_interp_2d_transform(trans):
+            cfg = interp_2d_config(trans)
+            before_rows = preprocessor._safe_nrows(df)
+            preprocessor._info(
+                "2D interpolation START:\n\t source \t-> {}\n\t rows_before \t-> {}".format(
+                    source_label or "<unknown>",
+                    before_rows if before_rows is not None else "NA",
+                )
+            )
+            df = make_interp_2d(df, cfg, preprocessor.logger)
+            after_rows = preprocessor._safe_nrows(df)
+            preprocessor._warn(
+                "2D interpolation DONE:\n\t source \t-> {}\n\t rows_after \t-> {}".format(
+                    source_label or "<unknown>",
+                    after_rows if after_rows is not None else "NA",
+                )
             )
         elif "sortby" in trans:
             df = sort_by(df, trans["sortby"], preprocessor.logger)
@@ -458,11 +452,11 @@ def apply_transforms_impl(
             df = keep_columns(df, trans.get("keep_columns"), preprocessor.logger)
         elif "drop_columns" in trans:
             df = drop_columns(df, trans.get("drop_columns"), preprocessor.logger)
-        elif "tocsv" in trans or "to_csv" in trans:
+        elif "to_csv" in trans:
             _save_dataframe_csv(
                 preprocessor,
                 df,
-                trans.get("tocsv", trans.get("to_csv")),
+                trans.get("to_csv"),
                 stage=profile_mode,
                 source_label=source_label,
             )

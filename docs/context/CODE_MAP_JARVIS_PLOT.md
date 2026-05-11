@@ -48,8 +48,10 @@ There is no separate implemented scene parser or layout engine yet. Those are st
 
 - `jarvisplot/Figure/preprocessor.py`: demand projection, cache identity, preprofile split, named `share_data` persistence
 - `jarvisplot/Figure/preprocessor_runtime.py`: source resolution, runtime transform execution, pipeline cache flow
-- `jarvisplot/Figure/preprocessor_runtime.py`: primitive transform functions (`filter_df`, `add_column`, `sort_by`, `keep_columns`, `drop_columns`)
-- `jarvisplot/Figure/profile_runtime.py`: `profile` / `grid_profile` implementations and profile prebuild helpers
+- `jarvisplot/Figure/preprocessor_runtime.py`: ordered transform pipeline execution plus primitive transform functions (`filter_df`, `add_column`, `sort_by`, `keep_columns`, `drop_columns`, CSV export)
+- `jarvisplot/Figure/profile_runtime.py`: `profile` implementations and profile prebuild helpers
+- `jarvisplot/Figure/density_cell_runtime.py`: `make_density_core` support/core construction for posterior mass tables
+- `jarvisplot/Figure/interp_2d_runtime.py`: `make_interp_2d` support/core-to-grid interpolation
 - `jarvisplot/inner_func.py`: eval namespace injection for expression helpers
 - `jarvisplot/utils/interpolator.py`: lazy YAML `Functions` loader and callable registry
 
@@ -61,13 +63,14 @@ There is no separate implemented scene parser or layout engine yet. Those are st
 - `jarvisplot/Figure/dynesty_runtime.py`: specialized dynesty `runplot` renderer and default panel semantics
 - `jarvisplot/Figure/adapters_rect.py`: rectangular-axes adapter implementations
 - `jarvisplot/Figure/adapters_ternary.py`: ternary-axes adapter implementations
-- `jarvisplot/Figure/adapters_rect.py`: rectangular-axes drawing primitives, custom `grid_profile` / Voronoi / tripcolor behavior (note: `grid_profile` contains ~210 lines of grid reconstruction logic coupled to `profile_runtime.py` `__grid_*` column output)
+- `jarvisplot/Figure/adapters_rect.py`: rectangular-axes drawing primitives, custom `pcolormesh` / Voronoi / tripcolor behavior
 - `jarvisplot/Figure/adapters_ternary.py`: ternary-axes drawing primitives and ternary render behavior
 - `jarvisplot/Figure/method_registry.py`: YAML `method` key to adapter callable resolution
 - `jarvisplot/Figure/style_runtime.py`: style family / variant resolution and frame/style bundle selection
 - `jarvisplot/Figure/helper.py`: clipping and geometry helpers used by adapters
 - `jarvisplot/Figure/layout_runtime.py`: axis-geometry helpers for numbered axes, ticks, and endpoint application
 - `jarvisplot/Figure/colorbar_runtime.py`: colorbar assembly, frame-driven colorbar config lookup; note: accumulates shared state across layers via `fig.axc._cb`
+- `jarvisplot/Figure/posterior_hpd.py`: integrated-mass HPD contour threshold computation and contour style preparation
 
 ### Style, assets, and shared utilities [implemented]
 
@@ -120,7 +123,8 @@ Do not hide these concerns inside `figure.py` or the adapter modules when implem
 - new summary formatting or HDF5 tree diagnostic helper -> `jarvisplot/data_loader_summary.py`
 - new HDF5 policy helper -> `jarvisplot/data_loader_hdf5.py` and `jarvisplot/data_loader_runtime.py`
 - new dataset transform/runtime helper -> `jarvisplot/data_loader_runtime.py` and `jarvisplot/data_loader.py`
-- new transform primitive -> `jarvisplot/Figure/preprocessor_runtime.py` and `jarvisplot/data_loader_runtime.py`
+- new transform primitive -> focused runtime helper under `jarvisplot/Figure/`, plus dispatch/projection updates in `jarvisplot/Figure/preprocessor_runtime.py`, `jarvisplot/Figure/preprocessor.py`, `jarvisplot/data_loader_runtime.py`, and `jarvisplot/core_runtime.py`
+- new posterior-density or HPD behavior -> keep the measure estimator independent from rendering; document it in `docs/specs/POSTERIOR_DENSITY.md`
 - new profile helper -> `jarvisplot/Figure/profile_runtime.py` and `jarvisplot/Figure/preprocessor_runtime.py`
 - new pipeline/runtime helper -> `jarvisplot/Figure/preprocessor_runtime.py` and `jarvisplot/Figure/preprocessor.py`
 - new render primitive -> `jarvisplot/Figure/adapters_rect.py`, `jarvisplot/Figure/adapters_ternary.py`, and `jarvisplot/Figure/method_registry.py`
@@ -135,7 +139,7 @@ Do not hide these concerns inside `figure.py` or the adapter modules when implem
 
 These are documented architectural issues that should be addressed over time:
 
-1. **grid_profile metadata coupling**: `profile_runtime.py` writes `__grid_*` columns that `adapters_rect.py` reads and reconstructs (~210 lines of grid reconstruction in the adapter). If profile column names change, adapters must change in sync. Consider extracting grid reconstruction to a helper in `profile_runtime.py`.
+1. **Grid metadata coupling**: `profile_runtime.py` writes `__grid_*` columns that `adapters_rect.py` reads and reconstructs for `pcolormesh`. If profile column names change, adapters must change in sync.
 
 2. **Colorbar state accumulation**: `colorbar_runtime.collect_and_attach_colorbar()` mutates shared `fig.axc._cb` across layers to track the union of all color ranges. This is intentional but should be documented in the function docstring.
 

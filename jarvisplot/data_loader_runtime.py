@@ -30,7 +30,7 @@ from .data_loader_hdf5 import (
 from .utils.dataframes import polars_to_pandas
 from .utils.pathing import resolve_project_path
 from .Figure.preprocessor_runtime import add_column, drop_columns, filter_df, keep_columns, sort_by
-from .Figure.profile_runtime import grid_profiling, profiling
+from .Figure.profile_runtime import profiling
 
 JP_ROW_IDX = "__jp_row_idx__"
 
@@ -49,24 +49,24 @@ def _transform_requests_column_prune(transform) -> bool:
     return False
 
 
-def _resolve_tocsv_target(dataset, target: Any) -> Path:
+def _resolve_csv_target(dataset, target: Any) -> Path:
     if isinstance(target, dict):
         raw = target.get("path", target.get("file", target.get("target", target.get("value", ""))))
     else:
         raw = target
     path = str(raw).strip()
     if not path:
-        raise ValueError("tocsv requires a non-empty path")
+        raise ValueError("to_csv requires a non-empty path")
     base_dir = getattr(dataset, "rootpath", None) or getattr(dataset, "path", None) or "."
     return resolve_project_path(path, base_dir=base_dir)
 
 
 def _resolve_toparquet_target(dataset, target: Any) -> Path:
-    return _resolve_tocsv_target(dataset, target)
+    return _resolve_csv_target(dataset, target)
 
 
 def _save_dataframe_csv(dataset, df, target: Any, stage: str) -> Path:
-    out_path = _resolve_tocsv_target(dataset, target)
+    out_path = _resolve_csv_target(dataset, target)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     if isinstance(df, pd.DataFrame):
         df.to_csv(out_path, index=False)
@@ -131,8 +131,22 @@ def apply_dataset_transform(dataset, stage: str = "dataset") -> None:
             )
         return
 
-    from .Figure.preprocessor_runtime import add_column, filter_df, sort_by
-    from .Figure.profile_runtime import grid_profiling, profiling
+    from .Figure.preprocessor_runtime import (
+        add_column,
+        filter_df,
+        sort_by,
+    )
+    from .Figure.density_cell_runtime import (
+        density_cell,
+        density_cell_config,
+        is_density_cell_transform,
+    )
+    from .Figure.interp_2d_runtime import (
+        interp_2d_config,
+        is_interp_2d_transform,
+        make_interp_2d,
+    )
+    from .Figure.profile_runtime import profiling
 
     push_mode = str(os.getenv("JP_DATASET_POLARS_TRANSFORM", "auto")).strip().lower()
     use_polars_pushdown = push_mode not in {"0", "false", "no", "off", "disable", "disabled"}
@@ -177,14 +191,10 @@ def apply_dataset_transform(dataset, stage: str = "dataset") -> None:
             df = filter_df(df, trans["filter"], dataset.logger)
         elif "profile" in trans:
             df = profiling(df, trans["profile"], dataset.logger)
-        elif "grid_profile" in trans:
-            cfg = trans.get("grid_profile", {})
-            if isinstance(cfg, dict):
-                cfg = cfg.copy()
-                cfg.setdefault("method", "grid")
-            else:
-                cfg = {"method": "grid"}
-            df = grid_profiling(df, cfg, dataset.logger)
+        elif is_density_cell_transform(trans):
+            df = density_cell(df, density_cell_config(trans), dataset.logger)
+        elif is_interp_2d_transform(trans):
+            df = make_interp_2d(df, interp_2d_config(trans), dataset.logger)
         elif "sortby" in trans:
             df = sort_by(df, trans["sortby"], dataset.logger)
         elif "add_column" in trans:
@@ -193,10 +203,10 @@ def apply_dataset_transform(dataset, stage: str = "dataset") -> None:
             df = keep_columns(df, trans.get("keep_columns"), dataset.logger)
         elif "drop_columns" in trans:
             df = drop_columns(df, trans.get("drop_columns"), dataset.logger)
-        elif "tocsv" in trans:
+        elif "to_csv" in trans:
             if isinstance(df, pd.DataFrame):
                 df = _ensure_row_index_on_pandas(df)
-            _save_dataframe_csv(dataset, df, trans.get("tocsv"), stage=stage)
+            _save_dataframe_csv(dataset, df, trans.get("to_csv"), stage=stage)
         elif "to_parquet" in trans:
             if isinstance(df, pd.DataFrame):
                 df = _ensure_row_index_on_pandas(df)
@@ -389,12 +399,21 @@ def _apply_dataset_transform_polars(
                 lf = keep_columns(lf, trans.get("keep_columns"), dataset.logger)
             elif "drop_columns" in trans:
                 lf = drop_columns(lf, trans.get("drop_columns"), dataset.logger)
-            elif "profile" in trans or "grid_profile" in trans:
+            elif (
+                "profile" in trans
+                or "make_density_core" in trans
+                or "make_interp_2d" in trans
+                or str(trans.get("type", "")).strip().lower()
+                in {
+                    "make_density_core",
+                    "make_interp_2d",
+                }
+            ):
                 return False
-            elif "tocsv" in trans:
+            elif "to_csv" in trans:
                 if JP_ROW_IDX not in polars_schema_names(lf):
                     lf = lf.with_row_index(JP_ROW_IDX)
-                _save_dataframe_csv(dataset, lf, trans.get("tocsv"), stage=stage)
+                _save_dataframe_csv(dataset, lf, trans.get("to_csv"), stage=stage)
             elif "to_parquet" in trans:
                 if JP_ROW_IDX not in polars_schema_names(lf):
                     lf = lf.with_row_index(JP_ROW_IDX)

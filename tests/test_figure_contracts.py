@@ -20,7 +20,7 @@ from jarvisplot.Figure.figure import Figure
 from jarvisplot.Figure.data_pipelines import DataContext, SharedContent
 from jarvisplot.Figure.method_registry import resolve_method
 from jarvisplot.Figure.preprocessor import DataPreprocessor
-from jarvisplot.Figure.profile_runtime import grid_profile_mesh
+from jarvisplot.Figure.profile_runtime import regular_grid_mesh
 from jarvisplot.core import _format_console_record
 from jarvisplot.data_loader import JP_ROW_IDX
 
@@ -491,7 +491,6 @@ def test_colorbar_legacy_axis_scale_is_ignored_without_color_scale():
         "tri_color",
         "tri_field_axes",
         "tripcolor_gouraud",
-        "grid_profiling",
     ],
 )
 def test_removed_method_aliases_are_rejected(alias):
@@ -689,7 +688,7 @@ def test_prescan_release_does_not_consume_shared_sources():
     assert isinstance(ctx.get("porfXY"), pd.DataFrame)
 
 
-def test_grid_profile_mesh_reconstructs_from_grid_metadata():
+def test_regular_grid_mesh_reconstructs_from_grid_metadata():
     df = pd.DataFrame(
         {
             "__grid_ix__": [0, 0, 1, 0, 1],
@@ -705,7 +704,7 @@ def test_grid_profile_mesh_reconstructs_from_grid_metadata():
         }
     )
 
-    mesh = grid_profile_mesh(
+    mesh = regular_grid_mesh(
         x=[0.25, 0.25, 1.25, 0.25, 1.25],
         y=[0.25, 0.25, 0.25, 1.25, 1.25],
         z=[1.0, 5.0, 3.0, 2.0, 4.0],
@@ -728,6 +727,46 @@ def test_grid_profile_mesh_reconstructs_from_grid_metadata():
     assert grid[0, 1] == 3.0
     assert grid[1, 0] == 2.0
     assert grid[1, 1] == 4.0
+
+
+def test_pcolormesh_accepts_flat_grid_metadata(monkeypatch):
+    from jarvisplot.Figure.adapters_rect import StdAxesAdapter
+
+    calls = []
+    raw_fig, raw_ax = plt.subplots()
+
+    def fake_pcolormesh(x_edges, y_edges, grid, **kwargs):
+        calls.append((np.asarray(x_edges), np.asarray(y_edges), np.asarray(grid), kwargs))
+        return SimpleNamespace()
+
+    monkeypatch.setattr(raw_ax, "pcolormesh", fake_pcolormesh)
+    adapter = StdAxesAdapter(raw_ax)
+    df = pd.DataFrame(
+        {
+            "x": [0.25, 0.75, 0.25, 0.75],
+            "y": [0.25, 0.25, 0.75, 0.75],
+            "z": [1.0, 2.0, 3.0, 4.0],
+            "__grid_ix__": [0, 1, 0, 1],
+            "__grid_iy__": [0, 0, 1, 1],
+            "__grid_nx__": [2, 2, 2, 2],
+            "__grid_ny__": [2, 2, 2, 2],
+            "__grid_xmin__": [0.0, 0.0, 0.0, 0.0],
+            "__grid_xmax__": [1.0, 1.0, 1.0, 1.0],
+            "__grid_ymin__": [0.0, 0.0, 0.0, 0.0],
+            "__grid_ymax__": [1.0, 1.0, 1.0, 1.0],
+        }
+    )
+
+    adapter.pcolormesh(x=df["x"], y=df["y"], z=df["z"], __df__=df, edgecolor="none")
+    plt.close(raw_fig)
+
+    assert len(calls) == 1
+    x_edges, y_edges, grid, kwargs = calls[0]
+    assert x_edges.shape == (3,)
+    assert y_edges.shape == (3,)
+    assert grid.shape == (2, 2)
+    assert np.isclose(grid[1, 1], 4.0)
+    assert kwargs["edgecolors"] == "none"
 
 
 def test_preprofile_identity_ignores_runtime_bin():
@@ -840,6 +879,26 @@ def test_pipeline_key_changes_when_projection_changes():
     key2 = dp._pipeline_key("source", transform, combine="concat", mode="runtime", projection=["b"])
 
     assert key1 != key2
+
+
+def test_expression_transform_type_is_no_longer_dispatched():
+    dp = DataPreprocessor(context=None, logger=_logger())
+    df_old = pd.DataFrame({"a": [1.0, 2.0]})
+    df_new = pd.DataFrame({"a": [1.0, 2.0]})
+
+    out_old = dp.apply_runtime_transforms(
+        df_old,
+        [{"type": "expression", "output": "b", "expression": "a + 1"}],
+        source_label="expr-test",
+    )
+    out_new = dp.apply_runtime_transforms(
+        df_new,
+        [{"add_column": {"name": "b", "expr": "a + 1"}}],
+        source_label="expr-test",
+    )
+
+    assert "b" not in out_old.columns
+    assert list(out_new["b"]) == [2.0, 3.0]
 
 
 def test_prebuild_profiles_rewrites_profile_source_to_alias():

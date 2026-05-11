@@ -67,11 +67,13 @@ Allowed pushdown today:
 - `filter`
 - `sortby`
 - `add_column`
+- `keep_columns`
+- `drop_columns`
+- terminal `to_csv` / `to_parquet` export steps when the backend supports them
 
 Current non-pushdown stages:
 
 - `profile`
-- `grid_profile`
 - render-time expression evaluation
 
 If you add a new stage, first ask whether it can stay in lazy polars. If not, make the pandas boundary later, not earlier.

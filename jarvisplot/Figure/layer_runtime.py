@@ -8,11 +8,12 @@ import numpy as np
 import pandas as pd
 
 from .preprocessor_runtime import add_column, filter_df, sort_by
-from .profile_runtime import grid_profiling, profiling
+from .profile_runtime import profiling
 from .method_registry import resolve_callable
 from .colorbar_runtime import collect_and_attach_colorbar
 from .interp_natural_neighbor import resolve_backend
 from .dynesty_runtime import render_dynesty_runplot
+from .posterior_hpd import prepare_hpd_contour_style
 
 
 def _resolve_csv_export_path(fig, target):
@@ -22,7 +23,7 @@ def _resolve_csv_export_path(fig, target):
         raw = target
     path = str(raw).strip()
     if not path:
-        raise ValueError("tocsv requires a non-empty path")
+        raise ValueError("to_csv requires a non-empty path")
     return Path(fig.load_path(path))
 
 
@@ -223,7 +224,92 @@ def _log_natural_neighbor_diagnostics(logger, diag) -> None:
         pass
 
 
-def _prepare_contour_args(fig, ax, method_key: str, style: dict, coor: dict):
+def _reconstruct_grid_from_metadata(df, x, y, z):
+    if df is None or not hasattr(df, "columns"):
+        return None
+    cols = set(getattr(df, "columns", []))
+    if not {"__grid_ix__", "__grid_iy__"} <= cols:
+        return None
+    ix = np.asarray(df["__grid_ix__"], dtype=np.int64).reshape(-1)
+    iy = np.asarray(df["__grid_iy__"], dtype=np.int64).reshape(-1)
+    x = np.asarray(x, dtype=float).reshape(-1)
+    y = np.asarray(y, dtype=float).reshape(-1)
+    z = np.asarray(z, dtype=float).reshape(-1)
+    n = min(ix.size, iy.size, x.size, y.size, z.size)
+    if n == 0:
+        return None
+    ix = ix[:n]
+    iy = iy[:n]
+    x = x[:n]
+    y = y[:n]
+    z = z[:n]
+    valid = np.isfinite(ix) & np.isfinite(iy) & (ix >= 0) & (iy >= 0)
+    if not np.any(valid):
+        return None
+    ix = ix[valid]
+    iy = iy[valid]
+    x = x[valid]
+    y = y[valid]
+    z = z[valid]
+    nx = None
+    ny = None
+    try:
+        if "__grid_nx__" in cols:
+            nx = int(np.asarray(df["__grid_nx__"])[0])
+        elif "__grid_bin__" in cols:
+            nx = int(np.asarray(df["__grid_bin__"])[0])
+        if "__grid_ny__" in cols:
+            ny = int(np.asarray(df["__grid_ny__"])[0])
+        elif "__grid_bin__" in cols:
+            ny = int(np.asarray(df["__grid_bin__"])[0])
+    except Exception:
+        nx = ny = None
+    if nx is None:
+        nx = int(np.max(ix)) + 1
+    if ny is None:
+        ny = int(np.max(iy)) + 1
+    if nx <= 1 or ny <= 1:
+        return None
+    X = np.full((ny, nx), np.nan, dtype=float)
+    Y = np.full((ny, nx), np.nan, dtype=float)
+    Z = np.full((ny, nx), np.nan, dtype=float)
+    keep = (ix < nx) & (iy < ny)
+    if not np.any(keep):
+        return None
+    X[iy[keep], ix[keep]] = x[keep]
+    Y[iy[keep], ix[keep]] = y[keep]
+    Z[iy[keep], ix[keep]] = z[keep]
+    return X, Y, Z
+
+
+def _reconstruct_grid_from_flat_regular(x, y, z):
+    x = np.asarray(x, dtype=float).reshape(-1)
+    y = np.asarray(y, dtype=float).reshape(-1)
+    z = np.asarray(z, dtype=float).reshape(-1)
+    if x.size == 0 or x.size != y.size or x.size != z.size:
+        return None
+    valid_xy = np.isfinite(x) & np.isfinite(y)
+    if not np.any(valid_xy):
+        return None
+    x_valid = x[valid_xy]
+    y_valid = y[valid_xy]
+    ux, ix = np.unique(x_valid, return_inverse=True)
+    uy, iy = np.unique(y_valid, return_inverse=True)
+    nx = int(ux.size)
+    ny = int(uy.size)
+    if nx <= 1 or ny <= 1 or nx * ny != x.size:
+        return None
+    slots = iy * nx + ix
+    if np.unique(slots).size != x.size:
+        return None
+    Z = np.full((ny, nx), np.nan, dtype=float)
+    z_valid = z[valid_xy]
+    Z[iy, ix] = z_valid
+    X, Y = np.meshgrid(ux, uy)
+    return X, Y, Z
+
+
+def _prepare_contour_args(fig, ax, method_key: str, style: dict, coor: dict, df=None):
     """Prepare positional contour/contourf args and remove interpolation config."""
     interp_cfg = style.pop("interp", None)
     interp_cfg = dict(interp_cfg) if isinstance(interp_cfg, dict) else None
@@ -232,20 +318,64 @@ def _prepare_contour_args(fig, ax, method_key: str, style: dict, coor: dict):
     y = np.asarray(coor.get("y"), dtype=float)
     z = np.asarray(coor.get("z"), dtype=float)
 
+    grid = _reconstruct_grid_from_metadata(df, x, y, z)
+    if grid is not None:
+        X, Y, Z = grid
+        style = prepare_hpd_contour_style(
+            Z,
+            X,
+            Y,
+            style,
+            logger=getattr(fig, "logger", None),
+        )
+        return (X, Y, np.ma.masked_invalid(Z)), style
+
     # Already-gridded inputs should pass straight through.
     if x.ndim == 2 and y.ndim == 2 and z.ndim == 2 and x.shape == y.shape == z.shape:
+        style = prepare_hpd_contour_style(
+            z,
+            x,
+            y,
+            style,
+            logger=getattr(fig, "logger", None),
+        )
         return (x, y, np.ma.masked_invalid(z)), style
 
     if x.ndim == 1 and y.ndim == 1 and z.ndim == 2:
         if z.shape == (y.size, x.size):
+            style = prepare_hpd_contour_style(
+                z,
+                x,
+                y,
+                style,
+                logger=getattr(fig, "logger", None),
+            )
             return (x, y, np.ma.masked_invalid(z)), style
         if z.shape == (x.size, y.size):
+            style = prepare_hpd_contour_style(
+                z.T,
+                x,
+                y,
+                style,
+                logger=getattr(fig, "logger", None),
+            )
             return (x, y, np.ma.masked_invalid(z.T)), style
         raise ValueError(
             f"{method_key} expects Z to have shape (len(y), len(x)) or the transpose when X/Y are 1D"
         )
 
     if interp_cfg is None:
+        grid = _reconstruct_grid_from_flat_regular(x, y, z)
+        if grid is not None:
+            X, Y, Z = grid
+            style = prepare_hpd_contour_style(
+                Z,
+                X,
+                Y,
+                style,
+                logger=getattr(fig, "logger", None),
+            )
+            return (X, Y, np.ma.masked_invalid(Z)), style
         raise ValueError(
             f"{method_key} requires gridded X/Y/Z inputs or style.interp.method: natural_neighbor"
         )
@@ -279,6 +409,13 @@ def _prepare_contour_args(fig, ax, method_key: str, style: dict, coor: dict):
             )
         return None, style
 
+    style = prepare_hpd_contour_style(
+        Z,
+        X,
+        Y,
+        style,
+        logger=getattr(fig, "logger", None),
+    )
     return (X, Y, np.ma.masked_invalid(Z)), style
 
 
@@ -304,6 +441,8 @@ def _prepare_jpcontour_style(
                 call_style[key] = interp_cfg[key]
         if include_diagnostics and "diagnostics" in interp_cfg and "diagnostics" not in call_style:
             call_style["diagnostics"] = bool(interp_cfg.get("diagnostics", False))
+    if method_key == "jpcontour":
+        call_style["_logger"] = getattr(fig, "logger", None)
 
     coords = {}
     items = coor.items() if coord_keys is None else ((kk, coor[kk]) for kk in coord_keys if kk in coor)
@@ -441,23 +580,14 @@ def load_bool_df(fig, df, transform):
             elif "profile" in trans.keys():
                 df = profiling(df, trans["profile"], fig.logger)
                 fig.logger.debug("After profiling -> {}".format(df.shape))
-            elif "grid_profile" in trans.keys():
-                cfg = trans.get("grid_profile", {})
-                if isinstance(cfg, dict):
-                    cfg = cfg.copy()
-                    cfg.setdefault("method", "grid")
-                else:
-                    cfg = {"method": "grid"}
-                df = grid_profiling(df, cfg, fig.logger)
-                fig.logger.debug("After grid profiling -> {}".format(df.shape))
             elif "sortby" in trans.keys():
                 df = sort_by(df, trans["sortby"], fig.logger)
                 fig.logger.debug("After sortby -> {}".format(df.shape))
             elif "add_column" in trans.keys():
                 df = add_column(df, trans["add_column"], fig.logger)
                 fig.logger.debug("After Add-column -> {}".format(df.shape))
-            elif "tocsv" in trans.keys() or "to_csv" in trans.keys():
-                _save_dataframe_csv(fig, df, trans.get("tocsv", trans.get("to_csv")))
+            elif "to_csv" in trans.keys():
+                _save_dataframe_csv(fig, df, trans.get("to_csv"))
 
         return df
 
@@ -552,7 +682,7 @@ def render_layer(fig, ax, layer_info):
             raise ValueError("Ternary layer must define coordinates: {left, right, bottom} or {x, y} with exprs.")
         for kk, vv in coor.items():
             style[kk] = fig._eval_series(df, vv)
-        if method_key == "grid_profile":
+        if method_key == "pcolormesh":
             style["__df__"] = df
         if method_key in {"jpcontour", "jpcontourf", "jpfield"}:
             jp_kwargs = _prepare_jpcontour_style(
@@ -626,7 +756,7 @@ def render_layer(fig, ax, layer_info):
                 else:
                     contour_coor[kk] = vv
 
-            contour_args, style = _prepare_contour_args(fig, ax.ax if hasattr(ax, "ax") else ax, method_key, style, contour_coor)
+            contour_args, style = _prepare_contour_args(fig, ax.ax if hasattr(ax, "ax") else ax, method_key, style, contour_coor, df=df)
             if contour_args is None:
                 return []
             return method(*contour_args, **style)
@@ -644,7 +774,7 @@ def render_layer(fig, ax, layer_info):
                     style[kk] = fig._eval_series(df, vv)
                 else:
                     style[kk] = vv
-            if method_key == "grid_profile":
+            if method_key == "pcolormesh":
                 style["__df__"] = df
             style.pop("interp", None)
             return method(**style)

@@ -6,7 +6,7 @@ Status: spec only
 
 This document defines the intended profile-step contract for Jarvis-PLOT.
 
-Current implementation uses `profile` and `grid_profile` transform steps inside YAML layer transforms.
+Current implementation uses `profile` transform steps inside YAML layer transforms.
 
 ## Current Shape
 
@@ -25,7 +25,7 @@ The current profile payload is effectively a transform config object with fields
 }
 ```
 
-For `grid_profile`, the method is usually treated as grid-style reduction.
+For grid-style reduction, use `profile` with `method: grid`.
 
 ## Current Owner
 
@@ -49,22 +49,25 @@ Supported dataset transform steps include:
 
 - `filter`
 - `profile`
-- `grid_profile`
+- `make_density_core`
+- `make_interp_2d`
 - `add_column`
 - `sortby`
 - `keep_columns`
 - `drop_columns`
-- `tocsv`
+- `to_csv`
 - `to_parquet`
+
+There is no standalone `expression` transform step. Computed columns are added through `add_column`.
 
 Execution rules:
 
 - `keep_columns` and `drop_columns` are the only explicit column-pruning steps.
 - If a transform list does not contain one of those pruning steps, no implicit column pruning is applied.
-- `tocsv` and `to_parquet` execute in list order and export the dataframe state at that point.
+- `to_csv` and `to_parquet` execute in list order and export the dataframe state at that point.
 - If an export step is the last transform step, the runtime may reuse the final frame without extra post-processing.
 - If an export step appears before later transforms, those later transforms still run and the export captures the earlier state.
-- `profile` / `grid_profile` remain reduction steps and may shrink row counts or reshape the table.
+- `profile` remains a reduction step and may shrink row counts or reshape the table.
 
 Example:
 
@@ -81,5 +84,5 @@ transform:
   - mN1
   - LogL1
   - z
-- tocsv: ./data/MSSM7_light.csv
+- to_csv: ./data/MSSM7_light.csv
 ```

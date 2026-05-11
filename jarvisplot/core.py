@@ -185,7 +185,11 @@ class JarvisPLOT():
             return record["extra"].get("JPlot", False)
 
         def stream_filter(record):
-            return record["extra"].get("to_console", False)
+            if not record["extra"].get("to_console", False):
+                return False
+            if self.args.debug:
+                return True
+            return record["level"].no >= logger.level("WARNING").no
 
         def custom_format(record):
             return _format_console_record(record)

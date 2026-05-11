@@ -54,6 +54,28 @@ def test_jpcontour_and_jpcontourf_return_quadcontoursets():
     plt.close(fig)
 
 
+def test_contour_accepts_flat_regular_grid_without_interp():
+    x = np.linspace(0.0, 1.0, 4)
+    y = np.linspace(0.0, 1.0, 3)
+    X, Y = np.meshgrid(x, y)
+    Z = X + Y
+    fig = SimpleNamespace(logger=SimpleNamespace(warning=lambda *args, **kwargs: None))
+
+    args, style = layer_runtime_mod._prepare_contour_args(
+        fig,
+        None,
+        "contour",
+        {"levels": [0.5, 1.0]},
+        {"x": X.ravel(), "y": Y.ravel(), "z": Z.ravel()},
+    )
+
+    assert len(args) == 3
+    assert args[0].shape == (3, 4)
+    assert args[1].shape == (3, 4)
+    assert args[2].shape == (3, 4)
+    assert style["levels"] == [0.5, 1.0]
+
+
 def test_jpfield_returns_quadmesh():
     fig, ax = plt.subplots()
     adapter = StdAxesAdapter(ax)
