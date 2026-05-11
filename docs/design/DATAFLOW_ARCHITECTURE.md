@@ -9,7 +9,7 @@ JarvisPLOT 1.3.0 replaced the old wide-table pipeline with a three-table model. 
 | Table type | Where it exists in code | Purpose | Allowed width |
 | --- | --- | --- | --- |
 | Dataset Table | `DataSet.data` in `jarvisplot/data_loader.py` (runtime loading/materialization helpers in `jarvisplot/data_loader_runtime.py`) | Dataset load output after ordered dataset-level transforms | Narrow by explicit transform only |
-| Selection Table | Output of `DataPreprocessor.run_pipeline()` before demand enrichment | Input to `profile`, `preprofile`, and `grid_profile`; compact cache payload | Narrow, profiling columns plus current-layer demand |
+| Selection Table | Output of `DataPreprocessor.run_pipeline()` before demand enrichment | Input to `profile` and `preprofile`; compact cache payload | Narrow, profiling columns plus current-layer demand |
 | Enriched Table | Output of `DataPreprocessor._enrich_for_demand()` and then `jarvisplot/Figure/layer_runtime.py:render_layer()` | Rendering, layer style evaluation, `share_data`, export-oriented use | Add only layer-requested columns |
 
 ## 1. Dataset Table
@@ -65,24 +65,27 @@ Properties:
 - Is the input to:
   - `profile`
   - `_preprofiling`
-  - `grid_profile`
 
 Typical contents:
 
 - `__jp_row_idx__`
 - profile keys such as `x`, `y`, `z`, `left`, `right`, `bottom`, or configured axis names
-- objective column used by `profile` or `grid_profile`
+- objective column used by `profile`
 - helper transform outputs added earlier in the pipeline
 - current-layer coordinate/style columns when they were part of the projected demand
-- grid helper columns for `grid_profile`, for example:
+- grid helper columns for `profile` with `method: grid`, for example:
   - `__grid_ix__`
   - `__grid_iy__`
+  - `__grid_nx__`, `__grid_ny__`
   - `__grid_bin__`
   - `__grid_xmin__`, `__grid_xmax__`
   - `__grid_ymin__`, `__grid_ymax__`
+  - `__grid_dx__`, `__grid_dy__`
   - `__grid_xscale__`, `__grid_yscale__`
   - `__grid_objective__`
   - `__grid_empty_value__`
+
+Posterior density reconstruction now uses `make_density_core` for mass-support construction and `make_interp_2d` for support-to-grid interpolation. These transforms keep output tables minimal; regular-grid contour layers can reconstruct flat `x/y/z` grids directly when needed.
 
 What it must not contain:
 
@@ -146,7 +149,7 @@ flowchart TD
 - Keep runtime caches compatible with narrow projections only.
 - Dataset-level `transform` is ordered; do not reorder steps during planning or execution.
 - `keep_columns` and `drop_columns` are the only explicit column-pruning steps.
-- `tocsv` and `to_parquet` execute at their position in the ordered transform list and export the dataframe state at that point.
+- `to_csv` and `to_parquet` execute at their position in the ordered transform list and export the dataframe state at that point.
 - If an export step is last, the runtime can avoid extra downstream transform work after the export.
 - If a new transform introduces new input or output columns, update the projection logic in both `core.py` and `Figure/preprocessor.py`.
 - If a new layer needs extra render columns, express that need in layer coordinates or style expressions so demand enrichment can discover it.

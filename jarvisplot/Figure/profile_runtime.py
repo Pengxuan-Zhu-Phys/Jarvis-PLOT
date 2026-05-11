@@ -89,7 +89,7 @@ def _grid_edges(lo, hi, nbin, scale):
     return np.linspace(lo, hi, int(nbin) + 1)
 
 
-def grid_profile_mesh(
+def regular_grid_mesh(
     x,
     y,
     z,
@@ -103,7 +103,7 @@ def grid_profile_mesh(
     objective="max",
     objective_from_style=False,
 ):
-    """Reconstruct grid_profile pcolormesh inputs from compact table metadata."""
+    """Reconstruct pcolormesh inputs from compact regular-grid metadata."""
     x = np.asarray(x, dtype=float)
     y = np.asarray(y, dtype=float)
     z = np.asarray(z, dtype=float)
@@ -114,12 +114,18 @@ def grid_profile_mesh(
     ix = None
     iy = None
     cols = getattr(df, "columns", [])
+    nx = None
+    ny = None
     if df is not None and ("__grid_ix__" in cols) and ("__grid_iy__" in cols):
         try:
             ix = np.asarray(df["__grid_ix__"], dtype=np.int32)
             iy = np.asarray(df["__grid_iy__"], dtype=np.int32)
             if "__grid_bin__" in cols and grid_bin is None:
                 grid_bin = int(np.asarray(df["__grid_bin__"])[0])
+            if "__grid_nx__" in cols:
+                nx = int(np.asarray(df["__grid_nx__"])[0])
+            if "__grid_ny__" in cols:
+                ny = int(np.asarray(df["__grid_ny__"])[0])
             if "__grid_xmin__" in cols and "__grid_xmax__" in cols and xlim is None:
                 xlim = [
                     float(np.asarray(df["__grid_xmin__"])[0]),
@@ -139,7 +145,7 @@ def grid_profile_mesh(
         except Exception:
             ix, iy = None, None
 
-    if grid_bin is None:
+    if grid_bin is None and (nx is None or ny is None):
         if ix is not None and ix.size > 0:
             try:
                 grid_bin = int(max(np.nanmax(ix), np.nanmax(iy)) + 1)
@@ -148,6 +154,12 @@ def grid_profile_mesh(
     if grid_bin is None:
         grid_bin = max(1, int(np.sqrt(max(len(x), 1))))
     grid_bin = max(int(grid_bin), 1)
+    if nx is None:
+        nx = grid_bin
+    if ny is None:
+        ny = grid_bin
+    nx = max(int(nx), 1)
+    ny = max(int(ny), 1)
 
     if xlim is None:
         xlim = _safe_minmax(x)
@@ -169,8 +181,8 @@ def grid_profile_mesh(
             return None
         xv = np.clip(xn[valid], 0.0, 1.0 - 1e-12)
         yv = np.clip(yn[valid], 0.0, 1.0 - 1e-12)
-        ix = (xv * grid_bin).astype(np.int32)
-        iy = (yv * grid_bin).astype(np.int32)
+        ix = (xv * nx).astype(np.int32)
+        iy = (yv * ny).astype(np.int32)
         zv = z[valid]
     else:
         ix = np.asarray(ix, dtype=np.int32)[:n]
@@ -199,17 +211,17 @@ def grid_profile_mesh(
         iy_u = np.asarray(iy, dtype=np.int32)
         z_u = np.asarray(zv, dtype=float)
 
-    x_edges = _grid_edges(xlim[0], xlim[1], grid_bin, xscale)
-    y_edges = _grid_edges(ylim[0], ylim[1], grid_bin, yscale)
+    x_edges = _grid_edges(xlim[0], xlim[1], nx, xscale)
+    y_edges = _grid_edges(ylim[0], ylim[1], ny, yscale)
 
-    in_range = (ix_u >= 0) & (ix_u < grid_bin) & (iy_u >= 0) & (iy_u < grid_bin)
+    in_range = (ix_u >= 0) & (ix_u < nx) & (iy_u >= 0) & (iy_u < ny)
     if not np.any(in_range):
         return None
     ix_u = ix_u[in_range]
     iy_u = iy_u[in_range]
     z_u = z_u[in_range]
 
-    grid = np.full((grid_bin, grid_bin), np.nan, dtype=float)
+    grid = np.full((ny, nx), np.nan, dtype=float)
     if len(ix_u) > 0:
         grid[iy_u, ix_u] = z_u
     return x_edges, y_edges, np.ma.masked_invalid(grid)
@@ -223,7 +235,7 @@ def grid_profiling(df, prof, logger):
     bin = max(bin, 1)
     memtrace_checkpoint(
         logger,
-        "grid_profile.before",
+        "profile.grid.before",
         df,
         extra={
             "bin": bin,
@@ -324,7 +336,7 @@ def grid_profiling(df, prof, logger):
 
     memtrace_checkpoint(
         logger,
-        "grid_profile.groupby_ready",
+        "profile.grid.groupby_ready",
         tmp,
         extra={"bin": bin, "objective": obj},
     )
@@ -373,7 +385,7 @@ def grid_profiling(df, prof, logger):
         )
     memtrace_checkpoint(
         logger,
-        "grid_profile.after",
+        "profile.grid.after",
         reduced,
         extra={"bin": bin, "filled": int(np.isfinite(grid).sum()), "cells": int(bin * bin)},
     )
@@ -384,7 +396,7 @@ def profiling(df, prof, logger):
     mode = "bridson"
     if isinstance(prof, dict):
         mode = str(prof.get("method", "bridson")).lower()
-    if mode in {"grid", "grid_profile"}:
+    if mode == "grid":
         return grid_profiling(df, prof, logger)
     memtrace_checkpoint(
         logger,

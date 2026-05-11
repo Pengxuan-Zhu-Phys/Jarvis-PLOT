@@ -36,7 +36,7 @@ def _expr_symbols(expr: Any) -> Set[str]:
 
 
 def _profile_cfg_columns(cfg: Any) -> Set[str]:
-    """Return column names referenced in a profile/grid_profile coordinates block."""
+    """Return column names referenced in a profile coordinates block."""
     out: Set[str] = set()
     if not isinstance(cfg, Mapping):
         return out
@@ -60,6 +60,130 @@ def _profile_cfg_columns(cfg: Any) -> Set[str]:
     return out
 
 
+def _density_cell_transform_config(step: Any) -> Mapping[str, Any]:
+    if not isinstance(step, Mapping):
+        return {}
+    for name in ("make_density_core",):
+        if name in step:
+            cfg = step.get(name)
+            return cfg if isinstance(cfg, Mapping) else {}
+    if str(step.get("type", "")).strip().lower() == "make_density_core":
+        return step
+    return {}
+
+
+def _density_cell_cfg_input_columns(cfg: Any) -> Set[str]:
+    out: Set[str] = set()
+    if not isinstance(cfg, Mapping):
+        return out
+    coors = cfg.get("coordinates", {})
+    if not isinstance(coors, Mapping):
+        coors = {}
+
+    def _add_coord(key: str, default: str, *, required: bool = True) -> None:
+        spec = coors.get(key, cfg.get(key, None))
+        if spec is None:
+            if required:
+                out.add(default)
+            return
+        if isinstance(spec, Mapping):
+            expr = spec.get("expr")
+            if expr is not None:
+                out.update(_expr_symbols(expr))
+                return
+            name = spec.get("name", default)
+            if isinstance(name, str) and name.strip():
+                out.add(name.strip())
+            return
+        if isinstance(spec, str) and spec.strip():
+            out.add(spec.strip())
+
+    _add_coord("x", "x")
+    _add_coord("y", "y")
+    _add_coord("weight", "weight", required=False)
+    return out
+
+
+def _density_cell_cfg_output_columns(cfg: Any) -> Set[str]:
+    if not isinstance(cfg, Mapping):
+        cfg = {}
+    coors = cfg.get("coordinates", {})
+    if not isinstance(coors, Mapping):
+        coors = {}
+
+    def _name(key: str, default: str) -> str:
+        spec = coors.get(key, cfg.get(key, None))
+        if isinstance(spec, Mapping):
+            value = spec.get("name", default)
+        else:
+            value = default
+        text = str(value).strip()
+        return text or default
+
+    return {_name("x", "x"), _name("y", "y"), _name("weight", "weight")}
+
+
+def _interp_2d_transform_config(step: Any) -> Mapping[str, Any]:
+    if not isinstance(step, Mapping):
+        return {}
+    if "make_interp_2d" in step:
+        cfg = step.get("make_interp_2d")
+        return cfg if isinstance(cfg, Mapping) else {}
+    if str(step.get("type", "")).strip().lower() == "make_interp_2d":
+        return step
+    return {}
+
+
+def _interp_2d_cfg_input_columns(cfg: Any) -> Set[str]:
+    out: Set[str] = set()
+    if not isinstance(cfg, Mapping):
+        return out
+    coors = cfg.get("coordinates", {})
+    if not isinstance(coors, Mapping):
+        coors = {}
+
+    def _add_coord(key: str, default: str) -> None:
+        spec = coors.get(key, cfg.get(key, None))
+        if spec is None:
+            out.add(default)
+            return
+        if isinstance(spec, Mapping):
+            expr = spec.get("expr")
+            if expr is not None:
+                out.update(_expr_symbols(expr))
+                return
+            name = spec.get("name", default)
+            if isinstance(name, str) and name.strip():
+                out.add(name.strip())
+            return
+        if isinstance(spec, str) and spec.strip():
+            out.add(spec.strip())
+
+    _add_coord("x", "x")
+    _add_coord("y", "y")
+    _add_coord("z", "z")
+    return out
+
+
+def _interp_2d_cfg_output_columns(cfg: Any) -> Set[str]:
+    if not isinstance(cfg, Mapping):
+        cfg = {}
+    coors = cfg.get("coordinates", {})
+    if not isinstance(coors, Mapping):
+        coors = {}
+
+    def _name(key: str, default: str) -> str:
+        spec = coors.get(key, cfg.get(key, None))
+        if isinstance(spec, Mapping):
+            value = spec.get("name", default)
+        else:
+            value = default
+        text = str(value).strip()
+        return text or default
+
+    return {_name("x", "x"), _name("y", "y"), _name("z", "z")}
+
+
 def _collect_expr_columns(obj: Any, out: Set[str]) -> None:
     """Recursively collect column names from expressions inside a config dict/list."""
     if isinstance(obj, Mapping):
@@ -71,10 +195,11 @@ def _collect_expr_columns(obj: Any, out: Set[str]) -> None:
             if key == "profile":
                 out.update(_profile_cfg_columns(v))
                 continue
-            if key == "grid_profile":
-                prof = dict(v) if isinstance(v, dict) else {}
-                prof.setdefault("method", "grid")
-                out.update(_profile_cfg_columns(prof))
+            if key == "make_density_core":
+                out.update(_density_cell_cfg_input_columns(v))
+                continue
+            if key == "make_interp_2d":
+                out.update(_interp_2d_cfg_input_columns(v))
                 continue
             _collect_expr_columns(v, out)
         return
@@ -92,6 +217,12 @@ def _transform_columns(transform: Any) -> Set[str]:
         if not isinstance(step, Mapping):
             continue
         _collect_expr_columns(step, out)
+        dcfg = _density_cell_transform_config(step)
+        if dcfg:
+            out.update(_density_cell_cfg_input_columns(dcfg))
+        icfg = _interp_2d_transform_config(step)
+        if icfg:
+            out.update(_interp_2d_cfg_input_columns(icfg))
         if "add_column" in step:
             add_cfg = step.get("add_column", {})
             if isinstance(add_cfg, Mapping):
@@ -116,11 +247,28 @@ def _transform_output_columns(transform: Any) -> Set[str]:
                 if isinstance(name, str) and name.strip():
                     out.add(name.strip())
         if "profile" in step:
-            out.update(_profile_cfg_columns(step.get("profile", {})))
-        if "grid_profile" in step:
-            cfg = dict(step.get("grid_profile", {})) if isinstance(step.get("grid_profile"), dict) else {}
-            cfg.setdefault("method", "grid")
+            cfg = step.get("profile", {})
             out.update(_profile_cfg_columns(cfg))
+            if isinstance(cfg, Mapping) and str(cfg.get("method", "bridson")).lower() == "grid":
+                out.update({
+                    "__grid_ix__",
+                    "__grid_iy__",
+                    "__grid_bin__",
+                    "__grid_xmin__",
+                    "__grid_xmax__",
+                    "__grid_ymin__",
+                    "__grid_ymax__",
+                    "__grid_xscale__",
+                    "__grid_yscale__",
+                    "__grid_objective__",
+                    "__grid_empty_value__",
+                })
+        dcfg = _density_cell_transform_config(step)
+        if dcfg:
+            out.update(_density_cell_cfg_output_columns(dcfg))
+        icfg = _interp_2d_transform_config(step)
+        if icfg:
+            out.update(_interp_2d_cfg_output_columns(icfg))
     return out
 
 

@@ -67,11 +67,11 @@ The runtime pipeline is intentionally narrow:
 ```mermaid
 flowchart LR
     A["Source file<br/>CSV / HDF5 / Parquet"] --> B["Dataset planning<br/>required_columns + explicit prune"]
-    B --> C["Lazy pushdown<br/>whitelist / rename / filter / sort / add_column"]
+    B --> C["Lazy pushdown<br/>whitelist / rename / filter / sort / add_column / prune / export"]
     C --> D["Collect"]
     D --> E["Compact dataset table<br/>DataSet.data + __jp_row_idx__"]
     E --> F["Selection table projection<br/>runtime/preprofile base projection"]
-    F --> G["profile / preprofile / grid_profile"]
+    F --> G["profile / preprofile"]
     G --> H["Compact pipeline cache<br/>.cache/data or named ref"]
     H --> I["Layer-demand enrichment<br/>fetch_rows_columns(row_idx, missing_cols)"]
     I --> J["Rendering<br/>jarvisplot/Figure/layer_runtime.py:render_layer()"]
@@ -83,7 +83,7 @@ flowchart LR
 - Lazy pushdown happens mainly in `jarvisplot/data_loader_runtime.py:load_hdf5_materialized()`, `jarvisplot/data_loader_runtime.py:_apply_dataset_transform_polars()`, and `DataSet.load_parquet()`.
 - The compact dataset table is the post-load `DataSet.data` object plus `__jp_row_idx__` after ordered transforms have run.
 - Selection-table projection is enforced by `DataPreprocessor._runtime_projection()`, `_runtime_cache_columns()`, and `_preprofile_base_projection()`.
-- Profiling is executed by `_preprofiling()`, `profiling()`, and `grid_profiling()` in `jarvisplot/Figure/profile_runtime.py`.
+- Profiling is executed by `_preprofiling()` and `profiling()` in `jarvisplot/Figure/profile_runtime.py`; `profile` with `method: grid` uses the grid reducer internally.
 - Layer-demand enrichment is performed by `DataPreprocessor._enrich_for_demand()` using `DataSet.fetch_rows_columns()`.
 
 ## Prebuild Branch

@@ -54,14 +54,6 @@ class TernaryAxesAdapter(StdAxesAdapter):
             kwargs['y'] = y
         return super().scatter(**kwargs)
 
-    def grid_profile(self, **kwargs):
-        if {"left", "right", "bottom"}.issubset(kwargs.keys()):
-            x, y = self._lbr_to_xy(kwargs.pop('left'), kwargs.pop('right'), kwargs.pop('bottom'))
-            kwargs['x'] = x
-            kwargs['y'] = y
-        return super().grid_profile(**kwargs)
-
-
     def plot(self, **kwargs):
         if {"left", "right", "bottom"}.issubset(kwargs.keys()):
             x, y = self._lbr_to_xy(kwargs.pop('left'), kwargs.pop('right'), kwargs.pop('bottom'))

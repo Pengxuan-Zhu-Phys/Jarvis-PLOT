@@ -94,7 +94,7 @@ Typical stage names:
 `DataPreprocessor.run_pipeline()` and transform helpers emit checkpoints around:
 
 - source resolution
-- profile and grid-profile execution
+- profile execution, including `profile` with `method: grid`
 - transform completion
 - pipeline return
 
@@ -103,8 +103,6 @@ Examples:
 - `pipeline.source_resolved`
 - `pipeline.profile.before`
 - `pipeline.profile.after`
-- `pipeline.grid_profile.before`
-- `pipeline.grid_profile.after`
 - `pipeline.transform_done`
 - `pipeline.return`
 
@@ -113,9 +111,9 @@ Examples:
 - `profile.before`
 - `profile.concat_ready`
 - `profile.after`
-- `grid_profile.before`
-- `grid_profile.groupby_ready`
-- `grid_profile.after`
+- `profile.grid.before`
+- `profile.grid.groupby_ready`
+- `profile.grid.after`
 
 ### Cache Writes
 

@@ -48,7 +48,7 @@ If the layer needs new draw logic:
 Notes:
 
 - `jarvisplot/Figure/layer_runtime.py:render_layer()` already evaluates coordinate expressions into numpy arrays
-- `grid_profile` is the current example of a custom adapter method that receives both arrays and the backing dataframe via `__df__`
+- `pcolormesh` is the current example of a custom adapter method that receives both arrays and the backing dataframe via `__df__`
 
 ### How a Layer Requests Columns
 
@@ -93,6 +93,7 @@ Required checklist for a new transform:
 4. Update input-column discovery.
 5. Update output-column discovery.
 6. Confirm that cached payloads still project correctly.
+7. Update the relevant spec doc. Posterior-density transforms and HPD contour behavior belong in `docs/specs/POSTERIOR_DENSITY.md`.
 
 The input/output discovery step matters because selection tables are built from those helper functions. A transform that silently depends on undeclared columns will force developers to widen the pipeline later.
 
@@ -108,6 +109,7 @@ Do not:
 - fetch the full dataset inside the transform
 - treat layer enrichment as a transform input mechanism
 - bypass cache fingerprinting when the transform changes row or column shape
+- drop probability mass in posterior-density transforms; if samples are thinned, aggregate discarded mass into retained representatives
 
 ## Adding a New Data Source
 
@@ -137,7 +139,7 @@ Avoid:
 
 - `bin/SUSYRun2_EWMSSM.yaml` uses `load_whitelist: only_in_list`, `isvalid_policy: clean`, and repeated `share_data` names. That file demonstrates why source planning and named cache reuse matter.
 - `bin/EggBox_Dynesty_06.yaml` uses `share_data: gridprofXY`, which is a concrete example of cross-layer runtime reuse.
-- `grid_profile` in `jarvisplot/Figure/adapters_rect.py` is the best reference for a custom rendering primitive that consumes a compact profiled table instead of the full source dataframe.
+- `pcolormesh` in `jarvisplot/Figure/adapters_rect.py` is the best reference for a custom rendering primitive that consumes a compact profiled table instead of the full source dataframe.
 
 ## Recommended Verification
 

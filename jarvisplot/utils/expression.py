@@ -12,6 +12,18 @@ from ..inner_func import update_funcs
 def build_eval_globals(extra: Optional[Mapping[str, Any]] = None) -> dict[str, Any]:
     """Build the shared eval globals used by dataframe-expression helpers."""
     allowed = update_funcs({"np": np, "math": math})
+    allowed.update(
+        {
+            "exp": np.exp,
+            "log": np.log,
+            "ln": np.log,
+            "sqrt": np.sqrt,
+            "sin": np.sin,
+            "cos": np.cos,
+            "tan": np.tan,
+            "abs": np.abs,
+        }
+    )
     allowed["__builtins__"] = {}
     if extra:
         allowed.update(dict(extra))

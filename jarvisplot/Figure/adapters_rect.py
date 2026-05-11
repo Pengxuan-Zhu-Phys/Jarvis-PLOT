@@ -11,8 +11,9 @@ from matplotlib.axes import Axes
 from matplotlib.collections import PolyCollection
 #
 from .helper import _auto_clip, _mask_by_extend, voronoi_finite_polygons_2d, _clip_poly_to_rect
-from .profile_runtime import grid_profile_mesh
+from .profile_runtime import regular_grid_mesh
 from .interp_natural_neighbor import resolve_backend
+from .posterior_hpd import prepare_hpd_contour_style
 
 DEFAULT_JP_SAMPLE_GRID = 500
 
@@ -371,19 +372,20 @@ class StdAxesAdapter:
         artists = self.ax.scatter(x, y, **kw)
         return _auto_clip(artists, self.ax, self._clip_path)
 
-    def grid_profile(self, **kwargs):
-        """Grid-cell partition rendering for profiled scalar fields.
+    def pcolormesh(self, *args, **kwargs):
+        """Render regular-grid fields, including compact tables with __grid_* metadata."""
+        if args:
+            kw = self._merge("pcolormesh", kwargs)
+            artist = self.ax.pcolormesh(*args, **kw)
+            return _auto_clip(artist, self.ax, self._clip_path)
 
-        Compared with tripcolor, this draws axis-aligned cells (like a regular
-        partition of the plane), closer to Voronoi-style region coloring.
-        """
         x = np.asarray(kwargs.pop("x"), dtype=float)
         y = np.asarray(kwargs.pop("y"), dtype=float)
         z = np.asarray(kwargs.pop("z", np.zeros_like(x)), dtype=float)
         df = kwargs.pop("__df__", None)
-        kw = self._merge("grid_profile", kwargs)
+        kw = self._merge("pcolormesh", kwargs)
 
-        # Strip kwargs that are not used by grid_profile rendering.
+        # Strip kwargs that are not used by pcolormesh rendering.
         for k in ("shading", "levels", "extend", "space", "marker", "s", "c"):
             kw.pop(k, None)
 
@@ -411,7 +413,7 @@ class StdAxesAdapter:
             xlim = [float(self.ax.get_xlim()[0]), float(self.ax.get_xlim()[1])]
         if ylim is None:
             ylim = [float(self.ax.get_ylim()[0]), float(self.ax.get_ylim()[1])]
-        mesh = grid_profile_mesh(
+        mesh = regular_grid_mesh(
             x,
             y,
             z,
@@ -441,7 +443,6 @@ class StdAxesAdapter:
         if zorder is not None:
             kw.setdefault("zorder", zorder)
 
-        # histo2d-like rendering via pcolormesh
         if norm is not None:
             artist = self.ax.pcolormesh(
                 x_edges,
@@ -482,7 +483,13 @@ class StdAxesAdapter:
 
     def contour(self, *args, **kwargs):
         kw = self._merge("contour", kwargs)
+        label_map = kw.pop("_hpd_label_map", None)
         artists = self.ax.contour(*args, **kw)
+        if label_map:
+            try:
+                self.ax.clabel(artists, fmt=label_map)
+            except Exception:
+                pass
         return _auto_clip(artists, self.ax, self._clip_path)
 
     def contourf(self, *args, **kwargs):
@@ -510,6 +517,7 @@ class StdAxesAdapter:
         """Scattered-data contour plot rendered in axes-fraction coordinates."""
         kw = self._merge("contour", kwargs)
         kw.pop("transform", None)
+        logger = kw.pop("_logger", None)
         X, Y, Z = self._interpolate_jpcontour_grid(
             x,
             y,
@@ -524,6 +532,8 @@ class StdAxesAdapter:
             diagnostics=diagnostics,
             backend_options=backend_options,
         )
+        kw = prepare_hpd_contour_style(Z, X, Y, kw, logger=logger)
+        label_map = kw.pop("_hpd_label_map", None)
         artists = self.ax.contour(
             X,
             Y,
@@ -532,6 +542,11 @@ class StdAxesAdapter:
             transform=self.ax.transAxes,
             **kw,
         )
+        if label_map:
+            try:
+                self.ax.clabel(artists, fmt=label_map)
+            except Exception:
+                pass
         return _auto_clip(artists, self.ax, self._clip_path)
 
     def jpcontourf(

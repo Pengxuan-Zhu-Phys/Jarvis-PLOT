@@ -25,6 +25,7 @@ Then read:
 
 - `context/CODE_MAP_JARVIS_PLOT.md`
 - `context/JARVIS_PLOT_FRAMEWORK_LOGIC.md`
+- `specs/POSTERIOR_DENSITY.md` for posterior reconstruction, KDE/query-Voronoi transforms, and HPD contour behavior
 - `roadmap/IMPLEMENTATION_ROADMAP.md` when you need the remaining task list
 
 ## Navigation Notes

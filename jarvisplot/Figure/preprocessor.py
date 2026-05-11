@@ -150,6 +150,124 @@ class DataPreprocessor:
                     out.add(axis)
         return sorted(out)
 
+    def _density_cell_transform_config(self, step: Any) -> Mapping[str, Any]:
+        if not isinstance(step, Mapping):
+            return {}
+        for name in ("make_density_core",):
+            if name in step:
+                cfg = step.get(name)
+                return cfg if isinstance(cfg, Mapping) else {}
+        if str(step.get("type", "")).strip().lower() == "make_density_core":
+            return step
+        return {}
+
+    def _density_cell_cfg_input_columns(self, cfg: Any) -> List[str]:
+        out: set[str] = set()
+        if not isinstance(cfg, Mapping):
+            return []
+        coors = cfg.get("coordinates", {})
+        if not isinstance(coors, Mapping):
+            coors = {}
+
+        def _add_coord(key: str, default: str, *, required: bool = True) -> None:
+            spec = coors.get(key, cfg.get(key, None))
+            if spec is None:
+                if required:
+                    out.add(default)
+                return
+            if isinstance(spec, Mapping):
+                expr = spec.get("expr")
+                if expr is not None:
+                    out.update(self._expr_symbols(expr))
+                    return
+                name = spec.get("name", default)
+                if isinstance(name, str) and name.strip():
+                    out.add(name.strip())
+                return
+            if isinstance(spec, str) and spec.strip():
+                out.add(spec.strip())
+
+        _add_coord("x", "x")
+        _add_coord("y", "y")
+        _add_coord("weight", "weight", required=False)
+        return sorted(out)
+
+    def _density_cell_cfg_output_columns(self, cfg: Any) -> List[str]:
+        if not isinstance(cfg, Mapping):
+            cfg = {}
+        coors = cfg.get("coordinates", {})
+        if not isinstance(coors, Mapping):
+            coors = {}
+
+        def _name(key: str, default: str) -> str:
+            spec = coors.get(key, cfg.get(key, None))
+            if isinstance(spec, Mapping):
+                value = spec.get("name", default)
+            else:
+                value = default
+            text = str(value).strip()
+            return text or default
+
+        return sorted({_name("x", "x"), _name("y", "y"), _name("weight", "weight")})
+
+    def _interp_2d_transform_config(self, step: Any) -> Mapping[str, Any]:
+        if not isinstance(step, Mapping):
+            return {}
+        if "make_interp_2d" in step:
+            cfg = step.get("make_interp_2d")
+            return cfg if isinstance(cfg, Mapping) else {}
+        if str(step.get("type", "")).strip().lower() == "make_interp_2d":
+            return step
+        return {}
+
+    def _interp_2d_cfg_input_columns(self, cfg: Any) -> List[str]:
+        out: set[str] = set()
+        if not isinstance(cfg, Mapping):
+            return []
+        coors = cfg.get("coordinates", {})
+        if not isinstance(coors, Mapping):
+            coors = {}
+
+        def _add_coord(key: str, default: str) -> None:
+            spec = coors.get(key, cfg.get(key, None))
+            if spec is None:
+                out.add(default)
+                return
+            if isinstance(spec, Mapping):
+                expr = spec.get("expr")
+                if expr is not None:
+                    out.update(self._expr_symbols(expr))
+                    return
+                name = spec.get("name", default)
+                if isinstance(name, str) and name.strip():
+                    out.add(name.strip())
+                return
+            if isinstance(spec, str) and spec.strip():
+                out.add(spec.strip())
+
+        _add_coord("x", "x")
+        _add_coord("y", "y")
+        _add_coord("z", "z")
+        return sorted(out)
+
+    def _interp_2d_cfg_output_columns(self, cfg: Any) -> List[str]:
+        if not isinstance(cfg, Mapping):
+            cfg = {}
+        coors = cfg.get("coordinates", {})
+        if not isinstance(coors, Mapping):
+            coors = {}
+
+        def _name(key: str, default: str) -> str:
+            spec = coors.get(key, cfg.get(key, None))
+            if isinstance(spec, Mapping):
+                value = spec.get("name", default)
+            else:
+                value = default
+            text = str(value).strip()
+            return text or default
+
+        return sorted({_name("x", "x"), _name("y", "y"), _name("z", "z")})
+
     def _transform_input_columns(self, transform: Any) -> List[str]:
         out: set[str] = set()
         if not isinstance(transform, list):
@@ -167,8 +285,12 @@ class DataPreprocessor:
                     out.update(self._expr_symbols(add_cfg.get("expr")))
             if "profile" in step:
                 out.update(self._profile_cfg_input_columns(step.get("profile", {})))
-            if "grid_profile" in step:
-                out.update(self._profile_cfg_input_columns(step.get("grid_profile", {})))
+            dcfg = self._density_cell_transform_config(step)
+            if dcfg:
+                out.update(self._density_cell_cfg_input_columns(dcfg))
+            icfg = self._interp_2d_transform_config(step)
+            if icfg:
+                out.update(self._interp_2d_cfg_input_columns(icfg))
         return sorted(out)
 
     def _transform_output_columns(self, transform: Any) -> List[str]:
@@ -185,24 +307,30 @@ class DataPreprocessor:
                     if isinstance(name, str) and name.strip():
                         out.add(name.strip())
             if "profile" in step:
-                out.update(self._profile_cfg_output_columns(step.get("profile", {})))
-            if "grid_profile" in step:
-                out.update(self._profile_cfg_output_columns(step.get("grid_profile", {})))
-                out.update(
-                    {
-                        "__grid_ix__",
-                        "__grid_iy__",
-                        "__grid_bin__",
-                        "__grid_xmin__",
-                        "__grid_xmax__",
-                        "__grid_ymin__",
-                        "__grid_ymax__",
-                        "__grid_xscale__",
-                        "__grid_yscale__",
-                        "__grid_objective__",
-                        "__grid_empty_value__",
-                    }
-                )
+                cfg = step.get("profile", {})
+                out.update(self._profile_cfg_output_columns(cfg))
+                if isinstance(cfg, Mapping) and str(cfg.get("method", "bridson")).lower() == "grid":
+                    out.update(
+                        {
+                            "__grid_ix__",
+                            "__grid_iy__",
+                            "__grid_bin__",
+                            "__grid_xmin__",
+                            "__grid_xmax__",
+                            "__grid_ymin__",
+                            "__grid_ymax__",
+                            "__grid_xscale__",
+                            "__grid_yscale__",
+                            "__grid_objective__",
+                            "__grid_empty_value__",
+                        }
+                    )
+            dcfg = self._density_cell_transform_config(step)
+            if dcfg:
+                out.update(self._density_cell_cfg_output_columns(dcfg))
+            icfg = self._interp_2d_transform_config(step)
+            if icfg:
+                out.update(self._interp_2d_cfg_output_columns(icfg))
         return sorted(out)
 
     @staticmethod
@@ -212,7 +340,7 @@ class DataPreprocessor:
         for step in transform:
             if not isinstance(step, Mapping):
                 continue
-            if any(key in step for key in ("tocsv", "to_csv")):
+            if "to_csv" in step:
                 return True
         return False
 
@@ -252,6 +380,24 @@ class DataPreprocessor:
             return []
         out.update(self._layer_expr_columns(layer.get("coordinates", {})))
         out.update(self._layer_expr_columns(layer.get("style", {})))
+        method = str(layer.get("method", "")).strip().lower()
+        if method in {"contour", "contourf"}:
+            out.update(
+                {
+                    "__grid_ix__",
+                    "__grid_iy__",
+                    "__grid_nx__",
+                    "__grid_ny__",
+                    "__grid_bin__",
+                    "__grid_xmin__",
+                    "__grid_xmax__",
+                    "__grid_ymin__",
+                    "__grid_ymax__",
+                    "__grid_dx__",
+                    "__grid_dy__",
+                    "__grid_objective__",
+                }
+            )
         return sorted(out)
 
     @staticmethod
@@ -598,14 +744,6 @@ class DataPreprocessor:
                 else:
                     cfg = {"value": cfg}
                 tokens.append({"kind": "profile", "cfg": cfg})
-            elif "grid_profile" in step:
-                cfg = step.get("grid_profile", {})
-                if isinstance(cfg, Mapping):
-                    cfg = deepcopy(cfg)
-                else:
-                    cfg = {}
-                cfg.setdefault("method", "grid")
-                tokens.append({"kind": "grid_profile", "cfg": cfg})
         return tokens
 
     def _runtime_profile_signature(self, transform: Any) -> Optional[str]:

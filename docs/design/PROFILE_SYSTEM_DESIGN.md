@@ -10,7 +10,7 @@ The profile system currently acts as a data-reduction stage for the plotting pip
 
 It should own:
 
-- `profile` and `grid_profile` transform semantics
+- `profile` transform semantics, including `method: grid`
 - prebuild/runtime split behavior
 - cache identity for profile results
 - narrow selection-table reduction
@@ -30,8 +30,10 @@ The profile system is implemented across:
 
 Current behavior:
 
-- `filter`, `add_column`, and `sortby` remain in the transform primitive layer
-- `profile` and `grid_profile` live in `profile_runtime.py` and are called through the transform pipeline
+- `filter`, `add_column`, `sortby`, `keep_columns`, `drop_columns`, `to_csv`, and `to_parquet` remain in the transform primitive layer
+- computed columns are created through `add_column`; there is no standalone `expression` transform type
+- `profile` lives in `profile_runtime.py` and is called through the transform pipeline
+- `make_density_core` and `make_interp_2d` are field-preparation transforms, not profile methods
 - prebuild can rewrite the first profile step into a reusable alias
 - runtime reuses compact cached profile tables when possible
 - the pipeline is designed to stay narrow

@@ -46,3 +46,8 @@ method layer. YAML-level `layers` still takes precedence when present.
 Keep colorbar defaults explicit. `frame.axc.color` is the preferred source of truth.
 
 Layer-level style keys are layer kwargs; `frame.axc.color` is the colorbar contract.
+
+Figure blocks and style cards do not own file-output policy. Output directory,
+DPI, and formats are project/YAML-level settings and should be configured through
+the top-level `output` block, for example `output.formats`. Do not add
+figure-local `output: {formats: ...}` overrides.
