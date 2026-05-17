@@ -48,6 +48,10 @@ class JarvisPLOT():
         # Initialize logger early
         self.init_logger()
 
+        if self._is_flowchart_command():
+            self.render_flowchart()
+            return
+
         load_cmaps(self.load_path, logger=self.logger)
 
         self.load_yaml()
@@ -97,6 +101,31 @@ class JarvisPLOT():
 
             self.style = load_styles(self.load_path, logger=self.logger)
             self.plot()
+
+    def _is_flowchart_command(self) -> bool:
+        command = getattr(self.args, "file", None)
+        return isinstance(command, str) and command.strip().lower() == "flowchart"
+
+    def render_flowchart(self) -> None:
+        flowchart_file = getattr(self.args, "flowchart_file", None)
+        if not flowchart_file:
+            self.logger.error("No input flowchart JSON file specified. Usage: jplot flowchart path-to-flowchart.json")
+            sys.exit(2)
+        from .flowchart import render_flowchart_file
+
+        try:
+            render_flowchart_file(
+                flowchart_file,
+                output_path=getattr(self.args, "out", None),
+                logger=self.logger,
+            )
+        except Exception as e:
+            self.logger.error(f"Flowchart rendering failed: {e}")
+            if getattr(self.args, "debug", False):
+                import traceback
+
+                self.logger.debug(traceback.format_exc())
+            sys.exit(2)
 
     def prebuild_profile_pipelines(self):
         """Traverse figures once and prebuild profile pipelines."""

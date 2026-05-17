@@ -1,0 +1,45 @@
+{
+  "classic": {
+    "min_width": 8.0,
+    "min_height": 3.5,
+    "max_width": 24.0,
+    "max_height": 16.0,
+    "units_per_inch": 1.25,
+    "layer_gap": 6.0,
+    "group_gap": 0.1,
+    "variable_gap": 0.22,
+    "input_file_dx": 1.1,
+    "output_file_dx": 1.1,
+    "variable_dx": 2.55,
+    "input_variable_dx": 2.55,
+    "output_variable_dx": 3.25,
+    "bridge_y_offset": 0.45,
+    "bridge_output_pad": 0.18,
+    "module_icon_size": 0.9,
+    "module_label_dy": -0.45,
+    "file_label_dy": -0.24,
+    "x_margin_left": 1.0,
+    "x_margin_right": 1.1,
+    "y_margin_top": 0.35,
+    "y_margin_bottom": 0.45,
+    "logo_size": 0.5,
+    "logo_y_offset": 0.45,
+    "logo_top_margin": 0.08,
+    "logo_text_dy": 0.14
+  },
+  "icons": {
+    "logo": "&JP/jarvisplot/cards/icons/flowchart/JarvisHEP.png",
+    "sampler": "&JP/jarvisplot/cards/icons/flowchart/sampler.png",
+    "calculator": "&JP/jarvisplot/cards/icons/flowchart/calculator.png",
+    "opera": "&JP/jarvisplot/cards/icons/flowchart/opera.png",
+    "input_file": "&JP/jarvisplot/cards/icons/flowchart/inputfile.png",
+    "output_file": "&JP/jarvisplot/cards/icons/flowchart/outputfile.png"
+  },
+  "output": {
+    "format": "png"
+  },
+  "savefig": {
+    "dpi": 300,
+    "facecolor": "white"
+  }
+}
