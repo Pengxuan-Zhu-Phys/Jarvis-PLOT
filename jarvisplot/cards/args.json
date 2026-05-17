@@ -2,7 +2,12 @@
     "positionals": [
         {
             "name": "file",
-            "help": "path of the input file, in yaml format"
+            "help": "path of the input YAML file, or the command 'flowchart'"
+        },
+        {
+            "name": "flowchart_file",
+            "help": "path of the input flowchart JSON file when using: jplot flowchart path-to-flowchart.json",
+            "nargs": "?"
         }
     ],
     "options": [
@@ -29,9 +34,9 @@
         {
             "long": "--out",
             "dest": "out",
-            "help": "Output YAML path (used with --parse-data). If omitted and --inplace not set, prints to stdout",
+            "help": "Output YAML path (used with --parse-data), or output image path/dir for 'jplot flowchart'",
             "action": "store",
-            "metavar": "YAML_FILE"
+            "metavar": "PATH"
 
         },
         {
