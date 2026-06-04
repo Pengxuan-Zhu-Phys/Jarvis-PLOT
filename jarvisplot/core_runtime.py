@@ -9,6 +9,7 @@ import yaml
 from .cache_store import ProjectCache
 from .data_loader import JP_ROW_IDX
 from .data_loader_hdf5 import scan_hdf5_leaf_metadata
+from .Figure.figure_types import expand_figure_types_in_config
 from .utils.pathing import resolve_project_path
 
 
@@ -72,6 +73,17 @@ def _density_cell_transform_config(step: Any) -> Mapping[str, Any]:
     return {}
 
 
+def _posterior_density_transform_config(step: Any) -> Mapping[str, Any]:
+    if not isinstance(step, Mapping):
+        return {}
+    if "posterior_density" in step:
+        cfg = step.get("posterior_density")
+        return cfg if isinstance(cfg, Mapping) else {}
+    if str(step.get("type", "")).strip().lower() == "posterior_density":
+        return step
+    return {}
+
+
 def _density_cell_cfg_input_columns(cfg: Any) -> Set[str]:
     out: Set[str] = set()
     if not isinstance(cfg, Mapping):
@@ -110,17 +122,36 @@ def _density_cell_cfg_output_columns(cfg: Any) -> Set[str]:
     coors = cfg.get("coordinates", {})
     if not isinstance(coors, Mapping):
         coors = {}
+    output = cfg.get("output", {})
+    if not isinstance(output, Mapping):
+        output = {}
 
     def _name(key: str, default: str) -> str:
-        spec = coors.get(key, cfg.get(key, None))
-        if isinstance(spec, Mapping):
-            value = spec.get("name", default)
+        if output.get(key) is not None:
+            value = output.get(key, default)
         else:
-            value = default
+            spec = coors.get(key, cfg.get(key, None))
+            if isinstance(spec, Mapping):
+                value = spec.get("name", default)
+            else:
+                value = default
         text = str(value).strip()
         return text or default
 
     return {_name("x", "x"), _name("y", "y"), _name("weight", "weight")}
+
+
+def _posterior_density_cfg_output_columns(cfg: Any) -> Set[str]:
+    if not isinstance(cfg, Mapping):
+        cfg = {}
+    output = cfg.get("output", "density")
+    if isinstance(output, Mapping):
+        x_name = str(output.get("x", "x")).strip() or "x"
+        y_name = str(output.get("y", "y")).strip() or "y"
+        z_name = str(output.get("z", output.get("density", "density"))).strip() or "density"
+        return {x_name, y_name, z_name}
+    text = str(output).strip()
+    return {"x", "y", text or "density"}
 
 
 def _interp_2d_transform_config(step: Any) -> Mapping[str, Any]:
@@ -171,19 +202,25 @@ def _interp_2d_cfg_output_columns(cfg: Any) -> Set[str]:
     coors = cfg.get("coordinates", {})
     if not isinstance(coors, Mapping):
         coors = {}
+    output = cfg.get("output", {})
+    if not isinstance(output, Mapping):
+        output = {}
 
     def _name(key: str, default: str) -> str:
-        spec = coors.get(key, cfg.get(key, None))
-        if isinstance(spec, Mapping):
-            value = spec.get("name", default)
+        if key == "z" and cfg.get("output_z") is not None:
+            value = cfg.get("output_z", default)
+        elif output.get(key) is not None:
+            value = output.get(key, default)
         else:
-            value = default
+            spec = coors.get(key, cfg.get(key, None))
+            if isinstance(spec, Mapping):
+                value = spec.get("name", default)
+            else:
+                value = default
         text = str(value).strip()
         return text or default
 
     return {_name("x", "x"), _name("y", "y"), _name("z", "z")}
-
-
 def _collect_expr_columns(obj: Any, out: Set[str]) -> None:
     """Recursively collect column names from expressions inside a config dict/list."""
     if isinstance(obj, Mapping):
@@ -196,6 +233,9 @@ def _collect_expr_columns(obj: Any, out: Set[str]) -> None:
                 out.update(_profile_cfg_columns(v))
                 continue
             if key == "make_density_core":
+                out.update(_density_cell_cfg_input_columns(v))
+                continue
+            if key == "posterior_density":
                 out.update(_density_cell_cfg_input_columns(v))
                 continue
             if key == "make_interp_2d":
@@ -220,6 +260,9 @@ def _transform_columns(transform: Any) -> Set[str]:
         dcfg = _density_cell_transform_config(step)
         if dcfg:
             out.update(_density_cell_cfg_input_columns(dcfg))
+        pcfg = _posterior_density_transform_config(step)
+        if pcfg:
+            out.update(_density_cell_cfg_input_columns(pcfg))
         icfg = _interp_2d_transform_config(step)
         if icfg:
             out.update(_interp_2d_cfg_input_columns(icfg))
@@ -266,6 +309,9 @@ def _transform_output_columns(transform: Any) -> Set[str]:
         dcfg = _density_cell_transform_config(step)
         if dcfg:
             out.update(_density_cell_cfg_output_columns(dcfg))
+        pcfg = _posterior_density_transform_config(step)
+        if pcfg:
+            out.update(_posterior_density_cfg_output_columns(pcfg))
         icfg = _interp_2d_transform_config(step)
         if icfg:
             out.update(_interp_2d_cfg_output_columns(icfg))
@@ -319,6 +365,12 @@ def prepare_project_layout(core) -> None:
     )
     core.logger.debug(f"Project workdir -> {core.workdir}")
     core.logger.debug(f"Cache dir -> {core.cache.root}")
+
+
+def expand_figure_types(core) -> None:
+    if not isinstance(getattr(core.yaml, "config", None), dict):
+        return
+    expand_figure_types_in_config(core.yaml.config, logger=getattr(core, "logger", None))
 
 
 def _layer_columns(layer: Any) -> Set[str]:

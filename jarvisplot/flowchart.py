@@ -301,7 +301,7 @@ class FlowchartRenderer:
                 self._classic_gradient_curve(ax, start, end, lw=1.7, start_color="#3994E3", end_color="#58F271", alpha=0.95)
                 ax.plot(start[0] + 0.06, start[1], "s", color="darkgray", markersize=2.6, zorder=80)
                 ax.plot(start[0] + 0.03, start[1], "s", color="gray", markersize=2.0, zorder=79)      
-            elif role == "fileflow" and graph.is_var(source_id) and graph.is_file(target_id):
+            elif role == "fileflow" and (graph.is_var(source_id) or graph.is_bridge(source_id)) and graph.is_file(target_id):
                 self._classic_gradient_curve(ax, start, end, lw=1.7)
                 ax.plot(start[0] + 0.06, start[1], "s", color="darkgray", markersize=2.6, zorder=80)
                 ax.plot(start[0] + 0.03, start[1], "s", color="gray", markersize=2.0, zorder=79)            
@@ -373,8 +373,10 @@ class _ClassicGraph:
         self.card = card
         self.nodes = {str(node.get("id")): node for node in scene.get("nodes", []) if node.get("id")}
         self.edges = [edge for edge in scene.get("edges", []) if isinstance(edge, Mapping)]
-        self.layers = _ordered_scene_layers(scene)
+        self.layers = [self._copy_layer(layer) for layer in _ordered_scene_layers(scene)]
         self.classic = card.get("classic", {}) if isinstance(card.get("classic"), Mapping) else {}
+        if bool(self.classic.get("synthesize_missing_bridges", True)):
+            self._synthesize_missing_bridges()
         self.layer_gap = float(self.classic.get("layer_gap", 6.0))
         self.group_gap = float(self.classic.get("group_gap", 1.0))
         self.var_gap = float(self.classic.get("variable_gap", 0.22))
@@ -393,6 +395,141 @@ class _ClassicGraph:
         self.xlim = (0.0, 1.0)
         self.ylim = (0.0, 1.0)
         self.logo_y = 1.0
+
+    @staticmethod
+    def _copy_layer(layer: Mapping[str, Any]) -> dict:
+        copied = dict(layer)
+        copied["nodes"] = [str(node_id) for node_id in copied.get("nodes", [])]
+        return copied
+
+    def _synthesize_missing_bridges(self) -> None:
+        layer_positions = {str(layer.get("id")): idx for idx, layer in enumerate(self.layers)}
+        if not layer_positions:
+            return
+        layer_names = [str(layer.get("id")) for layer in self.layers]
+        layer_indices = [layer.get("index", idx + 1) for idx, layer in enumerate(self.layers)]
+        next_edges: list[Mapping[str, Any]] = []
+        seen_edges: set[tuple[str, str, str, str, str]] = set()
+        bridgeable_roles = {"fileflow", "dataflow", "selectionflow"}
+
+        for edge in self.edges:
+            role = str(edge.get("role", "")).lower()
+            source_id = str(edge.get("source", {}).get("node", ""))
+            target_id = str(edge.get("target", {}).get("node", ""))
+            source = self.nodes.get(source_id)
+            target = self.nodes.get(target_id)
+            source_layer = str(source.get("layer", "")) if isinstance(source, Mapping) else ""
+            target_layer = str(target.get("layer", "")) if isinstance(target, Mapping) else ""
+            source_pos = layer_positions.get(source_layer)
+            target_pos = layer_positions.get(target_layer)
+            source_kind = source.get("kind") if isinstance(source, Mapping) else None
+            target_kind = target.get("kind") if isinstance(target, Mapping) else None
+
+            if (
+                role not in bridgeable_roles
+                or source_kind == "bridge"
+                or target_kind == "bridge"
+                or source_pos is None
+                or target_pos is None
+                or target_pos - source_pos <= 1
+            ):
+                self._append_unique_edge(next_edges, seen_edges, edge)
+                continue
+
+            label = self._bridge_label(edge, source_id)
+            prev_node = source_id
+            prev_port = str(edge.get("source", {}).get("port", "out") or "out")
+            for pos in range(source_pos + 1, target_pos):
+                bridge_id = f"bridge::{label}::L{layer_indices[pos]}"
+                self._ensure_synthetic_bridge(bridge_id, label, layer_names[pos], source_layer, target_layer)
+                self._append_unique_edge(
+                    next_edges,
+                    seen_edges,
+                    self._bridge_edge(edge, prev_node, prev_port, bridge_id, "in", "bridgeflow"),
+                )
+                prev_node = bridge_id
+                prev_port = "out"
+
+            self._append_unique_edge(
+                next_edges,
+                seen_edges,
+                self._bridge_edge(
+                    edge,
+                    prev_node,
+                    prev_port,
+                    target_id,
+                    str(edge.get("target", {}).get("port", "in") or "in"),
+                    role,
+                ),
+            )
+
+        self.edges = next_edges
+
+    @staticmethod
+    def _edge_key(edge: Mapping[str, Any]) -> tuple[str, str, str, str, str]:
+        return (
+            str(edge.get("source", {}).get("node", "")),
+            str(edge.get("source", {}).get("port", "")),
+            str(edge.get("target", {}).get("node", "")),
+            str(edge.get("target", {}).get("port", "")),
+            str(edge.get("role", "")),
+        )
+
+    def _append_unique_edge(self, edges: list[Mapping[str, Any]], seen: set[tuple[str, str, str, str, str]], edge: Mapping[str, Any]) -> None:
+        key = self._edge_key(edge)
+        if key in seen:
+            return
+        seen.add(key)
+        edges.append(edge)
+
+    def _bridge_label(self, edge: Mapping[str, Any], source_id: str) -> str:
+        metadata = edge.get("metadata") if isinstance(edge.get("metadata"), Mapping) else {}
+        if metadata.get("variable"):
+            return str(metadata["variable"])
+        source = self.nodes.get(source_id, {})
+        return str(source.get("label") or source_id.replace("var::", ""))
+
+    def _ensure_synthetic_bridge(self, bridge_id: str, label: str, layer_id: str, source_layer: str, target_layer: str) -> None:
+        if bridge_id not in self.nodes:
+            self.nodes[bridge_id] = {
+                "id": bridge_id,
+                "kind": "bridge",
+                "role": "bridge_relay",
+                "layer": layer_id,
+                "label": label,
+                "in_ports": [{"id": "in", "role": "bridge_in"}],
+                "out_ports": [{"id": "out", "role": "bridge_out"}],
+                "metadata": {
+                    "synthetic": True,
+                    "source_layer": source_layer,
+                    "target_layer": target_layer,
+                    "relay_for": label,
+                },
+            }
+        for layer in self.layers:
+            if str(layer.get("id")) == str(layer_id):
+                layer.setdefault("nodes", [])
+                if bridge_id not in layer["nodes"]:
+                    layer["nodes"].append(bridge_id)
+                break
+
+    @staticmethod
+    def _bridge_edge(
+        original: Mapping[str, Any],
+        source_node: str,
+        source_port: str,
+        target_node: str,
+        target_port: str,
+        role: str,
+    ) -> dict:
+        metadata = deepcopy(original.get("metadata")) if isinstance(original.get("metadata"), Mapping) else {}
+        metadata["synthetic_bridge"] = True
+        return {
+            "source": {"node": source_node, "port": source_port},
+            "target": {"node": target_node, "port": target_port},
+            "role": role,
+            "metadata": metadata,
+        }
 
     def layout(self) -> None:
         layer_groups = self._layer_groups()

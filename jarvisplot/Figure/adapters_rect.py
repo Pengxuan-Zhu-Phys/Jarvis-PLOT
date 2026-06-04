@@ -475,6 +475,15 @@ class StdAxesAdapter:
             artists = self.ax.plot(x, y, **kw)
         return _auto_clip(artists, self.ax, self._clip_path)
 
+    def quiver(self, **kwargs):
+        x = kwargs.pop("x")
+        y = kwargs.pop("y")
+        u = kwargs.pop("u")
+        v = kwargs.pop("v")
+        kw = self._merge("quiver", kwargs)
+        artists = self.ax.quiver(x, y, u, v, **kw)
+        return _auto_clip(artists, self.ax, self._clip_path)
+
     def fill(self, **kwargs):
         x, y = kwargs.pop("x"), kwargs.pop("y")
         kw = self._merge("fill", kwargs)

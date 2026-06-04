@@ -7,7 +7,9 @@ import numpy as np
 import pandas as pd
 
 from ..memtrace import memtrace_checkpoint
+from ..utils.pathing import resolve_project_path
 from ..utils.expression import eval_dataframe_expression
+from .posterior_mesh import build_posterior_mesh, conservative_density, mesh_diagnostics_frame
 
 
 _DENSITY_CELL_TYPES = {"make_density_core"}
@@ -67,7 +69,11 @@ def _coord_cfg(cfg: Mapping[str, Any], key: str) -> Mapping[str, Any]:
 
 
 def _output_name(cfg: Mapping[str, Any], key: str, default: str) -> str:
-    name = _coord_cfg(cfg, key).get("name", default)
+    output = cfg.get("output", {})
+    if isinstance(output, Mapping) and output.get(key) is not None:
+        name = output.get(key, default)
+    else:
+        name = _coord_cfg(cfg, key).get("name", default)
     text = str(name).strip()
     return text or default
 
@@ -144,7 +150,7 @@ def _unproject_axis(values: np.ndarray, lim: Tuple[float, float], scale: str) ->
     return lo + values * (hi - lo)
 
 
-def _grid_shape(cfg: Mapping[str, Any], default: int = 128) -> Tuple[int, int]:
+def _grid_shape(cfg: Mapping[str, Any], default: int = 64) -> Tuple[int, int]:
     grid = cfg.get("grid", {})
     if not isinstance(grid, Mapping):
         grid = {}
@@ -309,7 +315,7 @@ def _bridson_density_cell(x, y, w, cfg, logger):
     bridson = cfg.get("bridson", {})
     if not isinstance(bridson, Mapping):
         bridson = {}
-    bin_value = int(bridson.get("bin", bridson.get("bins", cfg.get("bin", 32))))
+    bin_value = int(bridson.get("bin", bridson.get("bins", cfg.get("bin", cfg.get("bins", 64)))))
     if bin_value <= 0:
         raise ValueError("make_density_core bridson bin must be positive.")
     radius = 1.0 / float(bin_value)
@@ -318,18 +324,29 @@ def _bridson_density_cell(x, y, w, cfg, logger):
     k = int(bridson.get("k", bridson.get("candidates", 30)))
     support = _bridson_points(radius, seed=seed, k=k)
     samples = np.column_stack([xp[inside], yp[inside]])
-    try:
-        from scipy.spatial import cKDTree
-
-        _, idx = cKDTree(support).query(samples, k=1)
-    except Exception:
-        diff = samples[:, None, :] - support[None, :, :]
-        idx = np.argmin(np.sum(diff * diff, axis=2), axis=1)
-    mass = np.zeros(int(support.shape[0]), dtype=float)
-    np.add.at(mass, np.asarray(idx, dtype=np.int64), w[inside])
-    xs = _unproject_axis(support[:, 0], xlim, xscale)
-    ys = _unproject_axis(support[:, 1], ylim, yscale)
+    mesh_cfg = cfg.get("_mesh_debug", {})
+    if not isinstance(mesh_cfg, Mapping):
+        mesh_cfg = {}
+    refinement_cfg = cfg.get("refinement", mesh_cfg.get("refinement", None))
+    mesh = build_posterior_mesh(
+        support,
+        samples,
+        w[inside],
+        xlim=(0.0, 1.0),
+        ylim=(0.0, 1.0),
+        include_polygons=bool(mesh_cfg.get("include_polygons", False)),
+        strict_geometry=False,
+        geometry_space="normalized",
+        refinement=refinement_cfg if isinstance(refinement_cfg, Mapping) else None,
+    )
+    _bridson_density_cell.last_mesh = mesh
+    mass = mesh.masses
+    xs = _unproject_axis(mesh.generators[:, 0], xlim, xscale)
+    ys = _unproject_axis(mesh.generators[:, 1], ylim, yscale)
     return xs, ys, mass
+
+
+_bridson_density_cell.last_mesh = None  # type: ignore[attr-defined]
 
 
 def _kde_core(x, y, w, cfg, logger):
@@ -376,6 +393,60 @@ def _diagnostics(*, method: str, input_count: int, output_count: int, normalize:
     )
 
 
+def _mesh_diagnostics(mesh) -> str:
+    if mesh is None:
+        return ""
+    diag = getattr(mesh, "diagnostics", {}) or {}
+    return (
+        "\nposterior mesh diagnostics:\n"
+        f"\t generators \t-> {int(diag.get('generator_count', 0))}\n"
+        f"\t nonzero_mass \t-> {int(diag.get('nonzero_mass_generators', 0))}\n"
+        f"\t empty_generators -> {int(diag.get('empty_generators', 0))}\n"
+        f"\t area_method \t-> {diag.get('area_method', 'not_performed')}\n"
+        f"\t geometry_space \t-> {diag.get('geometry_space', 'unknown')}\n"
+        f"\t max_centroid_drift -> {float(diag.get('max_centroid_drift', float('nan'))):.17g}\n"
+        f"\t max_anisotropy \t-> {float(diag.get('max_anisotropy_ratio', float('nan'))):.17g}\n"
+        f"\t mass_vs_geometry_corr -> {float(diag.get('mass_geometry_stress_corr', float('nan'))):.17g}\n"
+        f"\t refinement_enabled -> {bool(diag.get('refinement_enabled', False))}\n"
+        f"\t refinement_iters -> {int(diag.get('refinement_iterations_completed', 0))}\n"
+        f"\t refinement_splits -> {int(diag.get('refinement_splits', 0))}\n"
+        f"\t refinement_merges -> {int(diag.get('refinement_merges', 0))}"
+    )
+
+
+def _export_mesh_debug(mesh, cfg: Mapping[str, Any], xs: np.ndarray, ys: np.ndarray, logger) -> None:
+    if mesh is None:
+        return
+    mesh_cfg = cfg.get("_mesh_debug", {})
+    if not isinstance(mesh_cfg, Mapping):
+        return
+    target = mesh_cfg.get("to_csv", mesh_cfg.get("path", None))
+    if target is None:
+        return
+    path = str(target).strip()
+    if not path:
+        return
+    base_dir = cfg.get("_base_dir", None)
+    out_path = resolve_project_path(path, base_dir=base_dir)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    frame = mesh_diagnostics_frame(mesh, x=xs, y=ys)
+    try:
+        xlim = _axis_lim(np.asarray(xs, dtype=float), cfg, "x")
+        ylim = _axis_lim(np.asarray(ys, dtype=float), cfg, "y")
+        xscale = _axis_scale(cfg, "x")
+        yscale = _axis_scale(cfg, "y")
+        centroid_x = _unproject_axis(mesh.centroid_proposal[:, 0], xlim, xscale)
+        centroid_y = _unproject_axis(mesh.centroid_proposal[:, 1], ylim, yscale)
+        frame["centroid_x"] = centroid_x
+        frame["centroid_y"] = centroid_y
+        frame["drift_x"] = centroid_x - np.asarray(xs, dtype=float)
+        frame["drift_y"] = centroid_y - np.asarray(ys, dtype=float)
+    except Exception:
+        pass
+    frame.to_csv(out_path, index=False)
+    _logger_emit(logger, "warning", f"posterior mesh diagnostics exported -> {out_path}")
+
+
 def density_cell(df: pd.DataFrame, cfg: Mapping[str, Any], logger=None) -> pd.DataFrame:
     """
     Construct a minimal posterior density-support table from raw samples.
@@ -387,19 +458,29 @@ def density_cell(df: pd.DataFrame, cfg: Mapping[str, Any], logger=None) -> pd.Da
     if not isinstance(df, pd.DataFrame):
         raise TypeError("make_density_core expects a pandas DataFrame.")
     cfg = cfg if isinstance(cfg, Mapping) else {}
-    method = str(cfg.get("method", "grid")).strip().lower()
+    method = str(cfg.get("method", "bridson")).strip().lower()
     if method not in {"grid", "bridson", "kde"}:
         raise ValueError("make_density_core method must be one of: grid, bridson, kde.")
     memtrace_checkpoint(logger, "make_density_core.before", df)
+    density_cell.last_mesh = None
     x, y, w, input_count = _prepare_samples(df, cfg, logger)
     if method == "grid":
         xs, ys, mass = _grid_density_cell(x, y, w, cfg, logger)
     elif method == "bridson":
         xs, ys, mass = _bridson_density_cell(x, y, w, cfg, logger)
+        density_cell.last_mesh = _bridson_density_cell.last_mesh
     else:
         xs, ys, mass = _kde_core(x, y, w, cfg, logger)
     normalize = bool(cfg.get("normalize", True))
     mass = _normalize(mass, enabled=normalize)
+    if density_cell.last_mesh is not None:
+        density_cell.last_mesh.masses = np.asarray(mass, dtype=float)
+        density_cell.last_mesh.densities = conservative_density(
+            density_cell.last_mesh.masses,
+            density_cell.last_mesh.areas,
+        )
+        density_cell.last_mesh.diagnostics["mass_sum"] = float(np.sum(density_cell.last_mesh.masses))
+        _export_mesh_debug(density_cell.last_mesh, cfg, xs, ys, logger)
     names = (
         _output_name(cfg, "x", "x"),
         _output_name(cfg, "y", "y"),
@@ -417,6 +498,8 @@ def density_cell(df: pd.DataFrame, cfg: Mapping[str, Any], logger=None) -> pd.Da
         total=float(np.sum(out[names[2]].to_numpy(dtype=float))),
     )
     if bool(cfg.get("diagnostics", True)):
+        if method == "bridson":
+            msg += _mesh_diagnostics(density_cell.last_mesh)
         _logger_emit(logger, "warning", msg)
     memtrace_checkpoint(
         logger,
@@ -425,3 +508,6 @@ def density_cell(df: pd.DataFrame, cfg: Mapping[str, Any], logger=None) -> pd.Da
         extra={"method": method, "rows": int(out.shape[0]), "weight_sum": float(np.sum(out[names[2]]))},
     )
     return out
+
+
+density_cell.last_mesh = None  # type: ignore[attr-defined]

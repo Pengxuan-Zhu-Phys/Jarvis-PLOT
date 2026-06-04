@@ -25,6 +25,11 @@ from .interp_2d_runtime import (
     is_interp_2d_transform,
     make_interp_2d,
 )
+from .posterior_density_runtime import (
+    is_posterior_density_transform,
+    posterior_density,
+    posterior_density_config,
+)
 from .profile_runtime import _preprofiling, eval_series, profiling
 
 
@@ -411,7 +416,8 @@ def apply_transforms_impl(
                     },
                 )
         elif is_density_cell_transform(trans):
-            cfg = density_cell_config(trans)
+            cfg = dict(density_cell_config(trans))
+            cfg.setdefault("_base_dir", getattr(preprocessor, "base_dir", None))
             before_rows = preprocessor._safe_nrows(df)
             preprocessor._info(
                 "Density cell START:\n\t source \t-> {}\n\t rows_before \t-> {}".format(
@@ -423,6 +429,24 @@ def apply_transforms_impl(
             after_rows = preprocessor._safe_nrows(df)
             preprocessor._warn(
                 "Density cell DONE:\n\t source \t-> {}\n\t rows_after \t-> {}".format(
+                    source_label or "<unknown>",
+                    after_rows if after_rows is not None else "NA",
+                )
+            )
+        elif is_posterior_density_transform(trans):
+            cfg = dict(posterior_density_config(trans))
+            cfg.setdefault("_base_dir", getattr(preprocessor, "base_dir", None))
+            before_rows = preprocessor._safe_nrows(df)
+            preprocessor._info(
+                "Posterior density START:\n\t source \t-> {}\n\t rows_before \t-> {}".format(
+                    source_label or "<unknown>",
+                    before_rows if before_rows is not None else "NA",
+                )
+            )
+            df = posterior_density(df, cfg, preprocessor.logger)
+            after_rows = preprocessor._safe_nrows(df)
+            preprocessor._warn(
+                "Posterior density DONE:\n\t source \t-> {}\n\t rows_after \t-> {}".format(
                     source_label or "<unknown>",
                     after_rows if after_rows is not None else "NA",
                 )
