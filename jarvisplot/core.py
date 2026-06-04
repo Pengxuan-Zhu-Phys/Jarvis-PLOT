@@ -15,6 +15,7 @@ from .cache_store import ProjectCache
 from .Figure.preprocessor import DataPreprocessor
 from .utils.pathing import resolve_project_path
 from .core_runtime import (
+    expand_figure_types as runtime_expand_figure_types,
     plan_dataset_required_columns as runtime_plan_dataset_required_columns,
     prepare_project_layout as runtime_prepare_project_layout,
     prepare_usage_plan as runtime_prepare_usage_plan,
@@ -68,6 +69,7 @@ class JarvisPLOT():
             runtime_parse_hdf5_metadata_and_renew_yaml(self)
             return
         else:
+            runtime_expand_figure_types(self)
             runtime_prepare_project_layout(self)
             self.load_dataset(eager=False)
             runtime_plan_dataset_required_columns(self)

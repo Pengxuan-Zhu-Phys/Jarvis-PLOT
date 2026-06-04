@@ -5,6 +5,7 @@
     "max_width": 24.0,
     "max_height": 16.0,
     "units_per_inch": 1.25,
+    "synthesize_missing_bridges": true,
     "layer_gap": 6.0,
     "group_gap": 0.1,
     "variable_gap": 0.22,

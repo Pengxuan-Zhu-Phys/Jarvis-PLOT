@@ -13,6 +13,7 @@ Use these docs to understand the intended split between input parsing, dataflow,
 - `LAYOUT_ENGINE_DESIGN.md`: spec-only layout boundary and future layout-owner contract
 - `STYLE_SYSTEM_DESIGN.md`: partial style system boundary and future owner contract
 - `PROFILE_SYSTEM_DESIGN.md`: implemented-but-mixed profile system boundary
+- `YAML_DESIGN.md`: complete YAML schema reference — transforms, methods, coordinates, style, complexity analysis
 
 ## Reading Order
 

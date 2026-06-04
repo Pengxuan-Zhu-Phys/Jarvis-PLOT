@@ -48,6 +48,7 @@ METHOD_DISPATCH: Dict[str, str] = {
     "bar":          "bar",
     "barh":         "barh",
     "step":         "step",
+    "quiver":       "quiver",
 
     # images / grids
     "imshow":       "imshow",

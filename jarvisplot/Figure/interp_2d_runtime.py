@@ -7,6 +7,12 @@ import pandas as pd
 
 from ..utils.expression import eval_dataframe_expression
 from .interp_natural_neighbor import resolve_backend
+from .posterior_mesh import (
+    clipped_voronoi_cells,
+    regular_support_areas,
+    support_areas as mesh_support_areas,
+    voronoi_finite_polygons_2d as mesh_voronoi_finite_polygons_2d,
+)
 
 
 _INTERP_2D_TYPES = {"make_interp_2d"}
@@ -52,7 +58,14 @@ def _coord_cfg(cfg: Mapping[str, Any], key: str) -> Mapping[str, Any]:
 
 
 def _output_name(cfg: Mapping[str, Any], key: str, default: str) -> str:
-    name = _coord_cfg(cfg, key).get("name", default)
+    if key == "z" and cfg.get("output_z") is not None:
+        name = cfg.get("output_z", default)
+    else:
+        output = cfg.get("output", {})
+        if isinstance(output, Mapping) and output.get(key) is not None:
+            name = output.get(key, default)
+        else:
+            name = _coord_cfg(cfg, key).get("name", default)
     text = str(name).strip()
     return text or default
 
@@ -73,6 +86,8 @@ def _resolve_array(df: pd.DataFrame, cfg: Mapping[str, Any], key: str, default: 
 def _axis_lim(values: np.ndarray, cfg: Mapping[str, Any], key: str) -> Tuple[float, float]:
     spec = _coord_cfg(cfg, key)
     lim = spec.get("lim", spec.get("limits", None))
+    if lim is None:
+        lim = cfg.get(f"{key}lim", None)
     if lim is None:
         finite = np.asarray(values, dtype=float)
         finite = finite[np.isfinite(finite)]
@@ -162,112 +177,60 @@ def _dedupe_points(x: np.ndarray, y: np.ndarray, z: np.ndarray, *, reducer: str 
 
 
 def _regular_support_areas(x: np.ndarray, y: np.ndarray, xlim: Tuple[float, float], ylim: Tuple[float, float]):
-    ux, ix = np.unique(np.asarray(x, dtype=float), return_inverse=True)
-    uy, iy = np.unique(np.asarray(y, dtype=float), return_inverse=True)
-    nx = int(ux.size)
-    ny = int(uy.size)
-    if nx <= 1 or ny <= 1 or nx * ny != len(x):
-        return None
-    slots = iy * nx + ix
-    if np.unique(slots).size != len(x):
-        return None
-
-    def _edges(vals: np.ndarray, lim: Tuple[float, float]) -> np.ndarray:
-        mids = 0.5 * (vals[:-1] + vals[1:])
-        return np.concatenate([[float(lim[0])], mids, [float(lim[1])]])
-
-    x_edges = _edges(ux, xlim)
-    y_edges = _edges(uy, ylim)
-    dx = np.diff(x_edges)
-    dy = np.diff(y_edges)
-    if not (np.all(np.isfinite(dx)) and np.all(np.isfinite(dy)) and np.all(dx > 0) and np.all(dy > 0)):
-        return None
-    area_grid = dy[:, None] * dx[None, :]
-    return area_grid[iy, ix]
+    return regular_support_areas(x, y, xlim, ylim)
 
 
 def _voronoi_finite_polygons_2d(vor, radius=None):
-    if vor.points.shape[1] != 2:
-        raise ValueError("Requires 2D input")
-    new_regions = []
-    new_vertices = vor.vertices.tolist()
-    center = vor.points.mean(axis=0)
-    if radius is None:
-        radius = np.ptp(vor.points, axis=0).max() * 2
-    all_ridges = {}
-    for (p1, p2), (v1, v2) in zip(vor.ridge_points, vor.ridge_vertices):
-        all_ridges.setdefault(p1, []).append((p2, v1, v2))
-        all_ridges.setdefault(p2, []).append((p1, v1, v2))
-    for p1, region_index in enumerate(vor.point_region):
-        vertices = vor.regions[region_index]
-        if -1 not in vertices:
-            new_regions.append(vertices)
-            continue
-        ridges = all_ridges.get(p1, [])
-        new_region = [v for v in vertices if v != -1]
-        for p2, v1, v2 in ridges:
-            if v2 < 0:
-                v1, v2 = v2, v1
-            if v1 >= 0 and v2 >= 0:
-                continue
-            t = vor.points[p2] - vor.points[p1]
-            norm = np.linalg.norm(t)
-            if norm == 0:
-                continue
-            t /= norm
-            n = np.array([-t[1], t[0]])
-            midpoint = vor.points[[p1, p2]].mean(axis=0)
-            direction = np.sign(np.dot(midpoint - center, n)) * n
-            far_point = vor.vertices[v2] + direction * radius
-            new_region.append(len(new_vertices))
-            new_vertices.append(far_point.tolist())
-        vs = np.asarray([new_vertices[v] for v in new_region])
-        c = vs.mean(axis=0)
-        angles = np.arctan2(vs[:, 1] - c[1], vs[:, 0] - c[0])
-        new_regions.append(np.asarray(new_region)[np.argsort(angles)].tolist())
-    return new_regions, np.asarray(new_vertices)
+    return mesh_voronoi_finite_polygons_2d(vor, radius=radius)
 
 
 def _clipped_voronoi_areas(x: np.ndarray, y: np.ndarray, xlim: Tuple[float, float], ylim: Tuple[float, float]) -> np.ndarray:
     try:
-        from scipy.spatial import QhullError, Voronoi
-    except Exception as e:
-        raise ImportError("make_interp_2d as_density requires scipy.spatial.Voronoi for irregular support.") from e
-    try:
-        from shapely.geometry import Polygon, box
-    except Exception as e:
-        raise ImportError("make_interp_2d as_density requires shapely for clipped irregular Voronoi areas.") from e
-
-    pts = np.column_stack([x, y])
-    if pts.shape[0] < 4:
-        raise ValueError("make_interp_2d as_density requires at least four unique 2D support points for Voronoi areas.")
-    if np.linalg.matrix_rank(pts - pts.mean(axis=0)) < 2:
-        raise ValueError("make_interp_2d as_density requires non-collinear 2D support points.")
-    try:
-        vor = Voronoi(pts)
-    except QhullError as e:
-        raise ValueError(f"make_interp_2d failed to construct Voronoi areas: {e}") from e
-    regions, vertices = _voronoi_finite_polygons_2d(vor, radius=max(xlim[1] - xlim[0], ylim[1] - ylim[0]) * 4)
-    bbox = box(float(xlim[0]), float(ylim[0]), float(xlim[1]), float(ylim[1]))
-    areas = np.zeros(len(regions), dtype=float)
-    for idx, region in enumerate(regions):
-        if len(region) < 3:
-            continue
-        poly = Polygon(vertices[region])
-        if not poly.is_valid:
-            poly = poly.buffer(0)
-        clipped = poly.intersection(bbox)
-        areas[idx] = float(clipped.area) if not clipped.is_empty else 0.0
-    if not np.all(np.isfinite(areas)) or np.any(areas <= 0):
-        raise ValueError("make_interp_2d as_density produced invalid support-cell areas.")
-    return areas
+        return clipped_voronoi_cells(x, y, xlim, ylim).areas
+    except ImportError as e:
+        msg = str(e)
+        if "scipy" in msg:
+            raise ImportError("make_interp_2d as_density requires scipy.spatial.Voronoi for irregular support.") from e
+        if "shapely" in msg:
+            raise ImportError("make_interp_2d as_density requires shapely for clipped irregular Voronoi areas.") from e
+        raise
+    except ValueError as e:
+        pts = np.column_stack([x, y])
+        if pts.shape[0] < 4:
+            raise ValueError("make_interp_2d as_density requires at least four unique 2D support points for Voronoi areas.") from e
+        if np.linalg.matrix_rank(pts - pts.mean(axis=0)) < 2:
+            raise ValueError("make_interp_2d as_density requires non-collinear 2D support points.") from e
+        msg = str(e)
+        if "failed to construct" in msg:
+            raise ValueError(f"make_interp_2d failed to construct Voronoi areas: {e}") from e
+        if "invalid" in msg or "non-positive" in msg:
+            raise ValueError("make_interp_2d as_density produced invalid support-cell areas.") from e
+        raise
 
 
 def _support_areas(x_phys: np.ndarray, y_phys: np.ndarray, xlim: Tuple[float, float], ylim: Tuple[float, float]) -> Tuple[np.ndarray, str]:
-    areas = _regular_support_areas(x_phys, y_phys, xlim, ylim)
-    if areas is not None:
-        return areas, "regular_grid"
-    return _clipped_voronoi_areas(x_phys, y_phys, xlim, ylim), "clipped_voronoi"
+    try:
+        cells = mesh_support_areas(x_phys, y_phys, xlim, ylim)
+        return cells.areas, cells.method
+    except ImportError as e:
+        msg = str(e)
+        if "scipy" in msg:
+            raise ImportError("make_interp_2d as_density requires scipy.spatial.Voronoi for irregular support.") from e
+        if "shapely" in msg:
+            raise ImportError("make_interp_2d as_density requires shapely for clipped irregular Voronoi areas.") from e
+        raise
+    except ValueError as e:
+        pts = np.column_stack([x_phys, y_phys])
+        if pts.shape[0] < 4:
+            raise ValueError("make_interp_2d as_density requires at least four unique 2D support points for Voronoi areas.") from e
+        if np.linalg.matrix_rank(pts - pts.mean(axis=0)) < 2:
+            raise ValueError("make_interp_2d as_density requires non-collinear 2D support points.") from e
+        msg = str(e)
+        if "failed to construct" in msg:
+            raise ValueError(f"make_interp_2d failed to construct Voronoi areas: {e}") from e
+        if "invalid" in msg or "non-positive" in msg:
+            raise ValueError("make_interp_2d as_density produced invalid support-cell areas.") from e
+        raise
 
 
 def _grid_integral(Z: np.ndarray, x_values: np.ndarray, y_values: np.ndarray) -> float:

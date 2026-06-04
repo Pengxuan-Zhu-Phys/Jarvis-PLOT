@@ -18,6 +18,7 @@ The ordered `transform` list supports these steps:
 - `profile`
 - `make_density_core`
 - `make_interp_2d`
+- `posterior_density`
 - `sortby`
 - `add_column`
 - `keep_columns`
@@ -120,16 +121,14 @@ Canonical form:
 ```yaml
 transform:
   - make_density_core:
-      method: bridson
-      coordinates:
-        x: {expr: x, name: x, lim: [0, 5], scale: linear}
-        y: {expr: y, name: y, lim: [0, 5], scale: linear}
-        weight: {expr: exp(logL), name: mass}
-      normalize: true
+      x: {expr: x, lim: [0, 5]}
+      y: {expr: y, lim: [0, 5]}
+      weight: {expr: exp(logL)}
+      bins: 100
 ```
 
-The runtime also accepts `type: make_density_core` for compatibility, but new
-YAML should use the nested form above.
+The default method is `bridson`. The runtime also accepts the old
+`coordinates:` block plus `type: make_density_core` for compatibility.
 
 ### `make_interp_2d`
 
@@ -158,6 +157,35 @@ transform:
 The runtime also accepts `type: make_interp_2d` for compatibility, but new YAML
 should use the nested form above.
 
+### `posterior_density`
+
+Raw samples to regular posterior density grid. This is the compact path for the
+common `make_density_core -> make_interp_2d` workflow.
+
+Supported methods:
+
+- `voronoi`: Bridson support reconstruction followed by natural-neighbor
+  interpolation.
+- `adaptive`: `voronoi` plus posterior mesh refinement.
+- `grid`: regular histogram mass assignment converted directly to density.
+- `kde`: weighted Gaussian KDE converted directly to density.
+
+Canonical form:
+
+```yaml
+transform:
+  - posterior_density:
+      x: {expr: x, lim: [0, 5]}
+      y: {expr: y, lim: [0, 5]}
+      weight: {expr: exp(logL)}
+      bins: 100
+      grid: 300
+```
+
+The output table contains `x`, `y`, and `density` by default. Set
+`output: posterior_pdf` to rename the density column. The runtime also accepts
+`type: posterior_density`.
+
 ## Runtime Scope Notes
 
 - Dataset-level transforms run in `data_loader_runtime.py`.
@@ -168,5 +196,5 @@ should use the nested form above.
   preprocessor runtime path.
 - Polars pushdown currently covers `filter`, `sortby`, `add_column`,
   `keep_columns`, `drop_columns`, and export steps where the backend supports
-  them. `profile`, `make_density_core`, and `make_interp_2d` force the pandas
-  transform path.
+  them. `profile`, `make_density_core`, `make_interp_2d`, and
+  `posterior_density` force the pandas transform path.

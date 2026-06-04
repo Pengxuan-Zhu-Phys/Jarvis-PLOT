@@ -161,6 +161,16 @@ class DataPreprocessor:
             return step
         return {}
 
+    def _posterior_density_transform_config(self, step: Any) -> Mapping[str, Any]:
+        if not isinstance(step, Mapping):
+            return {}
+        if "posterior_density" in step:
+            cfg = step.get("posterior_density")
+            return cfg if isinstance(cfg, Mapping) else {}
+        if str(step.get("type", "")).strip().lower() == "posterior_density":
+            return step
+        return {}
+
     def _density_cell_cfg_input_columns(self, cfg: Any) -> List[str]:
         out: set[str] = set()
         if not isinstance(cfg, Mapping):
@@ -198,17 +208,35 @@ class DataPreprocessor:
         coors = cfg.get("coordinates", {})
         if not isinstance(coors, Mapping):
             coors = {}
+        output = cfg.get("output", {})
+        if not isinstance(output, Mapping):
+            output = {}
 
         def _name(key: str, default: str) -> str:
-            spec = coors.get(key, cfg.get(key, None))
-            if isinstance(spec, Mapping):
-                value = spec.get("name", default)
+            if output.get(key) is not None:
+                value = output.get(key, default)
             else:
-                value = default
+                spec = coors.get(key, cfg.get(key, None))
+                if isinstance(spec, Mapping):
+                    value = spec.get("name", default)
+                else:
+                    value = default
             text = str(value).strip()
             return text or default
 
         return sorted({_name("x", "x"), _name("y", "y"), _name("weight", "weight")})
+
+    def _posterior_density_cfg_output_columns(self, cfg: Any) -> List[str]:
+        if not isinstance(cfg, Mapping):
+            cfg = {}
+        output = cfg.get("output", "density")
+        if isinstance(output, Mapping):
+            x_name = str(output.get("x", "x")).strip() or "x"
+            y_name = str(output.get("y", "y")).strip() or "y"
+            z_name = str(output.get("z", output.get("density", "density"))).strip() or "density"
+            return sorted({x_name, y_name, z_name})
+        text = str(output).strip()
+        return sorted({"x", "y", text or "density"})
 
     def _interp_2d_transform_config(self, step: Any) -> Mapping[str, Any]:
         if not isinstance(step, Mapping):
@@ -256,13 +284,21 @@ class DataPreprocessor:
         coors = cfg.get("coordinates", {})
         if not isinstance(coors, Mapping):
             coors = {}
+        output = cfg.get("output", {})
+        if not isinstance(output, Mapping):
+            output = {}
 
         def _name(key: str, default: str) -> str:
-            spec = coors.get(key, cfg.get(key, None))
-            if isinstance(spec, Mapping):
-                value = spec.get("name", default)
+            if key == "z" and cfg.get("output_z") is not None:
+                value = cfg.get("output_z", default)
+            elif output.get(key) is not None:
+                value = output.get(key, default)
             else:
-                value = default
+                spec = coors.get(key, cfg.get(key, None))
+                if isinstance(spec, Mapping):
+                    value = spec.get("name", default)
+                else:
+                    value = default
             text = str(value).strip()
             return text or default
 
@@ -288,6 +324,9 @@ class DataPreprocessor:
             dcfg = self._density_cell_transform_config(step)
             if dcfg:
                 out.update(self._density_cell_cfg_input_columns(dcfg))
+            pcfg = self._posterior_density_transform_config(step)
+            if pcfg:
+                out.update(self._density_cell_cfg_input_columns(pcfg))
             icfg = self._interp_2d_transform_config(step)
             if icfg:
                 out.update(self._interp_2d_cfg_input_columns(icfg))
@@ -328,6 +367,9 @@ class DataPreprocessor:
             dcfg = self._density_cell_transform_config(step)
             if dcfg:
                 out.update(self._density_cell_cfg_output_columns(dcfg))
+            pcfg = self._posterior_density_transform_config(step)
+            if pcfg:
+                out.update(self._posterior_density_cfg_output_columns(pcfg))
             icfg = self._interp_2d_transform_config(step)
             if icfg:
                 out.update(self._interp_2d_cfg_output_columns(icfg))

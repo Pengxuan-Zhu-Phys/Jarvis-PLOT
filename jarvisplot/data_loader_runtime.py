@@ -146,6 +146,11 @@ def apply_dataset_transform(dataset, stage: str = "dataset") -> None:
         is_interp_2d_transform,
         make_interp_2d,
     )
+    from .Figure.posterior_density_runtime import (
+        is_posterior_density_transform,
+        posterior_density,
+        posterior_density_config,
+    )
     from .Figure.profile_runtime import profiling
 
     push_mode = str(os.getenv("JP_DATASET_POLARS_TRANSFORM", "auto")).strip().lower()
@@ -192,7 +197,13 @@ def apply_dataset_transform(dataset, stage: str = "dataset") -> None:
         elif "profile" in trans:
             df = profiling(df, trans["profile"], dataset.logger)
         elif is_density_cell_transform(trans):
-            df = density_cell(df, density_cell_config(trans), dataset.logger)
+            cfg = dict(density_cell_config(trans))
+            cfg.setdefault("_base_dir", getattr(dataset, "rootpath", None))
+            df = density_cell(df, cfg, dataset.logger)
+        elif is_posterior_density_transform(trans):
+            cfg = dict(posterior_density_config(trans))
+            cfg.setdefault("_base_dir", getattr(dataset, "rootpath", None))
+            df = posterior_density(df, cfg, dataset.logger)
         elif is_interp_2d_transform(trans):
             df = make_interp_2d(df, interp_2d_config(trans), dataset.logger)
         elif "sortby" in trans:
@@ -402,10 +413,12 @@ def _apply_dataset_transform_polars(
             elif (
                 "profile" in trans
                 or "make_density_core" in trans
+                or "posterior_density" in trans
                 or "make_interp_2d" in trans
                 or str(trans.get("type", "")).strip().lower()
                 in {
                     "make_density_core",
+                    "posterior_density",
                     "make_interp_2d",
                 }
             ):

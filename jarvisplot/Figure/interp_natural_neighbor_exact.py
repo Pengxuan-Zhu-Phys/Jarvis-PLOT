@@ -844,7 +844,9 @@ class NaturalNeighborExactInterpolator:
         skip_exact_hit: bool = False,
         skip_hull_check: bool = False,
     ) -> float:
-        assert self._coords is not None and self._values is not None
+        if self._coords is None or self._values is None or self._tree is None:
+            self.diagnostics.degenerate_queries += 1
+            return np.nan
 
         q = np.asarray(q, dtype=float).reshape(2)
 
