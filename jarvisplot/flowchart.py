@@ -276,13 +276,20 @@ class FlowchartRenderer:
         from shapely.geometry import Point, box
         from shapely.ops import unary_union
         x, y = item["pos"] 
-        circle1 = Point(x-0.15, y).buffer(0.15, resolution=128)
-        circle2 = Point(x+0.15, y).buffer(0.15, resolution=128)
+
+        def point_buffer(point, radius, segments=128):
+            try:
+                return point.buffer(radius, quad_segs=segments)
+            except TypeError:
+                return point.buffer(radius, resolution=segments)
+
+        circle1 = point_buffer(Point(x-0.15, y), 0.15)
+        circle2 = point_buffer(Point(x+0.15, y), 0.15)
         square = box(x - 0.15, y - 0.15, x + 0.15, y + 0.15)
         merged = unary_union([circle1, circle2, square])
         xx, yy = merged.exterior.xy
         ax.fill(xx, yy, alpha=0.95, edgecolor="#F9F9F8", facecolor="#00D86B", linewidth=0.1, zorder=120)
-        circle3 = Point(x-0.15, y).buffer(0.12, resolution=128)
+        circle3 = point_buffer(Point(x-0.15, y), 0.12)
         xx, yy = circle3.exterior.xy
         ax.fill(xx, yy, alpha=0.95, edgecolor="#FFFFFF", facecolor="#F9F9F8", linewidth=0.8, zorder=120)
         import matplotlib.patheffects as pe

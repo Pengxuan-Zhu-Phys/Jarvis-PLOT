@@ -394,6 +394,8 @@ def collect_and_attach_colorbar(
     if not axc._cb.get("used"):
         frame = getattr(fig, "frame", {})
         color_cfg = axc_color_config(frame, cb_name)
+        if color_cfg.get("cmap") is None and style.get("cmap") is not None:
+            color_cfg["cmap"] = style.get("cmap")
         data_range = collect_layer_color_range(
             df,
             coor,
