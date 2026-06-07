@@ -224,6 +224,41 @@ def test_figure_set_alias_removed():
     assert not hasattr(Figure, "set")
 
 
+def test_layer_clip_expr_builds_data_space_clip_path():
+    _, raw_ax = plt.subplots()
+    raw_ax.set_xlim(0.0, 10.0)
+    raw_ax.set_ylim(0.0, 10.0)
+    ax = SimpleNamespace(ax=raw_ax)
+    style = {"clip_expr": "x >= 2 * y", "cmap": "viridis"}
+
+    clip_path = layer_runtime_mod._layer_clip_path_from_style(ax, style)
+
+    assert "clip_expr" not in style
+    assert style["cmap"] == "viridis"
+    assert len(clip_path.vertices) >= 3
+    assert all(px >= 2 * py - 1e-10 for px, py in clip_path.vertices)
+    plt.close(raw_ax.figure)
+
+
+def test_layer_clip_is_temporary_on_adapter_and_raw_axes():
+    raw_ax = SimpleNamespace(_clip_path="raw-original")
+    adapter = SimpleNamespace(ax=raw_ax, _clip_path="adapter-original")
+    clip_path = object()
+    observed = {}
+
+    def draw():
+        observed["adapter"] = adapter._clip_path
+        observed["raw"] = raw_ax._clip_path
+        return "drawn"
+
+    out = layer_runtime_mod._call_with_layer_clip(adapter, clip_path, draw)
+
+    assert out == "drawn"
+    assert observed == {"adapter": clip_path, "raw": clip_path}
+    assert adapter._clip_path == "adapter-original"
+    assert raw_ax._clip_path == "raw-original"
+
+
 def test_colorbar_contract_uses_frame_color_config():
     class DummyColorbarAxis:
         def __init__(self):
@@ -257,6 +292,106 @@ def test_colorbar_contract_uses_frame_color_config():
     assert fig.axc._cb["mode"] == "log"
     assert fig.axc._cb["vmin"] == 1.0
     assert fig.axc._cb["vmax"] == 10.0
+
+
+def test_colorbar_contract_falls_back_to_layer_cmap_when_frame_omits_cmap():
+    class DummyColorbarAxis:
+        def __init__(self):
+            self._cb = {
+                "cmap": None,
+                "vmin": None,
+                "vmax": None,
+                "norm": None,
+                "levels": None,
+                "used": False,
+            }
+
+    fig = SimpleNamespace(
+        axes={"axc": DummyColorbarAxis()},
+        frame={"axc": {"color": {"scale": "linear"}}},
+        logger=_logger(),
+    )
+
+    out = collect_and_attach_colorbar(
+        fig,
+        style={"cmap": "jarvis_rainbow2_r"},
+        coor={"z": {"expr": "z"}},
+        method_key="voronoi",
+        df=pd.DataFrame({"z": [1, 2, 5]}),
+    )
+
+    assert out["cmap"] == "jarvis_rainbow2_r"
+    assert fig.axes["axc"]._cb["cmap"] == "jarvis_rainbow2_r"
+
+
+def test_prescan_colorbar_uses_layer_cmap_when_frame_omits_cmap():
+    class DummyColorbarAxis:
+        def __init__(self):
+            self._cb = {
+                "cmap": None,
+                "vmin": None,
+                "vmax": None,
+                "norm": None,
+                "levels": None,
+                "used": False,
+            }
+
+    fig = Figure()
+    fig.logger = _logger()
+    fig.frame = {"axc": {"color": {"scale": "linear"}}}
+    fig.axes = {"axc": DummyColorbarAxis()}
+    layer = {
+        "name": "colored_voronoi",
+        "method": "voronoi",
+        "style": {"cmap": "jarvis_rainbow2_r"},
+        "coor": {"z": {"expr": "z"}},
+        "colorbar": "axc",
+        "data": pd.DataFrame({"z": [1, 2, 5]}),
+        "data_loaded": True,
+        "layer_spec": {},
+        "source_refs": [],
+        "share_name": None,
+    }
+    fig._render_queue = [(None, layer)]
+
+    fig._prescan_colorbar_ranges()
+
+    assert fig.axes["axc"]._cb["cmap"] == "jarvis_rainbow2_r"
+
+
+def test_prescan_colorbar_frame_cmap_overrides_layer_cmap():
+    class DummyColorbarAxis:
+        def __init__(self):
+            self._cb = {
+                "cmap": None,
+                "vmin": None,
+                "vmax": None,
+                "norm": None,
+                "levels": None,
+                "used": False,
+            }
+
+    fig = Figure()
+    fig.logger = _logger()
+    fig.frame = {"axc": {"color": {"scale": "linear", "cmap": "viridis"}}}
+    fig.axes = {"axc": DummyColorbarAxis()}
+    layer = {
+        "name": "colored_voronoi",
+        "method": "voronoi",
+        "style": {"cmap": "jarvis_rainbow2_r"},
+        "coor": {"z": {"expr": "z"}},
+        "colorbar": "axc",
+        "data": pd.DataFrame({"z": [1, 2, 5]}),
+        "data_loaded": True,
+        "layer_spec": {},
+        "source_refs": [],
+        "share_name": None,
+    }
+    fig._render_queue = [(None, layer)]
+
+    fig._prescan_colorbar_ranges()
+
+    assert fig.axes["axc"]._cb["cmap"] == "viridis"
 
 
 def test_colorbar_attachment_skips_plain_scatter_without_color_channel():

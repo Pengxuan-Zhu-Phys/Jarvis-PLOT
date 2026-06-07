@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from matplotlib.path import Path as MplPath
 
 from .preprocessor_runtime import add_column, filter_df, sort_by
 from .profile_runtime import profiling
@@ -14,6 +15,117 @@ from .colorbar_runtime import collect_and_attach_colorbar
 from .interp_natural_neighbor import resolve_backend
 from .dynesty_runtime import render_dynesty_runplot
 from .posterior_hpd import prepare_hpd_contour_style
+
+_MISSING_CLIP_PATH = object()
+
+
+def _clip_expr_inside(expr: str, point) -> bool:
+    px, py = float(point[0]), float(point[1])
+    env = {
+        "x": px,
+        "y": py,
+        "np": np,
+        "numpy": np,
+        "abs": abs,
+        "min": min,
+        "max": max,
+    }
+    try:
+        return bool(eval(expr, {"__builtins__": {}}, env))
+    except Exception as exc:
+        raise ValueError(f"layer clip_expr failed for {expr!r}: {exc}") from exc
+
+
+def _clip_polygon_to_expr(poly, expr: str, *, iterations: int = 48):
+    """Clip a polygon to the region where expr is True in data coordinates."""
+    expr = str(expr or "").strip()
+    if not expr or not poly:
+        return poly
+
+    def inside(pt) -> bool:
+        return _clip_expr_inside(expr, pt)
+
+    def intersect(a, b):
+        pa = np.asarray(a, dtype=float)
+        pb = np.asarray(b, dtype=float)
+        a_inside = inside(pa)
+        lo = pa
+        hi = pb
+        for _ in range(iterations):
+            mid = 0.5 * (lo + hi)
+            if inside(mid) == a_inside:
+                lo = mid
+            else:
+                hi = mid
+        return tuple(0.5 * (lo + hi))
+
+    out = []
+    start = poly[-1]
+    start_inside = inside(start)
+    for end in poly:
+        end_inside = inside(end)
+        if end_inside:
+            if not start_inside:
+                out.append(intersect(start, end))
+            out.append(end)
+        elif start_inside:
+            out.append(intersect(start, end))
+        start = end
+        start_inside = end_inside
+    return out
+
+
+def _layer_clip_path_from_style(ax, style: dict):
+    expr = style.pop("clip_expr", style.pop("clip_where", None))
+    if expr is None:
+        return None
+    raw_ax = getattr(ax, "ax", ax)
+    try:
+        x0, x1 = raw_ax.get_xlim()
+        y0, y1 = raw_ax.get_ylim()
+    except Exception as exc:
+        raise ValueError("layer clip_expr requires axes with data limits") from exc
+
+    xmin, xmax = sorted((float(x0), float(x1)))
+    ymin, ymax = sorted((float(y0), float(y1)))
+    rect = [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
+    clipped = _clip_polygon_to_expr(rect, str(expr))
+    if len(clipped) < 3:
+        return MplPath([(xmin, ymin), (xmin, ymin)], [MplPath.MOVETO, MplPath.CLOSEPOLY])
+
+    vertices = list(clipped) + [tuple(clipped[0])]
+    codes = [MplPath.MOVETO] + [MplPath.LINETO] * (len(clipped) - 1) + [MplPath.CLOSEPOLY]
+    return MplPath(vertices, codes)
+
+
+def _layer_clip_targets(ax):
+    raw_ax = getattr(ax, "ax", None)
+    targets = []
+    for obj in (ax, raw_ax):
+        if obj is not None and not any(obj is prev for prev in targets):
+            targets.append(obj)
+    return targets
+
+
+def _call_with_layer_clip(ax, clip_path, func, *args, **kwargs):
+    if clip_path is None:
+        return func(*args, **kwargs)
+
+    states = []
+    for target in _layer_clip_targets(ax):
+        states.append((target, getattr(target, "_clip_path", _MISSING_CLIP_PATH)))
+        target._clip_path = clip_path
+    try:
+        return func(*args, **kwargs)
+    finally:
+        for target, previous in reversed(states):
+            if previous is _MISSING_CLIP_PATH:
+                try:
+                    delattr(target, "_clip_path")
+                except Exception:
+                    pass
+            else:
+                target._clip_path = previous
 
 
 def _resolve_csv_export_path(fig, target):
@@ -664,6 +776,7 @@ def render_layer(fig, ax, layer_info):
             pass
     if layer_info.get("style", {}) is not None:
         style.update(layer_info.get("style", {}))
+    layer_clip_path = _layer_clip_path_from_style(ax, style)
 
     cb_name = layer_info.get("colorbar", "axc")
 
@@ -696,8 +809,8 @@ def render_layer(fig, ax, layer_info):
                 required_keys=("z",),
                 include_diagnostics=method_key in {"jpcontour", "jpcontourf"},
             )
-            return method(**jp_kwargs)
-        return method(**style)
+            return _call_with_layer_clip(ax, layer_clip_path, method, **jp_kwargs)
+        return _call_with_layer_clip(ax, layer_clip_path, method, **style)
 
     elif getattr(ax, "_type", None) == "rect":
         df = fig._ensure_pandas_data(layer_info["data"], reason=f"render:{layer_info.get('name', '')}")
@@ -724,7 +837,7 @@ def render_layer(fig, ax, layer_info):
                 for kk, vv in coor.items():
                     style[kk] = fig._eval_series(df, vv)
 
-            return method(**style)
+            return _call_with_layer_clip(ax, layer_clip_path, method, **style)
         if method_key in {"jpcontour", "jpcontourf", "jpfield"}:
             jp_kwargs = _prepare_jpcontour_style(
                 fig,
@@ -737,7 +850,7 @@ def render_layer(fig, ax, layer_info):
                 required_keys=("x", "y", "z"),
                 include_diagnostics=method_key in {"jpcontour", "jpcontourf"},
             )
-            return method(**jp_kwargs)
+            return _call_with_layer_clip(ax, layer_clip_path, method, **jp_kwargs)
         if method_key in {"contour", "contourf"}:
             contour_coor = {}
             for kk in ("x", "y", "z"):
@@ -759,7 +872,7 @@ def render_layer(fig, ax, layer_info):
             contour_args, style = _prepare_contour_args(fig, ax.ax if hasattr(ax, "ax") else ax, method_key, style, contour_coor, df=df)
             if contour_args is None:
                 return []
-            return method(*contour_args, **style)
+            return _call_with_layer_clip(ax, layer_clip_path, method, *contour_args, **style)
         else:
             if not ({"x", "y"} <= set(coor.keys())):
                 raise ValueError("Rectangular layer must define coordinates: {x,y} with exprs.")
@@ -777,7 +890,7 @@ def render_layer(fig, ax, layer_info):
             if method_key == "pcolormesh":
                 style["__df__"] = df
             style.pop("interp", None)
-            return method(**style)
+            return _call_with_layer_clip(ax, layer_clip_path, method, **style)
 
     else:
         raise ValueError(f"Axes '{ax}' has unknown _type='{getattr(ax, '_type', None)}'.")

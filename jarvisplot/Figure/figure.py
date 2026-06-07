@@ -711,6 +711,7 @@ class Figure:
         read-only during the main render loop.
         """
         cb_ranges: dict[str, list] = {}
+        cb_style_cmaps: dict[str, object] = {}
 
         for ax, ly in self._render_queue:
             cb_name = ly.get("colorbar", "axc")
@@ -723,6 +724,9 @@ class Figure:
 
             if not layer_uses_color(style, coor, method_key):
                 continue
+
+            if style.get("cmap") is not None:
+                cb_style_cmaps.setdefault(cb_name, style.get("cmap"))
 
             # Load data (pipeline cache hit on second call in render loop)
             runtime_load_layer_runtime_data(self, ly)
@@ -742,6 +746,8 @@ class Figure:
             if axc_obj is None or not hasattr(axc_obj, "_cb"):
                 continue
             color_cfg = axc_color_config(self.frame, cb_name)
+            if color_cfg.get("cmap") is None and cb_name in cb_style_cmaps:
+                color_cfg["cmap"] = cb_style_cmaps[cb_name]
             axc_obj._cb.update(
                 precompute_colorbar_cb(color_cfg, ranges, logger=self.logger)
             )
