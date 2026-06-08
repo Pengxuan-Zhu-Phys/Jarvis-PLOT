@@ -124,6 +124,23 @@
                     "va":"center"
                 }
             }
+        },
+        "axlogo": {
+            "file": "&JP/jarvisplot/cards/icons/gambit_small.png",
+            "text": [
+                {
+                    "x": 0.0,
+                    "y": -0.5,
+                    "s": "GAMBIT 2.7",
+                    "ha": "left",
+                    "va": "bottom",
+                    "color": "black",
+                    "fontfamily": "Fira code",
+                    "fontsize": 5.0,
+                    "fontstyle": "normal",
+                    "fontweight": "normal"
+                }
+            ]
         }
     },
     "Style": {
