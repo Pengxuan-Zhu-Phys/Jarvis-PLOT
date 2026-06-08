@@ -1,0 +1,30 @@
+# Design-reference debug example  --  style [a4paper_2x1, TernaryCmap]
+#
+#   Run:    jplot a4paper_2x1_TernaryCmap.yaml
+#   Shows:  the axes layout of this style card -- every axis box with its
+#           rect [left, bottom, width, height] and width/height in cm, the
+#           figure size, margins and colorbar gap -- drawn by `debug: true`.
+#
+# The figure has no data layers on purpose: this is a pure layout reference.
+
+version: "0.3"
+
+project:
+  name: design_a4paper_2x1_TernaryCmap
+
+Functions: []
+DataSet: []
+
+Figures:
+  - name: a4paper_2x1_TernaryCmap
+    debug: true                      # draw the design-reference dimension overlay
+    style: [a4paper_2x1, TernaryCmap]
+    frame:
+      axtri: {labels: {left: "A", bottom: "B", right: "C"}}
+      axc: {label: {ylabel: "$z$"}}
+    layers: []                       # empty -- layout reference only
+
+output:
+  dir: ./plots
+  dpi: 150
+  formats: [png]

@@ -13,6 +13,7 @@ from .adapters_ternary import TernaryAxesAdapter
 from .method_registry import resolve_callable
 from .style_runtime import resolve_style_bundle_payload
 from .config_runtime import apply_figure_config
+from .design_runtime import draw_design_reference
 from .layer_runtime import (
     load_layer_runtime_data as runtime_load_layer_runtime_data,
     release_layer_runtime_data as runtime_release_layer_runtime_data,
@@ -975,16 +976,8 @@ class Figure:
     def plot(self):
         self.render()
         # for layer in self.layers:
-        if self.debug: 
-            if "axtri" in self.axes.keys():
-                # Demo of Scatter Clip
-                x = np.linspace(-1, 2, 121)
-                y = np.linspace(-1, 2, 121)
-                X, Y = np.meshgrid(x, y)
-                self.axtri.scatter(x=X.ravel() + 0.5 *  Y.ravel(), y=Y.ravel(), marker='.', s=1, facecolor="#0277BA", edgecolor="None")
-
-                # Demo of Plot Clip 
-                self.axtri.plot(x=[-1, 0.5, 0.5, 2], y=[-1.1, 0.6, 0.3, 1.8], linestyle="-", color="#0277BA")
+        if self.debug:
+            draw_design_reference(self)
         self.savefig()
         import matplotlib.pyplot as plt
         plt.close(self.fig)
