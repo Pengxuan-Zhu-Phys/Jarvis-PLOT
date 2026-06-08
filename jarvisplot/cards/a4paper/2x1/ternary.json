@@ -124,6 +124,9 @@
                     "va":"center"
                 }
             }
+        },
+        "axlogo": {
+            "file": "&JP/jarvisplot/cards/icons/jarvisHEP.png"
         }
     },
     "Style": {
