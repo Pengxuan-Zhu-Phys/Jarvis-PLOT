@@ -795,13 +795,12 @@ class Figure:
             self.ax.set_ylim(ylim)
 
                     
-        from matplotlib.ticker import AutoMinorLocator, MaxNLocator, AutoLocator
+        from matplotlib.ticker import AutoMinorLocator
         if self.frame['ax'].get("yscale", "").lower() == 'log':
             self.ax.set_yscale("log")
             from matplotlib.ticker import LogLocator
             self.ax.yaxis.set_minor_locator(LogLocator(subs='auto'))
         else:
-            self.ax.yaxis.set_major_locator(MaxNLocator(nbins=5, min_n_ticks=4))
             self.ax.yaxis.set_minor_locator(AutoMinorLocator())
         
         if self.frame['ax'].get("xscale", "").lower() == 'log':
@@ -809,7 +808,6 @@ class Figure:
             from matplotlib.ticker import LogLocator
             self.ax.xaxis.set_minor_locator(LogLocator(subs='auto'))
         else:
-            self.ax.xaxis.set_major_locator(MaxNLocator(nbins=5, min_n_ticks=4))
             self.ax.xaxis.set_minor_locator(AutoMinorLocator())
         
 

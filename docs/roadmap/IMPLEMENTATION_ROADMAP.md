@@ -103,6 +103,24 @@ The following implementation items are now in place in the current tree:
 - smoke tests cover style fallback, colorbar wiring, profile cache reuse, and template JSON parsing.
 - docs status labels are checked for consistency, including archive placement for historical notes.
 
+## 3.1 Agent Data API Backlog
+
+Contract: `docs/specs/AGENT_DATA_API.md` (spec only). Consumer: Jarvis-Agent milestone M4.6
+(`Jarvis-Agent/docs/PLOT_TOOLS.md`). All verbs are additive flags on `jplot`; the human YAML
+surface does not change.
+
+### P1 - agent channel core
+
+- [ ] JP-A1: JSON envelope helper + `--version-json` + `--validate --json` (jsonschema is already a dependency; diagnostics `{level, path, message}`).
+- [ ] JP-A2: `--describe --json` wrapping `jarvisplot/data_loader_summary.py` (columns, dtypes, ranges/quantiles, HDF5 tree).
+- [ ] JP-A3: `--analyze` headless channel + `likelihood_report` reducer — profile cells via `profile_runtime`, posterior mass via `make_density_core`, HPD thresholds via `posterior_hpd`; NEW: connected-region extraction over cell adjacency; artifacts `cells.parquet` / 1D curves / optional `regions.geojson`; digest budget rules per spec §4.2. Includes `summary_stats`, `top_points`, `interval_report`.
+
+### P2 - agent channel extensions
+
+- [ ] JP-A4: `--template` catalog + slot schemas (`source_hint` contract) shared with packaged cards and `docs/templates/`.
+- [ ] JP-A5: `--render-json` machine-readable render outcome + `--with-data` per-layer parquet sidecars (reuse `to_parquet`).
+- [ ] `compare_report` reducer (two-run region overlap / interval deltas) — extend spec before implementation.
+
 ## 4. Refactor Rules of Thumb
 
 Use these constraints when turning the backlog into code:
