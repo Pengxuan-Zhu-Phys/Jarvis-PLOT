@@ -180,3 +180,33 @@ def test_flowchart_synthesizes_missing_bridge_for_cross_layer_file_input():
         and edge["target"]["node"] == "file::SecondModule::input::second_input"
         for edge in graph.edges
     )
+
+
+def test_flowchart_uses_triangle_for_file_output_variables():
+    scene = {
+        "schema": "jarvisplot.scene/v1",
+        "scene_type": "flowchart",
+        "layers": [{"id": "layer_1", "index": 1, "nodes": ["Calc", "file::Calc::output::result", "var::result"]}],
+        "nodes": [
+            {"id": "Calc", "kind": "module", "label": "Calc", "layer": "layer_1"},
+            {"id": "file::Calc::output::result", "kind": "file", "role": "output_file", "label": "result", "layer": "layer_1"},
+            {"id": "var::result", "kind": "variable", "role": "observable", "label": "result", "layer": "layer_1"},
+        ],
+        "edges": [
+            {"source": {"node": "Calc", "port": "result"}, "target": {"node": "file::Calc::output::result", "port": "in"}, "role": "fileflow"},
+            {"source": {"node": "file::Calc::output::result", "port": "out"}, "target": {"node": "var::result", "port": "in"}, "role": "fileflow"},
+        ],
+    }
+
+    graph = _ClassicGraph(scene, {"classic": {}})
+    graph.layout()
+
+    assert graph.variables["var::result"]["marker_style"] == "<"
+    assert graph.variables["var::result"]["marker_dx"] == 0.04
+    assert graph.anchor("var::result", "in", "fileflow") == (
+        graph.variables["var::result"]["pos"][0]
+        - graph.variables["var::result"]["width"]
+        - 0.1
+        + 0.04,
+        graph.variables["var::result"]["pos"][1],
+    )

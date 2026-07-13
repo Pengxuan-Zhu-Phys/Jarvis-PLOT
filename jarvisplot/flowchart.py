@@ -259,8 +259,9 @@ class FlowchartRenderer:
             ha = "right"
             text_x = x
             marker_x = x - item.get("width", 0.42) - 0.1
+        marker_x += float(item.get("marker_dx", 0.0))
         ax.text(text_x, y, label, ha=ha, va="center", fontfamily="monospace", fontsize=6.4, fontweight="bold", color="#111111", zorder=115)
-        marker = "s" if item["node"].get("role") == "parameter" else "o"
+        marker = item.get("marker_style") or ("s" if item["node"].get("role") == "parameter" else "o")
         ax.plot(marker_x, y, marker, markersize=3.4, color="#3B4DC0", alpha=1.0, zorder=118)
         item["marker"] = (marker_x, y)
 
@@ -588,7 +589,7 @@ class _ClassicGraph:
             item = self.variables[node_id]
             x, y = item["pos"]
             width = item.get("width", 0.35)
-            marker = (x - width - 0.1, y)
+            marker = (x - width - 0.1 + float(item.get("marker_dx", 0.0)), y)
             if direction == "in":
                 return marker
             return (x + 0.12, y)
@@ -733,7 +734,28 @@ class _ClassicGraph:
             "pos": (x, y),
             "align": align,
             "width": max(0.28, len(label) * 0.095),
+            # A file's named output is a file handle, not an observable.
+            # Render it as a triangular endpoint so it is distinguishable
+            # from the circular observable endpoints.
+            "marker_style": "<" if self._is_file_output_variable(node_id) else None,
+            "marker_dx": 0.04 if self._is_file_output_variable(node_id) else 0.0,
         }
+
+    def _is_file_output_variable(self, variable_id: str) -> bool:
+        variable = self.nodes.get(variable_id, {})
+        variable_name = str(variable.get("label") or variable_id.removeprefix("var::"))
+        for edge in self.edges:
+            source_id = str(edge.get("source", {}).get("node", ""))
+            source = self.nodes.get(source_id, {})
+            if (
+                str(edge.get("role", "")).lower() == "fileflow"
+                and str(edge.get("target", {}).get("node", "")) == variable_id
+                and source.get("kind") == "file"
+                and source.get("role") == "output_file"
+                and str(source.get("label") or source_id.rsplit("::", 1)[-1]) == variable_name
+            ):
+                return True
+        return False
 
     def _compute_bounds(self, max_height: float) -> None:
         xs: list[float] = []
