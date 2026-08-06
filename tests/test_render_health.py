@@ -94,3 +94,78 @@ def test_viz_008_collapsed_cloud():
         ]
     )
     assert any(d.code == "JP-VIZ-008" for d in bag.warnings)
+
+
+def test_viz_004_colorbar_saturation():
+    bag = evaluate_health(
+        [
+            LayerObservation(
+                figure="f1",
+                layer="dens",
+                method="pcolormesh",
+                n_points=100,
+                c_min=0.0,
+                c_max=12.0,
+                colorbar_vmin=0.0,
+                colorbar_vmax=0.8,
+            )
+        ]
+    )
+    assert any(d.code == "JP-VIZ-004" for d in bag.errors)
+
+
+def test_viz_006_occlusion_by_mesh():
+    bag = evaluate_health(
+        [
+            LayerObservation(
+                figure="f1",
+                layer="pts",
+                axes="ax",
+                method="scatter",
+                n_points=50,
+                zorder=1,
+                data_bbox=(1.0, 2.0, 1.0, 2.0),
+            ),
+            LayerObservation(
+                figure="f1",
+                layer="mesh",
+                axes="ax",
+                method="pcolormesh",
+                n_points=200,
+                zorder=10,
+                data_bbox=(0.0, 5.0, 0.0, 5.0),
+            ),
+        ]
+    )
+    assert any(d.code == "JP-VIZ-006" for d in bag.warnings)
+
+
+def test_viz_007_grid_nan():
+    bag = evaluate_health(
+        [
+            LayerObservation(
+                figure="f1",
+                layer="field",
+                method="jpfield",
+                n_points=100,
+                grid_nan_ratio=0.9,
+            )
+        ]
+    )
+    assert any(d.code == "JP-VIZ-007" for d in bag.errors)
+
+
+def test_viz_009_legend_mismatch():
+    bag = evaluate_health(
+        [
+            LayerObservation(
+                figure="f1",
+                layer="pts",
+                method="scatter",
+                n_points=10,
+                style_label="signal",
+                legend_labels=["background"],
+            )
+        ]
+    )
+    assert any(d.code == "JP-VIZ-009" for d in bag.warnings)

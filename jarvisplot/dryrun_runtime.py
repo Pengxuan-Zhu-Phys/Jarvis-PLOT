@@ -19,7 +19,12 @@ from .utils.pathing import resolve_project_path
 __all__ = ["dryrun_config", "dryrun_file"]
 
 
-def dryrun_file(path: str) -> tuple[dict[str, Any], DiagnosticBag]:
+def dryrun_file(
+    path: str,
+    *,
+    with_data: bool = False,
+    out_dir: str | None = None,
+) -> tuple[dict[str, Any], DiagnosticBag]:
     import yaml
 
     resolved = os.path.abspath(os.path.expanduser(str(path)))
@@ -33,7 +38,12 @@ def dryrun_file(path: str) -> tuple[dict[str, Any], DiagnosticBag]:
         return {"file": resolved, "ok": False}, bag
     with open(resolved, "r", encoding="utf-8") as handle:
         config = yaml.safe_load(handle)
-    report, bag = dryrun_config(config, base_dir=os.path.dirname(resolved))
+    report, bag = dryrun_config(
+        config,
+        base_dir=os.path.dirname(resolved),
+        with_data=with_data,
+        out_dir=out_dir,
+    )
     report["file"] = resolved
     return report, bag
 
@@ -42,6 +52,8 @@ def dryrun_config(
     config: Any,
     *,
     base_dir: str | None = None,
+    with_data: bool = False,
+    out_dir: str | None = None,
 ) -> tuple[dict[str, Any], DiagnosticBag]:
     bag = DiagnosticBag()
     if not isinstance(config, dict):
@@ -50,6 +62,15 @@ def dryrun_config(
 
     datasets_meta, frames = _load_datasets(config, base_dir=base_dir, bag=bag)
     observations: list[LayerObservation] = []
+    twins: dict[str, Any] = {}
+
+    twin_root = None
+    if with_data:
+        twin_root = Path(
+            out_dir
+            or os.path.join(base_dir or ".", ".cache", "agent_twins")
+        )
+        twin_root.mkdir(parents=True, exist_ok=True)
 
     for figure_index, figure in enumerate(config.get("Figures") or ()):
         if not isinstance(figure, dict):
@@ -68,19 +89,25 @@ def dryrun_config(
         for layer_index, layer in enumerate(figure.get("layers") or ()):
             if not isinstance(layer, dict):
                 continue
-            obs = _observe_layer(
+            obs, twin_meta = _observe_layer(
                 figure_name=fig_name,
                 layer=layer,
                 layer_index=layer_index,
                 frames=frames,
                 frame_cfg=frame,
                 bag=bag,
+                with_data=with_data,
+                twin_root=twin_root,
             )
             if obs is not None:
                 observations.append(obs)
+            if twin_meta:
+                twins[f"{fig_name}/{obs.layer if obs else layer_index}"] = twin_meta
 
     evaluate_health(observations, bag=bag)
-    report = report_to_dict(observations, diagnostics=bag, datasets=datasets_meta)
+    report = report_to_dict(
+        observations, diagnostics=bag, datasets=datasets_meta, twins=twins
+    )
     report["ok"] = bag.ok
     return report, bag
 
@@ -159,17 +186,22 @@ def _observe_layer(
     frames: dict[str, Any],
     frame_cfg: dict[str, Any],
     bag: DiagnosticBag,
-) -> LayerObservation | None:
+    with_data: bool = False,
+    twin_root: Path | None = None,
+) -> tuple[LayerObservation | None, dict[str, Any] | None]:
     layer_name = str(layer.get("name") or f"layer_{layer_index}")
     method = str(layer.get("method") or "")
     data_blocks = layer.get("data") or []
     if not isinstance(data_blocks, list) or not data_blocks:
-        return LayerObservation(
-            figure=figure_name,
-            layer=layer_name,
-            method=method,
-            n_points=0,
-            notes=["no data blocks"],
+        return (
+            LayerObservation(
+                figure=figure_name,
+                layer=layer_name,
+                method=method,
+                n_points=0,
+                notes=["no data blocks"],
+            ),
+            None,
         )
 
     # Use the first data block (primary series); multi-source layers get a note.
@@ -178,13 +210,16 @@ def _observe_layer(
     if isinstance(source, list):
         source = source[0] if source else None
     if not isinstance(source, str) or source not in frames:
-        return LayerObservation(
-            figure=figure_name,
-            layer=layer_name,
-            method=method,
-            source=str(source or ""),
-            n_points=0,
-            notes=[f"source {source!r} not loaded"],
+        return (
+            LayerObservation(
+                figure=figure_name,
+                layer=layer_name,
+                method=method,
+                source=str(source or ""),
+                n_points=0,
+                notes=[f"source {source!r} not loaded"],
+            ),
+            None,
         )
 
     df = frames[source]
@@ -194,13 +229,18 @@ def _observe_layer(
     if isinstance(transform, list) and transform:
         df, steps = _apply_simple_transforms(df, transform)
 
-    # coordinate samples for bbox
+    # coordinate samples for bbox + colour channel
     n_points = int(len(df))
     finite_ratio = 1.0
     nan_ratio = 0.0
     data_bbox = None
+    c_min = c_max = None
+    grid_nan_ratio = None
+    twin_cols: dict[str, Any] = {}
     coords = layer.get("coordinates") if isinstance(layer.get("coordinates"), dict) else {}
     x_vals, y_vals = _eval_xy(df, coords)
+    z_vals = _eval_axis(df, coords, "z")
+    c_vals = _eval_axis(df, coords, "c")
     if x_vals is not None and y_vals is not None and len(x_vals) and len(y_vals):
         import numpy as np
 
@@ -220,6 +260,26 @@ def _observe_layer(
                 float(yf.min()),
                 float(yf.max()),
             )
+        twin_cols["x"] = x
+        twin_cols["y"] = y
+
+    for name, arr in (("z", z_vals), ("c", c_vals)):
+        if arr is None:
+            continue
+        import numpy as np
+
+        a = np.asarray(arr, dtype=float).reshape(-1)
+        twin_cols[name] = a
+        finite = np.isfinite(a)
+        if name == "z" and a.size:
+            grid_nan_ratio = float(1.0 - finite.mean())
+        if name in {"c", "z"} and finite.any():
+            lo, hi = float(a[finite].min()), float(a[finite].max())
+            if c_min is None:
+                c_min, c_max = lo, hi
+            else:
+                c_min = min(c_min, lo)
+                c_max = max(c_max, hi)
 
     axes_name = str(layer.get("axes") or "ax")
     ax_frame = frame_cfg.get(axes_name) if isinstance(frame_cfg.get(axes_name), dict) else {}
@@ -228,22 +288,57 @@ def _observe_layer(
         xlim = ax_frame.get("xlim")
         ylim = ax_frame.get("ylim")
         if isinstance(xlim, (list, tuple)) and isinstance(ylim, (list, tuple)):
-            axes_lim = {"x": [float(xlim[0]), float(xlim[1])], "y": [float(ylim[0]), float(ylim[1])]}
+            axes_lim = {
+                "x": [float(xlim[0]), float(xlim[1])],
+                "y": [float(ylim[0]), float(ylim[1])],
+            }
     xscale = str(ax_frame.get("xscale") or "linear")
     yscale = str(ax_frame.get("yscale") or "linear")
-    zorder = 0.0
-    style = layer.get("style")
-    if isinstance(style, dict) and "zorder" in style:
-        try:
-            zorder = float(style["zorder"])
-        except Exception:
-            pass
 
-    return LayerObservation(
+    # colorbar limits from frame.axc / named colorbar axes
+    cb_name = str(layer.get("colorbar") or "axc")
+    cb_frame = frame_cfg.get(cb_name) if isinstance(frame_cfg.get(cb_name), dict) else {}
+    color_cfg = {}
+    if isinstance(cb_frame, dict):
+        color_cfg = cb_frame.get("color") if isinstance(cb_frame.get("color"), dict) else {}
+    cb_vmin = _as_float(color_cfg.get("vmin"))
+    cb_vmax = _as_float(color_cfg.get("vmax"))
+
+    zorder = 0.0
+    style_label = None
+    style = layer.get("style")
+    if isinstance(style, dict):
+        if "zorder" in style:
+            try:
+                zorder = float(style["zorder"])
+            except Exception:
+                pass
+        if "label" in style and style["label"] is not None:
+            style_label = str(style["label"])
+
+    legend_labels = None
+    if isinstance(ax_frame, dict) and isinstance(ax_frame.get("legend"), dict):
+        leg = ax_frame["legend"]
+        if "labels" in leg:
+            raw = leg.get("labels")
+            if isinstance(raw, list):
+                legend_labels = [str(x) for x in raw]
+            elif raw is None:
+                legend_labels = []
+
+    twin_path = None
+    twin_meta = None
+    if with_data and twin_root is not None and twin_cols:
+        twin_path, twin_meta = _write_twin(
+            twin_root, figure_name, layer_name, twin_cols, n_points=n_points
+        )
+
+    obs = LayerObservation(
         figure=figure_name,
         layer=layer_name,
         method=method,
         source=source,
+        axes=axes_name,
         n_points=n_points,
         finite_ratio=finite_ratio,
         nan_ratio=nan_ratio,
@@ -252,8 +347,17 @@ def _observe_layer(
         xscale=xscale,
         yscale=yscale,
         zorder=zorder,
+        c_min=c_min,
+        c_max=c_max,
+        colorbar_vmin=cb_vmin,
+        colorbar_vmax=cb_vmax,
+        grid_nan_ratio=grid_nan_ratio,
+        style_label=style_label,
+        legend_labels=legend_labels,
         steps=steps,
+        twin_path=twin_path,
     )
+    return obs, twin_meta
 
 
 def _apply_simple_transforms(
@@ -345,26 +449,74 @@ def _apply_simple_transforms(
     return work, steps
 
 
-def _eval_xy(df, coordinates: Mapping[str, Any]):
+def _eval_axis(df, coordinates: Mapping[str, Any], name: str):
     from .utils.expression import eval_dataframe_expression
 
-    def _axis(name: str):
-        if name not in coordinates:
-            # ternary aliases
-            return None
-        spec = coordinates[name]
-        expr = spec.get("expr") if isinstance(spec, Mapping) else spec
-        if expr is None:
-            return None
-        try:
-            return eval_dataframe_expression(df, expr)
-        except Exception:
-            return None
+    if name not in coordinates:
+        return None
+    spec = coordinates[name]
+    expr = spec.get("expr") if isinstance(spec, Mapping) else spec
+    if expr is None:
+        return None
+    try:
+        return eval_dataframe_expression(df, expr)
+    except Exception:
+        return None
 
-    x = _axis("x")
-    y = _axis("y")
+
+def _eval_xy(df, coordinates: Mapping[str, Any]):
+    x = _eval_axis(df, coordinates, "x")
+    y = _eval_axis(df, coordinates, "y")
     if x is None and "left" in coordinates:
-        x = _axis("left")
+        x = _eval_axis(df, coordinates, "left")
     if y is None and "right" in coordinates:
-        y = _axis("right")
+        y = _eval_axis(df, coordinates, "right")
     return x, y
+
+
+def _as_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except Exception:
+        return None
+
+
+def _write_twin(
+    twin_root: Path,
+    figure: str,
+    layer: str,
+    columns: dict[str, Any],
+    *,
+    n_points: int,
+) -> tuple[str, dict[str, Any]]:
+    import numpy as np
+    import pandas as pd
+
+    safe_fig = "".join(c if c.isalnum() or c in "-_" else "_" for c in figure)
+    safe_ly = "".join(c if c.isalnum() or c in "-_" else "_" for c in layer)
+    # Prefer parquet when an engine is available; else CSV (still a numeric twin).
+    base = twin_root / f"{safe_fig}__{safe_ly}"
+    lengths = [np.asarray(v).reshape(-1).size for v in columns.values()]
+    n = min(lengths) if lengths else 0
+    frame = {k: np.asarray(v).reshape(-1)[:n] for k, v in columns.items()}
+    df = pd.DataFrame(frame)
+    fmt = "parquet"
+    path = base.with_suffix(".parquet")
+    try:
+        df.to_parquet(path, index=False)
+    except Exception:
+        fmt = "csv"
+        path = base.with_suffix(".csv")
+        df.to_csv(path, index=False)
+    meta = {
+        "path": str(path),
+        "format": fmt,
+        "figure": figure,
+        "layer": layer,
+        "rows": int(n),
+        "n_points": int(n_points),
+        "columns": list(frame.keys()),
+    }
+    return str(path), meta
