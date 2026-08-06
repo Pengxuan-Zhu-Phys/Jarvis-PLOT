@@ -33,6 +33,14 @@
             "ax4": { "rect": [0.195, 0.110, 0.790, 0.174] }
         },
         "ax0": {
+            "title_params": {
+                "position": "top",
+                "fontsize": "small",
+                "fontfamily": "Fira code",
+                "fontweight": "normal",
+                "clip_on": false,
+                "zorder": 1000
+            },
             "frame": {
                 "linewidth": 0.8,
                 "solid_capstyle": "projecting",

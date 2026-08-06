@@ -1,19 +1,48 @@
-#!/usr/bin/env python3 
-
 #!/usr/bin/env python3
+"""Session-level shared-value support for the YAML figure pipeline.
+
+This module is intentionally a **support layer**, not a runtime owner of
+transforms, layout, or rendering.
+
+Lifecycle contract
+------------------
+``SharedContent`` / ``DataContext`` provide:
+
+1. **Lazy registry** — ``register(name, compute_fn, release_fn=None)`` binds a
+   name to a factory.  Dataset sources and named ``share_data`` values use this.
+2. **Cached store** — ``get(name)`` returns a cached value or computes once via
+   the registry and stores the result.  Missing names return ``None``.
+3. **Usage plan** — ``set_usage_plan({name: count})`` records how many times a
+   tracked source is expected to be consumed across figures/layers.  Planning
+   lives in ``core_runtime.prepare_usage_plan``; this module only stores counts.
+4. **Consume** — ``consume(name)`` decrements a tracked count.  When the count
+   reaches zero the **cached value** is invalidated (and ``release_fn`` runs if
+   present).  The **registry entry remains**, so a later accidental ``get`` can
+   recompute rather than hard-fail.  Untracked names are no-ops for ``consume``.
+5. **Invalidate** — drops the cached value and calls ``release_fn`` when a
+   value was present.  Does not remove registry factories.
+
+Boundary rules
+--------------
+- Do not put transform execution, column planning, or render dispatch here.
+- ``share_data`` persistence and cache identity stay in ``preprocessor`` /
+  ``layer_runtime``; this module only holds the in-session values and counters.
+- Figures should talk to ``DataContext``, not reach into ``SharedContent``
+  internals.
+"""
+
 from __future__ import annotations
-from typing import Any, Callable, Dict, Optional
+
+from typing import Any, Callable, Dict, Mapping, Optional
 import threading
 
+
 class SharedContent:
+    """Session-level shared storage (lazy compute, usage counts, invalidation).
+
+    Support API only — see module docstring for the lifecycle contract.
     """
-    Session-level variable shared storage for all Figures (supports lazy evaluation and updates).
-    - register(name, compute_fn): Register a lazy evaluation function.
-    - get(name): Return cached value if available; otherwise, compute using compute_fn and cache the result.
-    - update(name, value): Explicitly write or overwrite a value.
-    - invalidate(name=None): Invalidate a specific entry or all entries.
-    - stats(): Diagnostic information.
-    """
+
     def __init__(self, seed: Optional[int] = None, logger: Any = None):
         self._logger = logger
         self._seed = seed
@@ -23,13 +52,13 @@ class SharedContent:
         self._remaining_uses: Dict[str, int] = {}
         self._lock = threading.RLock()
 
-    # ---- 懒计算接口 ----
     def register(
         self,
         name: str,
         compute_fn: Callable[[SharedContent], Any],
         release_fn: Optional[Callable[[], None]] = None,
     ) -> None:
+        """Register a lazy factory.  Does not compute immediately."""
         with self._lock:
             self._registry[name] = compute_fn
             if release_fn is not None:
@@ -38,6 +67,7 @@ class SharedContent:
                 self._logger.debug(f"SharedContent: register -> {name}")
 
     def get(self, name: str) -> Any:
+        """Return cached value, or compute via registry once, or ``None``."""
         with self._lock:
             if name in self._store:
                 return self._store[name]
@@ -52,6 +82,7 @@ class SharedContent:
             return None
 
     def update(self, name: str, value: Any, release_fn: Optional[Callable[[], None]] = None) -> None:
+        """Write or overwrite a cached value without requiring a registry entry."""
         with self._lock:
             self._store[name] = value
             if release_fn is not None:
@@ -59,29 +90,53 @@ class SharedContent:
             if self._logger:
                 self._logger.debug(f"SharedContent: update -> {name}")
 
+    def has_cached(self, name: str) -> bool:
+        """Return True when a value is currently resident in the store."""
+        with self._lock:
+            return str(name) in self._store
+
+    def is_registered(self, name: str) -> bool:
+        """Return True when a lazy factory is registered for ``name``."""
+        with self._lock:
+            return str(name) in self._registry
+
+    def is_tracked(self, name: str) -> bool:
+        """Return True when ``name`` appears in the usage plan."""
+        with self._lock:
+            return str(name) in self._remaining_uses
+
     def invalidate(self, name: Optional[str] = None) -> None:
+        """Drop cached value(s) and run release hooks for values that were present.
+
+        Registry factories are kept so a later ``get`` can recompute.  Usage-plan
+        counters are not modified here.
+        """
         with self._lock:
             if name is None:
-                for key, release_fn in list(self._release_registry.items()):
-                    try:
-                        release_fn()
-                    except Exception:
-                        pass
+                for key in list(self._store.keys()):
+                    self._release_cached_locked(key)
                 self._store.clear()
                 if self._logger:
                     self._logger.debug("SharedContent: invalidate ALL")
             else:
-                self._store.pop(name, None)
-                release_fn = self._release_registry.get(name)
-                if release_fn is not None:
-                    try:
-                        release_fn()
-                    except Exception:
-                        pass
+                key = str(name)
+                if key in self._store:
+                    self._release_cached_locked(key)
+                    self._store.pop(key, None)
                 if self._logger:
-                    self._logger.debug(f"SharedContent: invalidate -> {name}")
+                    self._logger.debug(f"SharedContent: invalidate -> {key}")
 
-    def set_usage_plan(self, counts: Dict[str, int]) -> None:
+    def _release_cached_locked(self, key: str) -> None:
+        release_fn = self._release_registry.get(key)
+        if release_fn is None:
+            return
+        try:
+            release_fn()
+        except Exception:
+            pass
+
+    def set_usage_plan(self, counts: Mapping[str, int]) -> None:
+        """Replace the session usage plan.  Counts must be non-negative integers."""
         with self._lock:
             self._remaining_uses = {}
             for name, count in counts.items():
@@ -99,10 +154,16 @@ class SharedContent:
                 )
 
     def remaining_uses(self, name: str) -> int:
+        """Return remaining planned uses, or 0 when untracked."""
         with self._lock:
             return int(self._remaining_uses.get(str(name), 0))
 
     def consume(self, name: str, amount: int = 1) -> int:
+        """Decrement a tracked usage count; invalidate cache at zero remaining.
+
+        Untracked names return 0 and do not touch the store.  When remaining hits
+        zero, only the **cached value** is released — the registry factory stays.
+        """
         key = str(name)
         with self._lock:
             if key not in self._remaining_uses:
@@ -115,11 +176,13 @@ class SharedContent:
             self._remaining_uses[key] = remain
             if self._logger:
                 self._logger.debug(f"SharedContent: consume -> {key}, remain={remain}")
-        if remain == 0:
+            should_release = remain == 0 and key in self._store
+        if should_release:
             self.invalidate(key)
         return remain
 
     def stats(self) -> Dict[str, int]:
+        """Diagnostic counters for logs and tests."""
         with self._lock:
             return {
                 "cached": len(self._store),
@@ -127,11 +190,14 @@ class SharedContent:
                 "tracked": len(self._remaining_uses),
             }
 
+
 class DataContext:
+    """Figure-facing facade over :class:`SharedContent`.
+
+    Isolates figure/layer code from the session store implementation.  Does not
+    own planning, transforms, or rendering.
     """
-    Inject it into the facade of each Figure to isolate the Figure from the core implementation.
-    Figures use it to get, update, register, and invalidate shared content.
-    """
+
     def __init__(self, shared: SharedContent):
         self._shared = shared
 
@@ -152,7 +218,16 @@ class DataContext:
     def invalidate(self, name: Optional[str] = None) -> None:
         self._shared.invalidate(name)
 
-    def set_usage_plan(self, counts: Dict[str, int]) -> None:
+    def has_cached(self, name: str) -> bool:
+        return self._shared.has_cached(name)
+
+    def is_registered(self, name: str) -> bool:
+        return self._shared.is_registered(name)
+
+    def is_tracked(self, name: str) -> bool:
+        return self._shared.is_tracked(name)
+
+    def set_usage_plan(self, counts: Mapping[str, int]) -> None:
         self._shared.set_usage_plan(counts)
 
     def remaining_uses(self, name: str) -> int:

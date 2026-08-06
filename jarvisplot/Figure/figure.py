@@ -22,6 +22,7 @@ from .layer_runtime import (
 from .layout_runtime import (
     apply_axis_endpoints,
     apply_auto_ticks,
+    apply_axis_title,
     apply_manual_ticks,
     ensure_numbered_rect_axes,
     has_manual_ticks,
@@ -819,6 +820,8 @@ class Figure:
                     self.ax.text(**txt, transform=self.ax.transAxes)
                 else:
                     self.ax.text(**txt)
+
+        apply_axis_title(self, self.ax, "ax")
 
 
 

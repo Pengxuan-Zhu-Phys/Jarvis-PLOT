@@ -45,6 +45,14 @@
             }
         },
         "ax": {
+            "title_params": {
+                "position": "top",
+                "fontsize": "small",
+                "fontfamily": "Fira code",
+                "fontweight": "normal",
+                "clip_on": false,
+                "zorder": 1000
+            },
             "frame": {
                 "linewidth": 0.8,
                 "solid_capstyle": "projecting",
@@ -123,12 +131,12 @@
                 {
                     "x": 1.0, 
                     "y": 0.9, 
-                    "s": "  Powered by",
+                    "s": "       Powered by",
                     "ha":   "left",
                     "va":   "top", 
                     "color":    "black",
                     "fontfamily":   "Fira code",
-                    "fontsize":     "xx-small",
+                    "fontsize":     4,
                     "fontstyle":    "normal",
                     "fontweight":   "normal"
                 }

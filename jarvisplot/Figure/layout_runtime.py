@@ -10,6 +10,57 @@ def is_numbered_ax(name: str) -> bool:
     return isinstance(name, str) and re.fullmatch(r"ax\d+", name) is not None
 
 
+_TITLE_POSITION_PARAMS = {
+    # `top` is the historical top-left placement used by the cards.
+    "top": {"x": 0.005, "y": 1.0, "ha": "left", "va": "bottom"},
+    "center": {"x": 0.5, "y": 1.0, "ha": "center", "va": "bottom"},
+    "right": {"x": 0.995, "y": 1.0, "ha": "right", "va": "bottom"},
+}
+
+
+def apply_axis_title(fig, ax_obj, ax_name: str) -> None:
+    """Render the configured title, with numbered-panel ownership rules."""
+    axis_cfg = fig.frame.get(ax_name, {})
+    if not isinstance(axis_cfg, dict) or "title" not in axis_cfg:
+        return
+
+    if is_numbered_ax(ax_name) and ax_name != "ax0":
+        if getattr(fig, "logger", None):
+            fig.logger.warning(
+                f"Ignoring title for axes '{ax_name}': title rendering is only supported on 'ax0'."
+            )
+        return
+
+    title = axis_cfg.get("title")
+    if title is None or str(title) == "":
+        return
+
+    title_params = dict(axis_cfg.get("title_params") or {})
+    position = str(title_params.pop("position", "top")).strip().lower()
+    if position not in _TITLE_POSITION_PARAMS:
+        if getattr(fig, "logger", None):
+            fig.logger.warning(
+                f"Unknown title position '{position}' for axes '{ax_name}'; using 'top'."
+            )
+        position = "top"
+
+    legacy_position_params = [key for key in ("x", "y", "ha", "va") if key in title_params]
+    if legacy_position_params and getattr(fig, "logger", None):
+        fig.logger.warning(
+            f"Ignoring title_params {legacy_position_params} for axes '{ax_name}'; use position instead."
+        )
+    for key in ("x", "y", "ha", "va"):
+        title_params.pop(key, None)
+
+    text_params = dict(_TITLE_POSITION_PARAMS[position])
+    text_params.update(title_params)
+    # The title text is owned by frame.<axis>.title; do not let an
+    # accidental `s` value in title_params override it.
+    text_params.pop("s", None)
+    text_params["transform"] = ax_obj.transAxes
+    ax_obj.text(s=str(title), **text_params)
+
+
 def ensure_numbered_rect_axes(fig, ax_name: str, kwgs: dict):
     if not is_numbered_ax(ax_name):
         raise ValueError(f"Illegal dynamic axes name '{ax_name}'. Only ax<NUMBER> is allowed.")
@@ -60,6 +111,8 @@ def ensure_numbered_rect_axes(fig, ax_name: str, kwgs: dict):
             else:
                 ax_obj.text(**txt)
 
+    apply_axis_title(fig, ax_obj, ax_name)
+
     xlim = fig.frame.get(ax_name, {}).get("xlim")
     if xlim:
         ax_obj.set_xlim(list(map(_safe_cast, xlim)))
@@ -99,8 +152,11 @@ def has_manual_ticks(frame: Mapping[str, Any], ax_key: str, which: str) -> bool:
     try:
         if ax_key == "ax":
             ticks_cfg = frame.get("ax", {}).get("ticks", {})
-        elif ax_key == "axc":
-            ticks_cfg = frame.get("axc", {}).get("ticks", {})
+        elif isinstance(ax_key, str) and ax_key.startswith("axc"):
+            # Colorbars can be named axc, axc2, etc.  Each must read its
+            # own frame node so a later auto-tick pass cannot replace YAML
+            # positions/labels with a Matplotlib formatter.
+            ticks_cfg = frame.get(ax_key, {}).get("ticks", {})
         else:
             return False
         node = ticks_cfg.get(which, {})

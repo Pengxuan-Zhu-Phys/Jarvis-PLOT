@@ -142,10 +142,26 @@ class FlowchartRenderer:
         """
         self._validate_scene()
 
-        os.environ.setdefault("MPLCONFIGDIR", os.path.join(tempfile.gettempdir(), "jarvisplot-mplconfig"))
-        os.environ.setdefault("XDG_CACHE_HOME", os.path.join(tempfile.gettempdir(), "jarvisplot-cache"))
+        # Persistent cache under ~/.cache so Agg does not rebuild the font
+        # cache on every Jarvis2 run (tempdir-based MPLCONFIGDIR was wiped often).
+        _cache_root = os.path.join(os.path.expanduser("~"), ".cache", "jarvisplot")
+        os.environ.setdefault("MPLCONFIGDIR", os.path.join(_cache_root, "mplconfig"))
+        os.environ.setdefault("XDG_CACHE_HOME", os.path.join(_cache_root, "xdg"))
         os.makedirs(os.environ["MPLCONFIGDIR"], exist_ok=True)
         os.makedirs(os.environ["XDG_CACHE_HOME"], exist_ok=True)
+
+        import logging
+        import warnings
+
+        # Quiet noisy one-shot font-manager chatter (cache build / missing weights).
+        logging.getLogger("matplotlib").setLevel(logging.ERROR)
+        logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
+        warnings.filterwarnings(
+            "ignore",
+            message=r".*findfont:.*",
+            category=UserWarning,
+            module=r"matplotlib(\..*)?",
+        )
 
         import matplotlib
 
@@ -245,7 +261,8 @@ class FlowchartRenderer:
             patch = FancyBboxPatch((x - 0.25, y - 0.24), 0.5, 0.48, boxstyle="round,pad=0.02,rounding_size=0.05", facecolor="#2D9CDB", edgecolor="none", zorder=95)
             ax.add_patch(patch)
         label_dy = float(self.card.get("classic", {}).get("file_label_dy", -0.34))
-        ax.text(x, y + label_dy, item.get("file_label") or item["node"].get("label") or "", ha="center", va="top", fontfamily="sans-serif", fontsize=6.2, fontweight="light", zorder=110)
+        # Use "normal" not "light": many systems have no light weight → findfont noise.
+        ax.text(x, y + label_dy, item.get("file_label") or item["node"].get("label") or "", ha="center", va="top", fontfamily="sans-serif", fontsize=6.2, fontweight="normal", zorder=110)
 
     def _draw_classic_variable(self, ax, item) -> None:
         x, y = item["pos"]
