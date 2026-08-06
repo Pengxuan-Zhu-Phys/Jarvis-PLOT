@@ -1,0 +1,93 @@
+id: workflow
+title: Coding-agent workflow
+summary: Discover columns and vocabulary, write YAML yourself, then validate/dryrun.
+role: how-to
+priority: 10
+see_also: [data-columns, validate, dryrun-viz, cli-map, type-posterior-2d]
+related_cli:
+  - argv: [jplot, data, describe, "<file>", "--json"]
+    why: column-name whitelist from the real file
+  - argv: [jplot, cap, all, "--json"]
+    why: methods/styles/cmaps/funcs whitelist
+  - argv: [jplot, man, transforms, "--json"]
+    why: transform contracts when hand-writing pipelines
+  - argv: [jplot, validate, "<yaml>", "--json"]
+    why: shape + columns gate
+  - argv: [jplot, doctor, "<yaml>", "--json"]
+    why: validate + dryrun + planned agent_output exports
+  - argv: [jplot, "plot.yaml"]
+    why: bare path renders figures AND agent_output JSON (no jplot run)
+live_sources:
+  - verb: data.describe
+    truth: real file columns only
+  - verb: cap.all
+    truth: methods/styles/cmaps/funcs/transforms/types
+human:
+  panels:
+    - kind: overview
+      title: Overview
+      body: |
+        CLI discovers and judges. You write the YAML in your editor.
+        Do not ask the CLI to author plot YAML as the main path.
+    - kind: steps
+      title: Loop
+      items:
+        - "1. jplot data describe <file> --json"
+        - "2. jplot cap / man (methods, transforms, types) --json"
+        - "3. edit plot.yaml (type: first; optional agent_output for digest JSON)"
+        - "4. jplot doctor plot.yaml --json  # plans exports, does not write digest"
+        - "5. jplot plot.yaml  # real pipeline: PNG/PDF + agent_output JSON"
+    - kind: notes
+      title: Agent digest (YAML, not CLI)
+      items:
+        - "Put agent_output on the figure (method: voronoi, max_cells, path: auto)."
+        - "Digest is lossy reference with provenance — not a substitute for doctor/render."
+        - "See docs/dev/AGENT_OUTPUT_YAML_DESIGN.md"
+    - kind: yaml
+      title: Minimal type-first sketch
+      lexer: yaml
+      body: |
+        DataSet:
+          - {name: samples, path: ./samples.csv, type: csv}
+        Figures:
+          - name: posterior
+            type: posterior_2d
+            data: samples
+            x: {expr: m_A}
+            y: {expr: tanb}
+            weight: {expr: exp(LogL)}
+            style: [a4paper_2x1, rectcmap]
+        output:
+          dir: ./plots
+          formats: [png]
+    - kind: notes
+      title: Rules
+      items:
+        - Never invent method, style, or cmap strings — use jplot cap.
+        - Bare path renders: jplot plot.yaml (there is no jplot run).
+        - Optional tools: suggest, config set/expand — not the main author path.
+        - Need layers control: jplot config expand plot.yaml --figure NAME --write
+agent:
+  body_markdown: |
+    ## Full agent playbook
+    1. **Discover** — `data describe` + `cap` subsets.
+    2. **Author** — edit `*.yaml` in the workspace (type macros preferred).
+    3. **Judge** — `validate --json` then `dryrun --json`, or `doctor --json`.
+    4. **Render** — `jplot <file>` only when a figure is required.
+    5. **Learn** — `explain JP-*` or `man diagnostics`.
+  anti_patterns:
+    - Inventing column names without data describe
+    - Inventing cmap/method strings without cap
+    - Using jplot run (does not exist; DR-08 bare path)
+    - Expecting man or config to write the full plot YAML for you
+  examples:
+    - title: type-first posterior
+      yaml: |
+        Figures:
+          - name: p
+            type: posterior_2d
+            data: samples
+            x: {expr: m_A}
+            y: {expr: tanb}
+            weight: {expr: exp(LogL)}
+            style: [a4paper_2x1, rectcmap]

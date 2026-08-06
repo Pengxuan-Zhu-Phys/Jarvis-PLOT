@@ -110,6 +110,10 @@
       "type": "boolean",
       "description": "Draw the design-reference overlay showing every axes box and its dimensions."
     },
+    "agent_output": {
+      "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/agentOutput",
+      "description": "Lossy agent digest export (JSON). Written by `jplot <yaml>`; planned by `jplot doctor`. See `jplot man agent-output`."
+    },
     "legend": {
       "x-jarvis-ignored": "frame.<axes>.legend",
       "description": "Not read here. The renderer only looks for a legend under frame.<axes>.legend."
@@ -119,5 +123,5 @@
     "yaml_path": { "x-jarvis-internal": true }
   },
   "additionalProperties": false,
-  "x-jarvis-example": "- name: EggBox\n  type: posterior_2d\n  style: [a4paper_2x1, rectcmap]\n  data: samples\n  x: {expr: m_A}\n  y: {expr: tanb}\n  weight: {expr: exp(LogL)}"
+  "x-jarvis-example": "- name: EggBox\n  type: posterior_2d\n  style: [a4paper_2x1, rectcmap]\n  data: samples\n  x: {expr: m_A}\n  y: {expr: tanb}\n  weight: {expr: exp(LogL)}\n  agent_output: {method: voronoi, max_cells: 1024, path: auto}"
 }

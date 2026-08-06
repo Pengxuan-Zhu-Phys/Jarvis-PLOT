@@ -1,0 +1,47 @@
+id: layer-method
+title: Layer methods and coordinates
+summary: method + coordinates contracts; live list always from jplot cap methods.
+role: reference
+priority: 40
+see_also: [methods, type-posterior-2d, style-axes, validate]
+related_cli:
+  - argv: [jplot, man, methods, "--json"]
+    why: full list of drawing methods + contracts
+  - argv: [jplot, man, scatter, "--json"]
+    why: example per-method page
+  - argv: [jplot, cap, methods, "--json"]
+    why: legal method strings + coordinate requirements (live)
+  - argv: [jplot, explain, JP-OWN-001, "--json"]
+    why: lim/scale on layer coordinates are ignored
+live_sources:
+  - verb: cap.methods
+    truth: METHOD_DISPATCH + coordinates.required
+human:
+  panels:
+    - kind: overview
+      title: Contracts
+      body: |
+        Each layer needs method + coordinates (and usually data).
+        Never invent method names — pull them from cap methods.
+    - kind: yaml
+      title: Hand-written layer sketch
+      lexer: yaml
+      body: |
+        layers:
+          - name: pts
+            data: [{source: samples}]
+            method: scatter
+            coordinates:
+              x: {expr: m_A}
+              y: {expr: tanb}
+            style: {s: 2, alpha: 0.4}
+    - kind: traps
+      title: Traps
+      items:
+        - layer.coordinates almost only wants expr (and friends for z).
+        - lim / scale / label on layer.coordinates are silently ignored — use frame or type slots.
+        - Contour-like methods often need z; cap methods lists required keys.
+agent:
+  anti_patterns:
+    - Guessing method strings
+    - Putting axis limits only on layer.coordinates

@@ -1,0 +1,53 @@
+id: yaml-root
+title: YAML root shape
+summary: DataSet → Figures → layers/type → output is the stable skeleton.
+role: reference
+priority: 20
+see_also: [type-posterior-2d, layer-method, style-axes, workflow]
+related_cli:
+  - argv: [jplot, validate, "<yaml>", "--json"]
+    why: shape + silent-key diagnostics
+  - argv: [jplot, template, list, "--json"]
+    why: type-first templates
+  - argv: [jplot, man, type-posterior-2d, "--json"]
+    why: primary figure macro
+live_sources:
+  - verb: cap.types
+    truth: known Figures[].type macros
+human:
+  panels:
+    - kind: overview
+      title: Skeleton
+      body: |
+        Keep the pipe: DataSet → Figures → (type | layers) → output.
+        Style cards hold layout/aesthetics; expressions use expr:.
+    - kind: yaml
+      title: Root keys
+      lexer: yaml
+      body: |
+        DataSet:
+          - name: samples
+            path: ./data.csv
+            type: csv
+        Figures:
+          - name: fig1
+            type: posterior_2d   # or hand-written layers:
+            # layers: [...]
+            data: samples
+            style: [a4paper_2x1, rectcmap]
+        output:
+          dir: ./plots
+          formats: [png, pdf]
+    - kind: notes
+      title: Dual figure modes
+      items:
+        - "type: — human default; expands to layers at render."
+        - "layers: — specialist control; same runtime engine."
+        - "Convert: jplot config expand <yaml> --figure NAME --write"
+agent:
+  body_markdown: |
+    Root collections: `DataSet`, `Figures`, `output` (and optional globals).
+    Figure is either a `type:` macro or explicit `layers:`.
+  anti_patterns:
+    - Mixing invented top-level keys that validate ignores silently
+    - Putting lim/scale on layer.coordinates (belong on frame / type slots)

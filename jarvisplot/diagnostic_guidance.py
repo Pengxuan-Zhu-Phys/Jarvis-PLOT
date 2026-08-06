@@ -175,6 +175,63 @@ _GUIDANCE_BY_CODE: dict[str, tuple[str, Optional[str]]] = {
         "Tighten xlim/ylim around the data, or check coordinate units/scale.",
         None,
     ),
+    "JP-VIZ-010": (
+        "dryrun skipped heavy transforms (profile/density/interp). "
+        "status=partial_renderable and renderable=true: config is OK to "
+        "`jplot <file>`; this is not a validation failure.",
+        None,
+    ),
+    # suggest / templates
+    "JP-TPL-000": (
+        "Suggest failed unexpectedly. Check --data, --kind, and column flags.",
+        None,
+    ),
+    "JP-TPL-001": (
+        "Pass an existing --data file path (csv / parquet / hdf5).",
+        None,
+    ),
+    "JP-TPL-002": (
+        "Use a kind from `jplot template list` (e.g. posterior_2d, profile_2d, scatter_2d).",
+        None,
+    ),
+    "JP-TPL-003": (
+        "No columns found — check file type/path with `jplot data describe`.",
+        None,
+    ),
+    "JP-TPL-004": (
+        "Column flag references a missing name. Run `jplot data describe` for legal columns.",
+        None,
+    ),
+    "JP-TPL-005": (
+        "posterior_2d needs --weight 'exp(LogL)' or a LogL/weight column in the data.",
+        "jplot suggest --data samples.csv --kind posterior_2d --weight 'exp(LogL)'",
+    ),
+    "JP-TPL-006": (
+        "profile_2d needs --z <objective_column> (e.g. LogL).",
+        "jplot suggest --data samples.csv --kind profile_2d --z LogL",
+    ),
+    "JP-TPL-007": (
+        "Weight/expr uses unknown columns — fix to match `jplot data describe`.",
+        None,
+    ),
+    # agent_output digests
+    "JP-AGT-001": (
+        "agent_output.max_cells out of range (min 4, hard cap 50000). "
+        "It is a cell budget, not a guaranteed grid.",
+        "agent_output:\n  max_cells: 1024",
+    ),
+    "JP-AGT-002": (
+        "Invalid agent_output field (format/method). v1: format=json, method=voronoi.",
+        "agent_output:\n  format: json\n  method: voronoi\n  max_cells: 1024",
+    ),
+    "JP-AGT-003": (
+        "agent_output path may not be writable; check output.dir permissions.",
+        None,
+    ),
+    "JP-AGT-004": (
+        "Figure needs 2D x/y (type slots or layer coordinates) for agent_output digest.",
+        None,
+    ),
     "JP-VIZ-009": (
         "Align style.label with frame.<axes>.legend labels, or remove the legend block.",
         "frame:\n  ax:\n    legend: {labels: [signal]}",

@@ -5,28 +5,42 @@
 from __future__ import annotations
 
 import argparse
+
+from ..cli_help import RichArgumentParser
 import sys
 from typing import Sequence
 
-from ..agent_io import EXIT_FAILED, EXIT_OK, EXIT_USAGE, emit, envelope, error_payload
+from ..agent_io import EXIT_FAILED, EXIT_OK, EXIT_USAGE, emit, envelope, system_exit_code, error_payload
 from ..templates_catalog import get_template, list_templates, render_template_yaml
 
 __all__ = ["build_parser", "run"]
 
 
 def build_parser(prog: str = "jplot template") -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = RichArgumentParser(
         prog=prog,
         description="List or emit type-first YAML templates with slot schemas.",
+        rich_title="template",
+        rich_usage=f"{prog} list|show <kind> [--json]",
     )
-    sub = parser.add_subparsers(dest="action", required=True)
+    sub = parser.add_subparsers(dest="action", required=True, parser_class=RichArgumentParser)
 
-    list_p = sub.add_parser("list", help="catalog of template kinds")
-    list_p.add_argument("--json", action="store_true")
+    list_p = sub.add_parser(
+        "list",
+        help="catalog of template kinds",
+        rich_title="template list",
+        rich_usage=f"{prog} list [--json]",
+    )
+    list_p.add_argument("--json", action="store_true", help="emit JSON envelope on stdout")
 
-    show_p = sub.add_parser("show", help="emit one template YAML + slots")
+    show_p = sub.add_parser(
+        "show",
+        help="emit one template YAML + slots",
+        rich_title="template show",
+        rich_usage=f"{prog} show <kind> [--yaml-only] [--json]",
+    )
     show_p.add_argument("kind", help="template kind (e.g. posterior_2d)")
-    show_p.add_argument("--json", action="store_true")
+    show_p.add_argument("--json", action="store_true", help="emit JSON envelope on stdout")
     show_p.add_argument(
         "--yaml-only",
         action="store_true",
@@ -40,7 +54,7 @@ def run(argv: Sequence[str], *, prog: str = "jplot template") -> int:
     try:
         args = parser.parse_args(list(argv))
     except SystemExit as exc:
-        return int(exc.code or EXIT_USAGE)
+        return system_exit_code(exc)
 
     as_json = bool(getattr(args, "json", False)) or not sys.stdout.isatty()
     action = args.action

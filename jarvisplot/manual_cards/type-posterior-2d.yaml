@@ -1,0 +1,56 @@
+id: type-posterior-2d
+title: type posterior_2d
+summary: Short macro for 2D weighted posterior density + optional HPD contours.
+role: how-to
+priority: 30
+see_also: [type-profile-2d, layer-method, workflow]
+related_cli:
+  - argv: [jplot, template, show, posterior_2d, "--json"]
+    why: slots + skeleton YAML
+  - argv: [jplot, suggest, "--data", "<file>", "--kind", posterior_2d, "--json"]
+    why: optional draft from columns
+  - argv: [jplot, config, expand, "<yaml>", "--figure", "<name>", "--write"]
+    why: lower to layers for fine-tuning
+  - argv: [jplot, explain, "<yaml>", "--json"]
+    why: print expanded layers without writing
+live_sources:
+  - verb: cap.types
+    truth: posterior_2d is a registered figure type
+human:
+  panels:
+    - kind: overview
+      title: When to use
+      body: |
+        Default for Bayesian / weighted 2D posterior heatmaps.
+        Prefer this over hand-writing posterior_density + pcolormesh + contour.
+    - kind: yaml
+      title: Minimal figure
+      lexer: yaml
+      body: |
+        - name: posterior
+          type: posterior_2d
+          data: samples
+          x: {expr: m_A, lim: [0, 5000], label: "$m_A$"}
+          y: {expr: tanb, lim: [1, 60], scale: log, label: "$\\tan\\beta$"}
+          weight: {expr: exp(LogL)}
+          style: [a4paper_2x1, rectcmap]
+          # optional:
+          # density: {method: voronoi, bins: 200}
+          # hpd: {masses: [0.68, 0.95]}
+          # colorbar: {label: density, cmap: viridis}
+    - kind: notes
+      title: Notes
+      items:
+        - Required slots: data, x, y, weight.
+        - style tokens pick geometry (a4paper_2x1) + cmap family (rectcmap).
+        - Expand to layers when you need extra overlays or method surgery.
+agent:
+  anti_patterns:
+    - Forgetting weight on posterior_2d
+    - Using profile_2d when you mean posterior density
+  examples:
+    - title: with HPD off
+      yaml: |
+        type: posterior_2d
+        hpd: false
+        density: {method: grid}

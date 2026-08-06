@@ -1,0 +1,113 @@
+# Optional prose for live method man pages (jplot man <method>).
+# Contracts always come from cap methods; this file only adds human tips.
+# Keys must match METHOD_DISPATCH names exactly.
+
+scatter:
+  summary: "2D point cloud; optional colour (c) and size (s)."
+  notes:
+    - "Most common overlay / raw-sample method."
+    - "optional c drives colorbar when style/frame provides a cmap path."
+  traps:
+    - "Huge N without downsample → heavy PDF/PNG; filter or subsample first."
+
+plot:
+  summary: "Polyline / curve through (x, y)."
+  notes:
+    - "Use for 1D theory curves and sorted scan tracks."
+  traps:
+    - "Unsorted x yields scribble lines — sort_by transform if needed."
+
+pcolormesh:
+  summary: "Rectilinear mesh colour field; needs x, y, z grids or flat mesh columns."
+  notes:
+    - "Default density/profile colour layer after transforms."
+  traps:
+    - "z missing or wrong shape → empty / crashed mesh; check dryrun after expand."
+
+contour:
+  summary: "Contour lines on a field; requires x, y, z."
+  notes:
+    - "Often used for HPD / iso-likelihood after density transforms."
+  traps:
+    - "Needs a gridded or interpolable z field, not raw scatter-only samples."
+
+contourf:
+  summary: "Filled contours; requires x, y, z."
+  traps:
+    - "Same field requirements as contour."
+
+fill:
+  summary: "Filled polygon / band from (x, y)."
+  notes:
+    - "Common for exclusion regions and theory bands."
+
+fill_between:
+  summary: "Vertical band between two y curves vs x."
+  notes:
+    - "coordinates may need y1/y2 depending on style; check contract optional keys."
+
+voronoi:
+  summary: "Voronoi cell field (often density visualisation)."
+  notes:
+    - "Heavy for large N; prefer type: posterior_2d density path when possible."
+
+voronoif:
+  summary: "Filled Voronoi field."
+  notes:
+    - "Sibling of voronoi with filled faces."
+
+jpfield:
+  summary: "Jarvis field helper over a regular/irregular field."
+  notes:
+    - "Prefer when working with pre-gridded z fields."
+
+jpcontour:
+  summary: "Jarvis contour helper."
+  notes:
+    - "Prefer for density isocontours with JP conventions."
+
+jpcontourf:
+  summary: "Jarvis filled contour helper."
+
+hist:
+  summary: "Histogram; coordinate contract is method-specific (often x or values)."
+  traps:
+    - "Not a substitute for 2D density — use posterior_2d / profile for maps."
+
+errorbar:
+  summary: "Points with error bars."
+  notes:
+    - "Check optional keys for xerr/yerr in the live contract."
+
+imshow:
+  summary: "Image / 2D array display."
+  traps:
+    - "Expects array-like z layout; not raw (x,y) scatter."
+
+dynesty_runplot:
+  summary: "Dynesty nested-sampling run diagnostics panel."
+  notes:
+    - "Specialised; needs dynesty-compatible inputs, not generic CSV columns."
+
+bar:
+  summary: "Vertical bars (x, height)."
+barh:
+  summary: "Horizontal bars (y, width)."
+step:
+  summary: "Step plot through (x, y)."
+quiver:
+  summary: "Vector field arrows."
+tricontour:
+  summary: "Triangulation contour."
+tricontourf:
+  summary: "Filled triangulation contour."
+tripcolor:
+  summary: "Triangulation pseudocolor."
+tripcolor_axes:
+  summary: "Triangulation pseudocolor (axes helper variant)."
+triplot:
+  summary: "Draw triangulation edges."
+pcolor:
+  summary: "Pseudocolor quad mesh (sibling of pcolormesh)."
+fill_betweenx:
+  summary: "Horizontal band between two x curves vs y."

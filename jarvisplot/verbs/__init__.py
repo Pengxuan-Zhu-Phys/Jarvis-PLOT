@@ -37,8 +37,10 @@ VERBS: dict[str, str] = {
     "doctor": "jarvisplot.verbs.doctor:run",
     "template": "jarvisplot.verbs.template:run",
     "suggest": "jarvisplot.verbs.suggest:run",
+    "context": "jarvisplot.verbs.context:run",
     "explain": "jarvisplot.verbs.explain:run",
     "config": "jarvisplot.verbs.config_cmd:run",
+    "man": "jarvisplot.verbs.man:run",
 }
 
 #: Tokens that must never become verbs or silent aliases. Map to a short
@@ -51,6 +53,10 @@ RESERVED_NON_VERBS: dict[str, str] = {
         "'run a scan' with 'render a figure'."
     ),
 }
+
+#: Bare tokens that are not agent verbs but are still legal CLI heads owned by
+#: the render/legacy path (must not be "unknown command").
+LEGACY_COMMANDS: frozenset[str] = frozenset({"flowchart"})
 
 
 def verb_names() -> list[str]:
@@ -80,6 +86,9 @@ def route(argv: Sequence[str], *, prog: str = "jplot") -> tuple[bool, int]:
 
     The reserved token ``run`` is **rejected** (not aliased) so
     ``Jarvis2 plot run scene.yaml`` cannot silently mean render.
+
+    Bare unknown words (e.g. ``jplot whaat``) are rejected with did-you-mean
+    instead of being treated as a missing YAML path.
     """
     tokens = list(argv)
     if not tokens:
@@ -90,8 +99,64 @@ def route(argv: Sequence[str], *, prog: str = "jplot") -> tuple[bool, int]:
         print(f"{prog}: {RESERVED_NON_VERBS[head]}", file=sys.stderr)
         return True, 2
 
-    if not is_verb(head):
+    if is_verb(head):
+        handler = _load(VERBS[head])
+        return True, handler(tokens[1:], prog=f"{prog} {head}")
+
+    # flowchart (and any other legacy head) falls through to core.
+    if head in LEGACY_COMMANDS:
         return False, 0
 
-    handler = _load(VERBS[head])
-    return True, handler(tokens[1:], prog=f"{prog} {head}")
+    if _looks_like_unknown_command(head):
+        from ..diagnostics import did_you_mean
+
+        near = did_you_mean(
+            head, verb_names() + list(RESERVED_NON_VERBS) + sorted(LEGACY_COMMANDS)
+        )
+        hint = f"; did you mean {near[0]!r}?" if near else ""
+        print(
+            f"{prog}: unknown command {head!r}{hint}\n"
+            f"  try `{prog} -h` or `{prog} man --json`",
+            file=sys.stderr,
+        )
+        return True, 2
+
+    return False, 0
+
+
+def _looks_like_unknown_command(token: str) -> bool:
+    """True for bare tokens that are almost certainly not config paths."""
+    from pathlib import Path
+
+    text = str(token).strip()
+    if not text or text in {"-h", "--help", "-v", "--version"}:
+        return False
+    if text.startswith("-"):
+        return False
+    # Path-like → let the render path handle existence errors.
+    if any(sep in text for sep in ("/", "\\")):
+        return False
+    if text.startswith("."):
+        return False
+    lower = text.lower()
+    if any(
+        lower.endswith(ext)
+        for ext in (
+            ".yaml",
+            ".yml",
+            ".json",
+            ".csv",
+            ".parquet",
+            ".h5",
+            ".hdf5",
+            ".hdf",
+        )
+    ):
+        return False
+    try:
+        if Path(text).expanduser().exists():
+            return False
+    except Exception:
+        pass
+    # Single bare word without extension and not on disk → unknown command.
+    return True

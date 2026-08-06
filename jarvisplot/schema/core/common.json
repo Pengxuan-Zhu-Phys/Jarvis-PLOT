@@ -31,6 +31,76 @@
     },
     "scale": {
       "enum": ["linear", "log", "symlog", "logit"]
+    },
+    "agentOutput": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "description": "Lossy agent digest export. Written only by `jplot <yaml>`; `jplot doctor` plans it. See `jplot man agent-output`.",
+      "properties": {
+        "enable": {
+          "type": "boolean",
+          "description": "false disables this export even if the block is present."
+        },
+        "format": {
+          "type": "string",
+          "enum": ["json"],
+          "description": "v1 only supports json."
+        },
+        "method": {
+          "type": "string",
+          "enum": ["voronoi", "bridson"],
+          "description": "Compression backend (bridson is an alias of voronoi partition)."
+        },
+        "path": {
+          "type": "string",
+          "description": "auto → {output.dir}/{figure.name}.agent.json; or a file path."
+        },
+        "max_cells": {
+          "type": "integer",
+          "minimum": 4,
+          "maximum": 50000,
+          "description": "Upper bound on digest cells (budget, not a regular grid guarantee)."
+        },
+        "xbin": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Alias: with ybin sets max_cells = xbin*ybin when max_cells omitted."
+        },
+        "ybin": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Alias: with xbin sets max_cells = xbin*ybin when max_cells omitted."
+        },
+        "seed": {
+          "type": "integer",
+          "description": "RNG seed for reproducible site sampling."
+        },
+        "geometry": {
+          "type": "string",
+          "enum": ["none", "polygon"],
+          "description": "none (default) omits polygon vertices to keep JSON small."
+        },
+        "weight": {
+          "description": "auto | expression | {expr: ...}. auto uses type-macro weight when present."
+        },
+        "include": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Optional global summary blocks: quantiles, top_cells, tails, nan_stats, provenance, categorical."
+        },
+        "strict": {
+          "type": "boolean",
+          "description": "If true, digest failure fails the whole render (default false)."
+        },
+        "_digest_axes": {
+          "type": "object",
+          "x-jarvis-zone": "delegated",
+          "x-jarvis-internal": true,
+          "additionalProperties": true,
+          "description": "Stashed by type expand for digest axes; not user-facing."
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

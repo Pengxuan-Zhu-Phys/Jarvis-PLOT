@@ -58,11 +58,43 @@ def dryrun_config(
     bag = DiagnosticBag()
     if not isinstance(config, dict):
         bag.error("JP-YML-003", "$", f"config root must be a mapping, got {type(config).__name__}")
-        return {"ok": False, "layers": [], "datasets": {}}, bag
+        return {"ok": False, "layers": [], "datasets": {}, "coverage": "failed"}, bag
 
-    datasets_meta, frames = _load_datasets(config, base_dir=base_dir, bag=bag)
+    # Expand type: macros in-memory (same engine as render) so dryrun/doctor are
+    # full coverage, not "structure ok / transforms skipped".
+    from copy import deepcopy
+
+    from .Figure.figure_types import expand_typed_figures
+
+    work = deepcopy(config)
+    expanded_names: list[str] = []
+    try:
+        expanded_names = expand_typed_figures(work, raise_on_error=True)
+    except Exception as exc:
+        bag.error(
+            "JP-VIZ-000",
+            "$.Figures",
+            f"type: expansion failed: {exc}",
+            suggestion=(
+                "Fix type macro fields (x/y/z/weight/data) or run "
+                "`jplot config expand <yaml> --diff` to inspect the expanded layers."
+            ),
+        )
+        return {
+            "ok": False,
+            "layers": [],
+            "datasets": {},
+            "coverage": "failed",
+            "type_expanded": [],
+        }, bag
+
+    datasets_meta, frames = _load_datasets(work, base_dir=base_dir, bag=bag)
     observations: list[LayerObservation] = []
     twins: dict[str, Any] = {}
+    heavy_skipped: list[str] = []
+    # share_data names that were not materialised because their producer
+    # transform is heavy and skipped in dryrun.
+    incomplete_sources: set[str] = set()
 
     twin_root = None
     if with_data:
@@ -72,24 +104,24 @@ def dryrun_config(
         )
         twin_root.mkdir(parents=True, exist_ok=True)
 
-    for figure_index, figure in enumerate(config.get("Figures") or ()):
+    for figure_index, figure in enumerate(work.get("Figures") or ()):
         if not isinstance(figure, dict):
             continue
         fig_name = str(figure.get("name") or f"figure_{figure_index}")
         if "type" in figure:
-            # type: macros expand only on the render path today
-            bag.info(
+            # Unknown type left unexpanded → hard error (not silent skip).
+            bag.error(
                 "JP-VIZ-000",
                 f"$.Figures[{figure_index}]",
-                f"figure {fig_name!r} uses type: {figure.get('type')!r}; "
-                "dryrun skips type expansion (use expanded layers for full ledger)",
+                f"figure {fig_name!r} still has type: {figure.get('type')!r} after expansion",
+                suggestion="Use a known type (jplot cap types) or write layers: by hand.",
             )
             continue
         frame = figure.get("frame") if isinstance(figure.get("frame"), dict) else {}
         for layer_index, layer in enumerate(figure.get("layers") or ()):
             if not isinstance(layer, dict):
                 continue
-            obs, twin_meta = _observe_layer(
+            obs, twin_meta, skipped = _observe_layer(
                 figure_name=fig_name,
                 layer=layer,
                 layer_index=layer_index,
@@ -98,17 +130,65 @@ def dryrun_config(
                 bag=bag,
                 with_data=with_data,
                 twin_root=twin_root,
+                incomplete_sources=incomplete_sources,
             )
+            if skipped:
+                for step_name in skipped:
+                    heavy_skipped.append(f"{fig_name}/{obs.layer if obs else layer_index}:{step_name}")
+                share = layer.get("share_data")
+                if isinstance(share, str) and share.strip():
+                    incomplete_sources.add(share.strip())
             if obs is not None:
                 observations.append(obs)
             if twin_meta:
                 twins[f"{fig_name}/{obs.layer if obs else layer_index}"] = twin_meta
 
     evaluate_health(observations, bag=bag)
+    # Tri-state ok + coverage (partial ≠ failed).
+    if not bag.ok:
+        verdict_ok: bool | None = False
+        coverage = "failed"
+        status = "failed"
+    elif heavy_skipped:
+        # Incomplete dryrun ledger ≠ config failure. Config is expected to render.
+        verdict_ok = None
+        coverage = "partial"
+        status = "partial_renderable"
+        bag.info(
+            "JP-VIZ-010",
+            "$.Figures",
+            f"dryrun skipped {len(heavy_skipped)} heavy transform step(s); "
+            "layer ledgers for density/profile/interp are incomplete "
+            "(status=partial_renderable — config is OK to render)",
+            suggestion=(
+                "Not a failed config. Structure/columns were checked; full mesh/"
+                "density only runs on `jplot <file>`. Proceed to render or "
+                "agent_output — do not rewrite YAML solely because of this."
+            ),
+            context={
+                "heavy_skipped": heavy_skipped[:20],
+                "renderable": True,
+                "status": "partial_renderable",
+            },
+        )
+    else:
+        verdict_ok = True
+        coverage = "full"
+        status = "ok"
+
     report = report_to_dict(
         observations, diagnostics=bag, datasets=datasets_meta, twins=twins
     )
-    report["ok"] = bag.ok
+    report["type_expanded"] = list(expanded_names)
+    report["heavy_skipped"] = list(heavy_skipped)
+    report["ok"] = verdict_ok
+    report["coverage"] = coverage
+    report["status"] = status
+    report["renderable"] = status in {"ok", "partial_renderable"}
+    if status == "partial_renderable":
+        report["status_note"] = (
+            "heavy transforms skipped in dryrun; YAML is expected to render successfully"
+        )
     return report, bag
 
 
@@ -178,6 +258,18 @@ def _load_datasets(
     return meta, frames
 
 
+_HEAVY_TRANSFORM_KEYS = frozenset(
+    {
+        "profile",
+        "make_density_core",
+        "posterior_density",
+        "make_interp_2d",
+        "to_csv",
+        "to_parquet",
+    }
+)
+
+
 def _observe_layer(
     *,
     figure_name: str,
@@ -188,9 +280,12 @@ def _observe_layer(
     bag: DiagnosticBag,
     with_data: bool = False,
     twin_root: Path | None = None,
-) -> tuple[LayerObservation | None, dict[str, Any] | None]:
+    incomplete_sources: set[str] | None = None,
+) -> tuple[LayerObservation | None, dict[str, Any] | None, list[str]]:
+    """Return ``(obs, twin_meta, heavy_step_names_skipped)``."""
     layer_name = str(layer.get("name") or f"layer_{layer_index}")
     method = str(layer.get("method") or "")
+    incomplete_sources = incomplete_sources or set()
     data_blocks = layer.get("data") or []
     if not isinstance(data_blocks, list) or not data_blocks:
         return (
@@ -202,6 +297,7 @@ def _observe_layer(
                 notes=["no data blocks"],
             ),
             None,
+            [],
         )
 
     # Use the first data block (primary series); multi-source layers get a note.
@@ -210,6 +306,11 @@ def _observe_layer(
     if isinstance(source, list):
         source = source[0] if source else None
     if not isinstance(source, str) or source not in frames:
+        # Missing share_data after a skipped heavy producer → incomplete, not failed.
+        incomplete = isinstance(source, str) and source in incomplete_sources
+        note = f"source {source!r} not loaded"
+        if incomplete:
+            note += " (upstream heavy transform skipped in dryrun)"
         return (
             LayerObservation(
                 figure=figure_name,
@@ -217,17 +318,20 @@ def _observe_layer(
                 method=method,
                 source=str(source or ""),
                 n_points=0,
-                notes=[f"source {source!r} not loaded"],
+                notes=[note],
+                incomplete=incomplete,
             ),
             None,
+            [],
         )
 
     df = frames[source]
     steps: list[TransformStepObs] = []
+    heavy_skipped: list[str] = []
     # layer-level transform under data block
     transform = block.get("transform")
     if isinstance(transform, list) and transform:
-        df, steps = _apply_simple_transforms(df, transform)
+        df, steps, heavy_skipped = _apply_simple_transforms(df, transform)
 
     # coordinate samples for bbox + colour channel
     n_points = int(len(df))
@@ -333,6 +437,14 @@ def _observe_layer(
             twin_root, figure_name, layer_name, twin_cols, n_points=n_points
         )
 
+    incomplete = bool(heavy_skipped) or (
+        isinstance(source, str) and source in incomplete_sources
+    )
+    # Coordinates often name columns produced by the skipped heavy step (x/y/z
+    # mesh); zero finite points then means incomplete, not empty data.
+    if heavy_skipped and n_points <= 0:
+        incomplete = True
+
     obs = LayerObservation(
         figure=figure_name,
         layer=layer_name,
@@ -356,15 +468,20 @@ def _observe_layer(
         legend_labels=legend_labels,
         steps=steps,
         twin_path=twin_path,
+        incomplete=incomplete,
+        notes=(["heavy transform skipped in dryrun"] if heavy_skipped else []),
     )
-    return obs, twin_meta
+    return obs, twin_meta, heavy_skipped
 
 
 def _apply_simple_transforms(
     df,
     transform: Sequence[Mapping[str, Any]],
-) -> tuple[Any, list[TransformStepObs]]:
-    """Apply the cheap transform subset; skip density/profile/interp (noted)."""
+) -> tuple[Any, list[TransformStepObs], list[str]]:
+    """Apply the cheap transform subset; skip density/profile/interp (noted).
+
+    Returns ``(df, steps, heavy_step_names_skipped)``.
+    """
     from .Figure.preprocessor_runtime import (
         add_column,
         drop_columns,
@@ -374,6 +491,7 @@ def _apply_simple_transforms(
     )
 
     steps: list[TransformStepObs] = []
+    heavy_skipped: list[str] = []
     work = df
     for step in transform:
         if not isinstance(step, Mapping):
@@ -397,20 +515,12 @@ def _apply_simple_transforms(
             elif "drop_columns" in step:
                 detail = str(step.get("drop_columns"))
                 work = drop_columns(work, step.get("drop_columns"), logger=None)
-            elif any(
-                k in step
-                for k in (
-                    "profile",
-                    "make_density_core",
-                    "posterior_density",
-                    "make_interp_2d",
-                    "to_csv",
-                    "to_parquet",
-                )
-            ):
+            elif any(k in step for k in _HEAVY_TRANSFORM_KEYS):
+                heavy_name = str(name)
+                heavy_skipped.append(heavy_name)
                 steps.append(
                     TransformStepObs(
-                        name=name,
+                        name=heavy_name,
                         detail="skipped in dryrun (heavy step)",
                         rows_in=rows_in,
                         rows_out=rows_in,
@@ -446,7 +556,7 @@ def _apply_simple_transforms(
                 rows_out=int(len(work)),
             )
         )
-    return work, steps
+    return work, steps, heavy_skipped
 
 
 def _eval_axis(df, coordinates: Mapping[str, Any], name: str):

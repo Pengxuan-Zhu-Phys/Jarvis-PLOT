@@ -36,22 +36,30 @@ pip install JarvisPLOT
 
 ## Command-Line Usage
 
-Display help information:
+Human help uses the same fixed-column Rich panels as Jarvis-HEP V2 / Portal:
 
 ```bash
 jplot -h
+jplot validate -h
+jplot man                  # manual index
+jplot man workflow         # topic page
 ```
 
-Run Jarvis-PLOT with one or more YAML configuration files:
+Render (bare path — there is no `jplot run`):
 
 ```bash
 jplot path/to/config.yaml
+jplot path/to/config.yaml --rebuild-cache
 ```
 
-Rebuild local cache for the current project workdir:
+Discover / judge (write YAML yourself in an editor):
 
 ```bash
-jplot path/to/config.yaml --rebuild-cache
+jplot data describe samples.csv --json
+jplot cap methods --json
+jplot doctor plot.yaml --json
+jplot man workflow --json          # agent-structured manual
+jplot config expand plot.yaml --figure p --write   # type: → layers
 ```
 
 Render a Jarvis-HEP flowchart scene JSON:

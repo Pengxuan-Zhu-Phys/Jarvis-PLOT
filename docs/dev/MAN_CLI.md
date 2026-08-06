@@ -1,7 +1,9 @@
 # `jplot man` — 结构化手册 CLI（开发文档）
 
-Status: design / ready to implement  
+Status: implemented  
 Date: 2026-08-06  
+Note: Agent 点云摘要 **不**走 man/context CLI；见 `AGENT_OUTPUT_YAML_DESIGN.md`（YAML `agent_output`）。  
+
 Audience: Jarvis-PLOT maintainers  
 Precedent: **Jarvis-Portal** `jportal man` / `jportal man <format>`  
 Related: coding-agent workflow (data/cap/validate/dryrun); DR-08 bare-path render  

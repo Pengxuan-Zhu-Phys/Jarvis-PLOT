@@ -1,0 +1,38 @@
+schema_version: 1
+default_topic: null
+aliases:
+  playbook: workflow
+  agent: workflow
+  posterior: type-posterior-2d
+  profile: type-profile-2d
+  viz: dryrun-viz
+  columns: data-columns
+  yaml: yaml-root
+  cli: cli-map
+  codes: diagnostics
+  # methods catalog
+  method: methods
+  drawing-methods: methods
+  plot-methods: methods
+  # transforms catalog
+  transform: transforms
+  pipeline: transforms
+  pipeline-steps: transforms
+  agent: agent-output
+  agent_output: agent-output
+  digest: agent-output
+topics:
+  - workflow
+  - yaml-root
+  - type-posterior-2d
+  - type-profile-2d
+  - layer-method
+  - methods
+  - transforms
+  - agent-output
+  - style-axes
+  - data-columns
+  - validate
+  - dryrun-viz
+  - diagnostics
+  - cli-map

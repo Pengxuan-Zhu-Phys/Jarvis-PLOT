@@ -1,0 +1,55 @@
+id: agent-output
+title: Agent digest export (YAML agent_output)
+summary: Lossy Voronoi cell JSON written by jplot <yaml>, planned by doctor — not a CLI digest verb.
+role: how-to
+priority: 42
+see_also: [workflow, type-posterior-2d, type-profile-2d, dryrun-viz]
+related_cli:
+  - argv: [jplot, doctor, "<yaml>", "--json"]
+    why: lists planned agent_output exports (does not write JSON)
+  - argv: [jplot, "<yaml>"]
+    why: render path writes PNG/PDF and agent_output JSON
+  - argv: [jplot, man, transforms, "--json"]
+    why: hand-written transform contracts
+live_sources:
+  - verb: doctor
+    truth: planned exports only
+human:
+  panels:
+    - kind: overview
+      title: Principle
+      body: |
+        CLI = knowledge base. YAML = the only reproducible job.
+        Put agent_output on a figure; jplot <file> runs the real pipeline and
+        writes a lossy digest JSON (site + bbox + aggregates, not full polygons).
+    - kind: yaml
+      title: Minimal figure export
+      lexer: yaml
+      body: |
+        Figures:
+          - name: posterior
+            type: posterior_2d
+            data: samples
+            x: {expr: m_A}
+            y: {expr: tanb}
+            weight: {expr: exp(LogL)}
+            style: [a4paper_2x1, rectcmap]
+            agent_output:
+              method: voronoi
+              max_cells: 1024   # budget, not a regular grid guarantee
+              path: auto        # → {output.dir}/{name}.agent.json
+              seed: 0
+    - kind: notes
+      title: Rules
+      items:
+        - "max_cells is an upper bound (xbin*ybin is only an alias for that budget)."
+        - "lossy: true always — digests are not raw data."
+        - "doctor status planned; only jplot <yaml> writes the file."
+        - "Do not use jplot context as the primary path for data shape."
+agent:
+  body_markdown: |
+    Full design: docs/dev/AGENT_OUTPUT_YAML_DESIGN.md
+  anti_patterns:
+    - Expecting doctor to write agent JSON
+    - Treating digest cells as exact samples
+    - Adding a separate data digest CLI for bins/weight

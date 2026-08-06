@@ -9,6 +9,8 @@ that it answers in one round, before any renderer exists.
 from __future__ import annotations
 
 import argparse
+
+from ..cli_help import RichArgumentParser
 import difflib
 import sys
 from pathlib import Path
@@ -16,7 +18,7 @@ from typing import Any, Sequence
 
 import yaml
 
-from ..agent_io import EXIT_FAILED, EXIT_OK, EXIT_USAGE, emit, envelope
+from ..agent_io import EXIT_FAILED, EXIT_OK, EXIT_USAGE, emit, envelope, system_exit_code
 from ..fix_apply import apply_fixes, planned_fixes
 from ..validation import validate_config, validate_file
 
@@ -24,9 +26,11 @@ __all__ = ["build_parser", "run"]
 
 
 def build_parser(prog: str = "jplot validate") -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = RichArgumentParser(
         prog=prog,
         description="Validate a Jarvis-PLOT YAML configuration without rendering.",
+        rich_title='validate',
+        rich_usage=f"{prog} <file> [--json] [--fix [--diff|--write]]",
     )
     parser.add_argument("file", help="path to a YAML plotting configuration")
     parser.add_argument(
@@ -69,7 +73,7 @@ def run(argv: Sequence[str], *, prog: str = "jplot validate") -> int:
     try:
         args = parser.parse_args(list(argv))
     except SystemExit as exc:
-        return int(exc.code or EXIT_USAGE)
+        return system_exit_code(exc)
 
     if (args.write or args.diff is True or args.fix_unsafe) and not args.fix:
         print(f"{prog}: --write / --diff / --fix-unsafe require --fix", file=sys.stderr)

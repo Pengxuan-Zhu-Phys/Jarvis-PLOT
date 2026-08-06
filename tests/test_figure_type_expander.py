@@ -124,6 +124,14 @@ def test_expand_figure_types_in_config_mutates_figures_before_runtime_planning()
     assert config["Figures"][1] == {"name": "manual", "layers": []}
 
 
+def test_expand_typed_figures_raises_on_unknown_type():
+    from jarvisplot.Figure.figure_types import expand_typed_figures
+
+    config = {"Figures": [{"name": "x", "type": "not_a_real_type", "data": "s"}]}
+    with pytest.raises(ValueError, match="unknown type"):
+        expand_typed_figures(config, raise_on_error=True)
+
+
 def test_posterior_2d_requires_core_fields():
     with pytest.raises(ValueError, match="requires x, y, and weight"):
         expand_posterior_2d({"type": "posterior_2d", "data": "samples", "x": {"expr": "x"}, "y": {"expr": "y"}})

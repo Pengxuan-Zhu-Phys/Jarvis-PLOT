@@ -10,10 +10,12 @@ consults (see :mod:`jarvisplot.capabilities`).
 from __future__ import annotations
 
 import argparse
+
+from ..cli_help import RichArgumentParser
 import sys
 from typing import Sequence
 
-from ..agent_io import EXIT_FAILED, EXIT_OK, EXIT_USAGE, emit, envelope, error_payload
+from ..agent_io import EXIT_FAILED, EXIT_OK, EXIT_USAGE, emit, envelope, system_exit_code, error_payload
 from ..capabilities import CAPABILITY_SECTIONS, capabilities, section
 
 __all__ = ["SECTIONS", "build_parser", "run"]
@@ -22,12 +24,14 @@ SECTIONS = CAPABILITY_SECTIONS  # methods … cli
 
 
 def build_parser(prog: str = "jplot cap") -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = RichArgumentParser(
         prog=prog,
         description=(
             "List every string Jarvis-PLOT will accept "
             "(methods, transforms, types, styles, cmaps, funcs, cli)."
         ),
+        rich_title="cap",
+        rich_usage=f"{prog} [all|methods|transforms|types|styles|cmaps|funcs|cli] [--json]",
     )
     parser.add_argument(
         "section",
@@ -52,7 +56,7 @@ def run(argv: Sequence[str], *, prog: str = "jplot cap") -> int:
     try:
         args = parser.parse_args(list(argv))
     except SystemExit as exc:
-        return int(exc.code or EXIT_USAGE)
+        return system_exit_code(exc)
 
     name = str(args.section or "all").strip().lower()
     as_json = bool(args.json) or not sys.stdout.isatty()

@@ -1,7 +1,8 @@
 # YAML 设计审查：Human + AI 友好 × 奥卡姆剃刀
 
-Status: review  
+Status: active  
 Date: 2026-08-06  
+Note: agent 压缩摘要见 `docs/dev/AGENT_OUTPUT_YAML_DESIGN.md`（YAML `agent_output`，非 `context` CLI）。  
 原则（今日对齐）：
 
 1. **写 YAML 不经 CLI**——人与 coding agent 都用编辑器写文件。  
@@ -18,10 +19,25 @@ Date: 2026-08-06
 | 维度 | 判断 |
 |---|---|
 | **管道骨架** `DataSet → Figures → layers → method/coordinates/style` | **保留**。人读得懂，语料大量使用，AI 也容易套。 |
+| **双模式 figure** `type:`（人侧默认）↔ `layers:`（专业微调） | **都保留**。`type` 是 layers 的封装；**无缝可降级**。 |
 | **Style card 两级 token** | **保留**。把几何与默认美学从每张图里抽走，是人侧最大的减负。 |
 | **表达式 `expr:`** | **保留**。科学绘图的刚需；AI 用 `data eval` / `cap funcs` 自证。 |
 | **今日已上的 validate/cap/data/dryrun** | **不改 YAML，却大幅改善双方**——这是正确的第一刀。 |
 | **真正该剃的** | 不是骨架，而是 **「同形不同义」**、**「多写法同一事」**、**「写了等于没写」**、**「两条等价长路径」**。 |
+
+### 0.1 双模式契约（已拍板）
+
+- **人类默认**：`Figures[].type` 宏（短、可读）。  
+- **专业 / 微调**：手写 `Figures[].layers`（完整控制）。  
+- **无缝转换**：`type` 展开引擎与 render 同源；CLI 可把文件里**某一张图**展开成 layers 再改：
+
+```bash
+jplot explain scene.yaml              # 打印展开后的等价 YAML（不写盘）
+jplot config expand scene.yaml        # 默认 unified diff
+jplot config expand scene.yaml --figure p --write   # 只展开 p，校验通过后落盘
+```
+
+纪律与 `config set` 相同：**`--diff` 默认，`--write` 显式，写前 validate，失败不落盘**。
 
 **一句话：**  
 YAML 不必为 AI 推倒重来；要剃的是**认知税**和**静默语义**，不是 `DataSet`/`Figures` 这层名词。

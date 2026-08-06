@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 
-"""``jplot config get|paths|set|rm`` -- named structural YAML access (F3/F4).
+"""``jplot config get|paths|set|rm|expand`` -- named structural YAML access (F3/F4).
 
-Write path (set/rm):
+Write path (set/rm/expand):
 
 1. load (ruamel when available → comments preserved)
-2. mutate by named address
+2. mutate by named address (or expand ``type:`` → ``layers``)
 3. validate in memory
 4. ``--diff`` by default; ``--write`` only if validate ok (write-validate-rollback)
+
+``expand`` is the intentional off-ramp from the human-friendly ``type:`` macro
+to hand-editable ``layers`` (same engine as render-time expansion).
 """
 
 from __future__ import annotations
@@ -21,7 +24,8 @@ from typing import Any, Sequence
 
 import yaml
 
-from ..agent_io import EXIT_FAILED, EXIT_OK, EXIT_USAGE, emit, envelope, error_payload
+from ..agent_io import EXIT_FAILED, EXIT_OK, EXIT_USAGE, emit, envelope, system_exit_code, error_payload
+from ..cli_help import RichArgumentParser
 from ..config_address import (
     AddressError,
     delete_address,
@@ -36,33 +40,50 @@ __all__ = ["build_parser", "run"]
 
 
 def build_parser(prog: str = "jplot config") -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = RichArgumentParser(
         prog=prog,
         description=(
             "Read/write plot YAML by named address "
             "(Figures[name].layers[name].…). Writes validate before disk."
         ),
+        rich_title="config",
+        rich_usage=(
+            f"{prog} get <file> <address> [--json]\n"
+            f"{prog} paths <file> [--json]\n"
+            f"{prog} set <file> <address> <value> [--write] [--json]\n"
+            f"{prog} rm <file> <address> [--write] [--json]\n"
+            f"{prog} expand <file> [--figure NAME] [--write] [--json]"
+        ),
     )
-    sub = parser.add_subparsers(dest="action", required=True)
+    sub = parser.add_subparsers(dest="action", required=True, parser_class=RichArgumentParser)
 
-    get_p = sub.add_parser("get", help="read one value (or subtree) by address")
+    get_p = sub.add_parser(
+        "get",
+        help="read one value (or subtree) by address",
+        rich_title="config get",
+        rich_usage=f"{prog} get <file> <address> [--json]",
+    )
     get_p.add_argument("file", help="path to a YAML plotting configuration")
     get_p.add_argument(
         "address",
         help="e.g. Figures[f1].layers[pts].method or DataSet[samples].path",
     )
-    get_p.add_argument("--json", action="store_true")
+    get_p.add_argument("--json", action="store_true", help="emit JSON envelope on stdout")
 
     path_p = sub.add_parser(
         "paths",
         help="list useful named addresses for Figures / DataSet / layers",
+        rich_title="config paths",
+        rich_usage=f"{prog} paths <file> [--json]",
     )
     path_p.add_argument("file", help="path to a YAML plotting configuration")
-    path_p.add_argument("--json", action="store_true")
+    path_p.add_argument("--json", action="store_true", help="emit JSON envelope on stdout")
 
     set_p = sub.add_parser(
         "set",
         help="set a value by address (validate before write; --diff default)",
+        rich_title="config set",
+        rich_usage=f"{prog} set <file> <address> <value> [--write] [--diff] [--json]",
     )
     set_p.add_argument("file", help="path to a YAML plotting configuration")
     set_p.add_argument("address", help="named address to set")
@@ -70,7 +91,7 @@ def build_parser(prog: str = "jplot config") -> argparse.ArgumentParser:
         "value",
         help="JSON or YAML scalar/mapping/list (e.g. 1.2, viridis, '{s: 6}')",
     )
-    set_p.add_argument("--json", action="store_true")
+    set_p.add_argument("--json", action="store_true", help="emit JSON envelope on stdout")
     set_p.add_argument(
         "--write",
         action="store_true",
@@ -92,16 +113,55 @@ def build_parser(prog: str = "jplot config") -> argparse.ArgumentParser:
     rm_p = sub.add_parser(
         "rm",
         help="remove a key or list item by address (validate before write)",
+        rich_title="config rm",
+        rich_usage=f"{prog} rm <file> <address> [--write] [--json]",
     )
     rm_p.add_argument("file", help="path to a YAML plotting configuration")
     rm_p.add_argument("address", help="named address to remove")
-    rm_p.add_argument("--json", action="store_true")
-    rm_p.add_argument("--write", action="store_true")
-    rm_p.add_argument("--diff", action="store_true", default=None)
+    rm_p.add_argument("--json", action="store_true", help="emit JSON envelope on stdout")
+    rm_p.add_argument("--write", action="store_true", help="write if validation passes")
+    rm_p.add_argument("--diff", action="store_true", default=None, help="print unified diff")
     rm_p.add_argument(
         "--no-columns",
         dest="check_columns",
         action="store_false",
+        help="skip column check during post-edit validate",
+    )
+
+    exp_p = sub.add_parser(
+        "expand",
+        help=(
+            "convert figure.type macros to figure.layers (same expansion as render); "
+            "default: unified diff; --write only after validate"
+        ),
+        rich_title="config expand",
+        rich_usage=f"{prog} expand <file> [--figure NAME] [--write] [--diff] [--json]",
+    )
+    exp_p.add_argument("file", help="path to a YAML plotting configuration")
+    exp_p.add_argument(
+        "--figure",
+        action="append",
+        dest="figures",
+        metavar="NAME",
+        help="expand only this figure name (repeatable; default: all type: figures)",
+    )
+    exp_p.add_argument("--json", action="store_true", help="emit JSON envelope on stdout")
+    exp_p.add_argument(
+        "--write",
+        action="store_true",
+        help="write the file if validation passes (default: diff only)",
+    )
+    exp_p.add_argument(
+        "--diff",
+        action="store_true",
+        default=None,
+        help="print unified diff (default when not --write)",
+    )
+    exp_p.add_argument(
+        "--no-columns",
+        dest="check_columns",
+        action="store_false",
+        help="skip column check during post-expand validate",
     )
     return parser
 
@@ -111,7 +171,7 @@ def run(argv: Sequence[str], *, prog: str = "jplot config") -> int:
     try:
         args = parser.parse_args(list(argv))
     except SystemExit as exc:
-        return int(exc.code or EXIT_USAGE)
+        return system_exit_code(exc)
 
     as_json = bool(getattr(args, "json", False)) or not sys.stdout.isatty()
     action = args.action
@@ -134,6 +194,8 @@ def run(argv: Sequence[str], *, prog: str = "jplot config") -> int:
             kind="config.rm",
             mutator=lambda doc: delete_address(doc, args.address),
         )
+    if action == "expand":
+        return _run_expand(args, as_json=as_json)
     return EXIT_USAGE
 
 
@@ -193,6 +255,7 @@ def _run_paths(args, *, as_json: bool) -> int:
 
 def _run_mutate(args, *, as_json: bool, kind: str, mutator) -> int:
     path = Path(args.file).expanduser()
+    extra: dict[str, Any] = {"address": getattr(args, "address", None)}
     try:
         doc, meta = load_yaml_doc(path)
         before = meta.get("raw_text") or dump_yaml_doc(doc, meta=meta)
@@ -201,19 +264,115 @@ def _run_mutate(args, *, as_json: bool, kind: str, mutator) -> int:
         env = envelope(
             kind,
             False,
-            data={"file": str(path), "address": args.address},
+            data={"file": str(path), **{k: v for k, v in extra.items() if v is not None}},
             error=error_payload(exc),
         )
         return emit(env) if as_json else _fail(env)
 
+    return _finish_write(
+        path,
+        doc=doc,
+        meta=meta,
+        before=before,
+        as_json=as_json,
+        kind=kind,
+        write=bool(args.write),
+        show_diff=bool(args.diff) if args.diff is not None else not bool(args.write),
+        check_columns=bool(getattr(args, "check_columns", True)),
+        extra=extra,
+    )
+
+
+def _run_expand(args, *, as_json: bool) -> int:
+    """``type:`` → ``layers`` convert; same expansion engine as render.
+
+    Idempotent: if nothing needs expanding, returns ``ok: true`` with
+    ``status: unchanged`` (exit 0) so agents can re-run safely.
+    """
+    from ..Figure.figure_types import expand_typed_figures
+
+    path = Path(args.file).expanduser()
+    names = list(args.figures) if args.figures else None
+    expanded: list[str] = []
+
+    try:
+        doc, meta = load_yaml_doc(path)
+        before = meta.get("raw_text") or dump_yaml_doc(doc, meta=meta)
+        expanded = expand_typed_figures(
+            doc,
+            figure_names=names,
+            raise_on_error=True,
+            allow_noop=True,
+        )
+    except Exception as exc:
+        env = envelope(
+            "config.expand",
+            False,
+            data={
+                "file": str(path),
+                "figures": names,
+                "expanded": expanded,
+                "status": "failed",
+            },
+            error=error_payload(exc),
+        )
+        return emit(env) if as_json else _fail(env)
+
+    if not expanded:
+        data = {
+            "file": str(path.resolve()),
+            "figures": names,
+            "expanded": [],
+            "status": "unchanged",
+            "wrote": False,
+            "comments_preserved": meta.get("comments_preserved", False),
+            "engine": meta.get("engine"),
+            "diff": None,
+            "message": (
+                "no type: figures to expand"
+                + (f" (looked for: {', '.join(names)})" if names else " (already layers form)")
+            ),
+        }
+        env = envelope("config.expand", True, data=data)
+        if as_json:
+            return emit(env)
+        print(f"{path}: config expand unchanged (already layers form)", file=sys.stderr)
+        return EXIT_OK
+
+    return _finish_write(
+        path,
+        doc=doc,
+        meta=meta,
+        before=before,
+        as_json=as_json,
+        kind="config.expand",
+        write=bool(args.write),
+        show_diff=bool(args.diff) if args.diff is not None else not bool(args.write),
+        check_columns=bool(getattr(args, "check_columns", True)),
+        extra={"figures": names, "expanded": expanded, "status": "expanded"},
+    )
+
+
+def _finish_write(
+    path: Path,
+    *,
+    doc: Any,
+    meta: dict[str, Any],
+    before: str,
+    as_json: bool,
+    kind: str,
+    write: bool,
+    show_diff: bool,
+    check_columns: bool,
+    extra: dict[str, Any] | None = None,
+) -> int:
     plain = _to_plain(doc)
     bag = validate_config(
         plain,
         base_dir=str(path.parent.resolve()),
-        check_columns=bool(getattr(args, "check_columns", True)),
+        check_columns=check_columns,
     )
     after = dump_yaml_doc(doc, meta=meta)
-    show_diff = bool(args.diff) if args.diff is not None else not bool(args.write)
     diff_text = None
     if show_diff:
         diff_text = "".join(
@@ -225,6 +384,7 @@ def _run_mutate(args, *, as_json: bool, kind: str, mutator) -> int:
             )
         )
 
+    payload_extra = {k: v for k, v in (extra or {}).items() if v is not None}
     wrote = False
     if not bag.ok:
         env = envelope(
@@ -232,11 +392,11 @@ def _run_mutate(args, *, as_json: bool, kind: str, mutator) -> int:
             False,
             data={
                 "file": str(path.resolve()),
-                "address": args.address,
                 "wrote": False,
                 "comments_preserved": meta.get("comments_preserved", False),
                 "engine": meta.get("engine"),
                 "diff": diff_text,
+                **payload_extra,
             },
             diagnostics=bag,
             error=error_payload(
@@ -252,7 +412,7 @@ def _run_mutate(args, *, as_json: bool, kind: str, mutator) -> int:
         print(bag.render_human(), file=sys.stderr)
         return EXIT_FAILED
 
-    if args.write:
+    if write:
         path.write_text(after, encoding="utf-8")
         wrote = True
 
@@ -261,11 +421,11 @@ def _run_mutate(args, *, as_json: bool, kind: str, mutator) -> int:
         True,
         data={
             "file": str(path.resolve()),
-            "address": args.address,
             "wrote": wrote,
             "comments_preserved": meta.get("comments_preserved", False),
             "engine": meta.get("engine"),
             "diff": diff_text,
+            **payload_extra,
         },
         diagnostics=bag,
     )
@@ -274,8 +434,12 @@ def _run_mutate(args, *, as_json: bool, kind: str, mutator) -> int:
     if diff_text:
         print(diff_text, file=sys.stderr)
     mode = "wrote" if wrote else "planned"
+    action = kind.split(".")[-1]
+    detail = ""
+    if kind == "config.expand" and payload_extra.get("expanded"):
+        detail = f" figures={payload_extra['expanded']}"
     print(
-        f"{path}: config {kind.split('.')[-1]} {mode} "
+        f"{path}: config {action} {mode}{detail} "
         f"(comments_preserved={meta.get('comments_preserved')})",
         file=sys.stderr,
     )

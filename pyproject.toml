@@ -35,6 +35,7 @@ jarvisplot = [
   "cards/**/*",
   "Figure/cards/**/*",
   "schema/**/*.json",
+  "manual_cards/**/*",
 ]
 
 [tool.setuptools.packages.find]
