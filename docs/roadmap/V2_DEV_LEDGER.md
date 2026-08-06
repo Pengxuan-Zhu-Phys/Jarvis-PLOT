@@ -426,8 +426,8 @@ M0+M1 **不破坏任何兼容**，可以在 1.5.x 发布。M4 才是 2.0。
 
 | ID | 标题 | 里程碑 | 依赖 | 规模 | 破坏 | 状态 |
 |---|---|---|---|---|---|---|
-| F1 | `template list \| show` type 化模板 + slot schema | M3 | D5 | M | 否 | ☐ |
-| F2 | `suggest` 数据感知合成 + `decisions[]` | M3 | C1, C6, F1 | L | 否 | ☐ |
+| F1 | `template list \| show` type 化模板 + slot schema | M3 | D5 | M | 否 | ☑ |
+| F2 | `suggest` 数据感知合成 + `decisions[]` | M3 | C1, C6, F1 | L | 否 | ☑ |
 | F3 | 地址语法 + `layers[].name` 必填/自动命名 | M3 | B3 | M | **是** | ☐ |
 | F4 | `config get / set`（round-trip 保留注释） | M3 | F3 | L | 否 | ⊘ DR-02 |
 | F5 | `config add-layer / rm / move` | M3 | F4 | M | 否 | ⊘ DR-02 |
@@ -611,7 +611,10 @@ M0+M1 **不破坏任何兼容**，可以在 1.5.x 发布。M4 才是 2.0。
                         dryrun 采集 c/z 与 frame.axc.color vmax
 2026-08-06 | E4  | 完成 | `jplot dryrun --with-data` 写 per-layer parquet twin
                         （.cache/agent_twins 或 --out-dir）
-2026-08-06 | M2  | 进度 | E 轨 dryrun/doctor/VIZ/twin 主路径已通；仍缺渲染期 adapter 直采与 F 轨起草
+2026-08-06 | F1  | 完成 | templates_catalog + `jplot template list|show`；figure schema 放开 type 宏字段
+2026-08-06 | F2  | 完成 | `jplot suggest --data … --kind …` + decisions[] reason；可 --write
+2026-08-06 | —   | 完成 | `jplot explain`（JP-* 码 / type: 展开）
+2026-08-06 | M3  | 进度 | F1/F2 起草出口已通；F3/F4 config 地址与 ruamel 仍待（DR-02）
 2026-08-06 | —   | 建账 | 从两份 V2 brainstorm 落成 46 条任务 / 5 个里程碑 / 7 条待拍板 DR
 2026-08-06 | A1  | 完成 | 新增 diagnostics.py（Diagnostic/Fix/DiagnosticBag/did_you_mean/join_path）
                         + agent_io.py（envelope/emit/exit_code_for）；23 条测试

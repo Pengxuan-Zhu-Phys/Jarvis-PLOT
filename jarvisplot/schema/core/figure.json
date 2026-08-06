@@ -22,6 +22,10 @@
       "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/stringOrStringList",
       "description": "Style card tokens, e.g. [a4paper_2x1, rect]. Run `jplot cap styles` for the catalog."
     },
+    "style_card": {
+      "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/stringOrStringList",
+      "description": "Alias of style for type: macros (posterior_2d / profile_2d)."
+    },
     "frame": {
       "type": "object",
       "x-jarvis-zone": "delegated",
@@ -30,6 +34,77 @@
     "layers": {
       "type": "array",
       "items": { "$ref": "https://jarvis-plot.org/schema/v2/core/layer.json" }
+    },
+    "data": {
+      "description": "type: macro dataset ref (DataSet.name) or inline source block. Expanded away before render.",
+      "x-jarvis-zone": "delegated"
+    },
+    "x": {
+      "description": "type: macro x coordinate (expr / name / lim / scale).",
+      "x-jarvis-zone": "delegated"
+    },
+    "y": {
+      "description": "type: macro y coordinate.",
+      "x-jarvis-zone": "delegated"
+    },
+    "z": {
+      "description": "type: profile_2d objective coordinate.",
+      "x-jarvis-zone": "delegated"
+    },
+    "weight": {
+      "description": "type: posterior_2d weight expression / column.",
+      "x-jarvis-zone": "delegated"
+    },
+    "density": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "additionalProperties": true,
+      "description": "type: posterior_2d density options."
+    },
+    "hpd": {
+      "x-jarvis-zone": "delegated",
+      "description": "type: posterior_2d HPD contour options."
+    },
+    "colorbar": {
+      "x-jarvis-zone": "delegated",
+      "description": "type: macro colorbar options merged into frame.axc."
+    },
+    "share_data": {
+      "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/identifier",
+      "description": "type: macro share_data name for the expanded density/profile table."
+    },
+    "extra_layers": {
+      "type": "array",
+      "description": "Additional hand-written layers appended after type expansion.",
+      "items": { "$ref": "https://jarvis-plot.org/schema/v2/core/layer.json" }
+    },
+    "credible_region": {
+      "x-jarvis-zone": "delegated",
+      "description": "type: profile_2d CL contour options."
+    },
+    "contour": {
+      "x-jarvis-zone": "delegated",
+      "description": "Alias of credible_region for profile_2d."
+    },
+    "method": {
+      "description": "type: profile_2d reduction method (bridson/grid).",
+      "x-jarvis-zone": "delegated"
+    },
+    "interp": {
+      "x-jarvis-zone": "delegated",
+      "description": "type: profile_2d interpolation toggle / options."
+    },
+    "pcolormesh": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "additionalProperties": true,
+      "description": "type: profile_2d style overrides for the pcolormesh layer."
+    },
+    "voronoi": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "additionalProperties": true,
+      "description": "type: profile_2d style overrides for the voronoi layer."
     },
     "debug": {
       "type": "boolean",
@@ -44,5 +119,5 @@
     "yaml_path": { "x-jarvis-internal": true }
   },
   "additionalProperties": false,
-  "x-jarvis-example": "- name: EggBox\n  style: [a4paper_2x1, rectcmap]\n  frame:\n    ax: {xlim: [0.1, 5], xscale: log}\n  layers: []"
+  "x-jarvis-example": "- name: EggBox\n  type: posterior_2d\n  style: [a4paper_2x1, rectcmap]\n  data: samples\n  x: {expr: m_A}\n  y: {expr: tanb}\n  weight: {expr: exp(LogL)}"
 }

@@ -31,6 +31,24 @@
             "kind": "agent"
         },
         {
+            "name": "template",
+            "help": "list/show type-first YAML templates + slots",
+            "usage": "jplot template list|show <kind> [--json]",
+            "kind": "agent"
+        },
+        {
+            "name": "suggest",
+            "help": "synthesize a YAML from a data file (kind + columns)",
+            "usage": "jplot suggest --data <file> --kind posterior_2d [--x …] [--json]",
+            "kind": "agent"
+        },
+        {
+            "name": "explain",
+            "help": "explain a JP-* code or expand type: figures to layers",
+            "usage": "jplot explain <JP-CODE|yaml> [--json]",
+            "kind": "agent"
+        },
+        {
             "name": "flowchart",
             "help": "render a Jarvis-HEP flowchart scene JSON",
             "usage": "jplot flowchart <flowchart_file>",
