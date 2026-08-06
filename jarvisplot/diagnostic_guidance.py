@@ -136,6 +136,32 @@ _GUIDANCE_BY_CODE: dict[str, tuple[str, Optional[str]]] = {
         "or a function from jplot cap funcs.",
         'jplot data eval "exp(LogL)" --data samples.csv --json',
     ),
+    # Render health
+    "JP-VIZ-000": (
+        "Expand type: macros or re-run dryrun after writing explicit layers.",
+        None,
+    ),
+    "JP-VIZ-001": (
+        "Check the row ledger: a filter may have emptied the table. "
+        "Use jplot data head / eval on the source.",
+        None,
+    ),
+    "JP-VIZ-002": (
+        "Widen frame.<axes>.xlim/ylim or fix coordinate expressions so data is visible.",
+        "frame:\n  ax:\n    xlim: [0, 10]\n    ylim: [0, 10]",
+    ),
+    "JP-VIZ-003": (
+        "Relax the filter / density cut, or verify the expression with jplot data eval.",
+        'transform:\n  - filter: "LogL > -100"',
+    ),
+    "JP-VIZ-005": (
+        "Filter non-positive values, switch to a linear scale, or shift the data.",
+        "frame:\n  ax:\n    xscale: linear",
+    ),
+    "JP-VIZ-008": (
+        "Tighten xlim/ylim around the data, or check coordinate units/scale.",
+        None,
+    ),
     # Methods / coordinates
     "JP-MTH-001": (
         "Set layers[].method to a name from jplot cap methods.",

@@ -181,6 +181,8 @@ def render_help(*, prog: str = "jplot") -> str:
         usage=(
             f"{prog} <file>\n"
             f"{prog} validate <file> [--json] [--fix]\n"
+            f"{prog} dryrun <file> [--json]\n"
+            f"{prog} doctor <file> [--json]\n"
             f"{prog} cap [section] [--json]\n"
             f"{prog} data describe|head|eval|suggest-axes … [--json]\n"
             f"{prog} flowchart <flowchart_file>\n"
