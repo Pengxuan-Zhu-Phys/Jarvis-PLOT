@@ -1,0 +1,43 @@
+{
+  "schema_version": "v2",
+  "draft": "2020-12",
+  "comment": [
+    "Data-only dispatch index. This file contains no logic and is never fetched",
+    "over the network; jarvisplot/schema_catalog.py resolves every $ref against",
+    "the files listed here and nothing else.",
+    "",
+    "Extension discipline: adding a method / transform / figure type means",
+    "  1. add a schema file under the matching directory,",
+    "  2. add its relative name to schema_files,",
+    "  3. add its dispatch entry below,",
+    "  4. add a fixture.",
+    "schema_catalog.py itself never changes. Jarvis-PLOT dispatches on five axes",
+    "(Figures[].type, layers[].method, transform type, DataSet[].type, style",
+    "tokens), so this discipline matters more here than it does in Jarvis-HEP v2."
+  ],
+  "root": "https://jarvis-plot.org/schema/v2/plot-config.json",
+  "schema_files": [
+    "plot-config.json",
+    "core/common.json",
+    "core/dataset.json",
+    "core/figure.json",
+    "core/layer.json",
+    "core/transform.json"
+  ],
+  "figure_types": {},
+  "methods": {},
+  "transforms": {
+    "filter": "https://jarvis-plot.org/schema/v2/core/transform.json",
+    "sortby": "https://jarvis-plot.org/schema/v2/core/transform.json",
+    "add_column": "https://jarvis-plot.org/schema/v2/core/transform.json",
+    "keep_columns": "https://jarvis-plot.org/schema/v2/core/transform.json",
+    "drop_columns": "https://jarvis-plot.org/schema/v2/core/transform.json",
+    "to_csv": "https://jarvis-plot.org/schema/v2/core/transform.json",
+    "to_parquet": "https://jarvis-plot.org/schema/v2/core/transform.json",
+    "profile": "https://jarvis-plot.org/schema/v2/core/transform.json",
+    "make_density_core": "https://jarvis-plot.org/schema/v2/core/transform.json",
+    "posterior_density": "https://jarvis-plot.org/schema/v2/core/transform.json",
+    "make_interp_2d": "https://jarvis-plot.org/schema/v2/core/transform.json"
+  },
+  "dataset_types": {}
+}

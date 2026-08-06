@@ -21,7 +21,8 @@ dependencies = [
   "sympy",
   "scipy",
   "shapely",
-  "deepmerge"
+  "deepmerge",
+  "rich"
 ]
 
 [project.scripts]
@@ -31,6 +32,7 @@ jplot = "jarvisplot.client:main"
 jarvisplot = [
   "cards/**/*",
   "Figure/cards/**/*",
+  "schema/**/*.json",
 ]
 
 [tool.setuptools.packages.find]

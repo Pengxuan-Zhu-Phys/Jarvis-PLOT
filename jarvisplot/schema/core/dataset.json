@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/core/dataset.json",
+  "title": "One entry of the root DataSet list",
+  "type": "object",
+  "x-jarvis-zone": "closed",
+  "required": ["name", "path", "type"],
+  "properties": {
+    "name": {
+      "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/identifier",
+      "description": "Addressed by layers via data[].source."
+    },
+    "path": {
+      "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/stringOrStringList",
+      "description": "Resolved relative to the config file. A list concatenates sources."
+    },
+    "type": {
+      "enum": ["csv", "hdf5", "parquet"]
+    },
+    "dataset": {
+      "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString",
+      "description": "HDF5 group name. Ignored for csv / parquet."
+    },
+    "columns": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "isvalid_policy": { "enum": ["clean", "raw"] },
+        "load_whitelist": {
+          "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/stringOrStringList"
+        },
+        "rename": {
+          "type": "array",
+          "description": "HDF5 source-name aliases, applied at load time.",
+          "items": {
+            "type": "object",
+            "x-jarvis-zone": "closed",
+            "required": ["source"],
+            "properties": {
+              "source": {
+                "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString",
+                "description": "Full HDF5 dataset path in the file."
+              },
+              "target": {
+                "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString",
+                "description": "Short alias that expressions and coordinates use instead."
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "transform": {
+      "type": ["array", "null"],
+      "description": "Dataset-level pre-steps, applied before any layer sees the table.",
+      "items": { "$ref": "https://jarvis-plot.org/schema/v2/core/transform.json" }
+    },
+    "is_gambit": {
+      "type": "boolean",
+      "deprecated": true,
+      "description": "Legacy GAMBIT marker; `jplot --parse-data` strips it."
+    },
+    "columnmap": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "additionalProperties": true,
+      "deprecated": true,
+      "description": "Legacy HDF5 column renaming; `jplot --parse-data` strips it."
+    }
+  },
+  "additionalProperties": false,
+  "x-jarvis-example": "- name: df\n  path: ./samples.hdf5\n  type: hdf5\n  dataset: data"
+}

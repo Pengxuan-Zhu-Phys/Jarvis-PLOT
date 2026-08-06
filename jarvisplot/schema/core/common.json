@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/core/common.json",
+  "title": "Shared value shapes",
+  "$defs": {
+    "nonemptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "description": "A name other blocks address this entry by."
+    },
+    "stringOrStringList": {
+      "oneOf": [
+        { "$ref": "#/$defs/nonemptyString" },
+        { "type": "array", "items": { "$ref": "#/$defs/nonemptyString" }, "minItems": 1 }
+      ]
+    },
+    "expression": {
+      "type": ["string", "number"],
+      "description": "A column name or an expression over columns, e.g. \"exp(LogL)\"."
+    },
+    "limits": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "Axis range as [low, high]."
+    },
+    "scale": {
+      "enum": ["linear", "log", "symlog", "logit"]
+    }
+  }
+}

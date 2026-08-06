@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/core/layer.json",
+  "title": "One drawing layer inside a figure",
+  "type": "object",
+  "x-jarvis-zone": "closed",
+  "properties": {
+    "name": {
+      "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/identifier",
+      "description": "Layer name. Also the stable address used by `jplot config set`."
+    },
+    "data": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/dataBlock" },
+      "description": "Input tables for this layer. Omit for layers that draw from share_data only."
+    },
+    "share_data": {
+      "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/identifier",
+      "description": "Publish this layer's prepared table under a name later layers can use as data[].source."
+    },
+    "combine": {
+      "enum": ["concat", "seperate"],
+      "description": "How multiple data blocks are joined. Note: 'seperate' is spelled that way in the runtime (Figure/layer_runtime.py); G3/R4 renames it with an alias."
+    },
+    "axes": {
+      "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString",
+      "description": "Which axes of the style card to draw on. Run `jplot cap styles` to see the axes a card provides (this is where names like 'axc' come from)."
+    },
+    "method": {
+      "$ref": "#/$defs/methodName"
+    },
+    "coordinates": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "additionalProperties": { "$ref": "#/$defs/layerCoordinate" },
+      "description": "Column/expression mapping per coordinate. Which keys are required depends on `method`."
+    },
+    "colorbar": {
+      "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString",
+      "description": "Name of the colorbar axes this layer feeds. Defaults to 'axc'."
+    },
+    "style": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "description": "Passed through to matplotlib. Jarvis-PLOT does not enumerate these keys; it only reports ownership conflicts with frame.axc.color."
+    }
+  },
+  "additionalProperties": false,
+  "x-jarvis-example": "- name: scatter\n  data:\n    - source: df\n  axes: ax\n  method: scatter\n  coordinates:\n    x: {expr: m_A}\n    y: {expr: tanb}\n  style: {s: 2, zorder: 1}",
+  "$defs": {
+    "methodName": {
+      "description": "Rendering primitive. Authoritative list: jarvisplot/Figure/method_registry.py::METHOD_DISPATCH (kept in sync by tests/test_schema_catalog.py).",
+      "enum": [
+        "bar",
+        "barh",
+        "contour",
+        "contourf",
+        "dynesty_runplot",
+        "errorbar",
+        "fill",
+        "fill_between",
+        "fill_betweenx",
+        "hist",
+        "imshow",
+        "jpcontour",
+        "jpcontourf",
+        "jpfield",
+        "pcolor",
+        "pcolormesh",
+        "plot",
+        "quiver",
+        "scatter",
+        "step",
+        "tricontour",
+        "tricontourf",
+        "tripcolor",
+        "tripcolor_axes",
+        "triplot",
+        "voronoi",
+        "voronoif"
+      ]
+    },
+    "dataBlock": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "source": {
+          "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/stringOrStringList",
+          "description": "A root DataSet name, or a name published by another layer's share_data."
+        },
+        "transform": {
+          "type": ["array", "null"],
+          "description": "Ordered pre-steps applied to this block only.",
+          "items": { "$ref": "https://jarvis-plot.org/schema/v2/core/transform.json" }
+        },
+        "label": {
+          "type": "string",
+          "description": "Legend label for this block."
+        }
+      },
+      "additionalProperties": false
+    },
+    "layerCoordinate": {
+      "description": "Either an expression mapping, or a literal value/array drawn as-is (used for reference lines that need no dataset). `if/then` rather than `oneOf`, so the mapping form keeps precise unknown-key errors instead of degrading to 'not valid under any of the given schemas'.",
+      "if": { "type": "object" },
+      "then": { "$ref": "#/$defs/coordinateSpec" }
+    },
+    "coordinateSpec": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "expr": {
+          "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/expression"
+        },
+        "fillna": {
+          "description": "Value substituted for NaN in this coordinate."
+        },
+        "name": {
+          "x-jarvis-ignored": "transform[].coordinates.<axis>.name",
+          "description": "Not read here. Output column naming belongs to a transform's coordinates block."
+        },
+        "lim": {
+          "x-jarvis-ignored": "frame.<axes>.xlim / ylim",
+          "description": "Not read here. Axis range is owned by the frame."
+        },
+        "scale": {
+          "x-jarvis-ignored": "frame.<axes>.xscale / yscale",
+          "description": "Not read here. Axis scale is owned by the frame."
+        },
+        "label": {
+          "x-jarvis-ignored": "frame.<axes>.labels",
+          "description": "Not read here. Axis labels are owned by the frame."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
