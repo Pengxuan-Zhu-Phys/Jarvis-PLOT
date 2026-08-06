@@ -11,8 +11,10 @@ Current package version: **1.4.2** (`pyproject.toml`).
 - `context/`: primary Codex-facing boundary docs and code owner map
 - `design/`: architecture and subsystem design notes
 - `specs/`: schema and contract docs
-- `dev/`: contributor rules, memory notes, and instrumentation guidance
+- `dev/`: contributor rules, memory notes, instrumentation, and CLI design notes
+  - `dev/MAN_CLI.md`: **`jplot man` design** (Portal-style dual human/agent manuals)
 - `roadmap/`: active implementation backlog and future work list
+
 - `templates/`: example scene, style, and profile payloads
 - `release/`: release playbooks and version notes
 - `archive/`: historical or retired notes
