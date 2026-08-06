@@ -5,15 +5,18 @@ but it can also be used as a **standalone scientific plotting tool**.
 
 It provides a simple command-line interface (CLI) to generate publication-quality figures from YAML configuration files, with most layout and style decisions handled by predefined profiles and style cards.
 
+Current package version: **1.4.2**.
+
 ---
 
 ## Installation
 
 ```bash
-pip install Jarvis-PLOT
+pip install JarvisPLOT
 ```
 
-The PyPI distribution name is now `Jarvis-PLOT`.
+The PyPI / distribution name is `JarvisPLOT` (normalized wheel name: `jarvisplot`).
+The product name remains **Jarvis-PLOT**.
 The Python import package and entrypoint remain unchanged:
 
 ```python
@@ -24,11 +27,11 @@ import jarvisplot
 jplot path/to/config.yaml
 ```
 
-If you have an older environment that still uses the historical package name, replace:
+If you have an older environment that still uses a historical package name, replace:
 
 ```bash
-pip uninstall jarvisplot
-pip install Jarvis-PLOT
+pip uninstall jarvisplot Jarvis-PLOT JarvisPLOT
+pip install JarvisPLOT
 ```
 
 ## Command-Line Usage
@@ -49,6 +52,20 @@ Rebuild local cache for the current project workdir:
 
 ```bash
 jplot path/to/config.yaml --rebuild-cache
+```
+
+Render a Jarvis-HEP flowchart scene JSON:
+
+```bash
+jplot flowchart path/to/scene.json
+# optional output path:
+jplot flowchart path/to/scene.json -o path/to/out.png
+```
+
+Library form:
+
+```python
+from jarvisplot import render_flowchart, render_flowchart_file
 ```
 
 ### Project Workdir and Cache
@@ -110,14 +127,17 @@ and evidence summary behavior.
 ### Required Packages
 - `numpy`
 - `pandas`
+- `polars`
 - `matplotlib`
 - `pyyaml`
 - `jsonschema`
 - `scipy` — numerical utilities
 - `h5py` — required for loading HDF5 data files
 - `shapely`
-- `scipy`
 - `sympy`
+- `loguru`
+- `deepmerge`
+- `Jarvis-Operas>=1.1.4`
 
 ### Github Page
 [https://github.com/Pengxuan-Zhu-Phys/Jarvis-PLOT](https://github.com/Pengxuan-Zhu-Phys/Jarvis-PLOT)
@@ -134,6 +154,7 @@ Tracked project docs live in `docs/`.
 - `docs/context/CODE_MAP_JARVIS_PLOT.md` - concrete code owner map
 - `docs/context/JARVIS_PLOT_FRAMEWORK_LOGIC.md` - runtime execution contract
 - `docs/roadmap/IMPLEMENTATION_ROADMAP.md` - active backlog and future work list
+- `docs/specs/AGENT_DATA_API.md` - planned agent bridge (spec only)
 - `docs/dev/DEVELOPER_RULES.md` - current pipeline and cache rules
 - `docs/dev/MEMORY_OPTIMIZATION_GUIDE.md` - narrow-table memory notes
 
