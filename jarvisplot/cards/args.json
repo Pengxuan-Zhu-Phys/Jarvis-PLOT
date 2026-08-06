@@ -14,8 +14,8 @@
         },
         {
             "name": "data",
-            "help": "inspect a data file (column names, ranges)",
-            "usage": "jplot data describe <file> [--json]",
+            "help": "inspect a data file (describe / head / eval)",
+            "usage": "jplot data describe|head|eval … [--json]",
             "kind": "agent"
         },
         {

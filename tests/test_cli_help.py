@@ -37,7 +37,7 @@ def test_root_help_uses_one_fixed_panel_width_and_aligned_columns(monkeypatch):
     assert "│ --rebuild-cache" in rendered
     assert "validate <file>" in rendered
     assert "cap [section]" in rendered
-    assert "data describe" in rendered
+    assert "data describe|head|eval" in rendered
 
     description_starts = {
         rendered.splitlines()[i].index(description)

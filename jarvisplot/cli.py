@@ -182,7 +182,7 @@ def render_help(*, prog: str = "jplot") -> str:
             f"{prog} <file>\n"
             f"{prog} validate <file> [--json]\n"
             f"{prog} cap [section] [--json]\n"
-            f"{prog} data describe <file> [--json]\n"
+            f"{prog} data describe|head|eval … [--json]\n"
             f"{prog} flowchart <flowchart_file>\n"
             f"{prog} -h\n"
             f"{prog} -v"
