@@ -522,9 +522,10 @@ M0+M1 **不破坏任何兼容**，可以在 1.5.x 发布。M4 才是 2.0。
 | ID | 标题 | 里程碑 | 依赖 | 规模 | 破坏 | 状态 |
 |---|---|---|---|---|---|---|
 | H1 | `examples list \| show` + CI 验证语料 | M4 | A2 | M | 否 | ☐ |
-| H2 | `explain <code \| type \| yaml>` | M2 | B4 | M | 否 | ☐ |
+| H2 | `explain <code \| type \| yaml>` | M2 | B4 | M | 否 | ☑ |
 | H3 | `YAML_DESIGN.md` 重排（type 前置） | M4 | G6 | L | 否 | ⊘ DR-07 |
-| H4 | `AGENT_PLAYBOOK.md`（给 agent 读的一页纸） | M1 | D5, C1 | S | 否 | ☐ |
+| H4 | **`jplot man`** 可调用手册（human Rich + agent `--json`） | M1 | D5, C1 | L | 否 | ☐ |
+| H4a | 设计：`docs/dev/MAN_CLI.md`（Portal man 对照 + 双受众） | — | — | S | 否 | ☑ |
 
 **H1 — `examples`**：CI 验证过的真实 YAML 语料。**few-shot 比 schema 更有效**——但前提是语料必须
 在 CI 里真的跑得过，否则就是新的幻觉源。
@@ -621,6 +622,8 @@ M0+M1 **不破坏任何兼容**，可以在 1.5.x 发布。M4 才是 2.0。
                         tests/test_config_edit.py
 2026-08-06 | F5  | 部分 | `config rm` 已支持按地址删层；add-layer/move 未做
 2026-08-06 | M3  | 进度 | F1–F4 起草/改配置主路径已通；F5 add-layer / F6 semantic diff 仍待
+2026-08-06 | H4a | 设计 | `docs/dev/MAN_CLI.md`：对照 Portal man；human 默认 Rich、agent `--json` 长文；
+                        写 YAML 不经 CLI；card 数据与渲染分离
 2026-08-06 | —   | 建账 | 从两份 V2 brainstorm 落成 46 条任务 / 5 个里程碑 / 7 条待拍板 DR
 2026-08-06 | A1  | 完成 | 新增 diagnostics.py（Diagnostic/Fix/DiagnosticBag/did_you_mean/join_path）
                         + agent_io.py（envelope/emit/exit_code_for）；23 条测试
