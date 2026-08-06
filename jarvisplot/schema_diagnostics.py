@@ -61,9 +61,22 @@ def _unknown_key(error: ValidationError) -> list[Diagnostic]:
     out: list[Diagnostic] = []
     for key in keys:
         near = did_you_mean(key, allowed)
-        # A key that differs only in case is a certain rename; anything else is
-        # a guess, and `--fix` must not apply guesses by default.
-        case_only = bool(near) and near[0].lower() == key.lower()
+        # Case-only renames are certain. A single high-ratio match (e.g.
+        # outputs→output) is also safe enough for default ``--fix``; weaker
+        # guesses stay heuristic and need ``--fix-unsafe``.
+        certain = False
+        if near:
+            if near[0].lower() == key.lower():
+                certain = True
+            elif len(near) == 1:
+                import difflib
+
+                certain = (
+                    difflib.SequenceMatcher(
+                        None, key.lower(), near[0].lower()
+                    ).ratio()
+                    >= 0.85
+                )
         suggestion = (
             f"Rename it to {near[0]!r}."
             if near
@@ -75,7 +88,7 @@ def _unknown_key(error: ValidationError) -> list[Diagnostic]:
                 path=_path(error, key),
                 old=key,
                 to=near[0],
-                confidence="certain" if case_only else "heuristic",
+                confidence="certain" if certain else "heuristic",
             )
             if near
             else None
