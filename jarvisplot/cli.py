@@ -186,6 +186,7 @@ def render_help(*, prog: str = "jplot") -> str:
             f"{prog} template list|show <kind> [--json]\n"
             f"{prog} suggest --data <file> --kind <kind> [--json]\n"
             f"{prog} explain <JP-CODE|yaml> [--json]\n"
+            f"{prog} config get <file> <addr> [--json]\n"
             f"{prog} cap [section] [--json]\n"
             f"{prog} data describe|head|eval|suggest-axes … [--json]\n"
             f"{prog} flowchart <flowchart_file>\n"
