@@ -13,6 +13,7 @@ Current package version: **1.4.2** (`pyproject.toml`).
 - `specs/`: schema and contract docs
 - `dev/`: contributor rules, memory notes, instrumentation, and CLI design notes
   - `dev/MAN_CLI.md`: **`jplot man` design** (Portal-style dual human/agent manuals)
+  - `dev/YAML_HUMAN_AI_OCCAM_REVIEW.md`: YAML Occam review (human+AI)
 - `roadmap/`: active implementation backlog and future work list
 
 - `templates/`: example scene, style, and profile payloads
