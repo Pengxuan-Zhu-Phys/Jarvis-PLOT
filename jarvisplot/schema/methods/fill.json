@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/methods/fill.json",
+  "title": "method: fill",
+  "description": "Coordinate contract for layers[].method='fill' (matplotlib: fill). Required axes must appear under coordinates.",
+  "x-jarvis-zone": "closed",
+  "x-jarvis-method": "fill",
+  "x-jarvis-mpl": "fill",
+  "x-jarvis-axes-types": [
+    "rect",
+    "any"
+  ],
+  "x-jarvis-coordinates": {
+    "required": [
+      "x",
+      "y"
+    ],
+    "optional": [],
+    "alternatives": []
+  },
+  "x-jarvis-example": "method: fill\ncoordinates:\n  x: {expr: x}\n  y: {expr: y}",
+  "type": "object",
+  "properties": {
+    "method": {
+      "const": "fill"
+    },
+    "coordinates": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "additionalProperties": true,
+      "description": "Required axes for fill: x, y. Optional: (none)."
+    }
+  },
+  "additionalProperties": true
+}

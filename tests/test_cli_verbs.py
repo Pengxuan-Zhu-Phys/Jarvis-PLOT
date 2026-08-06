@@ -45,6 +45,9 @@ def good_config(tmp_path):
                   - source: df
                 axes: ax
                 method: scatter
+                coordinates:
+                  x: {expr: x}
+                  y: {expr: y}
         output: {dir: ./plots}
         """,
     )
@@ -167,7 +170,10 @@ def test_validate_reports_every_problem_in_one_pass(tmp_path, capsys):
         Figures:
           - name: f1
             layers:
-              - {name: a, data: [{source: dff}], method: scatter}
+              - name: a
+                data: [{source: dff}]
+                method: scatter
+                coordinates: {x: {expr: x}, y: {expr: y}}
           - name: f1
             layers: {}
         """,
@@ -195,7 +201,10 @@ def test_validate_suggests_the_right_dataset_name(tmp_path, capsys):
         Figures:
           - name: f1
             layers:
-              - {name: a, data: [{source: df_smaples_0}], method: scatter}
+              - name: a
+                data: [{source: df_smaples_0}]
+                method: scatter
+                coordinates: {x: {expr: x}, y: {expr: y}}
         """,
     )
     main(["validate", str(config), "--json"])
@@ -207,7 +216,7 @@ def test_validate_suggests_the_right_dataset_name(tmp_path, capsys):
 
 def test_validate_accepts_share_data_as_a_source(tmp_path, capsys):
     """`share_data` publishes a name; consuming it is not an unknown source."""
-    (tmp_path / "samples.csv").write_text("x\n1\n", encoding="utf-8")
+    (tmp_path / "samples.csv").write_text("x,y\n1,2\n", encoding="utf-8")
     config = _write(
         tmp_path,
         "shared.yaml",
@@ -217,8 +226,15 @@ def test_validate_accepts_share_data_as_a_source(tmp_path, capsys):
         Figures:
           - name: f1
             layers:
-              - {name: a, data: [{source: df}], share_data: prof, method: scatter}
-              - {name: b, data: [{source: prof}], method: voronoi}
+              - name: a
+                data: [{source: df}]
+                share_data: prof
+                method: scatter
+                coordinates: {x: {expr: x}, y: {expr: y}}
+              - name: b
+                data: [{source: prof}]
+                method: voronoi
+                coordinates: {x: {expr: x}, y: {expr: y}}
         """,
     )
     assert main(["validate", str(config), "--json"]) == 0

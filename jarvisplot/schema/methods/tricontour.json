@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/methods/tricontour.json",
+  "title": "method: tricontour",
+  "description": "Coordinate contract for layers[].method='tricontour' (matplotlib: tricontour). Required axes must appear under coordinates.",
+  "x-jarvis-zone": "closed",
+  "x-jarvis-method": "tricontour",
+  "x-jarvis-mpl": "tricontour",
+  "x-jarvis-axes-types": [
+    "tri",
+    "any"
+  ],
+  "x-jarvis-coordinates": {
+    "required": [
+      "x",
+      "y",
+      "z"
+    ],
+    "optional": [],
+    "alternatives": []
+  },
+  "x-jarvis-example": "method: tricontour\ncoordinates:\n  x: {expr: x}\n  y: {expr: y}\n  z: {expr: z}",
+  "type": "object",
+  "properties": {
+    "method": {
+      "const": "tricontour"
+    },
+    "coordinates": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "additionalProperties": true,
+      "description": "Required axes for tricontour: x, y, z. Optional: (none)."
+    }
+  },
+  "additionalProperties": true
+}

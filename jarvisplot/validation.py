@@ -128,6 +128,7 @@ def validate_config(
     resolved_paths = _check_dataset_files(config, base_dir, bag)
     _check_unique_names(config, bag)
     _check_layer_sources(config, set(resolved_paths) | _collect_shared_names(config), bag)
+    _check_method_contracts(config, bag)
     _check_ignored_keys(config, bag)
     if check_columns:
         _check_columns_exist(config, resolved_paths, bag)
@@ -418,6 +419,62 @@ def _index_of(config: dict[str, Any], name: str) -> int:
         if isinstance(entry, dict) and str(entry.get("name", "")).strip() == name:
             return index
     return 0
+
+
+# --------------------------------------------------------------------------- #
+# Method coordinate contracts (B5)
+# --------------------------------------------------------------------------- #
+
+
+def _check_method_contracts(config: dict[str, Any], bag: DiagnosticBag) -> None:
+    """Enforce layers[].method coordinate requirements before render."""
+    from .Figure.method_registry import METHOD_DISPATCH, normalize_method_key
+    from .diagnostics import did_you_mean
+    from .method_contracts import contract_for, missing_coordinates
+
+    for figure_index, figure in enumerate(config.get("Figures") or ()):
+        if not isinstance(figure, dict) or "type" in figure:
+            continue
+        for layer_index, layer in enumerate(figure.get("layers") or ()):
+            if not isinstance(layer, dict):
+                continue
+            method = layer.get("method")
+            if not isinstance(method, str) or not method.strip():
+                continue
+            key = normalize_method_key(method)
+            base = join_path("Figures", figure_index, "layers", layer_index)
+            if key not in METHOD_DISPATCH:
+                near = did_you_mean(key, METHOD_DISPATCH)
+                hint = f" Did you mean {near[0]!r}?" if near else ""
+                bag.error(
+                    "JP-MTH-001",
+                    join_path(base, "method"),
+                    f"unknown method {method!r}.{hint}",
+                    context={
+                        "method": method,
+                        "did_you_mean": near,
+                        "available_methods": sorted(METHOD_DISPATCH)[:40],
+                    },
+                )
+                continue
+
+            missing = missing_coordinates(key, layer.get("coordinates"))
+            if not missing:
+                continue
+            contract = contract_for(key) or {}
+            required = list(contract.get("required") or ())
+            for axis in missing:
+                bag.error(
+                    "JP-MTH-002",
+                    join_path(base, "coordinates"),
+                    f"method={key!r} requires coordinates.{axis}",
+                    context={
+                        "method": key,
+                        "missing": axis,
+                        "required": required,
+                        "optional": list(contract.get("optional") or ()),
+                    },
+                )
 
 
 # --------------------------------------------------------------------------- #

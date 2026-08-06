@@ -228,7 +228,11 @@ def test_missing_data_file_suppresses_the_column_check(tmp_path):
         Figures:
           - name: f1
             layers:
-              - {name: s, data: [{source: df}], axes: ax, method: plot, coordinates: {x: {expr: aa}}}
+              - name: s
+                data: [{source: df}]
+                axes: ax
+                method: plot
+                coordinates: {x: {expr: aa}, y: {expr: bb}}
         """,
     )
     assert {d.code for d in bag} == {"JP-DAT-004"}

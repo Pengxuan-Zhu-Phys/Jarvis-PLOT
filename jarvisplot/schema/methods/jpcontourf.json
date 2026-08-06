@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/methods/jpcontourf.json",
+  "title": "method: jpcontourf",
+  "description": "Coordinate contract for layers[].method='jpcontourf' (matplotlib: jpcontourf). Required axes must appear under coordinates.",
+  "x-jarvis-zone": "closed",
+  "x-jarvis-method": "jpcontourf",
+  "x-jarvis-mpl": "jpcontourf",
+  "x-jarvis-axes-types": [
+    "rect",
+    "tri",
+    "any"
+  ],
+  "x-jarvis-coordinates": {
+    "required": [
+      "x",
+      "y",
+      "z"
+    ],
+    "optional": [],
+    "alternatives": []
+  },
+  "x-jarvis-example": "method: jpcontourf\ncoordinates:\n  x: {expr: x}\n  y: {expr: y}\n  z: {expr: z}",
+  "type": "object",
+  "properties": {
+    "method": {
+      "const": "jpcontourf"
+    },
+    "coordinates": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "additionalProperties": true,
+      "description": "Required axes for jpcontourf: x, y, z. Optional: (none)."
+    }
+  },
+  "additionalProperties": true
+}

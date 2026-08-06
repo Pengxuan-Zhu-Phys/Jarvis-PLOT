@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/methods/pcolormesh.json",
+  "title": "method: pcolormesh",
+  "description": "Coordinate contract for layers[].method='pcolormesh' (matplotlib: pcolormesh). Required axes must appear under coordinates.",
+  "x-jarvis-zone": "closed",
+  "x-jarvis-method": "pcolormesh",
+  "x-jarvis-mpl": "pcolormesh",
+  "x-jarvis-axes-types": [
+    "rect",
+    "any"
+  ],
+  "x-jarvis-coordinates": {
+    "required": [
+      "x",
+      "y",
+      "z"
+    ],
+    "optional": [],
+    "alternatives": []
+  },
+  "x-jarvis-example": "method: pcolormesh\ncoordinates:\n  x: {expr: x}\n  y: {expr: y}\n  z: {expr: z}",
+  "type": "object",
+  "properties": {
+    "method": {
+      "const": "pcolormesh"
+    },
+    "coordinates": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "additionalProperties": true,
+      "description": "Required axes for pcolormesh: x, y, z. Optional: (none)."
+    }
+  },
+  "additionalProperties": true
+}
