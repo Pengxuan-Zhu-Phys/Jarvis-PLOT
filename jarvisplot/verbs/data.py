@@ -28,6 +28,7 @@ __all__ = [
     "eval_on_file",
     "head_file",
     "run",
+    "suggest_axes",
 ]
 
 SUBCOMMANDS = ("describe", "head", "eval", "suggest-axes")
@@ -116,6 +117,18 @@ def build_parser(prog: str = "jplot data") -> argparse.ArgumentParser:
         default=5,
         help="how many sample values to return (default: 5)",
     )
+
+    axes = sub.add_parser(
+        "suggest-axes",
+        help="per-column scale/lim suggestions for frame.ax",
+    )
+    axes.add_argument("file", help="path to csv / parquet / hdf5")
+    _common_source(axes)
+    axes.add_argument(
+        "--cols",
+        default=None,
+        help="comma-separated column subset (default: all numeric)",
+    )
     return parser
 
 
@@ -133,6 +146,7 @@ def run(argv: Sequence[str], *, prog: str = "jplot data") -> int:
         "describe": _run_describe,
         "head": _run_head,
         "eval": _run_eval,
+        "suggest-axes": _run_suggest_axes,
     }
     handler = handlers.get(action)
     if handler is None:
@@ -142,7 +156,7 @@ def run(argv: Sequence[str], *, prog: str = "jplot data") -> int:
             error=error_payload(
                 "UsageError",
                 f"data action {action!r} is not implemented yet "
-                f"(available: describe, head, eval; planned: suggest-axes)",
+                f"(available: describe, head, eval, suggest-axes)",
             ),
         )
         return emit(env) if as_json else _usage_err(env)
@@ -190,6 +204,24 @@ def _run_head(args, *, as_json: bool, prog: str) -> int:
     if as_json:
         return emit(env)
     _print_head(data)
+    return EXIT_OK
+
+
+def _run_suggest_axes(args, *, as_json: bool, prog: str) -> int:
+    try:
+        data = suggest_axes(
+            args.file,
+            cols=args.cols,
+            file_type=args.file_type,
+            group=args.group,
+        )
+    except Exception as exc:
+        return _emit_failure("data.suggest_axes", args.file, exc, as_json=as_json)
+
+    env = envelope("data.suggest_axes", True, data=data)
+    if as_json:
+        return emit(env)
+    _print_suggest_axes(data)
     return EXIT_OK
 
 
@@ -344,6 +376,113 @@ def head_file(
         "columns": [str(c) for c in head.columns],
         "rows": rows,
     }
+
+
+def suggest_axes(
+    path: str,
+    *,
+    cols: str | None = None,
+    file_type: str = "auto",
+    group: str | None = None,
+) -> dict[str, Any]:
+    """Suggest frame-style ``scale`` / ``lim`` for numeric columns."""
+    import numpy as np
+    from pandas.api import types as pdt
+
+    resolved = _resolve_path(path)
+    kind = _detect_type(resolved, file_type)
+    df = _load_dataframe(resolved, kind=kind, group=group)
+    wanted = _parse_cols(cols)
+    axes: list[dict[str, Any]] = []
+    for col in df.columns:
+        name = str(col)
+        if wanted is not None and name not in wanted:
+            continue
+        series = df[col]
+        if not pdt.is_numeric_dtype(series.dtype) or pdt.is_bool_dtype(series.dtype):
+            continue
+        values = series.dropna().to_numpy(dtype=float, copy=False)
+        if values.size == 0:
+            axes.append(
+                {
+                    "col": name,
+                    "scale": "linear",
+                    "lim": None,
+                    "reason": "no finite values",
+                }
+            )
+            continue
+        positive = bool(np.all(values > 0))
+        vmin = float(np.min(values))
+        vmax = float(np.max(values))
+        q_lo, q_hi = np.quantile(values, [0.005, 0.995])
+        decades = float(np.log10(vmax / vmin)) if positive and vmin > 0 else 0.0
+        if positive and decades >= 2.0:
+            scale = "log"
+            lo = _nice_log_bound(float(q_lo), direction="down")
+            hi = _nice_log_bound(float(q_hi), direction="up")
+            reason = (
+                f"all positive; spans {decades:.2f} decades; "
+                f"lim from q0.5%–q99.5% rounded outward on a log scale"
+            )
+        else:
+            scale = "linear"
+            lo, hi = _nice_linear_bounds(float(q_lo), float(q_hi))
+            reason = (
+                f"spans {decades:.2f} decades"
+                if positive
+                else "not strictly positive"
+            ) + "; lim from q0.5%–q99.5% rounded outward"
+        axes.append(
+            {
+                "col": name,
+                "scale": scale,
+                "lim": [lo, hi],
+                "reason": reason,
+                "stats": {
+                    "min": vmin,
+                    "max": vmax,
+                    "q005": float(q_lo),
+                    "q995": float(q_hi),
+                    "positive": positive,
+                    "decades": decades if positive else None,
+                },
+            }
+        )
+    return {"path": resolved, "type": kind, "axes": axes}
+
+
+def _nice_linear_bounds(lo: float, hi: float) -> tuple[float, float]:
+    import math
+
+    if not math.isfinite(lo) or not math.isfinite(hi):
+        return lo, hi
+    if lo == hi:
+        pad = abs(lo) * 0.1 if lo else 1.0
+        return lo - pad, hi + pad
+    span = hi - lo
+    step = 10 ** math.floor(math.log10(span)) if span > 0 else 1.0
+    # expand slightly so data is not flush with the frame
+    lo2 = math.floor(lo / step) * step
+    hi2 = math.ceil(hi / step) * step
+    if lo2 == hi2:
+        hi2 = lo2 + step
+    return float(lo2), float(hi2)
+
+
+def _nice_log_bound(value: float, *, direction: str) -> float:
+    import math
+
+    if value <= 0 or not math.isfinite(value):
+        return value
+    exp = math.floor(math.log10(value))
+    base = 10.0**exp
+    candidates = [m * base for m in (1.0, 2.0, 5.0, 10.0)]
+    if direction == "down":
+        below = [c for c in candidates if c <= value]
+        return float(below[-1] if below else base / 10.0)
+    above = [c for c in candidates if c >= value]
+    return float(above[0] if above else base * 10.0)
 
 
 def eval_on_file(
@@ -858,6 +997,16 @@ def _print_eval(data: dict[str, Any]) -> None:
         file=sys.stderr,
     )
     print(f"  sample: {data.get('sample')}", file=sys.stderr)
+
+
+def _print_suggest_axes(data: dict[str, Any]) -> None:
+    print(f"{data.get('type')}  {data.get('path')}", file=sys.stderr)
+    for axis in data.get("axes") or []:
+        print(
+            f"  {axis['col']}: scale={axis.get('scale')}  lim={axis.get('lim')}  "
+            f"({axis.get('reason')})",
+            file=sys.stderr,
+        )
 
 
 def _usage_err(env: dict) -> int:
