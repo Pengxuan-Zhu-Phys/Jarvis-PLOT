@@ -154,13 +154,30 @@ _GUIDANCE_BY_CODE: dict[str, tuple[str, Optional[str]]] = {
         "Relax the filter / density cut, or verify the expression with jplot data eval.",
         'transform:\n  - filter: "LogL > -100"',
     ),
+    "JP-VIZ-004": (
+        "Raise frame.axc.color.vmax (or the layer colorbar limits) so the colour "
+        "scale covers the data, or clip the colour channel.",
+        "frame:\n  axc:\n    color: {vmin: 0, vmax: 1}",
+    ),
     "JP-VIZ-005": (
         "Filter non-positive values, switch to a linear scale, or shift the data.",
         "frame:\n  ax:\n    xscale: linear",
     ),
+    "JP-VIZ-006": (
+        "Raise the lower layer's zorder, lower the covering mesh zorder, or reduce opacity.",
+        "style: {zorder: 5}",
+    ),
+    "JP-VIZ-007": (
+        "Shrink the interpolation domain, densify support points, or mask exterior cells.",
+        None,
+    ),
     "JP-VIZ-008": (
         "Tighten xlim/ylim around the data, or check coordinate units/scale.",
         None,
+    ),
+    "JP-VIZ-009": (
+        "Align style.label with frame.<axes>.legend labels, or remove the legend block.",
+        "frame:\n  ax:\n    legend: {labels: [signal]}",
     ),
     # Methods / coordinates
     "JP-MTH-001": (

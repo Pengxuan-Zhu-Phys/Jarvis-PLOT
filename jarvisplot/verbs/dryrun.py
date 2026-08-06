@@ -32,6 +32,16 @@ def build_parser(prog: str = "jplot dryrun") -> argparse.ArgumentParser:
         action="store_true",
         help="emit one JSON envelope on stdout",
     )
+    parser.add_argument(
+        "--with-data",
+        action="store_true",
+        help="write per-layer parquet twins under .cache/agent_twins/ (or --out-dir)",
+    )
+    parser.add_argument(
+        "--out-dir",
+        default=None,
+        help="directory for --with-data twins (default: <yaml-dir>/.cache/agent_twins)",
+    )
     return parser
 
 
@@ -43,11 +53,16 @@ def run(argv: Sequence[str], *, prog: str = "jplot dryrun") -> int:
         return int(exc.code or EXIT_USAGE)
 
     as_json = bool(args.json) or not sys.stdout.isatty()
-    report, bag = dryrun_file(args.file)
+    report, bag = dryrun_file(
+        args.file,
+        with_data=bool(args.with_data),
+        out_dir=args.out_dir,
+    )
     data = {
         "file": report.get("file", args.file),
         "datasets": report.get("datasets") or {},
         "layers": report.get("layers") or [],
+        "twins": report.get("twins") or {},
         "error_count": len(bag.errors),
         "warning_count": len(bag.warnings),
     }

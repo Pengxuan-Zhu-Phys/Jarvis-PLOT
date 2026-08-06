@@ -21,7 +21,7 @@
         {
             "name": "dryrun",
             "help": "load data + transforms, row ledger + JP-VIZ health (no render)",
-            "usage": "jplot dryrun <file> [--json]",
+            "usage": "jplot dryrun <file> [--json] [--with-data]",
             "kind": "agent"
         },
         {
