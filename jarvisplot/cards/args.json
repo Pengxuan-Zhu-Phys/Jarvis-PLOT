@@ -1,71 +1,119 @@
 {
+    "help_groups": [
+        {
+            "title": "Discover",
+            "commands": ["data", "cap", "man", "explain", "context"]
+        },
+        {
+            "title": "Draft & edit",
+            "commands": ["template", "suggest", "config"]
+        },
+        {
+            "title": "Judge",
+            "commands": ["validate", "dryrun", "doctor"]
+        },
+        {
+            "title": "Render",
+            "commands": ["file"]
+        },
+        {
+            "title": "Flowchart",
+            "commands": ["flowchart"]
+        }
+    ],
+
     "commands": [
         {
-            "name": "validate",
-            "help": "check a YAML config without rendering it",
-            "usage": "jplot validate <file> [--json] [--fix [--diff|--write]]",
-            "kind": "agent"
+            "name": "data",
+            "help": "inspect a data file (describe / head / eval / suggest-axes)",
+            "usage": "jplot data describe|head|eval|suggest-axes … [--json]",
+            "kind": "agent",
+            "group": "Discover"
         },
         {
             "name": "cap",
             "help": "list legal strings (methods, styles, cmaps, funcs, …)",
             "usage": "jplot cap [all|methods|transforms|types|styles|cmaps|funcs|cli] [--json]",
-            "kind": "agent"
+            "kind": "agent",
+            "group": "Discover"
         },
         {
-            "name": "data",
-            "help": "inspect a data file (describe / head / eval / suggest-axes)",
-            "usage": "jplot data describe|head|eval|suggest-axes … [--json]",
-            "kind": "agent"
-        },
-        {
-            "name": "dryrun",
-            "help": "load data + transforms, row ledger + JP-VIZ health (no render)",
-            "usage": "jplot dryrun <file> [--json] [--with-data]",
-            "kind": "agent"
-        },
-        {
-            "name": "doctor",
-            "help": "validate + dryrun in one pass",
-            "usage": "jplot doctor <file> [--json]",
-            "kind": "agent"
-        },
-        {
-            "name": "template",
-            "help": "list/show type-first YAML templates + slots",
-            "usage": "jplot template list|show <kind> [--json]",
-            "kind": "agent"
-        },
-        {
-            "name": "suggest",
-            "help": "synthesize a YAML from a data file (kind + columns)",
-            "usage": "jplot suggest --data <file> --kind posterior_2d [--x …] [--json]",
-            "kind": "agent"
+            "name": "man",
+            "help": "callable manual (index or topic; --json for agents)",
+            "usage": "jplot man [topic] [--json]",
+            "kind": "agent",
+            "group": "Discover"
         },
         {
             "name": "explain",
             "help": "explain a JP-* code or expand type: figures to layers",
             "usage": "jplot explain <JP-CODE|yaml> [--json]",
-            "kind": "agent"
+            "kind": "agent",
+            "group": "Discover"
+        },
+        {
+            "name": "context",
+            "help": "(advanced) discover pack; prefer man/cap + YAML agent_output for digests",
+            "usage": "jplot context --data <file> [--kind profile_2d] [--json]",
+            "kind": "agent",
+            "group": "Discover"
+        },
+        {
+            "name": "template",
+            "help": "list/show type-first YAML templates + slots",
+            "usage": "jplot template list|show <kind> [--json]",
+            "kind": "agent",
+            "group": "Draft & edit"
+        },
+        {
+            "name": "suggest",
+            "help": "synthesize a YAML from a data file (kind + columns)",
+            "usage": "jplot suggest --data <file> --kind posterior_2d [--x …] [--json]",
+            "kind": "agent",
+            "group": "Draft & edit"
         },
         {
             "name": "config",
-            "help": "read/write YAML by named address (get / paths / set / rm)",
-            "usage": "jplot config get|set|rm|paths … [--json] [--write]",
-            "kind": "agent"
+            "help": "read/write YAML by named address (get / paths / set / rm / expand)",
+            "usage": "jplot config get|set|rm|paths|expand … [--json] [--write]",
+            "kind": "agent",
+            "group": "Draft & edit"
+        },
+        {
+            "name": "validate",
+            "help": "check a YAML config without rendering it",
+            "usage": "jplot validate <file> [--json] [--fix [--diff|--write]]",
+            "kind": "agent",
+            "group": "Judge"
+        },
+        {
+            "name": "dryrun",
+            "help": "load data + transforms, row ledger + JP-VIZ health (no render)",
+            "usage": "jplot dryrun <file> [--json] [--with-data]",
+            "kind": "agent",
+            "group": "Judge"
+        },
+        {
+            "name": "doctor",
+            "help": "validate + dryrun in one pass",
+            "usage": "jplot doctor <file> [--json]",
+            "kind": "agent",
+            "group": "Judge"
         },
         {
             "name": "flowchart",
             "help": "render a Jarvis-HEP flowchart scene JSON",
             "usage": "jplot flowchart <flowchart_file>",
-            "kind": "legacy"
+            "kind": "legacy",
+            "group": "Flowchart"
         }
     ],
 
     "positionals": [
         {
             "name": "file",
-            "help": "YAML to render (bare path = plot; not a verb — see DR-08)"
+            "help": "YAML to render (bare path; not a verb — DR-08)",
+            "group": "Render"
         },
         {
             "name": "flowchart_file",
@@ -97,7 +145,7 @@
         {
             "long": "--out",
             "dest": "out",
-            "help": "output YAML path or flowchart image path",
+            "help": "with --parse-data: output YAML path; with flowchart: image path. Does NOT redirect normal figure PNG/PDF (those use YAML output.dir)",
             "action": "store",
             "metavar": "PATH"
 
@@ -105,7 +153,7 @@
         {
             "long": "--inplace",
             "dest": "inplace",
-            "help": "modify the input YAML file in place",
+            "help": "with --parse-data: rewrite the input YAML in place (not for figure images)",
             "action": "store_true"
         },
         {

@@ -1,0 +1,33 @@
+id: style-axes
+title: Style cards and axes
+summary: Style tokens pick geometry; frame.ax / axc hold labels, scales, colorbar.
+role: trap
+priority: 45
+see_also: [yaml-root, type-posterior-2d, layer-method]
+related_cli:
+  - argv: [jplot, cap, styles, "--json"]
+    why: usable style tokens (bad cards filtered)
+  - argv: [jplot, cap, cmaps, "--json"]
+    why: legal colormap names
+live_sources:
+  - verb: cap.styles
+    truth: style card tokens with usable flag
+  - verb: cap.cmaps
+    truth: registered colormaps
+human:
+  panels:
+    - kind: overview
+      title: Two-level style
+      body: |
+        Figure style: [geometry_token, family_token] e.g. a4paper_2x1 + rectcmap.
+        Colorbar / axis limits live on frame (or type macro slots), not invented keys.
+    - kind: notes
+      title: Traps
+      items:
+        - axc / colorbar only make sense with *cmap style families.
+        - Prefer cap styles over memorizing card filenames.
+        - Unusable cards are reported by cap; do not force them.
+agent:
+  anti_patterns:
+    - Inventing style token strings
+    - Expecting layer-level lim/scale to drive axes

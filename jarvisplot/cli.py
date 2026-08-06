@@ -5,16 +5,30 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import shutil
 import sys
 from importlib.metadata import version as _pkg_version
-from io import StringIO
 from typing import Any, Sequence
 
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
-from rich.text import Text
+from .cli_help import (
+    HELP_ALIAS_COLUMN_WIDTH,
+    HELP_PRIMARY_COLUMN_WIDTH,
+    RichArgumentParser,
+    help_panel,
+    render_help_page,
+    terminal_width,
+)
+
+# Re-export geometry helpers so existing tests / importers keep working.
+__all__ = [
+    "CLI",
+    "JPLOT_VERSION",
+    "RichArgumentParser",
+    "help_panel",
+    "render_flowchart_help",
+    "render_help",
+    "render_help_page",
+    "terminal_width",
+]
 
 
 def _resolve_version() -> str:
@@ -29,61 +43,19 @@ def _resolve_version() -> str:
 
 JPLOT_VERSION = _resolve_version()
 
-_HELP_PRIMARY_COLUMN_WIDTH = 24
-_HELP_ALIAS_COLUMN_WIDTH = 6
+# Back-compat private names used by tests that patch module attrs.
+_HELP_PRIMARY_COLUMN_WIDTH = HELP_PRIMARY_COLUMN_WIDTH
+_HELP_ALIAS_COLUMN_WIDTH = HELP_ALIAS_COLUMN_WIDTH
 
 
 def _terminal_width() -> int:
-    return max(80, shutil.get_terminal_size().columns)
+    return terminal_width()
 
 
-def help_panel(
-    title: str,
-    rows: Sequence[tuple[str, str, str]],
-    *,
-    width: int,
-    primary_style: str = "bold cyan",
-) -> Panel:
-    """Build one fixed-column panel shared by root and subcommand help."""
-    table = Table(
-        show_header=False,
-        expand=True,
-        box=None,
-        pad_edge=False,
-        padding=(0, 1),
-    )
-    table.add_column(
-        width=_HELP_PRIMARY_COLUMN_WIDTH,
-        no_wrap=True,
-        style=primary_style,
-    )
-    table.add_column(
-        width=_HELP_ALIAS_COLUMN_WIDTH,
-        no_wrap=True,
-        style="bold cyan",
-    )
-    table.add_column(ratio=1, overflow="fold")
-    for primary, alias, description in rows:
-        table.add_row(Text(primary), Text(alias), Text(description))
-    return Panel(
-        table,
-        title=Text(title, style="bold magenta"),
-        title_align="left",
-        border_style="dim",
-        width=width,
-    )
+def _usage_panel(title: str, usage: str, *, width: int):
+    from .cli_help import usage_panel
 
-
-def _usage_panel(title: str, usage: str, *, width: int) -> Panel:
-    usage_text = Text("Usage:\n", style="yellow")
-    usage_text.append(usage, style="bold yellow")
-    return Panel(
-        usage_text,
-        title=Text(title, style="bold magenta"),
-        title_align="left",
-        border_style="dim",
-        width=width,
-    )
+    return usage_panel(title, usage, width=width)
 
 
 def _render_help_page(
@@ -92,28 +64,7 @@ def _render_help_page(
     usage: str,
     sections: Sequence[tuple[str, Sequence[tuple[str, str, str]], str]],
 ) -> str:
-    """Render a help page with the fixed Jarvis2 CLI geometry."""
-    width = _terminal_width()
-    is_tty = sys.stdout.isatty()
-    buffer = StringIO()
-    console = Console(
-        file=buffer,
-        width=width,
-        force_terminal=is_tty,
-        color_system="standard" if is_tty else None,
-        highlight=False,
-    )
-    console.print(_usage_panel(title, usage, width=width))
-    for section_title, rows, primary_style in sections:
-        console.print(
-            help_panel(
-                section_title,
-                rows,
-                width=width,
-                primary_style=primary_style,
-            )
-        )
-    return buffer.getvalue()
+    return render_help_page(title=title, usage=usage, sections=sections)
 
 
 def _load_cli_spec() -> dict[str, Any]:
@@ -152,50 +103,91 @@ def _option_rows(spec: dict[str, Any], *, flowchart: bool = False) -> list[tuple
     return rows
 
 
-def _command_rows(spec: dict[str, Any]) -> list[tuple[str, str, str]]:
-    """Commands come from ``cards/args.json`` so the CLI stays self-describing."""
-    return [
-        (str(command.get("name", "")), "", str(command.get("help", "")))
+def _command_by_name(spec: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {
+        str(command.get("name", "")): command
         for command in spec.get("commands", [])
         if command.get("name")
+    }
+
+
+def _grouped_command_sections(
+    spec: dict[str, Any],
+) -> list[tuple[str, list[tuple[str, str, str]], str]]:
+    """Build Jarvis2-style operation panels from ``help_groups`` + command meta.
+
+    Order follows ``help_groups`` (Discover → Draft & edit → Judge → Render).
+    Commands missing from the map still appear under the group that names them;
+    unknown leftovers fall into a final "Other" panel so the CLI never hides a verb.
+    """
+    by_name = _command_by_name(spec)
+    # Synthetic render entry: bare path is not a verb (DR-08).
+    synthetic = {
+        "file": {
+            "name": "file",
+            "help": "YAML to render (bare path; not a verb — DR-08)",
+        }
+    }
+    claimed: set[str] = set()
+    sections: list[tuple[str, list[tuple[str, str, str]], str]] = []
+
+    groups = spec.get("help_groups")
+    if not isinstance(groups, list) or not groups:
+        # Fallback: single panel (old shape).
+        rows = [
+            (str(c.get("name", "")), "", str(c.get("help", "")))
+            for c in spec.get("commands", [])
+            if c.get("name")
+        ]
+        rows.insert(0, ("file", "", synthetic["file"]["help"]))
+        return [("Commands", rows, "bold cyan")]
+
+    for group in groups:
+        if not isinstance(group, dict):
+            continue
+        title = str(group.get("title") or "Commands").strip() or "Commands"
+        names = group.get("commands") or []
+        rows: list[tuple[str, str, str]] = []
+        for raw in names:
+            name = str(raw)
+            if name in claimed:
+                continue
+            meta = by_name.get(name) or synthetic.get(name)
+            if meta is None:
+                continue
+            rows.append((name, "", str(meta.get("help", ""))))
+            claimed.add(name)
+        if rows:
+            sections.append((title, rows, "bold cyan"))
+
+    leftovers = [
+        (str(c.get("name", "")), "", str(c.get("help", "")))
+        for c in spec.get("commands", [])
+        if c.get("name") and str(c.get("name")) not in claimed
     ]
+    if leftovers:
+        sections.append(("Other", leftovers, "bold cyan"))
+    return sections
 
 
 def render_help(*, prog: str = "jplot") -> str:
-    """Render the root ``jplot -h`` page."""
+    """Render the root ``jplot -h`` page (Jarvis2-style operation groups)."""
     spec = _load_cli_spec()
-    sections = [
-        ("Commands", _command_rows(spec), "bold cyan"),
-        (
-            "Inputs",
-            [
-                ("file", "", "YAML to render (bare path; not a verb)"),
-                ("flowchart_file", "", "path to a flowchart scene JSON"),
-            ],
-            "bold cyan",
-        ),
-        ("Options", _option_rows(spec), "bold cyan"),
-    ]
+    sections = _grouped_command_sections(spec)
+    sections.append(("Options", _option_rows(spec), "bold cyan"))
     return _render_help_page(
         title="Jarvis-PLOT",
         usage=(
             f"{prog} <file>\n"
-            f"{prog} validate <file> [--json] [--fix]\n"
-            f"{prog} dryrun <file> [--json]\n"
-            f"{prog} doctor <file> [--json]\n"
-            f"{prog} template list|show <kind> [--json]\n"
-            f"{prog} suggest --data <file> --kind <kind> [--json]\n"
-            f"{prog} explain <JP-CODE|yaml> [--json]\n"
-            f"{prog} config get|set|rm|paths … [--json]\n"
-            f"{prog} cap [section] [--json]\n"
-            f"{prog} data describe|head|eval|suggest-axes … [--json]\n"
-            f"{prog} flowchart <flowchart_file>\n"
+            f"{prog} <command> [args]\n"
             f"{prog} -h\n"
-            f"{prog} -v"
+            f"{prog} -v\n"
+            f"\n"
+            f"Command help: {prog} COMMAND -h\n"
+            f"Write YAML yourself; CLI discovers and judges (see `{prog} man`)."
         ),
         sections=sections,
     )
-
 
 
 def render_flowchart_help(*, prog: str = "jplot") -> str:
@@ -212,6 +204,37 @@ def render_flowchart_help(*, prog: str = "jplot") -> str:
     return _render_help_page(
         title="flowchart",
         usage=f"{prog} flowchart <flowchart_file>",
+        sections=sections,
+    )
+
+
+def render_man_help(*, prog: str = "jplot") -> str:
+    """Render ``jplot man -h`` (same geometry as root help)."""
+    sections = [
+        (
+            "Arguments",
+            [
+                ("topic", "", "manual topic id (omit for index); see jplot man"),
+            ],
+            "bold cyan",
+        ),
+        (
+            "Options",
+            [
+                ("--help", "-h", "show this help message and exit"),
+                ("--json", "", "emit structured agent payload on stdout"),
+            ],
+            "bold cyan",
+        ),
+    ]
+    return _render_help_page(
+        title="man",
+        usage=(
+            f"{prog} man\n"
+            f"{prog} man <topic>\n"
+            f"{prog} man <topic> --json\n"
+            f"{prog} man --json"
+        ),
         sections=sections,
     )
 

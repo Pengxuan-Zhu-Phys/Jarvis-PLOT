@@ -83,24 +83,58 @@ def _methods() -> list[dict[str, Any]]:
 
 
 def _transforms() -> list[dict[str, Any]]:
-    """Pipeline steps, from the schema that pins their vocabulary."""
+    """Pipeline steps with full contracts (not delegated stubs).
+
+    Vocabulary still must match ``schema/core/transform.json``; field contracts
+    come from :mod:`jarvisplot.transform_contracts` (runtime-aligned).
+    """
     from .schema_catalog import subschema
+    from .transform_contracts import contract_for, list_contracts
 
     schema = subschema("https://jarvis-plot.org/schema/v2/core/transform.json")
+    schema_names = {
+        name for name in schema.get("properties", {}) if name != "type"
+    }
     discriminated = set(schema["$defs"]["discriminatedStepName"]["enum"])
     out: list[dict[str, Any]] = []
-    for name, spec in schema.get("properties", {}).items():
-        if name == "type":
+    for contract in list_contracts():
+        name = contract["name"]
+        if name not in schema_names:
+            # Contract ahead of schema is a packaging bug — skip quietly.
             continue
         entry: dict[str, Any] = {
             "name": name,
-            "form": "single-key mapping",
-            "description": str(spec.get("description", "")),
+            "form": contract.get("form") or "object",
+            "description": contract.get("description") or "",
+            "required": contract.get("required") or {},
+            "optional": contract.get("optional") or {},
+            "defaults": contract.get("defaults") or {},
+            "enums": contract.get("enums") or {},
+            "value": contract.get("value") or {},
+            "input": contract.get("input") or "table",
+            "output": contract.get("output") or "table",
+            "owner": contract.get("owner") or "",
+            "examples": contract.get("examples") or [],
+            "man": f"jplot man transform.{name}",
         }
         if name in discriminated:
-            entry["form"] = "single-key mapping, or {type: %s, ...}" % name
-        if spec.get("x-jarvis-zone") == "delegated":
-            entry["keys"] = "delegated -- see the runtime module named in the description"
+            entry["form_note"] = f"single-key mapping, or {{type: {name}, ...}}"
+        out.append(entry)
+    # Any schema-only names without a contract still appear (degraded).
+    known = {e["name"] for e in out}
+    for name in sorted(schema_names - known):
+        spec = schema["properties"][name]
+        entry = {
+            "name": name,
+            "form": "object",
+            "description": str(spec.get("description", "")),
+            "required": {},
+            "optional": {},
+            "defaults": {},
+            "enums": {},
+            "man": f"jplot man transform.{name}",
+            "note": "schema vocabulary only — contract not yet filled in transform_contracts",
+        }
         out.append(entry)
     return sorted(out, key=lambda e: e["name"])
 
@@ -108,24 +142,19 @@ def _transforms() -> list[dict[str, Any]]:
 def _types() -> list[dict[str, Any]]:
     """Figure-type shorthands that expand into a layer stack before rendering.
 
-    Only what ``Figure/figure_types.py::expand_figure_type`` actually dispatches
-    on. Listing an aspirational type here would be worse than listing none.
+    Only names in :data:`KNOWN_FIGURE_TYPES` (actual ``expand_*`` dispatch),
+    not helper names like ``typed_figures``.
     """
-    from .Figure import figure_types
+    from .Figure.figure_types import KNOWN_FIGURE_TYPES
 
-    names = sorted(
-        attr[len("expand_") :]
-        for attr in dir(figure_types)
-        if attr.startswith("expand_")
-        and attr not in {"expand_figure_type", "expand_figure_types_in_config"}
-    )
     return [
         {
             "name": name,
             "expands_to": "layers",
             "explain": f"jplot explain {name}",
+            "man": f"jplot man type-{name.replace('_', '-')}" if name.endswith("_2d") else f"jplot explain {name}",
         }
-        for name in names
+        for name in sorted(KNOWN_FIGURE_TYPES)
     ]
 
 
@@ -208,20 +237,21 @@ def _cmaps() -> dict[str, Any]:
 
 
 def _funcs() -> dict[str, Any]:
-    """Names an expression may call, beyond plain column references.
+    """Public expression callables for agents (filtered).
 
-    The namespace is assembled at call time by
-    ``utils/expression.build_eval_globals()`` -- there is no static table to
-    read, and the set is not fixed: ``inner_func.update_funcs`` folds in
-    Jarvis-Operas registrations and any externally injected interpolators. So
-    this reports what the namespace holds *right now*, and says so.
+    Full eval globals still include Operas registrations and ephemeral hashed
+    helpers; those are noise for agents. We publish:
 
-    Costs a numpy import. That is the one place ``cap`` is not free.
+    1. Stable tokens from :data:`EXPR_IDENTIFIER_IGNORE` that are callable-like.
+    2. A short public sample of remaining callables without ``_``/hash junk.
+
+    Full dump remains available under ``names_full`` for debugging only.
     """
+    from .expr_names import EXPR_IDENTIFIER_IGNORE
     from .utils.expression import build_eval_globals
 
     namespace = build_eval_globals()
-    names = sorted(
+    all_callable = sorted(
         name
         for name, value in namespace.items()
         if not name.startswith("__") and callable(value)
@@ -231,14 +261,57 @@ def _funcs() -> dict[str, Any]:
         for name, value in namespace.items()
         if not name.startswith("__") and hasattr(value, "__name__") and not callable(value)
     )
+
+    def _is_public(name: str) -> bool:
+        if name.startswith("_"):
+            return False
+        # hashed / gensym style: contains long digit runs or looks like uuid crumbs
+        if any(ch.isdigit() for ch in name) and sum(ch.isdigit() for ch in name) >= 4:
+            return False
+        if name.count("_") >= 3 and any(ch.isdigit() for ch in name):
+            return False
+        return True
+
+    preferred = [
+        n
+        for n in (
+            "exp",
+            "log",
+            "ln",
+            "log10",
+            "sqrt",
+            "abs",
+            "min",
+            "max",
+            "sin",
+            "cos",
+            "tan",
+            "Heaviside",
+            "Gauss",
+            "LogGauss",
+            "Normal",
+        )
+        if n in all_callable or n in EXPR_IDENTIFIER_IGNORE
+    ]
+    public = [n for n in all_callable if _is_public(n)]
+    # Prefer short stable names first
+    public.sort(key=lambda n: (0 if n in preferred else 1, len(n), n))
+    names = []
+    for n in preferred + public:
+        if n not in names:
+            names.append(n)
+        if len(names) >= 80:
+            break
+
     return {
         "names": names,
         "namespaces": modules,
+        "names_full_count": len(all_callable),
         "note": (
-            "Assembled at call time; Jarvis-Operas operators and externally "
-            "registered interpolators join this set, so it is not a fixed list. "
-            "Use `jplot data eval` to check one expression before writing it "
-            "into YAML."
+            "Public sample for agents (hashed/internal Operas helpers omitted). "
+            "`names_full_count` is the raw callable count in the eval namespace. "
+            "Use `jplot data eval` to check one expression; signatures are not "
+            "yet published (most are numpy/math-like unary/binary)."
         ),
     }
 

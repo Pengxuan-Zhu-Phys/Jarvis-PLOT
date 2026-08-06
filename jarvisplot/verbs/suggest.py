@@ -9,6 +9,8 @@ and a decisions[] log with reasons.
 from __future__ import annotations
 
 import argparse
+
+from ..cli_help import RichArgumentParser
 import os
 import sys
 from pathlib import Path
@@ -16,21 +18,54 @@ from typing import Any, Sequence
 
 import yaml
 
-from ..agent_io import EXIT_FAILED, EXIT_OK, EXIT_USAGE, emit, envelope, error_payload
+from ..agent_io import EXIT_FAILED, EXIT_OK, EXIT_USAGE, emit, envelope, system_exit_code, error_payload
+from ..diagnostics import Diagnostic, DiagnosticBag
 from ..templates_catalog import get_template, list_templates, render_template_yaml
 from ..validation import validate_config
 from .data import describe_file, suggest_axes
 
-__all__ = ["build_parser", "run", "suggest_config"]
+__all__ = ["SuggestError", "build_parser", "run", "suggest_config"]
+
+
+class SuggestError(Exception):
+    """Structured suggest failure with a stable JP-TPL-* code."""
+
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        *,
+        suggestion: str = "",
+        path: str = "$.suggest",
+        context: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.suggestion = suggestion
+        self.path = path
+        self.context = context or {}
+
+    def to_diagnostic(self) -> Diagnostic:
+        return Diagnostic(
+            code=self.code,
+            level="error",
+            path=self.path,
+            message=self.message,
+            suggestion=self.suggestion,
+            context=dict(self.context),
+        )
 
 
 def build_parser(prog: str = "jplot suggest") -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = RichArgumentParser(
         prog=prog,
         description=(
             "Synthesize a type-first YAML from a data file. "
             "PLOT chooses scales/lims; agent chooses columns and kind."
         ),
+        rich_title="suggest",
+        rich_usage=f"{prog} --data <file> --kind <kind> [--json]",
     )
     parser.add_argument(
         "--data",
@@ -89,7 +124,7 @@ def run(argv: Sequence[str], *, prog: str = "jplot suggest") -> int:
     try:
         args = parser.parse_args(list(argv))
     except SystemExit as exc:
-        return int(exc.code or EXIT_USAGE)
+        return system_exit_code(exc)
 
     as_json = bool(args.json) or not sys.stdout.isatty()
     try:
@@ -105,36 +140,69 @@ def run(argv: Sequence[str], *, prog: str = "jplot suggest") -> int:
             style=args.style,
             dataset_name=args.dataset_name,
         )
-    except Exception as exc:
+    except SuggestError as exc:
+        bag = DiagnosticBag()
+        bag.add(exc.to_diagnostic())
         env = envelope(
             "suggest",
             False,
-            error=error_payload(exc),
+            data={
+                "available_kinds": [t["kind"] for t in list_templates()],
+                **exc.context,
+            },
+            diagnostics=bag,
+            error=error_payload(exc.code, exc.message),
+        )
+        return emit(env) if as_json else _fail(env)
+    except Exception as exc:
+        bag = DiagnosticBag()
+        bag.add(
+            Diagnostic(
+                code="JP-TPL-000",
+                level="error",
+                path="$.suggest",
+                message=str(exc),
+                suggestion="Check --data path, --kind (jplot template list), and column flags.",
+            )
+        )
+        env = envelope(
+            "suggest",
+            False,
+            error=error_payload("JP-TPL-000", str(exc)),
             data={"available_kinds": [t["kind"] for t in list_templates()]},
+            diagnostics=bag,
+        )
+        return emit(env) if as_json else _fail(env)
+
+    # Always validate the synthesized YAML (including column existence against
+    # the source file). Agents must not treat a bad --x / weight as success.
+    parsed = yaml.safe_load(result["yaml_text"])
+    base_dir = str(Path(args.data).expanduser().resolve().parent)
+    bag = validate_config(
+        parsed,
+        base_dir=base_dir,
+        check_columns=True,
+    )
+    if not bag.ok:
+        env = envelope(
+            "suggest",
+            False,
+            data={
+                **result,
+                "wrote": None,
+                "validate_error_count": len(bag.errors),
+            },
+            diagnostics=bag,
+            error=error_payload(
+                "ValidationError",
+                "suggested YAML failed validate"
+                + ("; not written" if args.write else ""),
+            ),
         )
         return emit(env) if as_json else _fail(env)
 
     if args.write:
         path = Path(args.write)
-        # write-validate-rollback
-        parsed = yaml.safe_load(result["yaml_text"])
-        bag = validate_config(
-            parsed,
-            base_dir=str(path.parent.resolve()),
-            check_columns=False,
-        )
-        if not bag.ok:
-            env = envelope(
-                "suggest",
-                False,
-                data={**result, "validate_error_count": len(bag.errors)},
-                diagnostics=bag,
-                error=error_payload(
-                    "ValidationError",
-                    "suggested YAML failed validate; not written",
-                ),
-            )
-            return emit(env) if as_json else _fail(env)
         path.write_text(result["yaml_text"], encoding="utf-8")
         result["wrote"] = str(path.resolve())
     else:
@@ -169,10 +237,28 @@ def suggest_config(
 ) -> dict[str, Any]:
     path = os.path.abspath(os.path.expanduser(str(data_path)))
     if not os.path.isfile(path):
-        raise FileNotFoundError(path)
+        raise SuggestError(
+            "JP-TPL-001",
+            f"data file not found: {path}",
+            suggestion="Pass an existing --data path (csv / parquet / hdf5).",
+            path="$.suggest.data",
+            context={"path": path},
+        )
 
     # Ensure kind exists
-    get_template(kind)
+    try:
+        get_template(kind)
+    except Exception as exc:
+        kinds = [t["kind"] for t in list_templates()]
+        near = _did_you_mean(str(kind), kinds)
+        hint = f" Did you mean {near[0]!r}?" if near else ""
+        raise SuggestError(
+            "JP-TPL-002",
+            f"unknown template kind {kind!r}.{hint}",
+            suggestion="Use a kind from `jplot template list`.",
+            path="$.suggest.kind",
+            context={"kind": kind, "available_kinds": kinds, "did_you_mean": near},
+        ) from exc
 
     desc = describe_file(path, use_cache=True)
     axes = suggest_axes(path)
@@ -180,7 +266,13 @@ def suggest_config(
     by_name = {col["name"]: col for col in columns}
     col_names = [col["name"] for col in columns]
     if not col_names:
-        raise ValueError(f"no columns found in {path}")
+        raise SuggestError(
+            "JP-TPL-003",
+            f"no columns found in {path}",
+            suggestion="Check the file type and path; run `jplot data describe`.",
+            path="$.suggest.data",
+            context={"path": path},
+        )
 
     decisions: list[dict[str, Any]] = []
 
@@ -188,25 +280,47 @@ def suggest_config(
         decisions.append({"field": field, "value": value, "reason": reason})
         return value
 
-    x_col = x or _pick_column(columns, role="parameter", exclude=())
-    x_col = decide(
-        "x",
-        x_col,
-        "user-provided" if x else f"first parameter-like column ({x_col!r})",
-    )
-    y_col = y or _pick_column(columns, role="parameter", exclude={x_col})
-    y_col = decide(
-        "y",
-        y_col,
-        "user-provided" if y else f"next parameter-like column ({y_col!r})",
-    )
+    def require_column(name: str, *, field: str) -> str:
+        if name not in by_name:
+            near = _did_you_mean(name, col_names)
+            hint = f" Did you mean {near[0]!r}?" if near else ""
+            raise SuggestError(
+                "JP-TPL-004",
+                f"--{field} column {name!r} not in data file{hint}. Available: {col_names}",
+                suggestion="Run `jplot data describe <file>` for legal column names.",
+                path=f"$.suggest.{field}",
+                context={
+                    "field": field,
+                    "column": name,
+                    "available_columns": col_names,
+                    "did_you_mean": near,
+                },
+            )
+        return name
 
-    logl = _pick_column(columns, role="log_likelihood", exclude=())
-    weight_col = _pick_column(columns, role="weight", exclude=())
+    if x is not None:
+        x_col = require_column(str(x), field="x")
+        x_col = decide("x", x_col, "user-provided")
+    else:
+        x_col = _pick_column(columns, role="parameter", exclude=())
+        x_col = decide("x", x_col, f"first parameter-like column ({x_col!r})")
+
+    if y is not None:
+        y_col = require_column(str(y), field="y")
+        y_col = decide("y", y_col, "user-provided")
+    else:
+        y_col = _pick_column(columns, role="parameter", exclude={x_col})
+        y_col = decide("y", y_col, f"next parameter-like column ({y_col!r})")
+
+    # Role-only lookups (no silent fallback that pretends a parameter is LogL).
+    logl = _find_role(columns, "log_likelihood")
+    weight_col = _find_role(columns, "weight")
 
     if kind == "posterior_2d":
         if weight:
-            weight_expr = decide("weight", weight, "user-provided weight expression")
+            weight_expr = str(weight).strip()
+            _assert_expr_columns(weight_expr, col_names, field="weight")
+            weight_expr = decide("weight", weight_expr, "user-provided weight expression")
         elif logl:
             weight_expr = decide(
                 "weight",
@@ -220,30 +334,44 @@ def suggest_config(
                 f"column {weight_col!r} has role_hint=weight",
             )
         else:
-            weight_expr = decide(
-                "weight",
-                f"exp({col_names[-1]})",
-                "fallback: exp(last column); prefer a real LogL column",
+            raise SuggestError(
+                "JP-TPL-005",
+                "posterior_2d needs a weight: pass --weight 'exp(LogL)' (or a weight "
+                "column), or include a LogL/weight column in the data. "
+                f"Columns seen: {col_names} (no role_hint=log_likelihood|weight).",
+                suggestion="Add --weight 'exp(<LogL_col>)' or use a file with a LogL column.",
+                path="$.suggest.weight",
+                context={"columns_seen": col_names, "kind": kind},
             )
         z_col = None
         c_col = None
     elif kind == "profile_2d":
         weight_expr = None
-        z_col = z or logl or col_names[-1]
-        z_col = decide(
-            "z",
-            z_col,
-            "user-provided" if z else (
-                f"role_hint=log_likelihood ({z_col!r})" if z_col == logl else f"fallback {z_col!r}"
-            ),
-        )
+        if z is not None:
+            z_col = require_column(str(z), field="z")
+            z_col = decide("z", z_col, "user-provided")
+        elif logl:
+            z_col = decide("z", logl, f"role_hint=log_likelihood ({logl!r})")
+        else:
+            raise SuggestError(
+                "JP-TPL-006",
+                "profile_2d needs an objective column: pass --z LogL (or similar), "
+                f"or include a LogL-like column. Columns seen: {col_names}.",
+                suggestion="Pass --z <column> after `jplot data describe`.",
+                path="$.suggest.z",
+                context={"columns_seen": col_names, "kind": kind},
+            )
         c_col = None
     else:
         weight_expr = None
         z_col = None
-        c_col = c or logl
-        if c_col:
-            decide("c", c_col, "user-provided" if c else f"colour from {c_col!r}")
+        if c is not None:
+            c_col = require_column(str(c), field="c")
+            decide("c", c_col, "user-provided")
+        else:
+            c_col = logl
+            if c_col:
+                decide("c", c_col, f"colour from {c_col!r}")
 
     axis_by_col = {a["col"]: a for a in (axes.get("axes") or [])}
     x_axis = axis_by_col.get(x_col) or {}
@@ -328,6 +456,13 @@ def suggest_config(
     }
 
 
+def _find_role(columns: list[dict[str, Any]], role: str) -> str | None:
+    for col in columns:
+        if col.get("role_hint") == role:
+            return str(col["name"])
+    return None
+
+
 def _pick_column(
     columns: list[dict[str, Any]],
     *,
@@ -355,6 +490,39 @@ def _pick_column(
         if col["name"] not in excluded:
             return col["name"]
     raise ValueError("no columns available to pick")
+
+
+def _assert_expr_columns(expr: str, columns: list[str], *, field: str) -> None:
+    from ..column_demand import _expr_symbols
+    from ..expr_names import EXPR_IDENTIFIER_IGNORE
+
+    symbols = _expr_symbols(expr)
+    missing = sorted(
+        s for s in symbols if s not in columns and s not in EXPR_IDENTIFIER_IGNORE
+    )
+    if missing:
+        near = _did_you_mean(missing[0], columns)
+        hint = f" Did you mean {near[0]!r}?" if near else ""
+        raise SuggestError(
+            "JP-TPL-007",
+            f"--{field} expression references unknown column(s) {missing}.{hint} "
+            f"Available: {columns}",
+            suggestion="Fix the expression to use real columns from `jplot data describe`.",
+            path=f"$.suggest.{field}",
+            context={
+                "field": field,
+                "expr": expr,
+                "missing": missing,
+                "available_columns": columns,
+                "did_you_mean": near,
+            },
+        )
+
+
+def _did_you_mean(word: str, candidates: list[str]) -> list[str]:
+    from ..diagnostics import did_you_mean
+
+    return did_you_mean(word, candidates)
 
 
 def _fail(env: dict) -> int:

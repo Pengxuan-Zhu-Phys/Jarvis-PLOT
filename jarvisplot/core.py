@@ -7,8 +7,6 @@ from loguru import logger
 import os, sys
 from .config import ConfigLoader
 from .data_loader import DataSet
-import io
-from contextlib import redirect_stdout
 from .core_assets import load_cmaps, load_interpolators, load_styles
 from .Figure.data_pipelines import SharedContent, DataContext
 from .cache_store import ProjectCache
@@ -153,6 +151,7 @@ class JarvisPLOT():
         return resolve_project_path(path)
 
     def plot(self):
+        failures: list[str] = []
         for fig in self.yaml.config["Figures"]:
             from .Figure.figure import Figure
             figobj = Figure()
@@ -165,37 +164,80 @@ class JarvisPLOT():
             if getattr(self.args, "no_logo", False):
                 figobj.print = True
 
+            fig_name = (
+                (fig.get("name") if isinstance(fig, dict) else None)
+                or getattr(figobj, "name", None)
+                or "<noname>"
+            )
             try:
                 setup = figobj.from_dict(fig)
                 if setup:
-                    self.logger.warning(f"Succefully loading figure -> {figobj.name} setting")
+                    self.logger.warning(f"Successfully loading figure -> {figobj.name} setting")
                     figobj.plot()
+                    self._maybe_write_agent_digest(fig, figobj)
                 else:
-                    fig_name = figobj.name or fig.get("name", "<noname>")
                     if getattr(figobj, "_setup_status", None) == "disabled":
                         self.logger.warning(f"Skip figure {fig_name}: disabled in YAML.")
                     else:
-                        self.logger.warning(
-                            f"Skip figure {fig_name}: setup failed before plotting."
-                        )
+                        msg = f"Skip figure {fig_name}: setup failed before plotting."
+                        self.logger.error(msg)
+                        failures.append(str(fig_name))
             except Exception as e:
-                self.logger.warning(f"Figure {fig.get('name', '<noname>')} failed: {e}")
+                self.logger.error(f"Figure {fig_name} failed: {e}")
+                failures.append(str(fig_name))
+                if getattr(self.args, "debug", False):
+                    import traceback
+
+                    self.logger.debug(traceback.format_exc())
                 continue
+        if failures:
+            self.logger.error(
+                f"Render failed for {len(failures)} figure(s): {', '.join(failures)}"
+            )
+            sys.exit(1)
+    def _maybe_write_agent_digest(self, figure_cfg, figobj) -> None:
+        """Write figure-level agent_output digest after a successful plot."""
+        try:
+            from .agent_digest import load_figure_source_dataframe, maybe_write_figure_digest
+            from .cli import JPLOT_VERSION
+
+            if not isinstance(figure_cfg, dict):
+                return
+            # Prefer raw YAML figure block (pre type-expand may have type: fields).
+            # After expand_figure_types, config figures are already expanded; still OK.
+            df = load_figure_source_dataframe(self, figure_cfg)
+            if df is None and hasattr(figobj, "context") and figobj.context is not None:
+                # last resort: first registered dataset
+                reg = getattr(self, "dataset_registry", {}) or {}
+                for ds in reg.values():
+                    if hasattr(ds, "get_data"):
+                        df = ds.get_data()
+                        break
+            maybe_write_figure_digest(
+                figure_cfg=figure_cfg,
+                config=getattr(self.yaml, "config", {}) or {},
+                dataframe=df,
+                base_dir=getattr(self.yaml, "dir", None) or self.workdir,
+                yaml_path=getattr(self.yaml, "path", None),
+                logger=self.logger,
+                jplot_version=str(JPLOT_VERSION),
+            )
+        except Exception as exc:
+            # Non-strict failures already logged inside helper; strict re-raises.
+            self.logger.warning(f"agent_output digest step failed: {exc}")
+
     def load_yaml(self):
-        # If no YAML file provided, show a friendly message and help, then return gracefully
-        yaml_path = getattr(self.args, 'file', None)
+        # If no YAML file provided, keep the message short (full help is jplot -h).
+        yaml_path = getattr(self.args, "file", None)
         if not yaml_path:
-            self.logger.error("No input YAML file specified. Please provide one.\n")
-            try:
-                buf = io.StringIO()
-                with redirect_stdout(buf):
-                    self.cli.args.print_help()
-                help_text = buf.getvalue()
-                self.logger.warning("JarvisPLOT " + help_text)
-                sys.exit(2)
-            except Exception:
-                pass
-            return
+            prog = getattr(self.cli.args, "prog", None) or "jplot"
+            self.logger.error(
+                "No input YAML file specified.\n"
+                f"  usage: {prog} <file>\n"
+                f"         {prog} <command> [args]\n"
+                f"         {prog} -h"
+            )
+            sys.exit(2)
         resolved = os.path.abspath(yaml_path)
         try:
             self.parser_yaml(resolved)

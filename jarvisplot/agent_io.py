@@ -29,6 +29,7 @@ __all__ = [
     "envelope",
     "error_payload",
     "exit_code_for",
+    "system_exit_code",
 ]
 
 
@@ -39,6 +40,21 @@ API_VERSION = 1
 EXIT_OK = 0
 EXIT_FAILED = 1
 EXIT_USAGE = 2
+
+
+def system_exit_code(exc: BaseException) -> int:
+    """Map ``SystemExit`` from argparse (including ``-h`` → 0) to a process code.
+
+    Note: ``exc.code or EXIT_USAGE`` is wrong because successful help exits with
+    code ``0``, which is falsy in Python.
+    """
+    code = getattr(exc, "code", None)
+    if code is None:
+        return EXIT_OK
+    if isinstance(code, int):
+        return code
+    # argparse may pass a string message with status implied non-zero
+    return EXIT_USAGE
 
 
 def error_payload(exc_or_type: Any, message: str | None = None) -> dict[str, str]:
@@ -66,7 +82,7 @@ def _normalize_diagnostics(
 
 def envelope(
     kind: str,
-    ok: bool,
+    ok: bool | None,
     data: Any = None,
     diagnostics: DiagnosticBag | Iterable[Diagnostic] | Sequence[dict] | None = None,
     error: dict[str, str] | BaseException | None = None,
@@ -77,13 +93,22 @@ def envelope(
     because some verbs (``describe``) legitimately succeed while reporting
     warnings, and others (``validate``) report ``ok=false`` purely because the
     config has errors.
+
+    Tri-state ``ok``:
+    - ``True``  — full pass
+    - ``False`` — real failure (bad config / empty ledger that dryrun fully checked)
+    - ``None``  — partial coverage (e.g. heavy transforms skipped); not a failure
     """
     if isinstance(error, BaseException):
         error = error_payload(error)
+    if ok is None:
+        ok_value: bool | None = None
+    else:
+        ok_value = bool(ok)
     return {
         "api_version": API_VERSION,
         "kind": kind,
-        "ok": bool(ok),
+        "ok": ok_value,
         "data": data if data is not None else {},
         "diagnostics": _normalize_diagnostics(diagnostics),
         "error": error,
@@ -91,8 +116,9 @@ def envelope(
 
 
 def exit_code_for(env: dict[str, Any]) -> int:
-    """Map an envelope to a process exit code (0 ok / 1 failed / 2 usage)."""
-    if env.get("ok"):
+    """Map an envelope to a process exit code (0 ok|partial / 1 failed / 2 usage)."""
+    # Partial (ok is null) is not a process failure — agent should read status/coverage.
+    if env.get("ok") is not False:
         return EXIT_OK
     error = env.get("error") or {}
     if str(error.get("type", "")) in {"UsageError", "ArgumentError"}:

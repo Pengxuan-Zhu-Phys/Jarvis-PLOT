@@ -47,7 +47,11 @@
         "formats": {
           "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/stringOrStringList"
         },
-        "metadata": { "type": "object", "x-jarvis-zone": "delegated" }
+        "metadata": { "type": "object", "x-jarvis-zone": "delegated" },
+        "agent_output": {
+          "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/agentOutput",
+          "description": "Default agent digest settings for all figures (per-figure agent_output overrides)."
+        }
       },
       "additionalProperties": false
     }

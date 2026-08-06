@@ -392,8 +392,8 @@ def plan_source_demand(config: Mapping[str, Any]) -> Dict[str, SourceDemand]:
     pruning and useless for existence checking, so this walk keeps each layer's
     demand attached to the source that layer names.
 
-    Figures using the ``type:`` shorthand are skipped: their layers do not exist
-    until figure_types expansion has run.
+    Figures using the ``type:`` shorthand contribute demand from macro slots
+    (``x`` / ``y`` / ``z`` / ``weight`` / …) attributed to ``data`` sources.
     """
     demand: Dict[str, SourceDemand] = {}
 
@@ -414,9 +414,13 @@ def plan_source_demand(config: Mapping[str, Any]) -> Dict[str, SourceDemand]:
         bucket.produced.update(_transform_output_columns(entry.get("transform")))
 
     for fig_index, figure in enumerate(config.get("Figures") or ()):
-        if not isinstance(figure, Mapping) or "type" in figure:
+        if not isinstance(figure, Mapping):
             continue
         if figure.get("enable", True) is False:
+            continue
+        # type: macros: demand columns from macro slots (x/y/z/weight/…) before expansion.
+        if "type" in figure:
+            _note_type_figure_demand(figure, fig_index, slot)
             continue
         for layer_index, layer in enumerate(figure.get("layers") or ()):
             if not isinstance(layer, Mapping):
@@ -450,6 +454,45 @@ def plan_source_demand(config: Mapping[str, Any]) -> Dict[str, SourceDemand]:
                     bucket.produced.update(step_outputs)
 
     return demand
+
+
+def _note_type_figure_demand(
+    figure: Mapping[str, Any],
+    fig_index: int,
+    slot,
+) -> None:
+    """Attribute type-macro expr symbols to the figure's ``data`` source(s)."""
+    base = f"$.Figures[{fig_index}]"
+    raw = figure.get("data")
+    if isinstance(raw, str) and raw.strip():
+        sources = [raw.strip()]
+    elif isinstance(raw, (list, tuple)):
+        sources = [str(s).strip() for s in raw if str(s).strip()]
+    else:
+        sources = []
+    if not sources:
+        return
+
+    for key in ("x", "y", "z", "weight", "c", "color", "w"):
+        if key not in figure:
+            continue
+        field = figure.get(key)
+        path = f"{base}.{key}"
+        symbols: Set[str] = set()
+        if isinstance(field, Mapping):
+            symbols |= _expr_symbols(field.get("expr"))
+            name = field.get("name")
+            if isinstance(name, str) and name.strip() and "expr" not in field:
+                symbols.add(name.strip())
+            path = f"{path}.expr" if "expr" in field else path
+        elif isinstance(field, str):
+            symbols |= _expr_symbols(field)
+        else:
+            continue
+        if not symbols:
+            continue
+        for source in sources:
+            slot(source).note(symbols, path)
 
 
 def _layer_columns_by_path(layer: Mapping[str, Any], layer_path: str) -> Dict[str, str]:

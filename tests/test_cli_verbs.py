@@ -62,6 +62,8 @@ def test_known_verbs_are_claimed_by_the_router():
     assert is_verb("validate")
     assert is_verb("cap")
     assert is_verb("data")
+    assert is_verb("man")
+    assert is_verb("config")
     assert not is_verb("flowchart"), "flowchart stays owned by core.py"
     assert not is_verb("config.yaml")
 
@@ -70,6 +72,14 @@ def test_router_falls_through_for_files_and_flowchart():
     assert route(["config.yaml"]) == (False, 0)
     assert route(["flowchart", "scene.json"]) == (False, 0)
     assert route([]) == (False, 0)
+
+
+def test_unknown_bare_command_is_rejected(capsys):
+    handled, code = route(["whaat"])
+    assert handled is True
+    assert code == 2
+    err = capsys.readouterr().err
+    assert "unknown command" in err
 
 
 def test_run_is_rejected_not_aliased(capsys):

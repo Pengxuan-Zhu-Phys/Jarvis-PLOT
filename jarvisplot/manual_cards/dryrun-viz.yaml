@@ -1,0 +1,32 @@
+id: dryrun-viz
+title: dryrun and JP-VIZ
+summary: Load data + transforms; row ledger and empty-plot health without rendering.
+role: how-to
+priority: 55
+see_also: [validate, diagnostics, workflow]
+related_cli:
+  - argv: [jplot, dryrun, "<yaml>", "--json"]
+    why: row ledger + JP-VIZ codes
+  - argv: [jplot, explain, "JP-VIZ-003", "--json"]
+    why: explain one visualization health code
+live_sources:
+  - verb: dryrun
+    truth: same loader/transform path as render (no matplotlib figure)
+human:
+  panels:
+    - kind: overview
+      title: Why
+      body: |
+        Catch empty layers, dropped rows, and bad transforms before opening a PDF.
+        Agents cannot see plots — dryrun is the visual stand-in.
+    - kind: notes
+      title: Tips
+      items:
+        - Prefer doctor for the combined gate.
+        - type: figures expand before dryrun planning on the render path; use config expand if you need to inspect layers in-file.
+        - explain JP-VIZ-* for per-code guidance.
+agent:
+  diagnostics:
+    - code: JP-VIZ-000
+      when: type figure not expanded in some pure-shape paths
+      fix_hint: expand or use doctor/render path

@@ -21,6 +21,11 @@ def test_transforms_include_to_parquet_and_to_csv():
     assert "to_csv" in names
     assert "to_parquet" in names
     assert "filter" in names
+    by = {e["name"]: e for e in section("transforms")}
+    # contracts, not delegated stubs
+    assert by["make_interp_2d"].get("required")
+    assert "delegated" not in str(by["profile"].get("keys", ""))
+    assert by["profile"].get("defaults", {}).get("method") == "bridson"
 
 
 def test_style_cards_expose_axes_and_usable():

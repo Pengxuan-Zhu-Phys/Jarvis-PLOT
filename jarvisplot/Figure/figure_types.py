@@ -363,6 +363,14 @@ def expand_posterior_2d(info: Mapping[str, Any]) -> dict[str, Any]:
             if isinstance(layer, Mapping):
                 layers.append(_normalize_extra_layer(layer, source))
 
+    _stash_digest_axes(
+        out,
+        data=info.get("data"),
+        x=info.get("x"),
+        y=info.get("y"),
+        z=None,
+        weight=info.get("weight"),
+    )
     for key in (
         "style_card",
         "data",
@@ -382,6 +390,33 @@ def expand_posterior_2d(info: Mapping[str, Any]) -> dict[str, Any]:
     out["frame"] = frame
     out["layers"] = layers
     return out
+
+
+def _stash_digest_axes(
+    out: dict[str, Any],
+    *,
+    data: Any,
+    x: Any,
+    y: Any,
+    z: Any,
+    weight: Any,
+) -> None:
+    """Keep type-macro axes for agent_output digests after expand pops them."""
+    ao = out.get("agent_output")
+    if ao is False:
+        return
+    if not isinstance(ao, dict):
+        # Still stash if root defaults will enable digest later — only when block present.
+        return
+    ao = dict(ao)
+    ao["_digest_axes"] = {
+        "data": deepcopy(data),
+        "x": deepcopy(x),
+        "y": deepcopy(y),
+        "z": deepcopy(z),
+        "weight": deepcopy(weight),
+    }
+    out["agent_output"] = ao
 
 
 def _profile_hidden_style() -> dict[str, Any]:
@@ -530,6 +565,14 @@ def expand_profile_2d(info: Mapping[str, Any]) -> dict[str, Any]:
             if isinstance(layer, Mapping):
                 layers.append(_normalize_extra_layer(layer, source))
 
+    _stash_digest_axes(
+        out,
+        data=info.get("data"),
+        x=info.get("x"),
+        y=info.get("y"),
+        z=info.get("z"),
+        weight=None,
+    )
     for key in (
         "style_card",
         "data",
@@ -564,7 +607,19 @@ def expand_profile_2d(info: Mapping[str, Any]) -> dict[str, Any]:
     return out
 
 
+# Types that expand_figure_type can lower to layers. Keep in sync with
+# expand_figure_type dispatch and capabilities.figure_types.
+KNOWN_FIGURE_TYPES = frozenset({"posterior_2d", "profile_2d"})
+
+
 def expand_figure_type(info: Any) -> Any:
+    """Lower one figure dict: ``type:`` macro → ``layers`` / ``frame`` / ``style``.
+
+    Figures without ``type:`` (or with an unknown type) are returned as a
+    shallow structural copy. Runtime expansion is best-effort; callers that
+    need a strict convert (CLI write path) should use
+    :func:`expand_typed_figures`.
+    """
     if not isinstance(info, Mapping):
         return info
     fig_type = str(info.get("type", "")).strip().lower()
@@ -575,23 +630,133 @@ def expand_figure_type(info: Any) -> Any:
     return deepcopy(dict(info))
 
 
-def expand_figure_types_in_config(config: Any, logger=None) -> Any:
+def expand_typed_figures(
+    config: Any,
+    *,
+    figure_names: list[str] | tuple[str, ...] | None = None,
+    raise_on_error: bool = True,
+    allow_noop: bool = False,
+) -> list[str]:
+    """Expand ``type:`` figures in place to the equivalent layers form.
+
+    Parameters
+    ----------
+    config:
+        Full plot YAML document (mutated).
+    figure_names:
+        If set, only these figure names are expanded. Missing names still
+        raise when ``raise_on_error`` is true. Figures that are already
+        layers form are skipped (no-op when ``allow_noop`` is true).
+    raise_on_error:
+        When false (runtime path), failures leave the original figure and
+        continue. When true (CLI convert path), fail loudly on real errors.
+    allow_noop:
+        When true, "nothing to expand" is not an error — callers get an empty
+        list (CLI uses this for idempotent re-runs).
+
+    Returns
+    -------
+    list[str]
+        Names of figures that were expanded.
+    """
     if not isinstance(config, dict):
-        return config
+        if raise_on_error:
+            raise TypeError("config must be a mapping")
+        return []
     figures = config.get("Figures", [])
     if not isinstance(figures, list):
-        return config
-    expanded = []
-    for fig in figures:
+        if raise_on_error:
+            raise TypeError("Figures must be a list")
+        return []
+
+    wanted: set[str] | None = None
+    if figure_names is not None:
+        wanted = {str(n).strip() for n in figure_names if str(n).strip()}
+        if not wanted:
+            raise ValueError("figure_names is empty")
+
+    by_name: dict[str, int] = {}
+    for index, fig in enumerate(figures):
+        if not isinstance(fig, Mapping):
+            continue
+        name = fig.get("name")
+        if isinstance(name, str) and name.strip():
+            by_name[name.strip()] = index
+
+    if wanted is not None:
+        missing = sorted(wanted - set(by_name))
+        if missing:
+            raise KeyError(f"figure(s) not found: {', '.join(missing)}")
+
+    expanded_names: list[str] = []
+    for index, fig in enumerate(figures):
+        if not isinstance(fig, Mapping):
+            continue
+        name = fig.get("name")
+        label = (
+            str(name).strip()
+            if isinstance(name, str) and str(name).strip()
+            else f"_figure{index}"
+        )
+        if wanted is not None and label not in wanted:
+            continue
+
+        fig_type = str(fig.get("type", "")).strip().lower() if "type" in fig else ""
+        if not fig_type:
+            # Already layers form — skip (no-op when allow_noop / whole-file expand).
+            continue
+
+        if fig_type not in KNOWN_FIGURE_TYPES:
+            msg = (
+                f"Figure {label!r}: unknown type {fig_type!r}; "
+                f"known: {', '.join(sorted(KNOWN_FIGURE_TYPES))}"
+            )
+            if raise_on_error:
+                raise ValueError(msg)
+            continue
+
         try:
-            expanded.append(expand_figure_type(fig))
+            out = expand_figure_type(fig)
         except Exception as exc:
-            if logger is not None:
-                try:
-                    name = fig.get("name", "<unknown>") if isinstance(fig, Mapping) else "<unknown>"
-                    logger.warning(f"Figure type expansion failed for {name}: {exc}")
-                except Exception:
-                    pass
-            expanded.append(fig)
-    config["Figures"] = expanded
+            if raise_on_error:
+                raise ValueError(f"Figure {label!r}: type expansion failed: {exc}") from exc
+            continue
+
+        if not isinstance(out, Mapping) or out.get("type"):
+            msg = f"Figure {label!r}: type {fig_type!r} did not expand to layers"
+            if raise_on_error:
+                raise ValueError(msg)
+            continue
+
+        figures[index] = out
+        expanded_names.append(label)
+
+    if (
+        not expanded_names
+        and not allow_noop
+        and raise_on_error
+        and wanted is not None
+    ):
+        # Named figures were found but none had type: — tell the caller clearly
+        # only when they opted out of no-op (legacy tests may want this).
+        raise ValueError(
+            "no type: figures to expand"
+            + (f" (looked for: {', '.join(sorted(wanted))})" if wanted else "")
+        )
+
+    return expanded_names
+
+
+def expand_figure_types_in_config(config: Any, logger=None) -> Any:
+    """Runtime hook: expand every ``type:`` figure, best-effort (never raise)."""
+    if not isinstance(config, dict):
+        return config
+    try:
+        expand_typed_figures(config, raise_on_error=False)
+    except Exception as exc:
+        if logger is not None:
+            try:
+                logger.warning(f"Figure type expansion failed: {exc}")
+            except Exception:
+                pass
     return config

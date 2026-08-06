@@ -18,11 +18,12 @@ def main(argv=None, *, prog="jplot"):
     if handled:
         return code
 
+    from jarvisplot.agent_io import system_exit_code
     from jarvisplot.core import JarvisPLOT
 
     jp = JarvisPLOT(prog=prog, argv=tokens)
     try:
         jp.init()
     except SystemExit as exc:
-        return int(exc.code)
+        return system_exit_code(exc)
     return 0

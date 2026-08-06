@@ -63,3 +63,42 @@ def test_suggest_write_validates(tmp_path):
     assert out.is_file()
     config = yaml.safe_load(out.read_text(encoding="utf-8"))
     assert config["Figures"][0]["type"] == "posterior_2d"
+
+
+def test_suggest_rejects_unknown_column(tmp_path, capsys):
+    path = tmp_path / "s.csv"
+    path.write_text("a,b,LogL\n1,2,-1\n", encoding="utf-8")
+    assert (
+        main(
+            [
+                "suggest",
+                "--data",
+                str(path),
+                "--kind",
+                "profile_2d",
+                "--x",
+                "nope",
+                "--z",
+                "LogL",
+                "--json",
+            ]
+        )
+        == 1
+    )
+    env = json.loads(capsys.readouterr().out)
+    assert env["ok"] is False
+    assert env["error"]["type"] == "JP-TPL-004"
+    assert env["diagnostics"]
+    assert env["diagnostics"][0]["code"] == "JP-TPL-004"
+    assert "nope" in env["error"]["message"]
+
+
+def test_suggest_refuses_fake_logl_fallback(tmp_path, capsys):
+    """All-parameter columns must not silently become exp(a) weight."""
+    path = tmp_path / "triangle.csv"
+    path.write_text("a,b,c\n1,2,3\n4,5,6\n", encoding="utf-8")
+    assert main(["suggest", "--data", str(path), "--kind", "posterior_2d", "--json"]) == 1
+    env = json.loads(capsys.readouterr().out)
+    assert env["ok"] is False
+    assert env["error"]["type"] == "JP-TPL-005"
+    assert env["diagnostics"][0]["code"] == "JP-TPL-005"

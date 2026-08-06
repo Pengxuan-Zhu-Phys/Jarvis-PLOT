@@ -17,7 +17,8 @@ import sys
 from pathlib import Path
 from typing import Any, Sequence
 
-from ..agent_io import EXIT_FAILED, EXIT_OK, EXIT_USAGE, emit, envelope, error_payload
+from ..agent_io import EXIT_FAILED, EXIT_OK, EXIT_USAGE, emit, envelope, system_exit_code, error_payload
+from ..cli_help import RichArgumentParser
 from ..diagnostics import did_you_mean
 from ..expr_names import EXPR_IDENTIFIER_IGNORE
 
@@ -37,11 +38,18 @@ _DESCRIBE_CACHE_VERSION = 1
 
 
 def build_parser(prog: str = "jplot data") -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = RichArgumentParser(
         prog=prog,
         description="Inspect a data file the way Jarvis-PLOT will load it.",
+        rich_title="data",
+        rich_usage=(
+            f"{prog} describe <file> [--json]\n"
+            f"{prog} head <file> [-n N] [--json]\n"
+            f"{prog} eval <expr> --data <file> [--json]\n"
+            f"{prog} suggest-axes <file> [--json]"
+        ),
     )
-    sub = parser.add_subparsers(dest="action", required=True)
+    sub = parser.add_subparsers(dest="action", required=True, parser_class=RichArgumentParser)
 
     def _common_source(p: argparse.ArgumentParser) -> None:
         p.add_argument(
@@ -65,6 +73,8 @@ def build_parser(prog: str = "jplot data") -> argparse.ArgumentParser:
     describe = sub.add_parser(
         "describe",
         help="column names, dtypes, ranges (and HDF5 tree when applicable)",
+        rich_title="data describe",
+        rich_usage=f"{prog} describe <file> [--type auto] [--json]",
     )
     describe.add_argument("file", help="path to csv / parquet / hdf5")
     _common_source(describe)
@@ -82,6 +92,8 @@ def build_parser(prog: str = "jplot data") -> argparse.ArgumentParser:
     head = sub.add_parser(
         "head",
         help="first N real sample rows",
+        rich_title="data head",
+        rich_usage=f"{prog} head <file> [-n N] [--cols a,b] [--json]",
     )
     head.add_argument("file", help="path to csv / parquet / hdf5")
     _common_source(head)
@@ -91,6 +103,7 @@ def build_parser(prog: str = "jplot data") -> argparse.ArgumentParser:
         dest="n_rows",
         type=int,
         default=5,
+        metavar="N",
         help="number of rows (default: 5, hard cap 100)",
     )
     head.add_argument(
@@ -102,6 +115,8 @@ def build_parser(prog: str = "jplot data") -> argparse.ArgumentParser:
     evaluate = sub.add_parser(
         "eval",
         help="evaluate an expression against the file (sandbox before YAML)",
+        rich_title="data eval",
+        rich_usage=f'{prog} eval <expr> --data <file> [--sample N] [--json]',
     )
     evaluate.add_argument("expr", help='expression, e.g. "exp(LogL)"')
     evaluate.add_argument(
@@ -115,12 +130,15 @@ def build_parser(prog: str = "jplot data") -> argparse.ArgumentParser:
         "--sample",
         type=int,
         default=5,
+        metavar="N",
         help="how many sample values to return (default: 5)",
     )
 
     axes = sub.add_parser(
         "suggest-axes",
         help="per-column scale/lim suggestions for frame.ax",
+        rich_title="data suggest-axes",
+        rich_usage=f"{prog} suggest-axes <file> [--cols a,b] [--json]",
     )
     axes.add_argument("file", help="path to csv / parquet / hdf5")
     _common_source(axes)
@@ -137,7 +155,7 @@ def run(argv: Sequence[str], *, prog: str = "jplot data") -> int:
     try:
         args = parser.parse_args(list(argv))
     except SystemExit as exc:
-        return int(exc.code or EXIT_USAGE)
+        return system_exit_code(exc)
 
     action = str(getattr(args, "action", "") or "")
     as_json = bool(getattr(args, "json", False)) or not sys.stdout.isatty()
@@ -528,11 +546,6 @@ def eval_on_file(
             if h not in seen:
                 seen.add(h)
                 unique_hints.append(h)
-        funcs = sorted(
-            n
-            for n, v in build_eval_globals().items()
-            if not n.startswith("__") and callable(v)
-        )[:40]
         raise _EvalFailed(
             "JP-EXP-002",
             (
@@ -549,23 +562,18 @@ def eval_on_file(
                 "symbols_unresolved": unresolved,
                 "available_columns": columns,
                 "did_you_mean": unique_hints[:5],
-                "available_functions": funcs,
+                "available_functions": _public_eval_function_names(),
             },
             suggestion=(
                 f"Use a column from available_columns"
                 + (f", e.g. {unique_hints[0]!r}" if unique_hints else "")
-                + ", or a function from jplot cap funcs."
+                + ", or a function from `jplot cap funcs`."
             ),
         )
 
     try:
         arr = eval_dataframe_expression(df, text)
     except Exception as exc:
-        funcs = sorted(
-            n
-            for n, v in build_eval_globals().items()
-            if not n.startswith("__") and callable(v)
-        )[:40]
         raise _EvalFailed(
             "JP-EXP-001",
             f"expression failed: {exc}",
@@ -576,9 +584,9 @@ def eval_on_file(
                 "symbols_used": sorted(symbols),
                 "symbols_unresolved": [],
                 "available_columns": columns,
-                "available_functions": funcs,
+                "available_functions": _public_eval_function_names(),
             },
-            suggestion="Check operators and parentheses; run jplot cap funcs for callables.",
+            suggestion="Check operators and parentheses; run `jplot cap funcs` for callables.",
         ) from exc
 
     values = np.asarray(arr).reshape(-1)
@@ -934,6 +942,52 @@ def _role_hint(name: str, rec: dict[str, Any]) -> str | None:
 
 def _expr_symbols(expr: str) -> set[str]:
     return set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", expr))
+
+
+def _public_eval_function_names(*, limit: int = 24) -> list[str]:
+    """Short public function list for JP-EXP diagnostics (not the full Operas dump)."""
+    # Prefer the stable ignore-table (expr surface), not every callable in globals.
+    names = sorted(
+        n
+        for n in EXPR_IDENTIFIER_IGNORE
+        if n not in {
+            "True",
+            "False",
+            "None",
+            "and",
+            "or",
+            "not",
+            "in",
+            "if",
+            "else",
+            "for",
+            "lambda",
+            "np",
+            "math",
+        }
+        and n[:1].islower()
+    )
+    # Always surface the most common ones first.
+    preferred = [
+        "exp",
+        "log",
+        "ln",
+        "log10",
+        "sqrt",
+        "abs",
+        "min",
+        "max",
+        "sin",
+        "cos",
+        "tan",
+    ]
+    ordered: list[str] = []
+    for name in preferred + names:
+        if name not in ordered and name in EXPR_IDENTIFIER_IGNORE:
+            ordered.append(name)
+        if len(ordered) >= limit:
+            break
+    return ordered
 
 
 def _parse_cols(cols: str | None) -> list[str] | None:

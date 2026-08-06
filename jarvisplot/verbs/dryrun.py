@@ -9,22 +9,26 @@ before (or instead of) reading a PNG.
 from __future__ import annotations
 
 import argparse
+
+from ..cli_help import RichArgumentParser
 import sys
 from typing import Sequence
 
-from ..agent_io import EXIT_FAILED, EXIT_OK, EXIT_USAGE, emit, envelope
+from ..agent_io import EXIT_FAILED, EXIT_OK, EXIT_USAGE, emit, envelope, system_exit_code
 from ..dryrun_runtime import dryrun_file
 
 __all__ = ["build_parser", "run"]
 
 
 def build_parser(prog: str = "jplot dryrun") -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = RichArgumentParser(
         prog=prog,
         description=(
             "Run dataset load + layer transforms without rendering; "
             "emit a row ledger and JP-VIZ health diagnostics."
         ),
+        rich_title="dryrun",
+        rich_usage=f"{prog} <file> [--json] [--with-data]",
     )
     parser.add_argument("file", help="path to a YAML plotting configuration")
     parser.add_argument(
@@ -50,7 +54,7 @@ def run(argv: Sequence[str], *, prog: str = "jplot dryrun") -> int:
     try:
         args = parser.parse_args(list(argv))
     except SystemExit as exc:
-        return int(exc.code or EXIT_USAGE)
+        return system_exit_code(exc)
 
     as_json = bool(args.json) or not sys.stdout.isatty()
     report, bag = dryrun_file(
@@ -58,24 +62,43 @@ def run(argv: Sequence[str], *, prog: str = "jplot dryrun") -> int:
         with_data=bool(args.with_data),
         out_dir=args.out_dir,
     )
+    # Prefer the tri-state verdict from dryrun_config (None = partial coverage).
+    verdict = report.get("ok")
+    if "ok" not in report:
+        verdict = bag.ok
+    coverage = report.get("coverage") or ("full" if bag.ok else "failed")
+    status = report.get("status") or (
+        "ok"
+        if verdict is True
+        else ("partial_renderable" if verdict is None else "failed")
+    )
     data = {
         "file": report.get("file", args.file),
+        "status": status,
+        "coverage": coverage,
+        "renderable": report.get("renderable", status in {"ok", "partial_renderable"}),
+        "status_note": report.get("status_note"),
+        "type_expanded": report.get("type_expanded") or [],
+        "heavy_skipped": report.get("heavy_skipped") or [],
         "datasets": report.get("datasets") or {},
         "layers": report.get("layers") or [],
         "twins": report.get("twins") or {},
         "error_count": len(bag.errors),
         "warning_count": len(bag.warnings),
     }
-    env = envelope("dryrun", bag.ok, data=data, diagnostics=bag)
+    env = envelope("dryrun", verdict, data=data, diagnostics=bag)
     if as_json:
         return emit(env)
 
     _print_human(args.file, report, bag)
-    return EXIT_OK if bag.ok else EXIT_FAILED
+    # partial (ok is null) exits 0; only real errors fail
+    return EXIT_OK if verdict is not False else EXIT_FAILED
 
 
 def _print_human(path: str, report: dict, bag) -> None:
-    print(f"{path}: dryrun", file=sys.stderr)
+    status = report.get("status") or "?"
+    coverage = report.get("coverage") or "?"
+    print(f"{path}: dryrun  status={status}  coverage={coverage}", file=sys.stderr)
     for name, meta in (report.get("datasets") or {}).items():
         rows = meta.get("rows")
         print(f"  DataSet {name:<16} {rows if rows is not None else '?':>10} rows", file=sys.stderr)

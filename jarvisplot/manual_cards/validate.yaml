@@ -1,0 +1,41 @@
+id: validate
+title: validate and doctor
+summary: Shape + columns gate without rendering; doctor = validate + dryrun.
+role: how-to
+priority: 50
+see_also: [dryrun-viz, diagnostics, workflow]
+related_cli:
+  - argv: [jplot, validate, "<yaml>", "--json"]
+    why: one-round diagnostics envelope
+  - argv: [jplot, validate, "<yaml>", "--fix", "--diff"]
+    why: mechanical fixes preview
+  - argv: [jplot, validate, "<yaml>", "--fix", "--write"]
+    why: apply certain fixes
+  - argv: [jplot, doctor, "<yaml>", "--json"]
+    why: validate + dryrun combined
+live_sources:
+  - verb: validate
+    truth: schema + ownership + column existence
+human:
+  panels:
+    - kind: overview
+      title: When
+      body: |
+        Run validate after every YAML edit. Prefer --json for agents.
+        doctor is the usual one-shot gate before human eyeballing.
+    - kind: steps
+      title: Commands
+      items:
+        - "jplot validate plot.yaml --json"
+        - "jplot validate plot.yaml --fix --diff   # preview"
+        - "jplot doctor plot.yaml --json"
+    - kind: notes
+      title: Exit codes
+      items:
+        - "0 = ok; 1 = failed verdict; 2 = usage / parse error"
+        - "--no-columns skips file reads (shape only)"
+agent:
+  diagnostics:
+    - code: JP-OWN-001
+      when: ignored keys on layer coordinates
+      fix_hint: move lim/scale to frame or type slots

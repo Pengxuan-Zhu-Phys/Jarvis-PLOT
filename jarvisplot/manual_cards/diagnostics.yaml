@@ -1,0 +1,38 @@
+id: diagnostics
+title: JP-* diagnostic map
+summary: Error codes are the knowledge index; use jplot explain for one code.
+role: catalog
+priority: 60
+see_also: [validate, dryrun-viz, workflow]
+related_cli:
+  - argv: [jplot, explain, "JP-VIZ-003", "--json"]
+    why: suggestion + example for one code
+  - argv: [jplot, validate, "<yaml>", "--json"]
+    why: emit diagnostics[] on the envelope
+live_sources:
+  - verb: explain
+    truth: guidance_for(KNOWN_CODES)
+human:
+  panels:
+    - kind: overview
+      title: How to use codes
+      body: |
+        Diagnostics appear in validate/dryrun/doctor JSON envelopes.
+        Do not memorize the full table — call jplot explain <CODE>.
+    - kind: notes
+      title: Families (summary)
+      items:
+        - "JP-OWN-* ownership / ignored keys"
+        - "JP-VIZ-* empty or unhealthy visual outcomes"
+        - "JP-COL-* / column existence issues"
+        - "JP-CFG-* config shape / schema"
+    - kind: steps
+      title: Loop
+      items:
+        - "read diagnostics[].code from --json"
+        - "jplot explain CODE --json"
+        - "fix YAML; re-run doctor"
+agent:
+  body_markdown: |
+    Full tables live in diagnostic_guidance / explain.
+    man only maps families so agents know which verb to call next.

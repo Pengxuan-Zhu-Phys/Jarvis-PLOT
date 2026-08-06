@@ -1,0 +1,40 @@
+id: data-columns
+title: Data columns discipline
+summary: Column names only come from the data file — never from imagination.
+role: how-to
+priority: 25
+see_also: [workflow, validate, cli-map]
+related_cli:
+  - argv: [jplot, data, describe, "<file>", "--json"]
+    why: authoritative column list
+  - argv: [jplot, data, head, "<file>", "-n", "5", "--json"]
+    why: real sample rows
+  - argv: [jplot, data, eval, "<expr>", "--data", "<file>", "--json"]
+    why: sandbox expression before writing YAML
+  - argv: [jplot, data, suggest-axes, "<file>", "--json"]
+    why: scale/lim hints for frame.ax
+live_sources:
+  - verb: data.describe
+    truth: real file columns only
+human:
+  panels:
+    - kind: overview
+      title: Rule
+      body: |
+        Every expr / column reference must appear in data describe output.
+        Coding agents: treat inventing column names as a hard error.
+    - kind: steps
+      title: Before writing YAML
+      items:
+        - "jplot data describe samples.csv --json"
+        - "jplot data eval 'exp(LogL)' --data samples.csv --json"
+        - "only then write coordinates / weight / z"
+    - kind: notes
+      title: Notes
+      items:
+        - HDF5 needs the right --group when not at file root.
+        - --type auto is fine; force csv|parquet|hdf5 when extension is wrong.
+agent:
+  anti_patterns:
+    - Hallucinating column names from domain knowledge alone
+    - Writing expr that fail data eval

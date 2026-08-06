@@ -1,0 +1,40 @@
+id: type-profile-2d
+title: type profile_2d
+summary: Short macro for 2D profile likelihood / chi2 maps on a grid.
+role: how-to
+priority: 35
+see_also: [type-posterior-2d, layer-method, workflow]
+related_cli:
+  - argv: [jplot, template, show, profile_2d, "--json"]
+    why: slots + skeleton YAML
+  - argv: [jplot, config, expand, "<yaml>", "--figure", "<name>", "--write"]
+    why: lower to layers for fine-tuning
+live_sources:
+  - verb: cap.types
+    truth: profile_2d is a registered figure type
+human:
+  panels:
+    - kind: overview
+      title: When to use
+      body: |
+        Profile / frequentist-style 2D maps (z is the profiled objective).
+        Not the same as posterior_2d (which wants a weight).
+    - kind: yaml
+      title: Minimal figure
+      lexer: yaml
+      body: |
+        - name: profile
+          type: profile_2d
+          data: samples
+          x: {expr: m_A, lim: [0.1, 5000], scale: log}
+          y: {expr: tanb, lim: [1, 60]}
+          z: {expr: LogL, label: "$\\log\\mathcal{L}$"}
+          style: [a4paper_2x1, rectcmap]
+    - kind: notes
+      title: Notes
+      items:
+        - Required slots: data, x, y, z.
+        - Default mesh path is Bridson + natural neighbor + pcolormesh.
+agent:
+  anti_patterns:
+    - Passing weight instead of z for profile_2d

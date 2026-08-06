@@ -1,0 +1,43 @@
+id: cli-map
+title: CLI verb map
+summary: All jplot agent verbs; live list also from jplot cap cli.
+role: catalog
+priority: 15
+see_also: [workflow, validate, data-columns]
+related_cli:
+  - argv: [jplot, cap, cli, "--json"]
+    why: live command catalogue (do not hardcode forever)
+  - argv: [jplot, man, "--json"]
+    why: manual index
+  - argv: [jplot, "-h"]
+    why: human root help (Rich panels)
+live_sources:
+  - verb: cap.cli
+    truth: cards/args.json commands
+human:
+  panels:
+    - kind: overview
+      title: Roles
+      body: |
+        Sensor: data, cap, man, explain, template, suggest
+        Judge: validate, dryrun, doctor
+        Editor tools: config get|set|rm|expand (optional)
+        Render: jplot <file>  (bare path; no jplot run)
+    - kind: steps
+      title: Core verbs
+      items:
+        - "jplot data describe|head|eval|suggest-axes"
+        - "jplot cap [section]"
+        - "jplot man [topic]"
+        - "jplot validate|dryrun|doctor"
+        - "jplot config expand  # type → layers"
+        - "jplot <file>         # render"
+    - kind: notes
+      title: Human help style
+      items:
+        - "Default help is Rich fixed-column panels (Jarvis-HEP V2 family)."
+        - "Agent machine I/O is always --json envelopes on stdout."
+agent:
+  body_markdown: |
+    Prefer `jplot cap cli --json` for an up-to-date list.
+    DR-08: there is no `jplot run`.

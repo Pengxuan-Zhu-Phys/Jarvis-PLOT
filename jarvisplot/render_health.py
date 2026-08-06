@@ -76,6 +76,9 @@ class LayerObservation:
     steps: list[TransformStepObs] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     twin_path: Optional[str] = None
+    #: True when dryrun skipped a heavy transform this layer needs — empty
+    #: ledger is then *incomplete coverage*, not a proven empty plot.
+    incomplete: bool = False
 
 
 def report_to_dict(
@@ -120,6 +123,25 @@ def evaluate_health(
 
 def _viz_001_empty(obs: LayerObservation, path: str, bag: DiagnosticBag) -> None:
     if obs.n_points <= 0:
+        if obs.incomplete:
+            bag.info(
+                "JP-VIZ-001",
+                path,
+                f"layer {obs.layer!r} has zero points in dryrun, but coverage is "
+                f"incomplete (heavy transform skipped; method={obs.method or '?'})",
+                suggestion=(
+                    "This is not a config failure. dryrun skips profile/density/"
+                    "interp steps. Render with `jplot <file>`, or treat doctor "
+                    "status=partial as 'structure ok, full mesh not simulated'."
+                ),
+                context={
+                    "figure": obs.figure,
+                    "layer": obs.layer,
+                    "n_points": 0,
+                    "incomplete": True,
+                },
+            )
+            return
         bag.error(
             "JP-VIZ-001",
             path,
@@ -191,6 +213,19 @@ def _viz_002_clipped(obs: LayerObservation, path: str, bag: DiagnosticBag) -> No
 def _viz_003_transform_empty(obs: LayerObservation, path: str, bag: DiagnosticBag) -> None:
     for step in obs.steps:
         if not step.emptied:
+            continue
+        if "skipped" in (step.detail or "").lower():
+            # Heavy/unknown steps are skipped, not emptied.
+            continue
+        if obs.incomplete:
+            bag.info(
+                "JP-VIZ-003",
+                path,
+                f"transform step {step.name!r} looks empty under incomplete dryrun "
+                f"({step.rows_in} → {step.rows_out})",
+                suggestion="Not a config failure while coverage is partial.",
+                context={"figure": obs.figure, "layer": obs.layer, "step": step.name},
+            )
             continue
         bag.error(
             "JP-VIZ-003",
