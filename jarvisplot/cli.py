@@ -180,9 +180,9 @@ def render_help(*, prog: str = "jplot") -> str:
         title="Jarvis-PLOT",
         usage=(
             f"{prog} <file>\n"
-            f"{prog} validate <file> [--json]\n"
+            f"{prog} validate <file> [--json] [--fix]\n"
             f"{prog} cap [section] [--json]\n"
-            f"{prog} data describe|head|eval … [--json]\n"
+            f"{prog} data describe|head|eval|suggest-axes … [--json]\n"
             f"{prog} flowchart <flowchart_file>\n"
             f"{prog} -h\n"
             f"{prog} -v"
