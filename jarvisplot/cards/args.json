@@ -1,12 +1,38 @@
 {
+    "commands": [
+        {
+            "name": "validate",
+            "help": "check a YAML config without rendering it",
+            "usage": "jplot validate <file> [--json]",
+            "kind": "agent"
+        },
+        {
+            "name": "cap",
+            "help": "list legal strings (methods, styles, cmaps, funcs, …)",
+            "usage": "jplot cap [all|methods|transforms|types|styles|cmaps|funcs|cli] [--json]",
+            "kind": "agent"
+        },
+        {
+            "name": "data",
+            "help": "inspect a data file (column names, ranges)",
+            "usage": "jplot data describe <file> [--json]",
+            "kind": "agent"
+        },
+        {
+            "name": "flowchart",
+            "help": "render a Jarvis-HEP flowchart scene JSON",
+            "usage": "jplot flowchart <flowchart_file>",
+            "kind": "legacy"
+        }
+    ],
     "positionals": [
         {
             "name": "file",
-            "help": "path of the input YAML file, or the command 'flowchart'"
+            "help": "YAML to render (bare path = plot; not a verb — see DR-08)"
         },
         {
             "name": "flowchart_file",
-            "help": "path of the input flowchart JSON file when using: jplot flowchart path-to-flowchart.json",
+            "help": "path to the input flowchart scene JSON",
             "nargs": "?"
         }
     ],
@@ -22,19 +48,19 @@
             "short": "-d",
             "long": "--debug",
             "dest": "debug",
-            "help": "Run JarvisPLOT in debug mode",
+            "help": "run Jarvis-PLOT in debug mode",
             "action": "store_true"
         },
         {
             "long": "--parse-data",
             "dest": "parse_data",
-            "help": "Parse datasets (CSV/HDF5), sanitize column names, and write Variables/ColumnMap back to YAML",
+            "help": "parse datasets and update YAML metadata",
             "action": "store_true"
         },
         {
             "long": "--out",
             "dest": "out",
-            "help": "Output YAML path (used with --parse-data), or output image path/dir for 'jplot flowchart'",
+            "help": "output YAML path or flowchart image path",
             "action": "store",
             "metavar": "PATH"
 
@@ -42,19 +68,19 @@
         {
             "long": "--inplace",
             "dest": "inplace",
-            "help": "Modify the input YAML file in place (used with --parse-data)",
+            "help": "modify the input YAML file in place",
             "action": "store_true"
         },
         {
             "long": "--print",
             "dest": "no_logo",
-            "help": "Disable the Jarvis-HEP logo panel (axlogo)",
+            "help": "disable the Jarvis-HEP logo panel",
             "action": "store_true"
         },
         {
             "long": "--rebuild-cache",
             "dest": "rebuild_cache",
-            "help": "Ignore and rebuild workdir/.cache before plotting",
+            "help": "rebuild the project cache before plotting",
             "action": "store_true"
         }
     ]

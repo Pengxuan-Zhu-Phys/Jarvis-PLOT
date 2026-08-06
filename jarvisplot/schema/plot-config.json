@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/plot-config.json",
+  "title": "Jarvis-PLOT configuration",
+  "type": "object",
+  "x-jarvis-zone": "closed",
+  "required": ["DataSet", "Figures"],
+  "properties": {
+    "version": {
+      "type": ["string", "number"],
+      "description": "Config format version."
+    },
+    "project": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "name": {
+          "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString"
+        },
+        "workdir": {
+          "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString",
+          "description": "Anchor for relative data paths and the .cache/ directory. Defaults to the config file's directory."
+        }
+      },
+      "additionalProperties": false
+    },
+    "DataSet": {
+      "type": "array",
+      "items": { "$ref": "https://jarvis-plot.org/schema/v2/core/dataset.json" }
+    },
+    "Figures": {
+      "type": "array",
+      "items": { "$ref": "https://jarvis-plot.org/schema/v2/core/figure.json" }
+    },
+    "Functions": {
+      "type": "array",
+      "description": "External callables (e.g. lazy-loaded interpolators) registered into the expression runtime."
+    },
+    "output": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "dir": {
+          "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString"
+        },
+        "dpi": { "type": "number", "exclusiveMinimum": 0 },
+        "formats": {
+          "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/stringOrStringList"
+        },
+        "metadata": { "type": "object", "x-jarvis-zone": "delegated" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "x-jarvis-example": "version: \"0.3\"\nproject: {name: demo}\nDataSet:\n  - {name: df, path: ./samples.csv, type: csv}\nFigures:\n  - name: f1\n    style: [a4paper_2x1, rect]\n    layers: []\noutput: {dir: ./plots, dpi: 150, formats: [png]}"
+}

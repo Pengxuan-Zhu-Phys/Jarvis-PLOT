@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/core/figure.json",
+  "title": "One entry of the root Figures list",
+  "type": "object",
+  "x-jarvis-zone": "closed",
+  "required": ["name"],
+  "properties": {
+    "name": {
+      "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/identifier",
+      "description": "Becomes the output filename, and the stable address for `jplot config set`."
+    },
+    "enable": {
+      "type": "boolean",
+      "description": "false skips this figure without removing it."
+    },
+    "type": {
+      "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString",
+      "description": "Figure-type shorthand expanded into layers before rendering. Run `jplot cap types` for the list."
+    },
+    "style": {
+      "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/stringOrStringList",
+      "description": "Style card tokens, e.g. [a4paper_2x1, rect]. Run `jplot cap styles` for the catalog."
+    },
+    "frame": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "description": "Per-axes frame settings merged over the style card: limits, scales, labels, ticks, legend, colorbar colour ownership."
+    },
+    "layers": {
+      "type": "array",
+      "items": { "$ref": "https://jarvis-plot.org/schema/v2/core/layer.json" }
+    },
+    "debug": {
+      "type": "boolean",
+      "description": "Draw the design-reference overlay showing every axes box and its dimensions."
+    },
+    "legend": {
+      "x-jarvis-ignored": "frame.<axes>.legend",
+      "description": "Not read here. The renderer only looks for a legend under frame.<axes>.legend."
+    },
+    "yaml_dir": { "x-jarvis-internal": true },
+    "_yaml_dir": { "x-jarvis-internal": true },
+    "yaml_path": { "x-jarvis-internal": true }
+  },
+  "additionalProperties": false,
+  "x-jarvis-example": "- name: EggBox\n  style: [a4paper_2x1, rectcmap]\n  frame:\n    ax: {xlim: [0.1, 5], xscale: log}\n  layers: []"
+}

@@ -30,10 +30,11 @@ def _format_console_record(record):
 
 
 class JarvisPLOT():
-    def __init__(self) -> None:
+    def __init__(self, *, prog: str = "jplot", argv=None) -> None:
         self.yaml       =   ConfigLoader()
         self.style      =   {}
-        self.cli        =   CLI()
+        self.cli        =   CLI(prog=prog)
+        self.argv       =   argv
         self.logger     =   None
         self.dataset: list[DataSet] = []
         self.shared     =   None
@@ -44,7 +45,10 @@ class JarvisPLOT():
         self.preprocessor: Optional[DataPreprocessor] = None
 
     def init(self):
-        self.args = self.cli.args.parse_args()
+        if self.argv is None:
+            self.args = self.cli.args.parse_args()
+        else:
+            self.args = self.cli.args.parse_args(self.argv)
 
         # Initialize logger early
         self.init_logger()
@@ -225,8 +229,10 @@ class JarvisPLOT():
         def custom_format(record):
             return _format_console_record(record)
 
+        # stderr, not stdout: stdout is reserved for machine output so a caller
+        # can pipe `--json` straight into a parser while still seeing the log.
         logger.add(
-            sys.stdout,
+            sys.stderr,
             filter=stream_filter,
             format=custom_format,
             colorize=True,

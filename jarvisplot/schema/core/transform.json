@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/core/transform.json",
+  "title": "One step of a transform pipeline",
+  "description": "Today a step is a single-key mapping (`- filter: \"LogL > -100\"`); the density/interp/posterior steps additionally accept the discriminated `{type: <name>, ...}` form. `Figure/preprocessor_runtime.py::apply_transforms_impl` dispatches with an if/elif chain that has **no else branch**, so a misspelled step key is skipped in silence and the figure renders on untransformed data. Pinning the vocabulary here is what turns that into a diagnostic. G1/R2 replaces the whole shape with a discriminated union.",
+  "type": "object",
+  "x-jarvis-zone": "closed",
+  "minProperties": 1,
+  "properties": {
+    "type": {
+      "$ref": "#/$defs/discriminatedStepName",
+      "description": "Discriminated form. Only the density / interp / posterior steps accept it today."
+    },
+    "filter": {
+      "type": ["string", "number", "boolean"],
+      "description": "Boolean expression over columns; rows evaluating false are dropped. A literal true/false (or 1/0) keeps or empties the table -- Figure/preprocessor_runtime.py::filter_df short-circuits on those."
+    },
+    "sortby": {
+      "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/stringOrStringList"
+    },
+    "add_column": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "required": ["name", "expr"],
+      "properties": {
+        "name": {
+          "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/identifier"
+        },
+        "expr": {
+          "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/expression"
+        },
+        "fillna": {}
+      },
+      "additionalProperties": false
+    },
+    "keep_columns": {
+      "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/stringOrStringList"
+    },
+    "drop_columns": {
+      "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/stringOrStringList"
+    },
+    "to_csv": {
+      "description": "Write the table at this point of the pipeline (CSV). Debug aid, not a render step. Honoured at dataset load (data_loader_runtime) and in layer preprocess (preprocessor_runtime)."
+    },
+    "to_parquet": {
+      "description": "Write the table at this point of the pipeline (Parquet). Dataset-level only today (data_loader_runtime); same single-key form as to_csv."
+    },
+    "profile": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "description": "Profile-likelihood reduction over support cells. Keys are owned by Figure/profile_runtime.py."
+    },
+    "make_density_core": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "description": "Posterior mass over support cells. Keys are owned by Figure/density_cell_runtime.py."
+    },
+    "posterior_density": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "description": "Merged posterior-density pipeline. Keys are owned by Figure/posterior_density_runtime.py."
+    },
+    "make_interp_2d": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "description": "2D interpolation onto a grid. Keys are owned by Figure/interp_2d_runtime.py."
+    }
+  },
+  "additionalProperties": false,
+  "x-jarvis-example": "transform:\n  - filter: \"LogL > -100\"\n  - add_column: {name: ratio, expr: \"m_A / tanb\"}\n  - sortby: LogL",
+  "$defs": {
+    "discriminatedStepName": {
+      "description": "Step names that also work in the `{type: ...}` form. Kept in sync with the _*_TYPES sets by tests/test_schema_catalog.py.",
+      "enum": ["make_density_core", "posterior_density", "make_interp_2d"]
+    }
+  }
+}
