@@ -19,12 +19,25 @@
             "kind": "agent"
         },
         {
+            "name": "dryrun",
+            "help": "load data + transforms, row ledger + JP-VIZ health (no render)",
+            "usage": "jplot dryrun <file> [--json]",
+            "kind": "agent"
+        },
+        {
+            "name": "doctor",
+            "help": "validate + dryrun in one pass",
+            "usage": "jplot doctor <file> [--json]",
+            "kind": "agent"
+        },
+        {
             "name": "flowchart",
             "help": "render a Jarvis-HEP flowchart scene JSON",
             "usage": "jplot flowchart <flowchart_file>",
             "kind": "legacy"
         }
     ],
+
     "positionals": [
         {
             "name": "file",

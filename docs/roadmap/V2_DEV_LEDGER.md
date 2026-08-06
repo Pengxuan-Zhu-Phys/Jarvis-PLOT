@@ -368,9 +368,9 @@ M0+M1 **不破坏任何兼容**，可以在 1.5.x 发布。M4 才是 2.0。
 
 | ID | 标题 | 里程碑 | 依赖 | 规模 | 破坏 | 状态 |
 |---|---|---|---|---|---|---|
-| E1 | 渲染期观测点采集 | M2 | A1 | M | 否 | ☐ |
-| E2 | `JP-VIZ-001…009` 体检规则 | M2 | E1, B4 | L | 否 | ☐ |
-| E3 | 行数账本（row ledger） | M2 | E1 | S | 否 | ☐ |
+| E1 | 渲染期观测点采集 | M2 | A1 | M | 否 | ☑ |
+| E2 | `JP-VIZ-001…009` 体检规则 | M2 | E1, B4 | L | 否 | ◐ |
+| E3 | 行数账本（row ledger） | M2 | E1 | S | 否 | ☑ |
 | E4 | 数值孪生 `--with-data` | M2 | E1 | M | 否 | ☐ |
 | E5 | ASCII 缩略图原型 | M3 | E1 | S | 否 | ⊘ DR-04 |
 
@@ -604,8 +604,11 @@ M0+M1 **不破坏任何兼容**，可以在 1.5.x 发布。M4 才是 2.0。
 2026-08-06 | B8  | 完成 | fix_apply.py + validate --fix/--diff/--write/--fix-unsafe；
                         case A Layers/outputs 一次修；tests/test_fix_application.py
 2026-08-06 | C6  | 完成 | data suggest-axes（scale/lim/reason）；tests/test_suggest_axes.py
+2026-08-06 | E1-3| 完成 | render_health + dryrun_runtime；`jplot dryrun` / `jplot doctor`；
+                        行数账本 + JP-VIZ-001/002/003/005/008（E2 其余码待渲染期 hook）
+                        tests/test_render_health.py + test_row_ledger.py
 2026-08-06 | M1  | 进度 | 反幻觉白名单 + method 坐标 + guidance + fix + suggest-axes 已通；
-                        下一里程碑主看 E 轨渲染读回 / F 轨起草
+                        E 轨 dryrun/doctor 已通；仍缺全量 JP-VIZ、E4 --with-data、F 轨起草
 2026-08-06 | —   | 建账 | 从两份 V2 brainstorm 落成 46 条任务 / 5 个里程碑 / 7 条待拍板 DR
 2026-08-06 | A1  | 完成 | 新增 diagnostics.py（Diagnostic/Fix/DiagnosticBag/did_you_mean/join_path）
                         + agent_io.py（envelope/emit/exit_code_for）；23 条测试

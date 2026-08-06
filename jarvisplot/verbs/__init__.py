@@ -33,6 +33,8 @@ VERBS: dict[str, str] = {
     "validate": "jarvisplot.verbs.validate:run",
     "cap": "jarvisplot.verbs.cap:run",
     "data": "jarvisplot.verbs.data:run",
+    "dryrun": "jarvisplot.verbs.dryrun:run",
+    "doctor": "jarvisplot.verbs.doctor:run",
 }
 
 #: Tokens that must never become verbs or silent aliases. Map to a short
