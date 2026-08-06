@@ -36,6 +36,14 @@
             }
         },
         "ax": {
+            "title_params": {
+                "position": "top",
+                "fontsize": "small",
+                "fontfamily": "Fira code",
+                "fontweight": "normal",
+                "clip_on": false,
+                "zorder": 1000
+            },
             "frame": {
                 "linewidth": 0.8,
                 "solid_capstyle": "projecting",
@@ -89,12 +97,37 @@
                 },
                 "ylabel_coords": {
                     "x": -0.1,
-                    "y": 0.5
+                    "y": 1.0
                 }
             }
         },
         "axlogo": {
-            "file": "&JP/jarvisplot/cards/icons/JarvisHEP.png"
+            "file": "&JP/jarvisplot/cards/icons/JarvisHEP.png",
+            "text": [
+                {
+                    "x": 1.0, 
+                    "y": 0.0, 
+                    "s": "Jarvis-HEP",
+                    "ha":   "left",
+                    "va":   "bottom", 
+                    "fontfamily":   "Fira code",
+                    "fontsize":     "x-small",
+                    "fontstyle":    "normal",
+                    "fontweight":   "bold"
+                },
+                {
+                    "x": 1.0, 
+                    "y": 0.9, 
+                    "s": "       Powered by",
+                    "ha":   "left",
+                    "va":   "top", 
+                    "color":    "black",
+                    "fontfamily":   "Fira code",
+                    "fontsize":     4,
+                    "fontstyle":    "normal",
+                    "fontweight":   "normal"
+                }
+            ]
         }
     },
     "Style": {

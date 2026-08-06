@@ -240,6 +240,24 @@ def test_layer_clip_expr_builds_data_space_clip_path():
     plt.close(raw_ax.figure)
 
 
+def test_layer_clip_expr_uses_shared_scalar_expression_helper(monkeypatch):
+    from jarvisplot.utils import expression as expression_mod
+
+    calls = []
+    original = expression_mod.eval_scalar_expression
+
+    def wrapped(expr, local_vars=None, logger=None, **kwargs):
+        calls.append((str(expr), dict(local_vars or {})))
+        return original(expr, local_vars=local_vars, logger=logger, **kwargs)
+
+    monkeypatch.setattr(layer_runtime_mod, "eval_scalar_expression", wrapped)
+    assert layer_runtime_mod._clip_expr_inside("x + y > 1", (1.5, 0.0)) is True
+    assert calls
+    assert calls[0][0] == "x + y > 1"
+    assert calls[0][1]["x"] == 1.5
+    assert calls[0][1]["y"] == 0.0
+
+
 def test_layer_clip_is_temporary_on_adapter_and_raw_axes():
     raw_ax = SimpleNamespace(_clip_path="raw-original")
     adapter = SimpleNamespace(ax=raw_ax, _clip_path="adapter-original")
@@ -659,6 +677,43 @@ def test_colorbar_finalize_allows_missing_label_config():
     assert isinstance(out["norm"], mcolors.LogNorm)
     assert fig.axc._cb["mode"] == "log"
     assert fig.axc.get_yscale() == "log"
+
+
+@pytest.mark.parametrize("axc_name", ["axc", "axc2"])
+def test_colorbar_manual_y_ticks_override_auto_ticks(axc_name):
+    positions = [0.0, 0.05, 0.10, 0.15, 0.20]
+    labels = ["0", "0.05", "0.10", "0.15", "0.20"]
+
+    fig = Figure()
+    fig.logger = _logger()
+    fig.frame = {
+        "figure": {"figsize": (2, 2)},
+        axc_name: {
+            "label": {"ylabel": r"$\\Omega h^2$"},
+            "ticks": {"y": {"positions": positions, "labels": labels}},
+            "color": {"scale": "linear", "cmap": "viridis", "vmin": 0.0, "vmax": 0.2},
+        },
+    }
+    fig.fig = plt.figure(figsize=(2, 2))
+    fig.axes = {}
+    fig._init_axc_axes(axc_name, {"rect": [0.1, 0.1, 0.2, 0.8]})
+    axc = fig.axes[axc_name]
+    axc._cb.update({
+        "used": True,
+        "mode": "norm",
+        "vmin": 0.0,
+        "vmax": 0.2,
+        "norm": mcolors.Normalize(vmin=0.0, vmax=0.2),
+        "cmap": "viridis",
+    })
+
+    fig._finalize_axc(axc_name)
+    if not fig._has_manual_ticks(axc_name, "y"):
+        fig._apply_auto_ticks(axc, "y")
+
+    np.testing.assert_allclose(axc.yaxis.get_majorticklocs(), positions)
+    assert [label.get_text() for label in axc.get_yticklabels()] == labels
+    plt.close(fig.fig)
 
 
 @pytest.mark.parametrize("ax_type", ["rect", "tri"])

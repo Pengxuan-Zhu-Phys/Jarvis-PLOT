@@ -15,23 +15,26 @@ from .colorbar_runtime import collect_and_attach_colorbar
 from .interp_natural_neighbor import resolve_backend
 from .dynesty_runtime import render_dynesty_runplot
 from .posterior_hpd import prepare_hpd_contour_style
+from ..utils.expression import eval_scalar_expression
 
 _MISSING_CLIP_PATH = object()
 
 
 def _clip_expr_inside(expr: str, point) -> bool:
     px, py = float(point[0]), float(point[1])
-    env = {
-        "x": px,
-        "y": py,
-        "np": np,
-        "numpy": np,
-        "abs": abs,
-        "min": min,
-        "max": max,
-    }
     try:
-        return bool(eval(expr, {"__builtins__": {}}, env))
+        result = eval_scalar_expression(
+            expr,
+            {
+                "x": px,
+                "y": py,
+                "numpy": np,
+                "abs": abs,
+                "min": min,
+                "max": max,
+            },
+        )
+        return bool(result)
     except Exception as exc:
         raise ValueError(f"layer clip_expr failed for {expr!r}: {exc}") from exc
 
