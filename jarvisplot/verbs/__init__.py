@@ -38,6 +38,7 @@ VERBS: dict[str, str] = {
     "template": "jarvisplot.verbs.template:run",
     "suggest": "jarvisplot.verbs.suggest:run",
     "explain": "jarvisplot.verbs.explain:run",
+    "config": "jarvisplot.verbs.config_cmd:run",
 }
 
 #: Tokens that must never become verbs or silent aliases. Map to a short

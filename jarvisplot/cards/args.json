@@ -49,6 +49,12 @@
             "kind": "agent"
         },
         {
+            "name": "config",
+            "help": "read YAML by named address (get / paths); set blocked on DR-02",
+            "usage": "jplot config get <file> <addr> [--json]",
+            "kind": "agent"
+        },
+        {
             "name": "flowchart",
             "help": "render a Jarvis-HEP flowchart scene JSON",
             "usage": "jplot flowchart <flowchart_file>",
