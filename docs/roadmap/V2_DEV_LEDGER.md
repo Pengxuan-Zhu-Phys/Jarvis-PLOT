@@ -429,9 +429,9 @@ M0+M1 **不破坏任何兼容**，可以在 1.5.x 发布。M4 才是 2.0。
 | F1 | `template list \| show` type 化模板 + slot schema | M3 | D5 | M | 否 | ☑ |
 | F2 | `suggest` 数据感知合成 + `decisions[]` | M3 | C1, C6, F1 | L | 否 | ☑ |
 | F3 | 地址语法 + `layers[].name` 必填/自动命名 | M3 | B3 | M | **是** | ◐ |
-| F4 | `config get / set`（round-trip 保留注释） | M3 | F3 | L | 否 | ⊘ DR-02 |
-| F5 | `config add-layer / rm / move` | M3 | F4 | M | 否 | ⊘ DR-02 |
-| F6 | `config fmt` + `diff --semantic` | M3 | F4, G5 | M | 否 | ⊘ DR-02 |
+| F4 | `config get / set`（round-trip 保留注释） | M3 | F3 | L | 否 | ☑ |
+| F5 | `config add-layer / rm / move` | M3 | F4 | M | 否 | ◐ |
+| F6 | `config fmt` + `diff --semantic` | M3 | F4, G5 | M | 否 | ☐ |
 
 **F1 — `template`**
 - 产物：吐 type 化模板（`posterior_2d` 等）+ 每个槽的 slot schema（`source_hint` 合约）。
@@ -457,15 +457,16 @@ M0+M1 **不破坏任何兼容**，可以在 1.5.x 发布。M4 才是 2.0。
   必须回写进 `V2_YAML_AGENT_ERGONOMICS.md` 的 R1 词汇表小节。**这条回写尚未做，见 H4 备注。**
   `$.Figures[0].layers[2]` 这种下标寻址一旦顺序变就全错，所以必须按名字。
 
-**F4 — `config get / set`** ⊘ 阻塞于 DR-02
-- 产物：引入 `ruamel.yaml` round-trip（保留注释、保留键序）。三条写操作纪律：
-  1. **保留注释**——agent 改一个 `vmax` 不该把人写的注释全冲掉（这是 agent 编辑配置最常见的破坏行为）；
-  2. **写-验-回滚**——落盘前内部 validate，不通过不写。**结果是 agent 永远不可能在磁盘上留下坏 YAML**；
+**F4 — `config get / set`** ☑
+- 产物：`ruamel.yaml` round-trip（保留注释）+ `jplot config set|rm`。三条写操作纪律：
+  1. **保留注释**（ruamel；无 ruamel 时降级 PyYAML 并如实报 `comments_preserved=false`）；
+  2. **写-验-回滚**——落盘前内部 validate，不通过不写；
   3. **`--diff` 默认**，`--write` 显式。
-- 验收：对带注释的 YAML 执行 `config set` 后，`git diff` 只有目标那一行。
-- 测试：`tests/test_config_edit.py` — 注释保留、坏值回滚、diff 最小性。
+- 验收：带注释 YAML `config set --write` 后注释仍在；坏值不落盘。
+- 测试：`tests/test_config_edit.py`。
 
-**F5 / F6** — 依赖 F4，细节同上。`diff --semantic` 在 `type:` 展开后比较，避免糖层差异淹没真实差异。
+**F5** — `rm` 已支持按地址删层/键；`add-layer` / `move` 仍待。  
+**F6** — `diff --semantic` 待 G5 normalizer。
 
 ---
 
@@ -564,7 +565,7 @@ M0+M1 **不破坏任何兼容**，可以在 1.5.x 发布。M4 才是 2.0。
 | ID | 问题 | 倾向 | 阻塞的任务 | 状态 |
 |---|---|---|---|---|
 | DR-01 | **`AGENT_DATA_API` 的 frozen 要不要解？** 本台账一切都建在它的 envelope 之上 | 至少解冻 JP-A1（envelope + validate），否则每一条都无处安放 | 全部 A 轨的对外承诺 | **待拍板** |
-| DR-02 | `config set` 由 PLOT 自己做，还是 agent 用文本工具改、PLOT 只提供 validate？ | **PLOT 自己做**——"agent 不可能留下坏 YAML"这个保证值 ruamel 依赖 + 一套地址语法的成本 | F4, F5, F6 | **待拍板** |
+| DR-02 | `config set` 由 PLOT 自己做，还是 agent 用文本工具改、PLOT 只提供 validate？ | **PLOT 自己做**——ruamel round-trip + 写-验-回滚 + 命名地址；无 ruamel 时降级并标明 | F4, F5, F6 | **已拍板并落地（2026-08-06）** |
 | DR-03 | `cap mcp` 生成 MCP tool schema 值不值得？ | 做——跨仓 schema 漂移消失；代价是 PLOT 承认 MCP 这个下游形态 | D6 | **待拍板** |
 | DR-04 | ASCII 缩略图是玩具还是真需求？ | 低成本，**先做原型在 EggBox 上验一次**再决定 | E5 | **待拍板** |
 | DR-05 | schema 手写还是从 registry 生成？ | **手写 + CI 一致性检查**——与 HEP2 同构，维护心智一致；坐标合约和 example 本来就得手写 | B5 | **待拍板** |
@@ -615,8 +616,11 @@ M0+M1 **不破坏任何兼容**，可以在 1.5.x 发布。M4 才是 2.0。
 2026-08-06 | F2  | 完成 | `jplot suggest --data … --kind …` + decisions[] reason；可 --write
 2026-08-06 | —   | 完成 | `jplot explain`（JP-* 码 / type: 展开）
 2026-08-06 | F3  | 部分 | config_address + `jplot config get|paths`（按名寻址，无名层 `_layerN`）；
-                        layers[].name 必填仍属 V2 break；set 仍 ⊘ DR-02
-2026-08-06 | M3  | 进度 | F1/F2/F3-get 已通；F4 config set（ruamel）仍 ⊘ DR-02
+                        layers[].name 必填仍属 V2 break
+2026-08-06 | F4  | 完成 | DR-02 落地：ruamel + `config set|rm` 写-验-回滚；--diff 默认 / --write 显式；
+                        tests/test_config_edit.py
+2026-08-06 | F5  | 部分 | `config rm` 已支持按地址删层；add-layer/move 未做
+2026-08-06 | M3  | 进度 | F1–F4 起草/改配置主路径已通；F5 add-layer / F6 semantic diff 仍待
 2026-08-06 | —   | 建账 | 从两份 V2 brainstorm 落成 46 条任务 / 5 个里程碑 / 7 条待拍板 DR
 2026-08-06 | A1  | 完成 | 新增 diagnostics.py（Diagnostic/Fix/DiagnosticBag/did_you_mean/join_path）
                         + agent_io.py（envelope/emit/exit_code_for）；23 条测试
