@@ -21,8 +21,9 @@ jprel () {
     local dry=0
     local editable=1
     local update_local=1
-    local dist_name="Jarvis-PLOT"
-    local legacy_dist_name="jarvisplot"
+    # Product brand is Jarvis-PLOT; distribution name must match pyproject.toml.
+    local dist_name="JarvisPLOT"
+    local legacy_dist_names=("jarvisplot" "Jarvis-PLOT" "Jarvis_PLOT")
 
     while [[ $# -gt 0 ]]; do
       case "$1" in
@@ -71,6 +72,10 @@ jprel () {
     else
       echo "==> Note: version field not found in pyproject.toml (skip auto-bump)."
     fi
+    if [[ -f VERSION ]]; then
+      echo "==> Updating VERSION file -> ${ver}"
+      printf '%s\n' "${ver}" > VERSION
+    fi
 
     # ---- build ----
     echo "==> Building sdist + wheel ..."
@@ -96,12 +101,12 @@ jprel () {
       echo "==> Committing version bump (if any) ..."
       # Only commit if there are changes
       if [[ -n "$(git status --porcelain)" ]]; then
-        git add pyproject.toml || true
+        git add pyproject.toml VERSION || true
         git commit -m "Release v${ver}" || true
       fi
 
       echo "==> Creating local git tag (push disabled by policy) ..."
-      git tag -a "v${ver}" -m "${dist_name} v${ver}" || true
+      git tag -a "v${ver}" -m "Jarvis-PLOT v${ver} (${dist_name})" || true
     fi
 
     echo "==> Done: v${ver}"
@@ -110,9 +115,11 @@ jprel () {
     if [[ ${editable} -eq 1 ]]; then
       echo "==> Editable mode: cleaning old local install records for ${dist_name} ..."
       python3 -m pip uninstall -y "${dist_name}" >/dev/null 2>&1 || true
-      python3 -m pip uninstall -y "${legacy_dist_name}" >/dev/null 2>&1 || true
+      for legacy in "${legacy_dist_names[@]}"; do
+        python3 -m pip uninstall -y "${legacy}" >/dev/null 2>&1 || true
+        python3 -m pip cache remove "${legacy}" >/dev/null 2>&1 || true
+      done
       python3 -m pip cache remove "${dist_name}" >/dev/null 2>&1 || true
-      python3 -m pip cache remove "${legacy_dist_name}" >/dev/null 2>&1 || true
 
       # Remove stale dist-info/egg-info/egg-link that can keep old versions visible in local metadata.
       python3 - <<'PY'
@@ -121,8 +128,8 @@ import shutil
 import site
 import sysconfig
 
-dist_names = ("Jarvis-PLOT", "jarvisplot")
-normalized = {"jarvis_plot", "jarvisplot", "Jarvis_PLOT"}
+dist_names = ("JarvisPLOT", "jarvisplot", "Jarvis-PLOT", "Jarvis_PLOT")
+normalized = {"jarvisplot", "jarvis_plot", "jarvis_p_l_o_t"}
 paths = set()
 for p in getattr(site, "getsitepackages", lambda: [])():
     if p:
