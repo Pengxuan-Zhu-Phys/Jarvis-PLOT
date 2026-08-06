@@ -1,8 +1,11 @@
 # JarvisPLOT Dataflow Architecture
 
 Status: implemented
+Last updated: 2026-07-16
 
-JarvisPLOT 1.3.0 replaced the old wide-table pipeline with a three-table model. The code does not expose these as separate classes, but the distinction is enforced by how `core.py`, `data_loader.py`, `data_loader_summary.py`, `data_loader_runtime.py`, `data_loader_hdf5.py`, `Figure/preprocessor.py`, and `Figure/preprocessor_runtime.py` project, cache, and enrich data.
+JarvisPLOT's YAML figure path uses a three-table model introduced during the 1.3.x memory work and still current in 1.4.2. The code does not expose these as separate classes, but the distinction is enforced by how `core.py`, `data_loader.py`, `data_loader_summary.py`, `data_loader_runtime.py`, `data_loader_hdf5.py`, `Figure/preprocessor.py`, and `Figure/preprocessor_runtime.py` project, cache, and enrich data.
+
+The standalone flowchart path (`jarvisplot/flowchart.py`) does not use this three-table pipeline.
 
 ## The Three Table Types
 

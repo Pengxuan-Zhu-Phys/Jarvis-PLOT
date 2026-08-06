@@ -1,10 +1,14 @@
 # JarvisPLOT Architecture Overview
 
 Status: implemented
+Last updated: 2026-07-16
 
-This document captures the runtime architecture that shipped in JarvisPLOT 1.3.0 and is being consolidated for the 1.3.1 documentation release.
+This document captures the runtime architecture of the current Jarvis-PLOT tree (**v1.4.2**).
+The narrow-table pipeline introduced in the 1.3.x memory work remains the core constraint for the YAML figure path.
 
 The main architectural constraint is deliberate: JarvisPLOT must keep a narrow, selection-table pipeline. Full source tables must not flow through runtime profiling, cache storage, or layer rendering by default.
+
+There is also a standalone flowchart path (`jarvisplot/flowchart.py`) that does not use the dataset/transform cache stack.
 
 ## Core Components
 
@@ -17,48 +21,53 @@ The main architectural constraint is deliberate: JarvisPLOT must keep a narrow, 
 | `jarvisplot/Figure/preprocessor.py` | Projection planning, preprofile prebuild, pipeline cache compatibility, demand-based enrichment | `DataPreprocessor.prebuild_profiles()`, `_runtime_projection()`, `_runtime_cache_columns()`, `_enrich_for_demand()` |
 | `jarvisplot/Figure/preprocessor_runtime.py` | Runtime source resolution and transform application | `resolve_source_data()`, `apply_transforms_impl()`, `run_pipeline()` |
 | `jarvisplot/Figure/figure.py` | Figure assembly, layer queueing, runtime data loading, `share_data` reuse, coordinate evaluation, adapter dispatch, rendering | `Figure.layers`, `Figure.from_dict()`, `Figure.plot()` |
+| `jarvisplot/Figure/figure_types.py` | Expands high-level figure macros (profile/posterior helpers) into concrete layer configs before planning | `expand_figure_types_in_config()` |
+| `jarvisplot/flowchart.py` | Standalone classic flowchart scene validation, layout, and rendering | `render_flowchart()`, `render_flowchart_file()`, `FlowchartRenderer` |
 | `jarvisplot/cache_store.py` | Workdir-local cache store for pipeline payloads, summaries, named shared data, and materialized parquet manifests | `ProjectCache.put_dataframe()`, `get_dataframe()`, `put_named_reference()`, `put_materialized_manifest()` |
 | `jarvisplot/memtrace.py` | Opt-in memory tracing: RSS checkpoints, dataframe shape/backend tokens, large-object inventory, cache file checkpoints | `memtrace_checkpoint()`, `memtrace_object_inventory()`, `memtrace_file_checkpoint()` |
 
 Supporting infrastructure:
 
 - `jarvisplot/Figure/data_pipelines.py` provides `SharedContent` and `DataContext`, the session-level lazy data registry used by `core.py`, `preprocessor.py`, and `figure.py`.
-- `jarvisplot/Figure/preprocessor_runtime.py` holds runtime source resolution and transform execution helpers extracted from `preprocessor.py`.
-- `jarvisplot/Figure/preprocessor_runtime.py` contains the concrete transform primitives used by both the prebuild path and the runtime path.
+- `jarvisplot/Figure/preprocessor_runtime.py` holds runtime source resolution, transform execution, and transform primitives used by both prebuild and runtime paths.
 - `jarvisplot/Figure/profile_runtime.py` contains the concrete profiling and preprofiling algorithms used by both phases.
+- `jarvisplot/Figure/density_cell_runtime.py`, `interp_2d_runtime.py`, `posterior_*`, and natural-neighbor helpers implement specialized transform/geometry work.
 - `jarvisplot/Figure/method_registry.py` defines how YAML `method` keys resolve to rectangular or ternary rendering behavior.
 - `jarvisplot/Figure/adapters_rect.py` and `jarvisplot/Figure/adapters_ternary.py` carry the adapter-family implementations.
 - `jarvisplot/core_assets.py` centralizes colormap, interpolator, and style bootstrap helpers.
 - `jarvisplot/utils/pathing.py` centralizes `&JP/` and workdir-relative path resolution.
 - `jarvisplot/data_loader_hdf5.py` centralizes HDF5 whitelist, rename, and materialization helpers.
 - `jarvisplot/data_loader_summary.py` centralizes dataframe summary formatting and HDF5 tree diagnostics.
-- `jarvisplot/Figure/style_runtime.py`, `jarvisplot/Figure/layout_runtime.py`, and `jarvisplot/Figure/colorbar_runtime.py` hold the helper logic extracted from the main figure runtime.
+- `jarvisplot/Figure/style_runtime.py`, `jarvisplot/Figure/layout_runtime.py`, `jarvisplot/Figure/colorbar_runtime.py`, `jarvisplot/Figure/dynesty_runtime.py`, and `jarvisplot/Figure/design_runtime.py` hold helper logic extracted from the main figure runtime.
 
 ## Component Interaction
 
-1. `JarvisPLOT.init()` parses CLI args, initializes the logger, loads colormaps, and loads the user YAML.
-2. `jarvisplot/core_runtime.py:prepare_project_layout()` resolves `project.workdir` and creates `ProjectCache` under `<workdir>/.cache/`.
-3. `JarvisPLOT.load_dataset(eager=False)` registers each `DataSet` lazily (no data read yet).
-4. `jarvisplot/core_runtime.py:plan_dataset_required_columns()` scans figure layers and transforms to decide:
+1. `JarvisPLOT.init()` parses CLI args and initializes the logger.
+2. If the CLI command is `flowchart`, `core.py` short-circuits into `jarvisplot/flowchart.py` and returns after rendering.
+3. Otherwise it loads colormaps and the user YAML.
+4. `jarvisplot/Figure/figure_types.py` expands high-level figure macros in the loaded YAML when present.
+5. `jarvisplot/core_runtime.py:prepare_project_layout()` resolves `project.workdir` and creates `ProjectCache` under `<workdir>/.cache/`.
+6. `JarvisPLOT.load_dataset(eager=False)` registers each `DataSet` lazily (no data read yet).
+7. `jarvisplot/core_runtime.py:plan_dataset_required_columns()` scans figure layers and transforms to decide:
    - which columns a dataset must be able to compute (`required_columns`)
    - which columns are explicitly kept or dropped by ordered dataset transforms
-5. `SharedContent` and `DataContext` are created; each `DataSet` is registered in `DataContext` with a lazy loader and a release callback.
-6. `jarvisplot/core_assets.py:load_interpolators()` registers lazy `InterpolatorManager` hooks for YAML `Functions` in the expression runtime.
-7. `DataPreprocessor` is created with the `DataContext`, `ProjectCache`, and dataset registry.
-8. `DataPreprocessor.prebuild_profiles()` rewrites eligible first-profile transforms into cached `__jp_preprofile_<hash>` aliases so repeated profile-heavy layers do not repeat the same expensive reduction.
-9. `jarvisplot/core_runtime.py:prepare_usage_plan()` counts how many times each shared source is consumed across all figures, enabling release-after-last-use.
-10. `jarvisplot/core_assets.py:load_styles()` returns the style bundle map from `cards/`, and `core.py` stores it on `self.style`.
-11. `JarvisPLOT.plot()` iterates over YAML `Figures`. For each figure:
+8. `SharedContent` and `DataContext` are created; each `DataSet` is registered in `DataContext` with a lazy loader and a release callback.
+9. `jarvisplot/core_assets.py:load_interpolators()` registers lazy `InterpolatorManager` hooks for YAML `Functions` in the expression runtime.
+10. `DataPreprocessor` is created with the `DataContext`, `ProjectCache`, and dataset registry.
+11. `DataPreprocessor.prebuild_profiles()` rewrites eligible first-profile transforms into cached `__jp_preprofile_<hash>` aliases so repeated profile-heavy layers do not repeat the same expensive reduction.
+12. `jarvisplot/core_runtime.py:prepare_usage_plan()` counts how many times each shared source is consumed across all figures, enabling release-after-last-use.
+13. `jarvisplot/core_assets.py:load_styles()` returns the style bundle map from `cards/`, and `core.py` stores it on `self.style`.
+14. `JarvisPLOT.plot()` iterates over YAML `Figures`. For each figure:
     - creates a `Figure` instance and wires context, preprocessor, styles, and logger
     - `Figure.from_dict(fig_dict)` applies config, creates axes, and queues layers
     - `Figure.plot()` runs `DataPreprocessor.run_pipeline()` per layer, then renders
-12. `DataPreprocessor.run_pipeline()` for each layer:
+15. `DataPreprocessor.run_pipeline()` for each layer:
     - resolves the source from `DataContext`
     - keeps only projected columns
     - applies runtime transforms
     - caches the narrow result
     - enriches missing render-only columns on demand
-13. `jarvisplot/Figure/layer_runtime.py:render_layer()` evaluates coordinate expressions and dispatches to the rectangular or ternary adapter.
+16. `jarvisplot/Figure/layer_runtime.py:render_layer()` evaluates coordinate expressions and dispatches to the rectangular or ternary adapter.
 
 ## Runtime Dataflow
 

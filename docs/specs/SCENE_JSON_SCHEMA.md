@@ -1,20 +1,28 @@
-
-
 # SCENE_JSON_SCHEMA
 
-Status: spec only
+Status: partial
+Last updated: 2026-07-16
 
 ## Purpose
 
 This document defines the **scene-level JSON contract** that Jarvis-PLOT can consume as a stable plotting/layout input.
 
-For the upcoming Jarvis-HEP flowchart migration, this schema is the key interface boundary:
+For Jarvis-HEP flowchart export, this schema is the key interface boundary:
 
 - **Jarvis-HEP exports semantic flowchart JSON**.
 - **Jarvis-PLOT parses that JSON, computes layout, applies style/profile defaults, and renders the final figure**.
 
-This file defines the **scene/schema side** only.
-It does **not** define the layout algorithm, renderer internals, or theme implementation.
+### Implementation status
+
+- **implemented**: classic flowchart subset consumed by `jarvisplot/flowchart.py`
+  - requires `schema: jarvisplot.scene/v1`
+  - requires `scene_type: flowchart`
+  - requires `layers`, `nodes`, `edges`
+  - entry points: `render_flowchart` / `render_flowchart_file` and `jplot flowchart <scene.json>`
+- **not yet a general runtime**: non-flowchart `scene_type` values, formal schema validation beyond the flowchart checks, and a shared multi-diagram layout engine
+
+This file defines the **scene/schema side**.
+Layout algorithm details for the classic flowchart path live in `jarvisplot/flowchart.py`.
 
 ---
 

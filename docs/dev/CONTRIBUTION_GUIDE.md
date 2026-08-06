@@ -1,6 +1,6 @@
 # Contribution Guide
 
-This guide explains how to extend JarvisPLOT without breaking the 1.3.0 dataflow architecture.
+This guide explains how to extend JarvisPLOT without breaking the narrow-table dataflow architecture (current package version 1.4.2).
 
 Read these documents first:
 

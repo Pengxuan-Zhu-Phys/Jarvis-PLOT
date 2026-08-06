@@ -6,13 +6,19 @@ import re
 
 ALLOWED_STATUSES = {
     "active backlog",
+    "active ledger",
     "active",
+    "brainstorm",
     "implemented",
     "implemented but mixed",
     "partial",
     "spec only",
     "historical",
 }
+
+#: Statuses that only make sense for planning docs, so they cannot leak into
+#: design/spec/context directories and be mistaken for the current contract.
+ROADMAP_ONLY_STATUSES = {"active backlog", "active ledger", "brainstorm"}
 
 
 def _status_line(path: Path) -> str | None:
@@ -42,9 +48,9 @@ def test_docs_status_labels_are_consistent() -> None:
             assert "/docs/archive/" in f"/{path.as_posix()}/", (
                 f"Historical doc should live in docs/archive: {path}"
             )
-        if status == "active backlog":
+        if status in ROADMAP_ONLY_STATUSES:
             assert "/docs/roadmap/" in f"/{path.as_posix()}/", (
-                f"Active backlog doc should live in docs/roadmap: {path}"
+                f"Planning doc ('{status}') should live in docs/roadmap: {path}"
             )
 
     assert seen_status, "No docs status labels found under docs/"

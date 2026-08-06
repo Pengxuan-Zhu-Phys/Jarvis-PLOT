@@ -8,12 +8,12 @@ Use these docs to understand the intended split between input parsing, dataflow,
 
 ## Current Files
 
-- `ARCHITECTURE_OVERVIEW.md`: implemented narrow-table runtime architecture and ownership snapshot
+- `ARCHITECTURE_OVERVIEW.md`: implemented narrow-table runtime architecture and ownership snapshot (v1.4.2)
 - `DATAFLOW_ARCHITECTURE.md`: implemented three-table dataflow model
-- `LAYOUT_ENGINE_DESIGN.md`: spec-only layout boundary and future layout-owner contract
+- `LAYOUT_ENGINE_DESIGN.md`: partial layout boundary — flowchart classic layout is implemented; shared multi-diagram layout engine is not
 - `STYLE_SYSTEM_DESIGN.md`: partial style system boundary and future owner contract
 - `PROFILE_SYSTEM_DESIGN.md`: implemented-but-mixed profile system boundary
-- `YAML_DESIGN.md`: complete YAML schema reference — transforms, methods, coordinates, style, complexity analysis
+- `YAML_DESIGN.md`: YAML schema reference — transforms, methods, coordinates, style, complexity analysis
 
 ## Reading Order
 

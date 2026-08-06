@@ -1,5 +1,7 @@
 # 2D Interpolation Transform
 
+Status: implemented
+
 `make_interp_2d` converts a support/core table into a regular 2D scalar-field grid.
 It is deliberately independent of density reconstruction and plotting layers.
 
