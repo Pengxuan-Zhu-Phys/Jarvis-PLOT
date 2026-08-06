@@ -257,9 +257,9 @@ M0+M1 **不破坏任何兼容**，可以在 1.5.x 发布。M4 才是 2.0。
 |---|---|---|---|---|---|---|
 | C1 | `jplot data describe --json` | M1 | A2 | M | 否 | ☑ |
 | C2 | `role_hint` 列角色推断 | M1 | C1 | S | 否 | ☑ |
-| C3 | describe 结果缓存 | M1 | C1 | S | 否 | ☐ |
-| C4 | `jplot data head` | M1 | C1 | S | 否 | ☐ |
-| C5 | `jplot data eval` 表达式沙盒 | M1 | A2 | M | 否 | ☐ |
+| C3 | describe 结果缓存 | M1 | C1 | S | 否 | ☑ |
+| C4 | `jplot data head` | M1 | C1 | S | 否 | ☑ |
+| C5 | `jplot data eval` 表达式沙盒 | M1 | A2 | M | 否 | ☑ |
 | C6 | `jplot data suggest-axes` | M2 | C1 | M | 否 | ☐ |
 
 **C1 — `data describe --json`**
@@ -594,9 +594,11 @@ M0+M1 **不破坏任何兼容**，可以在 1.5.x 发布。M4 才是 2.0。
                         styles 报 usable/axes；to_parquet 进 transform schema
 2026-08-06 | C1-2| 完成 | verbs/data.py describe --json；role_hint（LogL/weight/…）；
                         tests/test_data_describe.py
+2026-08-06 | C3-5| 完成 | data head / data eval + describe 走 ProjectCache summary；
+                        JP-EXP-002 did-you-mean；tests/test_data_head_eval.py
 2026-08-06 | —   | 修  | expr_names.py 与 build_eval_globals 同源忽略表（ln/log10/Min 不再假阳性）
-2026-08-06 | M1  | 进度 | 反幻觉两条白名单 CLI 出口已通：`jplot data describe` + `jplot cap all`
-                        仍缺 C3–C5 / B4 / 语料上的 did-you-mean 全覆盖等
+2026-08-06 | M1  | 进度 | 反幻觉白名单出口：`data describe|head|eval` + `cap all` 已通；
+                        仍缺 B4 guidance / C6 suggest-axes / B5 method 坐标合约
 2026-08-06 | —   | 建账 | 从两份 V2 brainstorm 落成 46 条任务 / 5 个里程碑 / 7 条待拍板 DR
 2026-08-06 | A1  | 完成 | 新增 diagnostics.py（Diagnostic/Fix/DiagnosticBag/did_you_mean/join_path）
                         + agent_io.py（envelope/emit/exit_code_for）；23 条测试
