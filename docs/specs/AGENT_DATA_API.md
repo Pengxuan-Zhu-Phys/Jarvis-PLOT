@@ -1,7 +1,8 @@
 # Agent Data API
 
 Status: spec only
-Last updated: 2026-07-03
+Last updated: 2026-07-16
+Implementation: **frozen** — do not implement until the roadmap unfreezes this track.
 Design authority: this document (wire contract for the Jarvis-Agent ↔ Jarvis-PLOT bridge).
 Agent-side tool spec: `Jarvis-Agent/docs/PLOT_TOOLS.md`.
 Related workshop precedent: `Jarvis-Books/Docs/DESIGN_AGENT_BRIDGE_2.0.md` (the Jarvis-HEP V2
