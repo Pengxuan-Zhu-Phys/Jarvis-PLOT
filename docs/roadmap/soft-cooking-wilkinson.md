@@ -1,8 +1,13 @@
 # Jarvis-PLOT v2.0 Architectural Refactoring Plan
 
+Status: active backlog
+Last updated: 2026-07-16
+
 ## Context
 
-Jarvis-PLOT is a YAML-driven HEP plotting engine (~23.5k LOC, v1.3.11) that has grown organically over one year with incremental "patch-on-patch" development. The goal is a **v2.0 release** with a clean architecture designed for a 5+ year lifecycle. Since this is a major version bump, we can break backward compatibility with a migration guide — no need for re-export shims or facade classes.
+Jarvis-PLOT is a YAML-driven HEP plotting engine (~20k LOC in `jarvisplot/`, currently **v1.4.2**) that has grown organically with incremental "patch-on-patch" development. The goal is a **v2.0 release** with a clean architecture designed for a 5+ year lifecycle. Since this is a major version bump, we can break backward compatibility with a migration guide — no need for re-export shims or facade classes.
+
+This document is a longer-horizon plan. Near-term 1.x work (Agent Data API, remaining boundary cleanup) lives in `IMPLEMENTATION_ROADMAP.md`.
 
 ### Key Problems in v1.x
 
