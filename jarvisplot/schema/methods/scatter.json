@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/methods/scatter.json",
+  "title": "method: scatter",
+  "description": "Coordinate contract for layers[].method='scatter' (matplotlib: scatter). Required axes must appear under coordinates.",
+  "x-jarvis-zone": "closed",
+  "x-jarvis-method": "scatter",
+  "x-jarvis-mpl": "scatter",
+  "x-jarvis-axes-types": [
+    "rect",
+    "any"
+  ],
+  "x-jarvis-coordinates": {
+    "required": [
+      "x",
+      "y"
+    ],
+    "optional": [
+      "c",
+      "s",
+      "marker"
+    ],
+    "alternatives": [
+      [
+        "left",
+        "right",
+        "bottom"
+      ]
+    ]
+  },
+  "x-jarvis-example": "method: scatter\ncoordinates:\n  x: {expr: x}\n  y: {expr: y}",
+  "type": "object",
+  "properties": {
+    "method": {
+      "const": "scatter"
+    },
+    "coordinates": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "additionalProperties": true,
+      "description": "Required axes for scatter: x, y. Optional: c, s, marker."
+    }
+  },
+  "additionalProperties": true
+}

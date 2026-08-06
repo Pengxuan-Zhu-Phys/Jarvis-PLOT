@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/methods/tripcolor.json",
+  "title": "method: tripcolor",
+  "description": "Coordinate contract for layers[].method='tripcolor' (matplotlib: tripcolor). Required axes must appear under coordinates.",
+  "x-jarvis-zone": "closed",
+  "x-jarvis-method": "tripcolor",
+  "x-jarvis-mpl": "tripcolor",
+  "x-jarvis-axes-types": [
+    "tri",
+    "any"
+  ],
+  "x-jarvis-coordinates": {
+    "required": [
+      "x",
+      "y",
+      "z"
+    ],
+    "optional": [],
+    "alternatives": []
+  },
+  "x-jarvis-example": "method: tripcolor\ncoordinates:\n  x: {expr: x}\n  y: {expr: y}\n  z: {expr: z}",
+  "type": "object",
+  "properties": {
+    "method": {
+      "const": "tripcolor"
+    },
+    "coordinates": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "additionalProperties": true,
+      "description": "Required axes for tripcolor: x, y, z. Optional: (none)."
+    }
+  },
+  "additionalProperties": true
+}

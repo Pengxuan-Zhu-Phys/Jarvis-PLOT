@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/methods/bar.json",
+  "title": "method: bar",
+  "description": "Coordinate contract for layers[].method='bar' (matplotlib: bar). Required axes must appear under coordinates.",
+  "x-jarvis-zone": "closed",
+  "x-jarvis-method": "bar",
+  "x-jarvis-mpl": "bar",
+  "x-jarvis-axes-types": [
+    "rect",
+    "any"
+  ],
+  "x-jarvis-coordinates": {
+    "required": [
+      "x",
+      "height"
+    ],
+    "optional": [
+      "bottom"
+    ],
+    "alternatives": []
+  },
+  "x-jarvis-example": "method: bar\ncoordinates:\n  x: {expr: x}\n  height: {expr: height}",
+  "type": "object",
+  "properties": {
+    "method": {
+      "const": "bar"
+    },
+    "coordinates": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "additionalProperties": true,
+      "description": "Required axes for bar: x, height. Optional: bottom."
+    }
+  },
+  "additionalProperties": true
+}

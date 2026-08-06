@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/methods/fill_betweenx.json",
+  "title": "method: fill_betweenx",
+  "description": "Coordinate contract for layers[].method='fill_betweenx' (matplotlib: fill_betweenx). Required axes must appear under coordinates.",
+  "x-jarvis-zone": "closed",
+  "x-jarvis-method": "fill_betweenx",
+  "x-jarvis-mpl": "fill_betweenx",
+  "x-jarvis-axes-types": [
+    "rect",
+    "any"
+  ],
+  "x-jarvis-coordinates": {
+    "required": [
+      "y",
+      "x1",
+      "x2"
+    ],
+    "optional": [],
+    "alternatives": []
+  },
+  "x-jarvis-example": "method: fill_betweenx\ncoordinates:\n  y: {expr: y}\n  x1: {expr: x1}\n  x2: {expr: x2}",
+  "type": "object",
+  "properties": {
+    "method": {
+      "const": "fill_betweenx"
+    },
+    "coordinates": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "additionalProperties": true,
+      "description": "Required axes for fill_betweenx: y, x1, x2. Optional: (none)."
+    }
+  },
+  "additionalProperties": true
+}

@@ -60,20 +60,24 @@ def _load_json(path: Path) -> Any:
 
 
 def _methods() -> list[dict[str, Any]]:
-    """Rendering primitives, with the axes families each one works on."""
-    from .Figure.method_registry import METHOD_DISPATCH, MethodRegistry
+    """Rendering primitives, with axes families and coordinate contracts."""
+    from .Figure.method_registry import METHOD_DISPATCH, REGISTRY
+    from .method_contracts import contract_for
 
-    registry = MethodRegistry()
     out: list[dict[str, Any]] = []
     for key in sorted(METHOD_DISPATCH):
         entry: dict[str, Any] = {"name": key, "mpl_method": METHOD_DISPATCH[key]}
         try:
-            spec = registry.resolve(key)
+            spec, _ = REGISTRY.resolve(key, strict=False)
+            entry["axes_types"] = sorted(str(a) for a in spec.axes_types)
         except Exception:
-            spec = None
-        axes_types = getattr(spec, "axes_types", None)
-        if axes_types:
-            entry["axes_types"] = sorted(str(a) for a in axes_types)
+            pass
+        contract = contract_for(key)
+        if contract is not None:
+            entry["coordinates"] = {
+                "required": list(contract.get("required") or ()),
+                "optional": list(contract.get("optional") or ()),
+            }
         out.append(entry)
     return out
 

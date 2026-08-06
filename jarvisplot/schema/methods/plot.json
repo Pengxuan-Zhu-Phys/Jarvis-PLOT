@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/methods/plot.json",
+  "title": "method: plot",
+  "description": "Coordinate contract for layers[].method='plot' (matplotlib: plot). Required axes must appear under coordinates.",
+  "x-jarvis-zone": "closed",
+  "x-jarvis-method": "plot",
+  "x-jarvis-mpl": "plot",
+  "x-jarvis-axes-types": [
+    "rect",
+    "any"
+  ],
+  "x-jarvis-coordinates": {
+    "required": [
+      "x",
+      "y"
+    ],
+    "optional": [],
+    "alternatives": [
+      [
+        "left",
+        "right",
+        "bottom"
+      ]
+    ]
+  },
+  "x-jarvis-example": "method: plot\ncoordinates:\n  x: {expr: x}\n  y: {expr: y}",
+  "type": "object",
+  "properties": {
+    "method": {
+      "const": "plot"
+    },
+    "coordinates": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "additionalProperties": true,
+      "description": "Required axes for plot: x, y. Optional: (none)."
+    }
+  },
+  "additionalProperties": true
+}

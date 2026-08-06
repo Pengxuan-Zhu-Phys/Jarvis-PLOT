@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/methods/imshow.json",
+  "title": "method: imshow",
+  "description": "Coordinate contract for layers[].method='imshow' (matplotlib: imshow). Required axes must appear under coordinates.",
+  "x-jarvis-zone": "closed",
+  "x-jarvis-method": "imshow",
+  "x-jarvis-mpl": "imshow",
+  "x-jarvis-axes-types": [
+    "rect",
+    "any"
+  ],
+  "x-jarvis-coordinates": {
+    "required": [
+      "z"
+    ],
+    "optional": [],
+    "alternatives": []
+  },
+  "x-jarvis-example": "method: imshow\ncoordinates:\n  z: {expr: z}",
+  "type": "object",
+  "properties": {
+    "method": {
+      "const": "imshow"
+    },
+    "coordinates": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "additionalProperties": true,
+      "description": "Required axes for imshow: z. Optional: (none)."
+    }
+  },
+  "additionalProperties": true
+}
