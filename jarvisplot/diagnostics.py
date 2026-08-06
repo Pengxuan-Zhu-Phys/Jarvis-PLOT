@@ -19,7 +19,7 @@ things an agent (or a human) needs to act:
 from __future__ import annotations
 
 import difflib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Iterable, Iterator, Sequence
 
 __all__ = [
@@ -199,6 +199,7 @@ class DiagnosticBag:
     # -- collection ------------------------------------------------------- #
 
     def add(self, diagnostic: Diagnostic) -> Diagnostic:
+        diagnostic = _with_guidance(diagnostic)
         self._items.append(diagnostic)
         return diagnostic
 
@@ -212,7 +213,8 @@ class DiagnosticBag:
         return self.add(Diagnostic(code=code, level="info", path=path, message=message, **kwargs))
 
     def extend(self, items: Iterable[Diagnostic]) -> None:
-        self._items.extend(items)
+        for item in items:
+            self.add(item)
 
     # -- inspection ------------------------------------------------------- #
 
@@ -262,3 +264,22 @@ class DiagnosticBag:
 
     def render_human(self) -> str:
         return "\n\n".join(d.render_human() for d in self.sorted())
+
+
+def _with_guidance(diagnostic: Diagnostic) -> Diagnostic:
+    """Fill empty suggestion/example from the JP-* knowledge base (B4)."""
+    if diagnostic.suggestion and diagnostic.example is not None:
+        return diagnostic
+    try:
+        from .diagnostic_guidance import guidance_for
+    except Exception:
+        return diagnostic
+    suggestion, example = guidance_for(
+        diagnostic.code, diagnostic.path, diagnostic.message
+    )
+    updates: dict[str, Any] = {}
+    if not diagnostic.suggestion and suggestion:
+        updates["suggestion"] = suggestion
+    if diagnostic.example is None and example is not None:
+        updates["example"] = example
+    return replace(diagnostic, **updates) if updates else diagnostic

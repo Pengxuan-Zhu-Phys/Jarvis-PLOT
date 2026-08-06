@@ -154,8 +154,8 @@ M0+M1 **不破坏任何兼容**，可以在 1.5.x 发布。M4 才是 2.0。
 | B1 | schema 目录骨架 + `manifest.json` 派发索引 | M1 | A1 | M | 否 | ☑ |
 | B2 | `x-jarvis-zone` 标注 + catalog 自检 lint | M1 | B1 | M | 否 | ☑ |
 | B3 | **R1 闭合根/figure/layer/transform 词汇表 + did-you-mean** | M1 | B2 | L | 否 | ☑ |
-| B4 | `JP-*` 错误码表 + suggestion/example 知识库 | M1 | B3 | M | 否 | ☐ |
-| B5 | method 坐标合约进 schema | M2 | B4, D1 | L | 否 | ☐ |
+| B4 | `JP-*` 错误码表 + suggestion/example 知识库 | M1 | B3 | M | 否 | ☑ |
+| B5 | method 坐标合约进 schema | M2 | B4, D1 | L | 否 | ☑ |
 | B6 | 列存在性校验 | M1 | A1 | M | 否 | ☑ |
 | B7 | `validate` 零 matplotlib 守卫 | M0 | A2 | S | 否 | ☑ |
 | B8 | `--fix` 结构化修复 | M2 | B4 | M | 否 | ☐ |
@@ -596,9 +596,13 @@ M0+M1 **不破坏任何兼容**，可以在 1.5.x 发布。M4 才是 2.0。
                         tests/test_data_describe.py
 2026-08-06 | C3-5| 完成 | data head / data eval + describe 走 ProjectCache summary；
                         JP-EXP-002 did-you-mean；tests/test_data_head_eval.py
+2026-08-06 | B4  | 完成 | diagnostic_guidance.py；DiagnosticBag 自动补 suggestion/example；
+                        tests/test_diagnostic_guidance.py
+2026-08-06 | B5  | 完成 | method_contracts + schema/methods/*（27）+ validate JP-MTH-001/002；
+                        cap methods 带 coordinates.required；tests/test_method_contracts.py
 2026-08-06 | —   | 修  | expr_names.py 与 build_eval_globals 同源忽略表（ln/log10/Min 不再假阳性）
-2026-08-06 | M1  | 进度 | 反幻觉白名单出口：`data describe|head|eval` + `cap all` 已通；
-                        仍缺 B4 guidance / C6 suggest-axes / B5 method 坐标合约
+2026-08-06 | M1  | 进度 | 反幻觉白名单 + method 坐标合约 + guidance 已通；
+                        仍缺 C6 suggest-axes / B8 --fix / E 轨渲染读回
 2026-08-06 | —   | 建账 | 从两份 V2 brainstorm 落成 46 条任务 / 5 个里程碑 / 7 条待拍板 DR
 2026-08-06 | A1  | 完成 | 新增 diagnostics.py（Diagnostic/Fix/DiagnosticBag/did_you_mean/join_path）
                         + agent_io.py（envelope/emit/exit_code_for）；23 条测试
