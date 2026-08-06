@@ -1,6 +1,6 @@
 # Memory Optimization Guide
 
-JarvisPLOT 1.3.0 changed the data pipeline to lower peak memory without changing the plotting model. This document records the reason for that change and the mechanisms that now protect the pipeline.
+JarvisPLOT 1.3.x changed the data pipeline to lower peak memory without changing the plotting model. Those mechanisms remain in force in the current 1.4.x tree. This document records the reason for that change and the mechanisms that now protect the YAML figure pipeline.
 
 ## Previous Architecture Problem
 

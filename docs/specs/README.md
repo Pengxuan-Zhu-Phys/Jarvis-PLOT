@@ -8,8 +8,8 @@ Use these docs when you need to know what a valid scene, style, profile, or laye
 
 ## Current Files
 
-- `SCENE_JSON_SCHEMA.md`: spec-only semantic scene contract for Jarvis-PLOT
-- `STYLE_SCHEMA.md`: spec-only style contract
+- `SCENE_JSON_SCHEMA.md`: partial semantic scene contract; flowchart subset is implemented in `jarvisplot/flowchart.py`
+- `STYLE_SCHEMA.md`: partial style contract (cards exist; formal schema ownership is incomplete)
 - `DYNESTY_RUNPLOT.md`: implemented reusable dynesty runplot format
 - `TRANSFORMS.md`: implemented transform contract and runtime scope
 - `PROFILE_SCHEMA.md`: spec-only profile contract

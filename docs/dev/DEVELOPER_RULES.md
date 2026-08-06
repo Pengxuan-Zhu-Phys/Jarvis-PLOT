@@ -52,7 +52,20 @@ Required behavior:
 
 Do not preload full source tables for labels, markers, colors, or style expressions.
 
-## Rule 4: Preserve the pandas Conversion Boundary
+## Rule 4: SharedContent Is Support-Only
+
+`jarvisplot/Figure/data_pipelines.py` holds session shared values and usage counters only.
+
+Required behavior:
+
+- planning of usage counts stays in `core_runtime.prepare_usage_plan`
+- `share_data` persistence / named-cache identity stays in preprocessor + layer runtime
+- `consume()` may free a cached value at zero remaining uses, but must not become a second transform/render owner
+- registry factories may remain after cache invalidation so a later `get` can recompute
+
+Do not put transform execution, column planning, or adapter dispatch into `SharedContent` / `DataContext`.
+
+## Rule 5: Preserve the pandas Conversion Boundary
 
 Avoid converting to pandas earlier than necessary.
 
@@ -78,7 +91,7 @@ Current non-pushdown stages:
 
 If you add a new stage, first ask whether it can stay in lazy polars. If not, make the pandas boundary later, not earlier.
 
-## Rule 5: `__jp_row_idx__` Is a Contract, Not an Implementation Detail
+## Rule 6: `__jp_row_idx__` Is a Contract, Not an Implementation Detail
 
 `__jp_row_idx__` is the join key between:
 
@@ -92,7 +105,7 @@ Rules:
 - do not repurpose it for user-facing semantics
 - if a new source backend is added, it must provide stable row ids before late enrichment is expected to work
 
-## Rule 6: Preprofile Must Stay Reusable
+## Rule 7: Preprofile Must Stay Reusable
 
 `prebuild_profiles()` exists to reduce repeated runtime work.
 
@@ -106,7 +119,7 @@ In particular:
 - do not key preprofile caches on runtime-only knobs such as render `bin` when the base candidate set is unchanged
 - do not replace the alias rewrite (`__jp_preprofile_<hash>`) with eager figure-local copies
 
-## Rule 7: New Heavy Stages Need Memory Observability
+## Rule 8: New Heavy Stages Need Memory Observability
 
 If a change adds a heavy collect, transform, cache write, or conversion step:
 

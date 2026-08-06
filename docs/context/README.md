@@ -8,7 +8,7 @@ Files here answer three questions quickly:
 
 - what Jarvis-PLOT currently owns
 - which code paths own which responsibilities
-- where the flowchart migration boundary starts and stops
+- where the YAML figure path and flowchart path start and stop
 
 ## Primary Entry Point
 
@@ -16,13 +16,13 @@ Start with:
 
 1. `docs/context/JARVIS_PLOT_CONTEXT.md`
 
-That file is the canonical Codex-facing pre-read. It defines the current project shape, boundary with Jarvis-HEP, conceptual stack, runtime ownership, and the flowchart migration contract.
+That file is the canonical Codex-facing pre-read. It defines the current project shape, boundary with Jarvis-HEP, conceptual stack, runtime ownership, and the flowchart contract.
 
 ## Current Files
 
 - `JARVIS_PLOT_CONTEXT.md`: primary boundary and ownership doc
 - `CODE_MAP_JARVIS_PLOT.md`: concrete code owner map for common changes
-- `JARVIS_PLOT_FRAMEWORK_LOGIC.md`: runtime execution contract for figure build, data pipeline, cache, and render dispatch
+- `JARVIS_PLOT_FRAMEWORK_LOGIC.md`: runtime execution contract for figure build, data pipeline, cache, flowchart, and render dispatch
 - `CODEX_JARVIS_PLOT_STYLE.md`: local editing policy and project-specific change checklist
 
 ## Recommended Reading Order
@@ -46,3 +46,4 @@ Use this directory first when you need to:
 
 Keep files in this directory short, current, and implementation-oriented.
 Do not keep stale historical notes here as active guidance.
+When code ownership moves, update `CODE_MAP_JARVIS_PLOT.md` and `JARVIS_PLOT_CONTEXT.md` in the same change cycle.

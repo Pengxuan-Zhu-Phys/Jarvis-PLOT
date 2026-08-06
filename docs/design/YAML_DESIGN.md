@@ -1,5 +1,7 @@
 # Jarvis-PLOT YAML Design Document
 
+Status: partial
+
 > 目标：为 YAML 重封装工作提供完整参考。梳理当前 YAML 所有顶层结构、Transform 链、画图 Method、坐标/表达式系统、Style 系统。标注出"过度复杂 / 可简化"的地方。
 
 ---

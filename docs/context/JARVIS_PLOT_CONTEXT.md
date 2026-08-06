@@ -1,6 +1,6 @@
 # Project Context For Codex
 
-Last updated: 2026-03-25
+Last updated: 2026-07-16
 Audience: Codex, maintainers, and contributors making implementation changes.
 Status: implemented
 Document role: primary pre-read for Jarvis-PLOT changes.
@@ -35,18 +35,24 @@ Jarvis-PLOT is a plotting, scene, and layout framework.
 
 Current stable product facts:
 
+- package / product version: **1.4.2** (`pyproject.toml`; distribution name `JarvisPLOT`, import package `jarvisplot`)
 - CLI entry point: `jplot`
 - primary package path: `jarvisplot/`
 - primary orchestrator: `jarvisplot/core.py`
 - current main renderer: Matplotlib-based figure rendering
-- input surfaces: YAML figure configs, style cards, dataset configs, scene-oriented JSON (`spec only`)
+- input surfaces:
+  - YAML figure configs, style cards, dataset configs (**implemented**)
+  - flowchart scene JSON via `jplot flowchart <scene.json>` or `render_flowchart*` (**implemented**, classic flowchart subset)
+  - general semantic scene types beyond flowchart (**partial / mostly spec**)
 - current data pipeline transforms: `filter`, `add_column`, `sortby`, `profile`, `make_density_core`, `make_interp_2d`, `keep_columns`, `drop_columns`, `to_csv`, `to_parquet`
 - computed columns use `add_column`; there is no standalone `type: expression` transform
 - expensive profile work is split across prebuild and runtime phases
+- high-level figure macros expand through `jarvisplot/Figure/figure_types.py` before planning
 - transform primitives live in `jarvisplot/Figure/preprocessor_runtime.py`; profiling helpers live in `jarvisplot/Figure/profile_runtime.py`
 - dataset summary helpers live in `jarvisplot/data_loader_summary.py`
 - dataset-level runtime helpers live in `jarvisplot/data_loader_runtime.py`; pipeline runtime helpers live in `jarvisplot/Figure/preprocessor_runtime.py`
-- runtime artifacts: output images plus workdir-local cache under `.cache/`
+- flowchart runtime lives in `jarvisplot/flowchart.py` (standalone path; not the YAML figure stack)
+- runtime artifacts: output images plus workdir-local cache under `.cache/` for the YAML figure pipeline
 
 Treat the project as a framework that converts semantic plotting or diagram input into final rendered output.
 Do not reduce it to a bag of plotting helpers.
@@ -55,11 +61,11 @@ Do not reduce it to a bag of plotting helpers.
 
 Jarvis-PLOT owns:
 
-- scene parsing and normalization
-- layout computation
+- scene parsing and normalization for supported scene types (currently flowchart)
+- layout computation for supported paths (figure axes geometry + flowchart classic layout)
 - style and profile application
 - renderer dispatch and final output generation
-- cache behavior needed to support those runtime stages
+- cache behavior needed to support the YAML figure pipeline
 
 Jarvis-PLOT does not own:
 
@@ -86,20 +92,14 @@ Think in this order when reading or changing the code:
 
 Current ownership snapshot:
 
-- semantic scene input:
-  - `jarvisplot/config.py`
-  - `jarvisplot/data_loader.py`
-  - `jarvisplot/data_loader_summary.py`
-  - `jarvisplot/data_loader_runtime.py`
-  - `jarvisplot/Figure/preprocessor_runtime.py`
-  - `docs/specs/SCENE_JSON_SCHEMA.md`
-- layout engine:
-  - `jarvisplot/Figure/figure.py`
-  - `jarvisplot/Figure/helper.py`
-  - `jarvisplot/Figure/adapters_rect.py`
-  - `jarvisplot/Figure/adapters_ternary.py`
-  - `jarvisplot/Figure/layer_runtime.py`
-  - `docs/design/LAYOUT_ENGINE_DESIGN.md`
+- semantic scene / config input:
+  - YAML path: `jarvisplot/config.py`, `jarvisplot/data_loader.py`, `jarvisplot/data_loader_summary.py`, `jarvisplot/data_loader_runtime.py`, `jarvisplot/Figure/preprocessor_runtime.py`, `jarvisplot/Figure/figure_types.py`
+  - flowchart path: `jarvisplot/flowchart.py`
+  - contract: `docs/specs/SCENE_JSON_SCHEMA.md` (partial)
+- layout:
+  - figure axes / panel geometry: `jarvisplot/Figure/figure.py`, `jarvisplot/Figure/layout_runtime.py`, `jarvisplot/Figure/helper.py`
+  - flowchart classic layout: `jarvisplot/flowchart.py` (`_ClassicGraph`)
+  - design note: `docs/design/LAYOUT_ENGINE_DESIGN.md` (partial)
 - style and profile system:
   - `jarvisplot/cards/**`
   - `jarvisplot/core_assets.py`
@@ -111,15 +111,8 @@ Current ownership snapshot:
   - `docs/design/STYLE_SYSTEM_DESIGN.md`
   - `docs/design/PROFILE_SYSTEM_DESIGN.md`
 - renderer and output backends:
-  - `jarvisplot/Figure/figure.py`
-  - `jarvisplot/Figure/config_runtime.py`
-  - `jarvisplot/Figure/layer_runtime.py`
-  - `jarvisplot/Figure/adapters_rect.py`
-  - `jarvisplot/Figure/adapters_ternary.py`
-  - `jarvisplot/Figure/adapters_rect.py`
-  - `jarvisplot/Figure/adapters_ternary.py`
-  - `jarvisplot/Figure/method_registry.py`
-  - `jarvisplot/Figure/colorbar_runtime.py`
+  - YAML figures: `jarvisplot/Figure/figure.py`, `jarvisplot/Figure/config_runtime.py`, `jarvisplot/Figure/layer_runtime.py`, `jarvisplot/Figure/adapters_rect.py`, `jarvisplot/Figure/adapters_ternary.py`, `jarvisplot/Figure/method_registry.py`, `jarvisplot/Figure/colorbar_runtime.py`, `jarvisplot/Figure/dynesty_runtime.py`, `jarvisplot/Figure/design_runtime.py`
+  - flowchart: `jarvisplot/flowchart.py`
 
 Default debugging order:
 
@@ -130,28 +123,38 @@ Default debugging order:
 
 ## 6. Runtime Ownership Snapshot
 
-Normal runtime flow:
+### YAML figure path
 
 1. `jarvisplot/client.py` and `jarvisplot/cli.py` parse CLI input
 2. `jarvisplot/core.py` initializes project state, workdir, cache, datasets, and style assets
-3. `jarvisplot/data_loader.py` registers or loads source datasets
-4. `jarvisplot/data_loader_summary.py` formats summary text and HDF5 tree diagnostics
-5. `jarvisplot/data_loader_runtime.py` and `jarvisplot/Figure/preprocessor_runtime.py` execute runtime transform and pipeline logic
-6. `jarvisplot/Figure/preprocessor.py` prepares transform and profile pipelines
-7. `jarvisplot/Figure/figure.py` builds axes and scene state for each figure
-8. `jarvisplot/Figure/method_registry.py` resolves draw methods
-9. `jarvisplot/Figure/adapters_rect.py` and `jarvisplot/Figure/adapters_ternary.py` execute backend-specific drawing
-10. output is written through figure save/render paths
+3. `jarvisplot/Figure/figure_types.py` expands high-level figure macros when present
+4. `jarvisplot/data_loader.py` registers or loads source datasets
+5. `jarvisplot/data_loader_summary.py` formats summary text and HDF5 tree diagnostics
+6. `jarvisplot/data_loader_runtime.py` and `jarvisplot/Figure/preprocessor_runtime.py` execute runtime transform and pipeline logic
+7. `jarvisplot/Figure/preprocessor.py` prepares transform and profile pipelines
+8. `jarvisplot/Figure/figure.py` builds axes and scene state for each figure
+9. `jarvisplot/Figure/method_registry.py` resolves draw methods
+10. `jarvisplot/Figure/adapters_rect.py` and `jarvisplot/Figure/adapters_ternary.py` execute backend-specific drawing
+11. output is written through figure save/render paths
 
-## 7. Flowchart Migration Context
+### Flowchart path
 
-Jarvis-PLOT is the rendering target for the upcoming flowchart migration.
+1. CLI form: `jplot flowchart path/to/scene.json`
+2. `core.py` detects the flowchart command and skips the YAML figure pipeline
+3. `jarvisplot/flowchart.py` validates the scene, runs classic layout, and renders the image
+4. optional library use: `from jarvisplot import render_flowchart, render_flowchart_file`
 
-Expected contract:
+## 7. Flowchart Context
 
-- Jarvis-HEP exports semantic flowchart JSON.
+Jarvis-PLOT is the rendering target for Jarvis-HEP flowchart export.
+
+**Current status: implemented for the classic flowchart grammar.**
+
+Supported contract:
+
+- Jarvis-HEP exports semantic flowchart JSON (`schema: jarvisplot.scene/v1`, `scene_type: flowchart`).
 - Jarvis-PLOT consumes that JSON as scene input.
-- Jarvis-PLOT computes node coordinates, box sizes, edge routing, and final rendering.
+- Jarvis-PLOT computes node coordinates, box sizes, edge routing, and final rendering in `flowchart.py`.
 
 Jarvis-HEP should not emit:
 
@@ -160,15 +163,16 @@ Jarvis-HEP should not emit:
 - renderer-specific image paths or style tokens
 - final edge curve geometry
 
-Jarvis-PLOT should own:
+Jarvis-PLOT owns for this path:
 
 - coordinate placement
 - size calculation
 - routing strategy
-- theme and style selection
-- backend-specific rendering to PNG, PDF, SVG, or future outputs
+- theme/style card selection (`cards/flowchart/`)
+- backend-specific rendering to PNG (and related Matplotlib outputs)
 
 For flowcharts, treat the upstream payload as semantic scene data, not pre-rendered geometry.
+A general multi-diagram layout engine is still future work; do not force every diagram type through `figure.py`.
 
 ## 8. Active Engineering Rules
 
@@ -181,6 +185,7 @@ For flowcharts, treat the upstream payload as semantic scene data, not pre-rende
 - Do not add new unsafe eval surfaces; existing eval paths are already a technical debt area.
 - If transform semantics change, update cache identity assumptions in the same change.
 - Update docs in the same change cycle when a boundary or runtime contract moves.
+- Keep flowchart changes in `flowchart.py` / flowchart cards unless a change is intentionally promoting a shared scene/layout owner.
 
 ## 9. Practical Patch Guidance
 
@@ -190,6 +195,7 @@ When deciding where a patch belongs:
 - box placement, panel arrangement, axis geometry, or graph routing -> layout layer
 - theme selection, profile behavior, or card defaults -> style/profile layer
 - draw primitive behavior or file output differences -> renderer/backend layer
+- agent-facing JSON verbs / digests -> Agent Data API layer on top of existing pipeline owners
 
 If a patch crosses multiple layers, define the ownership split first and keep the interfaces narrow.
 
@@ -199,8 +205,9 @@ The active project backlog lives in `docs/roadmap/IMPLEMENTATION_ROADMAP.md`.
 
 Use that file for:
 
-- remaining code fixes called out by the review pass
-- flowchart migration work that still lacks a code owner
-- validation and test work that should not be mixed into the boundary doc
+- remaining boundary cleanup (`data_pipelines` lifecycle, general scene/layout split)
+- Agent Data API implementation
+- longer-horizon v2.0 architecture work (`docs/roadmap/soft-cooking-wilkinson.md`)
+- validation and test work that should not be mixed into this boundary doc
 
 Keep this context doc focused on current state, ownership, and boundaries.

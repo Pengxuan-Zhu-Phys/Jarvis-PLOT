@@ -1,6 +1,7 @@
 # Jarvis-PLOT Layout Engine Design
 
-Status: spec only
+Status: partial
+Last updated: 2026-07-16
 
 ## Purpose
 
@@ -18,16 +19,27 @@ It should not own rendering, source loading, or style selection.
 
 ## Current Reality
 
-Layout behavior is currently implicit in:
+Layout behavior is currently split across two paths:
+
+### YAML figure path
+
+Implicit layout / axes geometry lives in:
 
 - `jarvisplot/Figure/figure.py`
-- `jarvisplot/Figure/adapters_rect.py`
-- `jarvisplot/Figure/adapters_ternary.py`
+- `jarvisplot/Figure/layout_runtime.py`
 - `jarvisplot/Figure/adapters_rect.py`
 - `jarvisplot/Figure/adapters_ternary.py`
 - `jarvisplot/Figure/helper.py`
 
-There is no dedicated layout owner yet. That is the gap this document is tracking.
+There is still no dedicated shared layout engine for figure panels.
+
+### Flowchart path
+
+Classic flowchart layout is implemented inside:
+
+- `jarvisplot/flowchart.py` (`_ClassicGraph.layout` and related geometry helpers)
+
+This is a real owner for the classic Jarvis-HEP flowchart grammar, but it is not yet a reusable multi-diagram layout engine.
 
 ## Intended Boundary
 
@@ -44,4 +56,4 @@ The output of the layout stage should be data, not matplotlib artists.
 
 ## Flowchart Migration Note
 
-Future Jarvis-HEP flowchart support should land here first, not in the renderer.
+Flowchart layout already lives in `flowchart.py`. Future general diagram types should grow a shared layout owner rather than landing new geometry rules in `figure.py` or adapters.
