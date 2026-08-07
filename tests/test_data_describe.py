@@ -7,7 +7,7 @@ import json
 import pytest
 
 from jarvisplot.client import main
-from jarvisplot.verbs.data import describe_file
+from jarvisplot.data_access import describe_file
 
 
 @pytest.fixture

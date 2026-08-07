@@ -217,7 +217,7 @@ def _load_datasets(
     """Return (metadata, name->dataframe)."""
     import pandas as pd
 
-    from .verbs.data import _detect_type, _load_dataframe
+    from .data_access import detect_type, load_dataframe
 
     meta: dict[str, Any] = {}
     frames: dict[str, Any] = {}
@@ -245,12 +245,12 @@ def _load_datasets(
             )
             meta[name] = {"path": str(resolved), "rows": None, "error": "missing"}
             continue
-        kind = str(entry.get("type") or _detect_type(str(resolved), "auto"))
+        kind = str(entry.get("type") or detect_type(str(resolved), "auto"))
         try:
-            df = _load_dataframe(
+            df = load_dataframe(
                 str(resolved),
                 kind=kind if kind in {"csv", "parquet", "hdf5"} else "csv",
-                group=entry.get("dataset"),
+                group=entry.get("dataset") if isinstance(entry.get("dataset"), str) else None,
             )
             # dataset-level transform (simple steps only)
             ds_transform = entry.get("transform")
