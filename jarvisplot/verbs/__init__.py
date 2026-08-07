@@ -52,10 +52,9 @@ RESERVED_NON_VERBS: dict[str, str] = {
         "'run a scan' with 'render a figure'."
     ),
     "context": (
-        "`jplot context` was removed. "
-        "Use `jplot data describe`, `jplot cap`, `jplot man`, and "
-        "YAML `agent_output` (written by `jplot <file>`) instead of an "
-        "aggregated context pack."
+        "unknown command 'context'. "
+        "Use the jplot CLI for full usage and information "
+        "(`jplot -h`, `jplot man --json`, `jplot cap --json`)."
     ),
 }
 
