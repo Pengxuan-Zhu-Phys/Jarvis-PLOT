@@ -24,6 +24,7 @@ SECTIONS = CAPABILITY_SECTIONS  # methods … cli
 
 
 def build_parser(prog: str = "jplot cap") -> argparse.ArgumentParser:
+    section_list = "all | " + " | ".join(SECTIONS)
     parser = RichArgumentParser(
         prog=prog,
         description=(
@@ -31,16 +32,20 @@ def build_parser(prog: str = "jplot cap") -> argparse.ArgumentParser:
             "(methods, transforms, types, styles, cmaps, funcs, cli)."
         ),
         rich_title="cap",
-        rich_usage=f"{prog} [all|methods|transforms|types|styles|cmaps|funcs|cli] [--json]",
+        rich_usage=(
+            f"{prog}                      # section index (human card)\n"
+            f"{prog} all [--json]         # full catalogue\n"
+            f"{prog} <section> [--json]   # one of: {section_list}"
+        ),
     )
     parser.add_argument(
         "section",
         nargs="?",
-        default="all",
+        default=None,
         help=(
             "which catalogue to print: all | "
             + " | ".join(SECTIONS)
-            + "  (default: all)"
+            + "  (omit for the section index card; all is explicit)"
         ),
     )
     parser.add_argument(
@@ -58,7 +63,23 @@ def run(argv: Sequence[str], *, prog: str = "jplot cap") -> int:
     except SystemExit as exc:
         return system_exit_code(exc)
 
-    name = str(args.section or "all").strip().lower()
+    # Bare `jplot cap` → human section card (like data/template), not 35KB cap.all.
+    # Explicit `jplot cap all` remains the full-catalogue path.
+    if args.section is None:
+        if args.json:
+            env = envelope(
+                "cap.index",
+                True,
+                data={
+                    "sections": ["all", *list(SECTIONS)],
+                    "note": "Pass a section name (or all) for catalogue data; bare cap is the index.",
+                },
+            )
+            return emit(env)
+        parser.print_help()
+        return EXIT_OK
+
+    name = str(args.section).strip().lower()
     as_json = bool(args.json) or not sys.stdout.isatty()
 
     try:

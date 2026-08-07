@@ -94,6 +94,20 @@ def test_jplot_cap_all_json(capsys):
     assert len(env["data"]["methods"]) == len(METHOD_DISPATCH)
 
 
+def test_jplot_cap_bare_is_index_not_full_dump(capsys):
+    """Bare `jplot cap` must not emit cap.all (P2.1); agents pass section or --json index."""
+    assert main(["cap", "--json"]) == 0
+    env = json.loads(capsys.readouterr().out)
+    assert env["ok"] is True
+    assert env["kind"] == "cap.index"
+    sections = env["data"].get("sections") or []
+    assert "all" in sections
+    assert "methods" in sections
+    # Must not dump the full catalogue (no digest / method list payload)
+    assert "digest" not in env["data"]
+    assert not isinstance(env["data"].get("methods"), list)
+
+
 def test_jplot_cap_styles_json_marks_broken_cards(capsys):
     assert main(["cap", "styles", "--json"]) == 0
     env = json.loads(capsys.readouterr().out)
