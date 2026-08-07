@@ -351,8 +351,19 @@ def build_voronoi_digest(
             mass = float(ws.sum())
             w_mean = float(mass / cnt) if cnt else 0.0
             bbox = [float(xs.min()), float(xs.max()), float(ys.min()), float(ys.max())]
-            area = max(bbox[1] - bbox[0], 1e-30) * max(bbox[3] - bbox[2], 1e-30)
-            dens = float(mass / area) if mass > 0 else 0.0
+            width = bbox[1] - bbox[0]
+            height = bbox[3] - bbox[2]
+            # Degenerate (point/line) cells: do NOT invent a microscopic area —
+            # that made density ~1e60 and poisoned top_density rankings.
+            degenerate = (cnt < 3) or (width <= 0.0) or (height <= 0.0)
+            flags: list[str] = []
+            if degenerate:
+                flags.append("degenerate")
+                dens = 0.0
+                area = 0.0
+            else:
+                area = width * height
+                dens = float(mass / area) if mass > 0 and area > 0 else 0.0
             rec: dict[str, Any] = {
                 "i": i,
                 "site": [float(sites[i, 0]), float(sites[i, 1])],
@@ -361,7 +372,8 @@ def build_voronoi_digest(
                 "mass": mass,
                 "weight_mean": w_mean,
                 "density": dens,
-                "flags": [],
+                "area": area,
+                "flags": flags,
             }
             if zu is not None:
                 zz = zu[mask]
@@ -381,13 +393,19 @@ def build_voronoi_digest(
         for c in cells:
             c["mass"] = float(c["mass"] / total_mass)
 
-        # flag tails: lowest density among non-empty with mass
-        nonempty = [c for c in cells if c["count"] > 0]
-        if nonempty:
-            dens_vals = np.array([c["density"] for c in nonempty], dtype=float)
+        # flag tails among non-empty, non-degenerate cells with positive density
+        rankable = [
+            c
+            for c in cells
+            if c["count"] > 0
+            and "degenerate" not in (c.get("flags") or [])
+            and (c.get("density") or 0.0) > 0
+        ]
+        if rankable:
+            dens_vals = np.array([c["density"] for c in rankable], dtype=float)
             thr = float(np.quantile(dens_vals, 0.1)) if dens_vals.size else 0.0
-            for c in nonempty:
-                if c["density"] <= thr and c["density"] > 0:
+            for c in rankable:
+                if c["density"] <= thr:
                     c["flags"].append("tail")
         actual_cells = n_sites
 
@@ -416,13 +434,24 @@ def build_voronoi_digest(
 
     highlights: dict[str, Any] = {}
     if "top_cells" in include and cells:
-        by_dens = sorted(cells, key=lambda c: c.get("density") or 0.0, reverse=True)
-        by_mass = sorted(cells, key=lambda c: c.get("mass") or 0.0, reverse=True)
+        # Never rank degenerate cells by density (area≈0 would dominate).
+        dens_pool = [
+            c
+            for c in cells
+            if c.get("count", 0) > 0
+            and "degenerate" not in (c.get("flags") or [])
+            and (c.get("density") or 0.0) > 0
+        ]
+        mass_pool = [c for c in cells if c.get("count", 0) > 0]
+        by_dens = sorted(dens_pool, key=lambda c: c.get("density") or 0.0, reverse=True)
+        by_mass = sorted(mass_pool, key=lambda c: c.get("mass") or 0.0, reverse=True)
         highlights["top_density"] = [
-            {"cell_index": c["i"], "density": c["density"]} for c in by_dens[:10] if c["count"]
+            {"cell_index": c["i"], "density": c["density"], "count": c["count"]}
+            for c in by_dens[:10]
         ]
         highlights["top_mass"] = [
-            {"cell_index": c["i"], "mass": c["mass"]} for c in by_mass[:10] if c["count"]
+            {"cell_index": c["i"], "mass": c["mass"], "count": c["count"]}
+            for c in by_mass[:10]
         ]
     if "tails" in include and cells:
         highlights["tails"] = [
@@ -431,6 +460,7 @@ def build_voronoi_digest(
             if "tail" in (c.get("flags") or [])
         ][:20]
 
+    n_degenerate = sum(1 for c in cells if "degenerate" in (c.get("flags") or []))
     payload = {
         "schema_version": 1,
         "kind": "agent_digest",
@@ -444,6 +474,8 @@ def build_voronoi_digest(
             "actual_cells": int(actual_cells),
             "partition": "nearest_site",
             "area_mode": "bbox",
+            # Cells excluded from density ranking (point/line or count<3).
+            "excluded_cells": int(n_degenerate),
         },
         "provenance": {
             "source_rows": source_rows,

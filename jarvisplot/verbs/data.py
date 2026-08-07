@@ -434,23 +434,36 @@ def suggest_axes(
         vmin = float(np.min(values))
         vmax = float(np.max(values))
         q_lo, q_hi = np.quantile(values, [0.005, 0.995])
-        decades = float(np.log10(vmax / vmin)) if positive and vmin > 0 else 0.0
-        if positive and decades >= 2.0:
+        mean = float(np.mean(values))
+        median = float(np.median(values))
+        # Scale decision must share the same robust window as lim (not min/max).
+        # min/max decades made uniform [0,5] look "log" after one near-zero outlier.
+        # Quantile decades alone still flag Uniform(0,5) (~2.3 decades) — also require
+        # a right-skewed shape (median ≪ mean), typical of log-normal / power-law.
+        decades = 0.0
+        if positive and float(q_lo) > 0 and float(q_hi) > float(q_lo):
+            decades = float(np.log10(float(q_hi) / float(q_lo)))
+        skew_ratio = (median / mean) if mean > 0 else 1.0
+        use_log = positive and decades >= 2.0 and skew_ratio < 0.5
+        if use_log:
             scale = "log"
             lo = _nice_log_bound(float(q_lo), direction="down")
             hi = _nice_log_bound(float(q_hi), direction="up")
             reason = (
-                f"all positive; spans {decades:.2f} decades; "
-                f"lim from q0.5%–q99.5% rounded outward on a log scale"
+                f"all positive; robust span {decades:.2f} decades "
+                f"(q0.5%–q99.5%) and median/mean={skew_ratio:.2f}<0.5; "
+                f"lim rounded outward on a log scale"
             )
         else:
             scale = "linear"
             lo, hi = _nice_linear_bounds(float(q_lo), float(q_hi))
-            reason = (
-                f"spans {decades:.2f} decades"
-                if positive
-                else "not strictly positive"
-            ) + "; lim from q0.5%–q99.5% rounded outward"
+            if positive:
+                reason = (
+                    f"robust span {decades:.2f} decades (q0.5%–q99.5%), "
+                    f"median/mean={skew_ratio:.2f}; lim from quantiles, linear"
+                )
+            else:
+                reason = "not strictly positive; lim from q0.5%–q99.5% rounded outward"
         axes.append(
             {
                 "col": name,
@@ -460,10 +473,13 @@ def suggest_axes(
                 "stats": {
                     "min": vmin,
                     "max": vmax,
+                    "mean": mean,
+                    "median": median,
                     "q005": float(q_lo),
                     "q995": float(q_hi),
                     "positive": positive,
                     "decades": decades if positive else None,
+                    "median_over_mean": skew_ratio if positive else None,
                 },
             }
         )
