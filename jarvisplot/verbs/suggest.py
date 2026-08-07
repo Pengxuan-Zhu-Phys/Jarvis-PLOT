@@ -22,7 +22,7 @@ from ..agent_io import EXIT_FAILED, EXIT_OK, EXIT_USAGE, emit, envelope, system_
 from ..diagnostics import Diagnostic, DiagnosticBag
 from ..templates_catalog import get_template, list_templates, render_template_yaml
 from ..validation import validate_config
-from .data import describe_file, suggest_axes
+from ..data_access import describe_file, suggest_axes
 
 __all__ = ["SuggestError", "build_parser", "run", "suggest_config"]
 

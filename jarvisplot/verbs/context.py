@@ -115,7 +115,7 @@ def build_context(
 ) -> dict[str, Any]:
     from ..capabilities import section
     from ..templates_catalog import get_template, list_templates, render_template_yaml
-    from .data import describe_file, suggest_axes
+    from ..data_access import describe_file, suggest_axes
     from .suggest import SuggestError, suggest_config
 
     path = os.path.abspath(os.path.expanduser(str(data_path)))

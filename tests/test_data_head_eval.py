@@ -8,8 +8,8 @@ from unittest import mock
 import pytest
 
 from jarvisplot.client import main
-from jarvisplot.verbs import data as data_mod
-from jarvisplot.verbs.data import describe_file, eval_on_file, head_file
+from jarvisplot import data_access as data_access_mod
+from jarvisplot.data_access import describe_file, eval_on_file, head_file
 
 
 @pytest.fixture
@@ -106,13 +106,13 @@ def test_describe_cache_hit(csv_file, monkeypatch):
     assert first["cache"] == "miss"
 
     calls = {"n": 0}
-    real_load = data_mod._load_dataframe
+    real_load = data_access_mod.load_dataframe
 
     def counting_load(*args, **kwargs):
         calls["n"] += 1
         return real_load(*args, **kwargs)
 
-    monkeypatch.setattr(data_mod, "_load_dataframe", counting_load)
+    monkeypatch.setattr(data_access_mod, "load_dataframe", counting_load)
     second = describe_file(str(csv_file), use_cache=True)
     assert second["cache"] == "hit"
     assert calls["n"] == 0

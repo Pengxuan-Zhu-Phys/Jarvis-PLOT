@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from jarvisplot.client import main
-from jarvisplot.verbs.data import suggest_axes
+from jarvisplot.data_access import suggest_axes
 
 
 @pytest.fixture
