@@ -74,40 +74,42 @@ def test_router_falls_through_for_files_and_flowchart():
     assert route([]) == (False, 0)
 
 
+def _assert_unknown_cli_message(err: str, name: str) -> None:
+    low = err.lower()
+    assert "unknown command" in low
+    assert name in err
+    assert "jplot -h" in err or "jplot man" in err or "jplot cap" in err
+    assert "use the jplot cli" in low
+
+
 def test_unknown_bare_command_is_rejected(capsys):
     handled, code = route(["whaat"])
     assert handled is True
     assert code == 2
-    err = capsys.readouterr().err
-    assert "unknown command" in err
+    _assert_unknown_cli_message(capsys.readouterr().err, "whaat")
 
 
 def test_run_is_rejected_not_aliased(capsys):
-    """DR-08: bare path renders; `jplot run` must not silently mean render."""
+    """DR-08: bare path renders; `jplot run` is not a verb — same unknown-command shape."""
     assert is_verb("run") is False
     handled, code = route(["run", "x.yaml"])
     assert handled is True
     assert code == 2
-    err = capsys.readouterr().err
-    assert "jplot <file>" in err or "bare path" in err.lower() or "Jarvis2 plot" in err
-    assert "run a scan" in err or "no `jplot run`" in err or "no jplot run" in err.lower()
+    _assert_unknown_cli_message(capsys.readouterr().err, "run")
 
 
 def test_context_verb_removed(capsys):
-    """context is not a verb — hard error; point at the CLI, not a cookbook."""
+    """context is not a verb — same short CLI pointer, no replacement cookbook."""
     assert is_verb("context") is False
     handled, code = route(["context", "--data", "x.csv", "--json"])
     assert handled is True
     assert code == 2
-    err = capsys.readouterr().err
-    assert "unknown command" in err.lower() or "context" in err.lower()
-    assert "jplot -h" in err or "jplot man" in err or "jplot cap" in err
+    _assert_unknown_cli_message(capsys.readouterr().err, "context")
 
 
 def test_main_rejects_run_verb(capsys):
     assert main(["run", "whatever.yaml"]) == 2
-    err = capsys.readouterr().err
-    assert "Jarvis2 plot" in err or "jplot <file>" in err
+    _assert_unknown_cli_message(capsys.readouterr().err, "run")
 
 
 def test_legacy_parser_semantics_are_untouched():

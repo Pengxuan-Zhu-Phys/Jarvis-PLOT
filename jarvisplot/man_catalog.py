@@ -132,13 +132,12 @@ def resolve_topic(raw: str | None) -> str | None:
         + [f"transform.{n}" for n in list_transform_names()]
     )
     suggestions = did_you_mean(token, known)
-    if suggestions:
-        hint = f"; did you mean {suggestions[0]!r}?"
-        if len(suggestions) > 1:
-            hint = f"; did you mean {', '.join(repr(s) for s in suggestions)}?"
-    else:
-        hint = ""
-    raise ManCatalogError(f"unknown man topic {raw!r}{hint}")
+    hint = f"; did you mean {suggestions[0]!r}?" if suggestions else ""
+    raise ManCatalogError(
+        f"unknown man topic {raw!r}{hint}. "
+        "Use the jplot CLI for full usage and information "
+        "(`jplot -h`, `jplot man --json`, `jplot cap --json`)."
+    )
 
 
 def load_card(topic: str) -> dict[str, Any]:

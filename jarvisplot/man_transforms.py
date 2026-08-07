@@ -56,7 +56,11 @@ def resolve_transform_token(token: str) -> str | None:
             return transform_topic_id(name)
         near = did_you_mean(name, list(TRANSFORM_NAMES))
         hint = f"; did you mean {near[0]!r}?" if near else ""
-        raise ValueError(f"unknown transform {name!r}{hint}")
+        raise ValueError(
+            f"unknown transform {name!r}{hint}. "
+            "Use the jplot CLI for full usage and information "
+            "(`jplot -h`, `jplot man --json`, `jplot cap --json`)."
+        )
     if text in TRANSFORM_NAMES:
         return transform_topic_id(text)
     return None
@@ -153,7 +157,11 @@ def load_transform_card(name: str) -> dict[str, Any]:
     if c is None:
         near = did_you_mean(name, list(TRANSFORM_NAMES))
         hint = f"; did you mean {near[0]!r}?" if near else ""
-        raise KeyError(f"unknown transform {name!r}{hint}")
+        raise KeyError(
+            f"unknown transform {name!r}{hint}. "
+            "Use the jplot CLI for full usage and information "
+            "(`jplot -h`, `jplot man --json`, `jplot cap --json`)."
+        )
 
     topic = transform_topic_id(name)
     required = c.get("required") or {}
