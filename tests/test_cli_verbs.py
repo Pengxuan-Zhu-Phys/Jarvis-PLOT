@@ -94,14 +94,14 @@ def test_run_is_rejected_not_aliased(capsys):
 
 
 def test_context_verb_removed(capsys):
-    """Aggregated context pack was product-discouraged; command must not exist."""
+    """context is not a verb — hard error; point at the CLI, not a cookbook."""
     assert is_verb("context") is False
     handled, code = route(["context", "--data", "x.csv", "--json"])
     assert handled is True
     assert code == 2
     err = capsys.readouterr().err
-    assert "context" in err.lower()
-    assert "data describe" in err or "agent_output" in err
+    assert "unknown command" in err.lower() or "context" in err.lower()
+    assert "jplot -h" in err or "jplot man" in err or "jplot cap" in err
 
 
 def test_main_rejects_run_verb(capsys):
