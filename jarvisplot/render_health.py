@@ -136,9 +136,9 @@ def observe_layer_dataframe(
 ) -> LayerObservation:
     """Build a :class:`LayerObservation` from a post-transform dataframe.
 
-    This is the shared hook for dryrun (deep/shallow) and Figure render paths:
-    observations must describe the table that methods will consume, not a
-    parallel dryrun-only projection.
+    Shared hook for dryrun light checks and Figure render paths. Observations
+    describe the table available after the steps that path actually ran
+    (light transforms only in doctor/dryrun; full pipeline on render).
     """
     import numpy as np
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
-"""``jplot dryrun`` -- load data and transforms, no matplotlib figure.
+"""``jplot dryrun`` -- load data and light transforms, no matplotlib figure.
 
-Produces the row ledger and ``JP-VIZ-*`` health findings that agents need
-before (or instead of) reading a PNG.
+Check phase only: never re-runs heavy profile/density/interp. Execute with
+``jplot <yaml>``. Emits a row ledger and light ``JP-VIZ-*`` findings.
 """
 
 from __future__ import annotations
@@ -24,11 +24,12 @@ def build_parser(prog: str = "jplot dryrun") -> argparse.ArgumentParser:
     parser = RichArgumentParser(
         prog=prog,
         description=(
-            "Run dataset load + layer transforms without rendering; "
-            "emit a row ledger and JP-VIZ health diagnostics."
+            "Load datasets + light layer transforms without rendering; "
+            "emit a row ledger and light JP-VIZ diagnostics. "
+            "Does not re-run heavy profile/density/interp."
         ),
         rich_title="dryrun",
-        rich_usage=f"{prog} <file> [--json] [--with-data] [--deep]",
+        rich_usage=f"{prog} <file> [--json] [--with-data]",
     )
     parser.add_argument("file", help="path to a YAML plotting configuration")
     parser.add_argument(
@@ -46,15 +47,6 @@ def build_parser(prog: str = "jplot dryrun") -> argparse.ArgumentParser:
         default=None,
         help="directory for --with-data twins (default: <yaml-dir>/.cache/agent_twins)",
     )
-    parser.add_argument(
-        "--deep",
-        action="store_true",
-        help=(
-            "run heavy transforms (profile/density/interp) via the same "
-            "preprocessor path as render; full JP-VIZ on type: figures "
-            "(default for `jplot doctor`)"
-        ),
-    )
     return parser
 
 
@@ -70,7 +62,6 @@ def run(argv: Sequence[str], *, prog: str = "jplot dryrun") -> int:
         args.file,
         with_data=bool(args.with_data),
         out_dir=args.out_dir,
-        deep=bool(args.deep),
     )
     # Prefer the tri-state verdict from dryrun_config (None = partial coverage).
     verdict = report.get("ok")
@@ -90,7 +81,6 @@ def run(argv: Sequence[str], *, prog: str = "jplot dryrun") -> int:
         "status_note": report.get("status_note"),
         "type_expanded": report.get("type_expanded") or [],
         "heavy_skipped": report.get("heavy_skipped") or [],
-        "deep": bool(report.get("deep")),
         "datasets": report.get("datasets") or {},
         "layers": report.get("layers") or [],
         "twins": report.get("twins") or {},

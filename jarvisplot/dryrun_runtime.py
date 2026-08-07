@@ -30,7 +30,6 @@ def dryrun_file(
     *,
     with_data: bool = False,
     out_dir: str | None = None,
-    deep: bool = False,
 ) -> tuple[dict[str, Any], DiagnosticBag]:
     import yaml
 
@@ -50,7 +49,6 @@ def dryrun_file(
         base_dir=os.path.dirname(resolved),
         with_data=with_data,
         out_dir=out_dir,
-        deep=deep,
     )
     report["file"] = resolved
     return report, bag
@@ -62,7 +60,6 @@ def dryrun_config(
     base_dir: str | None = None,
     with_data: bool = False,
     out_dir: str | None = None,
-    deep: bool = False,
 ) -> tuple[dict[str, Any], DiagnosticBag]:
     bag = DiagnosticBag()
     if not isinstance(config, dict):
@@ -140,8 +137,6 @@ def dryrun_config(
                 with_data=with_data,
                 twin_root=twin_root,
                 incomplete_sources=incomplete_sources,
-                deep=deep,
-                base_dir=base_dir,
             )
             if skipped:
                 for step_name in skipped:
@@ -188,9 +183,10 @@ def dryrun_config(
             "layer ledgers for density/profile/interp are incomplete "
             "(status=partial_renderable — config is OK to render)",
             suggestion=(
-                "Not a failed config. Structure/columns were checked; full mesh/"
-                "density only runs on `jplot <file>`. Proceed to render or "
-                "agent_output — do not rewrite YAML solely because of this."
+                "Not a failed config. Doctor/dryrun never re-run heavy "
+                "profile/density/interp — that is only `jplot <file>`. "
+                "Proceed to render or agent_output; do not rewrite YAML solely "
+                "because coverage is partial."
             ),
             context={
                 "heavy_skipped": heavy_skipped[:20],
@@ -208,15 +204,14 @@ def dryrun_config(
     )
     report["type_expanded"] = list(expanded_names)
     report["heavy_skipped"] = list(heavy_skipped)
-    report["deep"] = bool(deep)
     report["ok"] = verdict_ok
     report["coverage"] = coverage
     report["status"] = status
     report["renderable"] = status in {"ok", "partial_renderable"}
     if status == "partial_renderable":
         report["status_note"] = (
-            "heavy transforms skipped in dryrun; YAML is expected to render successfully. "
-            "Re-run with --deep (or `jplot doctor`, which defaults to deep) for post-mesh JP-VIZ."
+            "heavy transforms not simulated in doctor/dryrun (by design); "
+            "YAML structure/columns were checked — run `jplot <file>` to execute."
         )
     return report, bag
 
@@ -482,13 +477,11 @@ def _observe_layer(
     with_data: bool = False,
     twin_root: Path | None = None,
     incomplete_sources: set[str] | None = None,
-    deep: bool = False,
-    base_dir: str | None = None,
 ) -> tuple[LayerObservation | None, dict[str, Any] | None, list[str]]:
     """Return ``(obs, twin_meta, heavy_step_names_skipped)``.
 
-    When ``deep`` is True, heavy transforms run via the same
-    ``preprocessor_runtime.apply_transforms_impl`` path as render (P0.2 root).
+    Check phase never re-runs heavy profile/density/interp — only light steps.
+    Execute once via ``jplot <yaml>``.
     """
     layer_name = str(layer.get("name") or f"layer_{layer_index}")
     method = str(layer.get("method") or "")
@@ -538,26 +531,12 @@ def _observe_layer(
     notes: list[str] = []
     transform = block.get("transform")
     if isinstance(transform, list) and transform:
-        if deep:
-            df, steps, heavy_skipped, err = _apply_runtime_transforms(
-                df, transform, base_dir=base_dir
-            )
-            if err:
-                notes.append(f"runtime transform failed: {err}")
-                bag.warning(
-                    "JP-VIZ-011",
-                    f"$.Figures[name={figure_name}].layers[name={layer_name}]",
-                    f"deep dryrun transform failed on layer {layer_name!r}: {err}",
-                    suggestion="Fix transform inputs or re-run without --deep to isolate structure checks.",
-                )
-            else:
-                notes.append("transforms via preprocessor_runtime (deep)")
-        else:
-            df, steps, heavy_skipped = _apply_simple_transforms(df, transform)
-            if heavy_skipped:
-                notes.append("heavy transform skipped in dryrun")
+        df, steps, heavy_skipped = _apply_simple_transforms(df, transform)
+        if heavy_skipped:
+            notes.append("heavy transform skipped in dryrun")
 
-    # Publish share_data so downstream layers (type: expand density→contour) see it.
+    # After light-only steps, share_data may still be useful for multi-source
+    # layers that do not depend on heavy producers.
     share = layer.get("share_data")
     if (
         isinstance(share, str)
@@ -602,109 +581,6 @@ def _observe_layer(
     return obs, twin_meta, heavy_skipped
 
 
-class _NullRuntimeLogger:
-    """Profile/density runtimes call logger.debug without None-guards."""
-
-    def debug(self, *args: Any, **kwargs: Any) -> None:
-        return None
-
-    def info(self, *args: Any, **kwargs: Any) -> None:
-        return None
-
-    def warning(self, *args: Any, **kwargs: Any) -> None:
-        return None
-
-    def error(self, *args: Any, **kwargs: Any) -> None:
-        return None
-
-    def exception(self, *args: Any, **kwargs: Any) -> None:
-        return None
-
-
-class _DryrunPreprocessor:
-    """Minimal shim so dryrun can call :func:`apply_transforms_impl` (render path)."""
-
-    def __init__(self, base_dir: str | None = None) -> None:
-        self.base_dir = base_dir
-        self.logger = _NullRuntimeLogger()
-
-    def _warn(self, msg: str) -> None:
-        return None
-
-    def _info(self, msg: str) -> None:
-        return None
-
-    def ensure_pandas(self, df: Any, reason: str = "runtime") -> Any:
-        return df
-
-    @staticmethod
-    def _safe_nrows(df: Any) -> int | None:
-        try:
-            return int(len(df))
-        except Exception:
-            return None
-
-    def _should_collect_dataframe(self, df: Any) -> bool:
-        return False
-
-
-def _apply_runtime_transforms(
-    df,
-    transform: Sequence[Mapping[str, Any]],
-    *,
-    base_dir: str | None,
-) -> tuple[Any, list[TransformStepObs], list[str], str | None]:
-    """Run the *same* transform dispatch as render (no heavy-skip second chain)."""
-    from .Figure.preprocessor_runtime import apply_transforms_impl
-
-    rows_in = 0
-    try:
-        rows_in = int(len(df))
-    except Exception:
-        rows_in = 0
-    prep = _DryrunPreprocessor(base_dir=base_dir)
-    try:
-        work = apply_transforms_impl(
-            prep,
-            df,
-            list(transform),
-            profile_mode="runtime",
-            source_label="dryrun.deep",
-        )
-    except Exception as exc:
-        return (
-            df,
-            [
-                TransformStepObs(
-                    name="pipeline",
-                    detail=f"failed: {exc}",
-                    rows_in=rows_in,
-                    rows_out=rows_in,
-                )
-            ],
-            [],
-            str(exc),
-        )
-    rows_out = 0
-    try:
-        rows_out = int(len(work))
-    except Exception:
-        rows_out = 0
-    return (
-        work,
-        [
-            TransformStepObs(
-                name="pipeline",
-                detail="preprocessor_runtime.apply_transforms_impl",
-                rows_in=rows_in,
-                rows_out=rows_out,
-            )
-        ],
-        [],
-        None,
-    )
-
-
 def _twin_columns(df, layer: Mapping[str, Any]) -> dict[str, Any]:
     coords = layer.get("coordinates") if isinstance(layer.get("coordinates"), dict) else {}
     out: dict[str, Any] = {}
@@ -721,7 +597,7 @@ def _apply_simple_transforms(
 ) -> tuple[Any, list[TransformStepObs], list[str]]:
     """Apply the cheap transform subset; skip density/profile/interp (noted).
 
-    Shallow dryrun only. Deep dryrun uses :func:`_apply_runtime_transforms`.
+    Doctor/dryrun must never re-run heavy mesh steps — only ``jplot <yaml>`` does.
 
     Returns ``(df, steps, heavy_step_names_skipped)``.
     """
