@@ -20,9 +20,13 @@ __all__ = ["build_parser", "run"]
 def build_parser(prog: str = "jplot doctor") -> argparse.ArgumentParser:
     parser = RichArgumentParser(
         prog=prog,
-        description="Validate the YAML and dryrun transforms/health in one pass.",
+        description=(
+            "Validate the YAML and dryrun transforms/health in one pass. "
+            "Default dryrun is shallow (fast; type: → partial + pre-transform lim). "
+            "Pass --deep to run the same heavy transforms as render for full JP-VIZ."
+        ),
         rich_title='doctor',
-        rich_usage=f"{prog} <file> [--json]",
+        rich_usage=f"{prog} <file> [--json] [--deep]",
     )
     parser.add_argument("file", help="path to a YAML plotting configuration")
     parser.add_argument(
@@ -36,6 +40,14 @@ def build_parser(prog: str = "jplot doctor") -> argparse.ArgumentParser:
         action="store_false",
         help="skip column-existence check during validate",
     )
+    parser.add_argument(
+        "--deep",
+        action="store_true",
+        help=(
+            "run heavy transforms via preprocessor_runtime (same path as render); "
+            "full post-mesh JP-VIZ on type: figures. Slower on large grids."
+        ),
+    )
     return parser
 
 
@@ -48,7 +60,8 @@ def run(argv: Sequence[str], *, prog: str = "jplot doctor") -> int:
 
     as_json = bool(args.json) or not sys.stdout.isatty()
     _config, vbag = validate_file(args.file, check_columns=args.check_columns)
-    report, dbag = dryrun_file(args.file)
+    # Shallow default keeps doctor interactive; --deep is the P0.2 full path.
+    report, dbag = dryrun_file(args.file, deep=bool(args.deep))
 
     # merge bags: validate first, then dryrun health
     from ..diagnostics import DiagnosticBag
@@ -105,7 +118,9 @@ def run(argv: Sequence[str], *, prog: str = "jplot doctor") -> int:
         "status": status,
         "coverage": coverage,
         "renderable": renderable,
-        "status_note": (
+        "deep": bool(report.get("deep")),
+        "status_note": report.get("status_note")
+        or (
             "heavy transforms skipped in dryrun; config is expected to render"
             if status == "partial_renderable"
             else None
@@ -125,6 +140,7 @@ def run(argv: Sequence[str], *, prog: str = "jplot doctor") -> int:
             "coverage": coverage,
             "status": report.get("status"),
             "renderable": report.get("renderable"),
+            "deep": bool(report.get("deep")),
             "datasets": report.get("datasets") or {},
             "layers": report.get("layers") or [],
         },

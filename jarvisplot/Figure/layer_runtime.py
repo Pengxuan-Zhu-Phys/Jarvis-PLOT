@@ -721,6 +721,44 @@ def load_layer_runtime_data(fig, layer_info):
     layer_info["data_loaded"] = True
     layer_info["share_cache_ref"] = cache_ref
     fig._store_share_data_if_needed(layer, data, cache_ref=cache_ref)
+    # P0.2 root: post-transform observation on the same table methods consume.
+    collector = getattr(fig, "health_observations", None)
+    if collector is not None and data is not None and not isinstance(data, dict):
+        try:
+            from ..render_health import observe_layer_dataframe
+
+            frame_cfg = {}
+            raw_frame = getattr(fig, "frame", None)
+            if isinstance(raw_frame, dict):
+                frame_cfg = raw_frame
+            elif hasattr(raw_frame, "__dict__"):
+                # Figure may hold frame as object; best-effort mapping
+                frame_cfg = getattr(raw_frame, "_cfg", None) or {}
+            # Prefer YAML frame block if attached during setup
+            yaml_frame = layer_info.get("frame_cfg")
+            if isinstance(yaml_frame, dict):
+                frame_cfg = yaml_frame
+            fig_frame = getattr(fig, "_yaml_frame", None)
+            if isinstance(fig_frame, dict):
+                frame_cfg = fig_frame
+            obs = observe_layer_dataframe(
+                figure=str(getattr(fig, "name", "") or "figure"),
+                layer=layer if isinstance(layer, dict) else layer_info,
+                df=data,
+                frame_cfg=frame_cfg if isinstance(frame_cfg, dict) else {},
+                source=str(
+                    (layer.get("data") or [{}])[0].get("source", "")
+                    if isinstance(layer, dict) and isinstance(layer.get("data"), list) and layer.get("data")
+                    else ""
+                ),
+                notes=["figure render path"],
+            )
+            collector.append(obs)
+        except Exception as exc:
+            try:
+                fig.logger.debug(f"health observation skipped: {exc}")
+            except Exception:
+                pass
     return data
 
 

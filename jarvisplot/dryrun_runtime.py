@@ -13,7 +13,13 @@ from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence
 
 from .diagnostics import DiagnosticBag
-from .render_health import LayerObservation, TransformStepObs, evaluate_health, report_to_dict
+from .render_health import (
+    LayerObservation,
+    TransformStepObs,
+    evaluate_health,
+    observe_layer_dataframe,
+    report_to_dict,
+)
 from .utils.pathing import resolve_project_path
 
 __all__ = ["dryrun_config", "dryrun_file"]
@@ -24,6 +30,7 @@ def dryrun_file(
     *,
     with_data: bool = False,
     out_dir: str | None = None,
+    deep: bool = False,
 ) -> tuple[dict[str, Any], DiagnosticBag]:
     import yaml
 
@@ -43,6 +50,7 @@ def dryrun_file(
         base_dir=os.path.dirname(resolved),
         with_data=with_data,
         out_dir=out_dir,
+        deep=deep,
     )
     report["file"] = resolved
     return report, bag
@@ -54,6 +62,7 @@ def dryrun_config(
     base_dir: str | None = None,
     with_data: bool = False,
     out_dir: str | None = None,
+    deep: bool = False,
 ) -> tuple[dict[str, Any], DiagnosticBag]:
     bag = DiagnosticBag()
     if not isinstance(config, dict):
@@ -131,6 +140,8 @@ def dryrun_config(
                 with_data=with_data,
                 twin_root=twin_root,
                 incomplete_sources=incomplete_sources,
+                deep=deep,
+                base_dir=base_dir,
             )
             if skipped:
                 for step_name in skipped:
@@ -197,13 +208,15 @@ def dryrun_config(
     )
     report["type_expanded"] = list(expanded_names)
     report["heavy_skipped"] = list(heavy_skipped)
+    report["deep"] = bool(deep)
     report["ok"] = verdict_ok
     report["coverage"] = coverage
     report["status"] = status
     report["renderable"] = status in {"ok", "partial_renderable"}
     if status == "partial_renderable":
         report["status_note"] = (
-            "heavy transforms skipped in dryrun; YAML is expected to render successfully"
+            "heavy transforms skipped in dryrun; YAML is expected to render successfully. "
+            "Re-run with --deep (or `jplot doctor`, which defaults to deep) for post-mesh JP-VIZ."
         )
     return report, bag
 
@@ -469,8 +482,14 @@ def _observe_layer(
     with_data: bool = False,
     twin_root: Path | None = None,
     incomplete_sources: set[str] | None = None,
+    deep: bool = False,
+    base_dir: str | None = None,
 ) -> tuple[LayerObservation | None, dict[str, Any] | None, list[str]]:
-    """Return ``(obs, twin_meta, heavy_step_names_skipped)``."""
+    """Return ``(obs, twin_meta, heavy_step_names_skipped)``.
+
+    When ``deep`` is True, heavy transforms run via the same
+    ``preprocessor_runtime.apply_transforms_impl`` path as render (P0.2 root).
+    """
     layer_name = str(layer.get("name") or f"layer_{layer_index}")
     method = str(layer.get("method") or "")
     incomplete_sources = incomplete_sources or set()
@@ -516,150 +535,184 @@ def _observe_layer(
     df = frames[source]
     steps: list[TransformStepObs] = []
     heavy_skipped: list[str] = []
-    # layer-level transform under data block
+    notes: list[str] = []
     transform = block.get("transform")
     if isinstance(transform, list) and transform:
-        df, steps, heavy_skipped = _apply_simple_transforms(df, transform)
-
-    # coordinate samples for bbox + colour channel
-    n_points = int(len(df))
-    finite_ratio = 1.0
-    nan_ratio = 0.0
-    data_bbox = None
-    c_min = c_max = None
-    grid_nan_ratio = None
-    twin_cols: dict[str, Any] = {}
-    coords = layer.get("coordinates") if isinstance(layer.get("coordinates"), dict) else {}
-    x_vals, y_vals = _eval_xy(df, coords)
-    z_vals = _eval_axis(df, coords, "z")
-    c_vals = _eval_axis(df, coords, "c")
-    if x_vals is not None and y_vals is not None and len(x_vals) and len(y_vals):
-        import numpy as np
-
-        x = np.asarray(x_vals, dtype=float)
-        y = np.asarray(y_vals, dtype=float)
-        n = min(x.size, y.size)
-        x, y = x[:n], y[:n]
-        finite = np.isfinite(x) & np.isfinite(y)
-        n_points = int(finite.sum())
-        finite_ratio = float(finite.mean()) if n else 0.0
-        nan_ratio = 1.0 - finite_ratio
-        if n_points:
-            xf, yf = x[finite], y[finite]
-            data_bbox = (
-                float(xf.min()),
-                float(xf.max()),
-                float(yf.min()),
-                float(yf.max()),
+        if deep:
+            df, steps, heavy_skipped, err = _apply_runtime_transforms(
+                df, transform, base_dir=base_dir
             )
-        twin_cols["x"] = x
-        twin_cols["y"] = y
-
-    for name, arr in (("z", z_vals), ("c", c_vals)):
-        if arr is None:
-            continue
-        import numpy as np
-
-        a = np.asarray(arr, dtype=float).reshape(-1)
-        twin_cols[name] = a
-        finite = np.isfinite(a)
-        if name == "z" and a.size:
-            grid_nan_ratio = float(1.0 - finite.mean())
-        if name in {"c", "z"} and finite.any():
-            lo, hi = float(a[finite].min()), float(a[finite].max())
-            if c_min is None:
-                c_min, c_max = lo, hi
+            if err:
+                notes.append(f"runtime transform failed: {err}")
+                bag.warning(
+                    "JP-VIZ-011",
+                    f"$.Figures[name={figure_name}].layers[name={layer_name}]",
+                    f"deep dryrun transform failed on layer {layer_name!r}: {err}",
+                    suggestion="Fix transform inputs or re-run without --deep to isolate structure checks.",
+                )
             else:
-                c_min = min(c_min, lo)
-                c_max = max(c_max, hi)
+                notes.append("transforms via preprocessor_runtime (deep)")
+        else:
+            df, steps, heavy_skipped = _apply_simple_transforms(df, transform)
+            if heavy_skipped:
+                notes.append("heavy transform skipped in dryrun")
 
-    axes_name = str(layer.get("axes") or "ax")
-    ax_frame = frame_cfg.get(axes_name) if isinstance(frame_cfg.get(axes_name), dict) else {}
-    axes_lim = None
-    if isinstance(ax_frame, dict):
-        xlim = ax_frame.get("xlim")
-        ylim = ax_frame.get("ylim")
-        if isinstance(xlim, (list, tuple)) and isinstance(ylim, (list, tuple)):
-            axes_lim = {
-                "x": [float(xlim[0]), float(xlim[1])],
-                "y": [float(ylim[0]), float(ylim[1])],
-            }
-    xscale = str(ax_frame.get("xscale") or "linear")
-    yscale = str(ax_frame.get("yscale") or "linear")
-
-    # colorbar limits from frame.axc / named colorbar axes
-    cb_name = str(layer.get("colorbar") or "axc")
-    cb_frame = frame_cfg.get(cb_name) if isinstance(frame_cfg.get(cb_name), dict) else {}
-    color_cfg = {}
-    if isinstance(cb_frame, dict):
-        color_cfg = cb_frame.get("color") if isinstance(cb_frame.get("color"), dict) else {}
-    cb_vmin = _as_float(color_cfg.get("vmin"))
-    cb_vmax = _as_float(color_cfg.get("vmax"))
-
-    zorder = 0.0
-    style_label = None
-    style = layer.get("style")
-    if isinstance(style, dict):
-        if "zorder" in style:
-            try:
-                zorder = float(style["zorder"])
-            except Exception:
-                pass
-        if "label" in style and style["label"] is not None:
-            style_label = str(style["label"])
-
-    legend_labels = None
-    if isinstance(ax_frame, dict) and isinstance(ax_frame.get("legend"), dict):
-        leg = ax_frame["legend"]
-        if "labels" in leg:
-            raw = leg.get("labels")
-            if isinstance(raw, list):
-                legend_labels = [str(x) for x in raw]
-            elif raw is None:
-                legend_labels = []
+    # Publish share_data so downstream layers (type: expand density→contour) see it.
+    share = layer.get("share_data")
+    if (
+        isinstance(share, str)
+        and share.strip()
+        and not heavy_skipped
+        and df is not None
+    ):
+        frames[share.strip()] = df
 
     twin_path = None
     twin_meta = None
-    if with_data and twin_root is not None and twin_cols:
-        twin_path, twin_meta = _write_twin(
-            twin_root, figure_name, layer_name, twin_cols, n_points=n_points
-        )
+    if with_data and twin_root is not None:
+        twin_cols = _twin_columns(df, layer)
+        if twin_cols:
+            n_est = 0
+            try:
+                n_est = int(len(df))
+            except Exception:
+                n_est = 0
+            twin_path, twin_meta = _write_twin(
+                twin_root, figure_name, layer_name, twin_cols, n_points=n_est
+            )
 
     incomplete = bool(heavy_skipped) or (
         isinstance(source, str) and source in incomplete_sources
     )
-    # Coordinates often name columns produced by the skipped heavy step (x/y/z
-    # mesh); zero finite points then means incomplete, not empty data.
-    if heavy_skipped and n_points <= 0:
-        incomplete = True
-
-    obs = LayerObservation(
+    obs = observe_layer_dataframe(
         figure=figure_name,
-        layer=layer_name,
-        method=method,
-        source=source,
-        axes=axes_name,
-        n_points=n_points,
-        finite_ratio=finite_ratio,
-        nan_ratio=nan_ratio,
-        data_bbox=data_bbox,
-        axes_lim=axes_lim,
-        xscale=xscale,
-        yscale=yscale,
-        zorder=zorder,
-        c_min=c_min,
-        c_max=c_max,
-        colorbar_vmin=cb_vmin,
-        colorbar_vmax=cb_vmax,
-        grid_nan_ratio=grid_nan_ratio,
-        style_label=style_label,
-        legend_labels=legend_labels,
+        layer=layer,
+        df=df,
+        frame_cfg=frame_cfg,
+        source=str(source),
         steps=steps,
-        twin_path=twin_path,
         incomplete=incomplete,
-        notes=(["heavy transform skipped in dryrun"] if heavy_skipped else []),
+        notes=notes,
+        twin_path=twin_path,
     )
+    # Coordinates often name columns produced by a skipped heavy step; zero
+    # finite points then means incomplete, not empty data.
+    if heavy_skipped and obs.n_points <= 0:
+        obs.incomplete = True
     return obs, twin_meta, heavy_skipped
+
+
+class _NullRuntimeLogger:
+    """Profile/density runtimes call logger.debug without None-guards."""
+
+    def debug(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+    def info(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+    def warning(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+    def error(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+    def exception(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+
+class _DryrunPreprocessor:
+    """Minimal shim so dryrun can call :func:`apply_transforms_impl` (render path)."""
+
+    def __init__(self, base_dir: str | None = None) -> None:
+        self.base_dir = base_dir
+        self.logger = _NullRuntimeLogger()
+
+    def _warn(self, msg: str) -> None:
+        return None
+
+    def _info(self, msg: str) -> None:
+        return None
+
+    def ensure_pandas(self, df: Any, reason: str = "runtime") -> Any:
+        return df
+
+    @staticmethod
+    def _safe_nrows(df: Any) -> int | None:
+        try:
+            return int(len(df))
+        except Exception:
+            return None
+
+    def _should_collect_dataframe(self, df: Any) -> bool:
+        return False
+
+
+def _apply_runtime_transforms(
+    df,
+    transform: Sequence[Mapping[str, Any]],
+    *,
+    base_dir: str | None,
+) -> tuple[Any, list[TransformStepObs], list[str], str | None]:
+    """Run the *same* transform dispatch as render (no heavy-skip second chain)."""
+    from .Figure.preprocessor_runtime import apply_transforms_impl
+
+    rows_in = 0
+    try:
+        rows_in = int(len(df))
+    except Exception:
+        rows_in = 0
+    prep = _DryrunPreprocessor(base_dir=base_dir)
+    try:
+        work = apply_transforms_impl(
+            prep,
+            df,
+            list(transform),
+            profile_mode="runtime",
+            source_label="dryrun.deep",
+        )
+    except Exception as exc:
+        return (
+            df,
+            [
+                TransformStepObs(
+                    name="pipeline",
+                    detail=f"failed: {exc}",
+                    rows_in=rows_in,
+                    rows_out=rows_in,
+                )
+            ],
+            [],
+            str(exc),
+        )
+    rows_out = 0
+    try:
+        rows_out = int(len(work))
+    except Exception:
+        rows_out = 0
+    return (
+        work,
+        [
+            TransformStepObs(
+                name="pipeline",
+                detail="preprocessor_runtime.apply_transforms_impl",
+                rows_in=rows_in,
+                rows_out=rows_out,
+            )
+        ],
+        [],
+        None,
+    )
+
+
+def _twin_columns(df, layer: Mapping[str, Any]) -> dict[str, Any]:
+    coords = layer.get("coordinates") if isinstance(layer.get("coordinates"), dict) else {}
+    out: dict[str, Any] = {}
+    for name in ("x", "y", "z", "c", "left", "right", "bottom"):
+        arr = _eval_axis(df, coords, name)
+        if arr is not None:
+            out[name] = arr
+    return out
 
 
 def _apply_simple_transforms(
@@ -667,6 +720,8 @@ def _apply_simple_transforms(
     transform: Sequence[Mapping[str, Any]],
 ) -> tuple[Any, list[TransformStepObs], list[str]]:
     """Apply the cheap transform subset; skip density/profile/interp (noted).
+
+    Shallow dryrun only. Deep dryrun uses :func:`_apply_runtime_transforms`.
 
     Returns ``(df, steps, heavy_step_names_skipped)``.
     """
