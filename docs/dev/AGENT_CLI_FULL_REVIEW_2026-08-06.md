@@ -2,46 +2,63 @@
 
 Status: review
 Date: 2026-08-06
-Reviewer: Claude
+Updated: 2026-08-07（产品纪律回写：检查阶段禁止 heavy 重跑；删 --deep 计划）
+Reviewer: Claude（初评）+ 产品决策修订
 Scope: `jplot` 全动词面 + `jarvisplot/schema/**` + `manual_cards/**` + agent_output 端到端 +
-`docs/dev/*` 设计文档一致性。以工作区当前代码为准（HEAD `1d2c52a`，415 passed / 1 skipped）。
-所有负面结论均附路径或可复现命令。
+`docs/dev/*` 设计文档一致性。初评以 HEAD `1d2c52a` 为准；§0 与 §8 以当前产品纪律为准。
 
 ---
 
-## 0. 执行摘要
+## 0. 产品纪律（检查 vs 执行）——优先于下文任何「修裁判」提案
 
-**总评：7.5 / 10。**
+> **Agent 写 YAML → 检查阶段只过结构/语法/列/轻步骤 → 通过后 `jplot <yaml>` 执行一次。**  
+> **检查阶段（`validate` / `dryrun` / `doctor`）禁止再跑 profile / density / interp 等重步骤。**  
+> **看图内容靠执行产物（PNG + `agent_output` digest），不靠 doctor 重算 mesh。**
 
-> 一句话结论：**"CLI 是知识库+传感器+裁判"这条产品线已经真正落地，闭环可机器驱动、假成功已消灭；
-> 但裁判在产品自己规定的默认路径（`type:`）上结构性失明，而 agent 唯一能"看图"的凭据
-> （digest 的 `top_density`）当前会给出错误的众数位置。**
+因此下列方案**一律否决，不得再写进路线图或实现**：
 
-### 三个最大优点
+| 否决 | 原因 |
+|---|---|
+| `jplot dryrun --deep` / `doctor --deep` / `doctor --full` | 检查阶段重跑 heavy = 第二条执行流水线 |
+| 让 doctor 默认 full mesh / 覆盖 post-mesh 全套 JP-VIZ | 同上；且贵、与「写通就执行」冲突 |
+| 为「type: 上 JP-VIZ 全覆盖」而在 dryrun 里接真 transform 派发 | 同上 |
 
-1. **产品原则不是口号，能在代码里逐条验证。** DR-08 的 bare-path render 一直贯穿到 `jplot -h` 的
-   Render 卡片文案（"bare path; not a verb — DR-08"）；"doctor 只 plan、`jplot <yaml>` 才写"在
-   `doctor` 输出 `status: planned` 与真实渲染产出 `.agent.json` 两侧都被证实。
-2. **假成功已经消灭。** 坏列表达式在三道关口全部拦下：`validate ok=false` → `doctor status=failed`
-   → `jplot bad.yaml` exit=1。这是 agent 可信闭环的地基，已经打牢。
-3. **`man` 是我见过做得最认真的 agent 知识库之一。** `see_also` / `related_cli` / `live_sources`
-   / `anti_patterns` 四件套齐全，`man transform.make_interp_2d --json` 给出完整字段契约——
-   曾经的 "delegated — see runtime" 死胡同已经填平。
+**允许且已落地的轻量检查**（不重跑 mesh）：
 
-### 三个最大风险
+- schema / 列 / 轻 transform 行数账本  
+- `coverage: partial` + `partial_renderable`（含重步骤时**明示判不全**，不是失败）  
+- pre-transform lim 代理（`JP-VIZ-002` + `basis: pre-transform`）——只用输入坐标，不跑 density/profile mesh  
+- 执行期：`jplot <yaml>` 上的观测钩子 / digest（**唯一** heavy 入口）
 
-1. **P0 · digest 的 `top_density` 被退化 cell 污染**，头名比次名高 **56 个数量级**，`count=1`。
-   agent 会把单点噪声当成主峰上报给用户。
-2. **P0 · `type:` 路径上 JP-VIZ 结构性不可达。** dryrun 跳过 profile/density/interp，而现存两个
-   `type:` 必然含重步骤 → `coverage` 永远 `partial`，`JP-VIZ-002/004/007/008` 永不触发。
-   实测：`suggest` 自己产出的 `ylim` 会裁掉数据，`doctor` 抓不到。
-3. **P1 · `transform_contracts` ↔ runtime 已经漂移**，且无 CI 守卫。`profile` 的 `pregrid` /
-   `pregrid_bin` 是用户可写键，但契约、schema、文档、manual card、全部语料里**一处都没有**。
+下文 §5 保留初评现象与证据；**修复建议以本节为准**，冲突处一律作废。
 
-### 是否建议发布给外部 agent 用户
+---
 
-**有条件建议。** 内部 / 受控使用：现在就可以。对外发布：**必须先修两个 P0**（§5）。
-理由是这两条都会让 agent *自信地给出错误结论*，而不是失败——后者可恢复，前者不可。
+## 0.1 执行摘要（初评 + 修订）
+
+**初评总分：7.5 / 10。** 主线闭环已通；P0/P1 中与纪律兼容的项已在后续 commit 落地（见 §8）。
+
+> 修订后的结论：**CLI = 知识库 + 轻检查 + 一次执行。**  
+> doctor 在 `type:` 上 `partial` **是设计结果**（不假装看过 mesh），不是要靠 --deep 补全的洞。  
+> agent 看图靠 **`jplot <yaml>` 写出的 lossy digest**，不靠 dryrun 重算。
+
+### 三个最大优点（仍成立）
+
+1. **产品原则可验证。** DR-08 bare-path render；doctor 只 plan `agent_output`、`jplot <yaml>` 才写。  
+2. **假成功已消灭。** 坏列：`validate` → `doctor failed` → render exit=1。  
+3. **`man` 契约化。** transform 死胡同已填；cap/man 可机器消费。
+
+### 初评三大风险 → 修订状态
+
+| 初评 | 修订 |
+|---|---|
+| P0 digest `top_density` 退化 cell | **已修**（`degenerate` + 过滤 ranking） |
+| P0 type: 上 JP-VIZ「失明」 | **接受为纪律**：检查不做 heavy；补 pre-transform lim 代理；全图判断在执行/digest |
+| P1 transform 契约漂移 | **已修**（pregrid + 一致性测试） |
+
+### 是否建议发布
+
+内部可用。对外：消化 §8 已修项即可；**不要**再把「doctor full mesh」当发布前置。
 
 ---
 
@@ -180,39 +197,30 @@ python3 -c "import json;d=json.load(open('plots/posterior_2d.agent.json'));print
 
 ---
 
-#### P0.2 · `type:` 路径上 JP-VIZ 结构性不可达
+#### P0.2 · `type:` 路径上 doctor 不做 post-mesh JP-VIZ（设计，非缺陷）
 
-**现象**　`suggest` 产出的 `posterior_2d` 配置里 `yscale: log` + `ylim: [0.02, 5.0]`
-会裁掉大量 y 值，`doctor` 报 `coverage: partial`，**未触发任何 JP-VIZ-002**。
-同一份数据用手写 layers（无重步骤）+ 同样坏的 lim，`JP-VIZ-002` 立刻触发。
+**现象（初评）**　`type: posterior_2d` / `profile_2d` 展开后含重步骤 → doctor
+`coverage: partial` / `partial_renderable`；跳过 mesh 时拿不到 post-transform 坐标上的全套 JP-VIZ。
 
-**根因**　[`dryrun_runtime.py:477`](jarvisplot/dryrun_runtime.py:477) `_apply_simple_transforms`
-是 [`preprocessor_runtime.py::apply_transforms_impl`](jarvisplot/Figure/preprocessor_runtime.py) 的
-**第二条派发链**，且整体跳过 `profile` / `make_density_core` / `posterior_density` / `make_interp_2d`。
-而现存两个 `type:` 宏展开后**必然**含其中之一。
+**产品结论（2026-08-07）**　这是**正确行为**，不是要修掉的洞：
 
-推论：**产品原则 4 把 `type:` 定为人类默认路径，而裁判恰好在这条路径上永远给不出结论。**
+- 检查阶段**不得**重跑 profile / density / interp（已否决 `--deep` / doctor full mesh）。  
+- `ok: null` + `partial_renderable` + `renderable: true` 的语义是：  
+  **「结构/列过了；图内容要等 `jplot <yaml>`」**——agent **不准**据此改一份好 YAML。  
+- 轻量兜底（已做）：重步骤跳过时用**输入** x/y 对 `frame.lim` 做 `JP-VIZ-002`，  
+  `context.basis: pre-transform`（不声称 post-mesh）。  
+- 图质量：只看 **执行** 产物（PNG / `.agent.json`），可选渲染期观测日志。
 
-**复现**
-```bash
-jplot doctor p.yaml --json | python3 -c "import json,sys;d=json.load(sys.stdin)['data'];print(d['status'],d['coverage'],d['heavy_skipped'])"
-# → partial_renderable partial ['posterior_2d/_density:posterior_density']
-```
+**已否决的「修复」**（勿复活）
 
-**影响对象**　**agent 与人都受影响**。agent 拿到 `ok: null` 只知道"判不了"，无法区分
-"配置好"与"配置坏但我看不见"。
+1. ~~`dryrun --deep` / `doctor --full` 真跑重步骤~~  
+2. ~~让 doctor 在 type: 上覆盖 full post-mesh JP-VIZ~~  
+3. ~~检查阶段接 `apply_transforms_impl` 与 render 并跑 heavy~~  
 
-**修复建议**（按 ROI 排序）
-1. **短期**：给 `_density` / `_profile` 这类重步骤层做一个**廉价代理观测**——
-   在跳过重步骤时，仍用重步骤的**输入** x/y 与 `frame.lim` 计算 `JP-VIZ-002`，
-   并把该诊断标记 `basis: "pre-transform"`。裁掉判断对 profile 前后其实近似成立
-   （profile 只减行不改坐标域），这条能立刻覆盖最常见的坏 lim。
-2. **中期**：`dryrun --deep`（或 `doctor --full`）允许真跑重步骤，代价明示。
-3. **根治**：按 `V2_DEV_LEDGER.md` E1 原意，在 `Figure/` 渲染路径注入观测点，
-   让 `jplot <yaml>` 自己产出 JP-VIZ，删掉 dryrun 的第二条链。
+**可选后续（不与纪律冲突）**
 
-**建议文件**　`jarvisplot/dryrun_runtime.py`、`jarvisplot/render_health.py`、
-`jarvisplot/Figure/layer_runtime.py`。
+- 执行期 report / envelope 暴露渲染路径上的 JP-VIZ（**一次执行内**，不是 doctor 再跑一遍）。  
+- man anti_patterns 写死：`partial` ≠ 图一定对 / 一定错。
 
 ---
 
@@ -359,38 +367,48 @@ profile_runtime.py 实际读:    bin coordinates empty_value fill_empty grid_poi
 ### 不准（5 条）
 
 1. **不准把 `doctor` 的 `ok: null` / `status: partial_renderable` 当成失败。**
-   它表示"含重步骤、dryrun 覆盖不全"，`renderable: true` 才是结论。**不要据此改一份正确的 YAML。**
+   它表示「含重步骤、检查阶段**故意**不重跑 mesh」，`renderable: true` 才是结论。
+   **不要据此改一份正确的 YAML。** 图内容看 `jplot <yaml>` 产物。
 2. **不准指望 `doctor` 写 `.agent.json`。** 它只 `status: planned`；只有 `jplot <yaml>` 写。
-3. **不准把 digest 的 `cells` 当原始样本。** 顶层 `lossy: true` 是硬约束；
-   **且当前不要相信 `top_density` 的头名**（P0.1 未修前，先按 `cells[].count` 加权自行排序）。
+3. **不准把 digest 的 `cells` 当原始样本。** 顶层 `lossy: true` 是硬约束。
 4. **不准用 `jplot context` 作为拿数据形状的主路径**（产品文档明文反对）。
 5. **不准假设存在 `jplot run`。** 渲染是裸路径 `jplot <file>`（DR-08）。
+6. **不准在检查阶段重跑 heavy**（无 `doctor --deep` / 等价物）。执行一次即可。
 
 ---
 
-## 8. 路线图建议
+## 8. 路线图（修订：与纪律对齐）
 
-### 两周（按 ROI 排序）
+### 已落地（勿再当 backlog）
 
-| 序 | 事项 | 工作量 | 解锁 |
+| 项 | 状态 |
+|---|---|
+| P0.1 digest degenerate / top_density | done |
+| P0.2 pre-transform lim 代理 | done |
+| P1.1 suggest median/mean + 分位 decades | done |
+| P1.2 transform 契约 + pregrid + CI | done |
+| P1.3 `data_access` 读路径收敛 | done |
+| P2.1 裸 `jplot cap` 索引卡 | done |
+| 删除 `--deep` 及检查期 heavy 重跑 | done |
+
+### 仍可做（不与纪律冲突）
+
+| 序 | 事项 | 工作量 | 说明 |
 |:--:|---|:--:|---|
-| 1 | **P0.1** digest 面积下限 + `degenerate`/`undersampled` flag + `top_density` 过滤 | S | agent 不再上报错误众数——**发布前置** |
-| 2 | **P0.2 短期方案** 重步骤跳过时仍用输入坐标算 `JP-VIZ-002`，标 `basis: pre-transform` | S | 默认路径终于有裁切判据 |
-| 3 | **P1.1** `suggest` 判据换成 `median/mean` 形状判据 | S | NL→YAML 第一跳不再造坏轴 |
-| 4 | **P1.2** transform 一致性测试 + 补 `pregrid`/`pregrid_bin` | S | 堵住已发生的漂移 |
-| 5 | **P2.1** 裸 `jplot cap` 给人类卡片 | XS | 人机界面无泄漏 |
+| 1 | P2.3 man JSON 无 `body: null` 时省略键 | XS | 消费方更简单 |
+| 2 | P2.5 `_digest_axes` schema 说明 | XS | expand 自动写、勿手改 |
+| 3 | P2.4 manual_cards 真实性 CI | S | 命令/topic 可解析 |
+| 4 | man anti_patterns：partial ≠ 图对/错 | XS | 锁 agent 纪律 |
+| 5 | 执行期 JP-VIZ → report/envelope（可选） | M | **仅** `jplot <yaml>` 内，不是 doctor 再跑 |
+| 6 | `context` 降级 unstable | S | 减聚合面 |
+| 7 | 更多 `type:` 宏 | M | 产品默认路径 |
 
-前五项都是 S/XS，**两周内可全部落地，且 1–3 直接决定能否对外发布**。
+### 明确不做（已从路线图删除）
 
-### 一个季度
-
-| 序 | 事项 | 工作量 | 解锁 |
-|:--:|---|:--:|---|
-| 6 | **P1.3** 抽 `data_access.py`，三条读数据路径收敛为一条 | L | 同时解 P2.2，并为第 7 项提供地基 |
-| 7 | **P0.2 根治** 在 `Figure/` 注入观测点，`jplot <yaml>` 自产 JP-VIZ，删 dryrun 第二条链 | L | 兑现 `AGENT_DATA_API` 的 skin 承诺；JP-VIZ 覆盖全路径 |
-| 8 | 补 `type: scatter_2d` / `hist_1d` | M | 让"type 是默认"真正成立 |
-| 9 | `manual_cards` 真实性 CI（命令可解析、topic id 存在） | S | 散文不再是幻觉源 |
-| 10 | `context` 降级为 unstable 或折进 `man workflow` | S | 减一个聚合面与一份漂移风险 |
+- ~~dryrun/doctor `--deep` / `--full`~~  
+- ~~检查阶段 full post-mesh JP-VIZ~~  
+- ~~为 type: 在 dryrun 接真 heavy 派发以「补全裁判」~~  
+- ~~「两条 transform 链合并」若意味着检查也跑 heavy~~（维护性合并若只影响 render 内部，另议）
 
 ---
 
@@ -412,35 +430,26 @@ profile_runtime.py 实际读:    bin coordinates empty_value fill_empty grid_poi
 
 **3. `ok: null` + `partial_renderable` 是否足以防止误改正确 YAML？**
 
-**防"误判失败"够了，防"误判成功"不够。** 它准确表达了"我判不了"，agent 不会因此去改一份好 YAML；
-但它同样**永远无法确认图是对的**——而这正好发生在产品的默认路径上（P0.2）。
-两个方向缺一个。
+**防「误判失败」够了——这正是产品要的。** 它表示检查阶段**故意**不重跑 mesh，不是配置坏了。
+「图对不对」不在 doctor 的职责里；在 `jplot <yaml>` + digest。  
+~~用 --deep 补全 doctor~~ **已否决。**
 
 **4. 是否应删除或隐藏 `context`？**
 
-**隐藏，不删除。** 从 `jplot -h` 移除、标 unstable。理由不是它没用，而是
-**产品文档自己在 `anti_patterns` 里劝退它**，同时它是第二个聚合面、承担与 `man` 相同的漂移风险
-却无 `man` 的契约纪律。留代码是因为 `next_cli` / `gaps` 这两个字段的想法有价值，
-可择机并入 `man workflow`。
+**隐藏，不删除。** 从 `jplot -h` 移除、标 unstable。产品 `anti_patterns` 已劝退；可择机并入 `man workflow`。
 
 **5. `transform_contracts` / schema / runtime 三源会漂移吗？**
 
-**已经漂移了**（P1.2，`pregrid` 缺失 + `bins`/`seed` 幽灵）。
-锁的办法现成——**照抄 methods 轴的做法**：`tests/test_method_contracts.py` 已经证明
-"手写契约 + CI 一致性检查"这条路可行，把同一模式套到 transforms 即可，一天工作量。
+初评时已漂移；**P1.2 已加一致性测试与 pregrid 契约**。继续靠 CI 守。
 
-**6. 与"强制真画图拿信息"相比，当前设计是否更优？**
+**6. 与「强制真画图拿信息」相比？**
 
-**更优。** 三点：确定性（同一 YAML 同一 digest，有 `seed` 与 `source_hash`）、
-无显示依赖、成本可控（`max_cells` 是预算而非网格保证）。
-**代价是**：健康判断的质量完全取决于 dryrun 的覆盖面，而今天这正是最大的洞。
-换句话说，这条路选对了，但**它把风险从"跑不动"转移到了"判不准"**，而后者更隐蔽。
+**更优：执行一次拿 digest。** 检查不重跑；不把风险押在 dryrun 假装看过 mesh。
 
-**7. 距离可发布给外部 agent 用户还差什么 P0？**
+**7. 发布前置还剩什么？**
 
-**只差两条**：P0.1（digest `top_density` 污染）与 P0.2 的短期方案（重步骤下的裁切判据）。
-两者都是 S 级工作量。P1 系列可以带着发布，但要在 `man` 的 `anti_patterns` 里显式声明
-"`coverage: partial` 时不要相信没有 JP-VIZ 就等于图是对的"。
+与纪律冲突的 P0 已按兼容方式处理（digest + pre-transform lim；不 deep）。  
+剩余多为 P2 体验项（man JSON 形状、card 真实性、文案纪律）。
 
 ---
 

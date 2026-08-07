@@ -1,32 +1,44 @@
 id: dryrun-viz
 title: dryrun and JP-VIZ
-summary: Load data + transforms; row ledger and empty-plot health without rendering.
+summary: >
+  Light check only — load data + light transforms, row ledger, limited JP-VIZ.
+  Never re-runs profile/density/interp; execute with jplot <yaml>.
 role: how-to
 priority: 55
 see_also: [validate, diagnostics, workflow]
 related_cli:
   - argv: [jplot, dryrun, "<yaml>", "--json"]
-    why: row ledger + JP-VIZ codes
+    why: row ledger + light JP-VIZ codes
   - argv: [jplot, explain, "JP-VIZ-003", "--json"]
     why: explain one visualization health code
 live_sources:
   - verb: dryrun
-    truth: same loader/transform path as render (no matplotlib figure)
+    truth: light transforms only; heavy steps skipped (partial coverage on type:)
 human:
   panels:
     - kind: overview
       title: Why
       body: |
-        Catch empty layers, dropped rows, and bad transforms before opening a PDF.
-        Agents cannot see plots — dryrun is the visual stand-in.
+        Catch empty tables, dropped rows, and bad light transforms before render.
+        Does NOT re-run profile/density/interp — that is only jplot <yaml>.
+        Agents cannot see plots; dryrun is a structure/ledger stand-in, not a second render.
     - kind: notes
       title: Tips
       items:
-        - Prefer doctor for the combined gate.
-        - type: figures expand before dryrun planning on the render path; use config expand if you need to inspect layers in-file.
+        - Prefer doctor for the combined validate+dryrun gate.
+        - type: figures often report coverage partial / heavy_skipped — expected, not a failed YAML.
+        - Bad frame lims may still surface as JP-VIZ-002 with basis pre-transform (no mesh re-run).
         - explain JP-VIZ-* for per-code guidance.
+        - Full figure judgment: jplot <yaml> (+ agent_output digest).
 agent:
+  anti_patterns:
+    - Treating coverage partial / partial_renderable as a failed config
+    - Expecting dryrun to re-run density or profile (there is no --deep)
+    - Using dryrun as a substitute for jplot <yaml> render
   diagnostics:
+    - code: JP-VIZ-010
+      when: "heavy transforms skipped (type density/profile path)"
+      fix_hint: "not a failure — proceed to jplot <file> if structure is ok"
     - code: JP-VIZ-000
       when: type figure not expanded in some pure-shape paths
       fix_hint: expand or use doctor/render path

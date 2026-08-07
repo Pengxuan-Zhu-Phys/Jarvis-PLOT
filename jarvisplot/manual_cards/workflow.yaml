@@ -35,13 +35,14 @@ human:
         - "1. jplot data describe <file> --json"
         - "2. jplot cap / man (methods, transforms, types) --json"
         - "3. edit plot.yaml (type: first; optional agent_output for digest JSON)"
-        - "4. jplot doctor plot.yaml --json  # plans exports, does not write digest"
-        - "5. jplot plot.yaml  # real pipeline: PNG/PDF + agent_output JSON"
+        - "4. jplot doctor plot.yaml --json  # structure gate; no heavy re-run; plans exports only"
+        - "5. jplot plot.yaml  # ONLY execution: heavy transforms + PNG/PDF + agent_output JSON"
     - kind: notes
       title: Agent digest (YAML, not CLI)
       items:
         - "Put agent_output on the figure (method: voronoi, max_cells, path: auto)."
-        - "Digest is lossy reference with provenance — not a substitute for doctor/render."
+        - "Digest is lossy reference with provenance — figure content after execute, not a doctor re-run."
+        - "doctor partial_renderable on type: is by design; do not rewrite YAML for that alone."
         - "See docs/dev/AGENT_OUTPUT_YAML_DESIGN.md"
     - kind: yaml
       title: Minimal type-first sketch
@@ -72,11 +73,14 @@ agent:
     ## Full agent playbook
     1. **Discover** — `data describe` + `cap` subsets.
     2. **Author** — edit `*.yaml` in the workspace (type macros preferred).
-    3. **Judge** — `validate --json` then `dryrun --json`, or `doctor --json`.
-    4. **Render** — `jplot <file>` only when a figure is required.
-    5. **Learn** — `explain JP-*` or `man diagnostics`.
+    3. **Judge (light only)** — `validate` / `doctor --json`. No heavy re-run; partial on type: is OK.
+    4. **Execute once** — `jplot <file>` for PNG/PDF + agent_output digest.
+    5. **Learn** — `explain JP-*` or `man diagnostics`; figure content from digest, not doctor mesh.
   anti_patterns:
     - Inventing column names without data describe
+    - Treating doctor partial_renderable / coverage partial as failure
+    - Expecting doctor/dryrun to re-run profile or density (no --deep)
+    - Skipping jplot <file> and asking dryrun to "prove" the figure
     - Inventing cmap/method strings without cap
     - Using jplot run (does not exist; DR-08 bare path)
     - Expecting man or config to write the full plot YAML for you
