@@ -174,11 +174,6 @@ def test_verb_help_uses_rich_panels(monkeypatch, capsys):
     assert "╭─" in man
     assert "topic" in man.lower()
 
-    assert main(["context", "-h"]) == 0
-    ctx = capsys.readouterr().out
-    assert "╭─" in ctx
-    assert "context" in ctx.lower()
-
 
 def test_usage_errors_also_use_rich_cards(monkeypatch, capsys):
     """Missing required args must not fall back to plain argparse usage."""

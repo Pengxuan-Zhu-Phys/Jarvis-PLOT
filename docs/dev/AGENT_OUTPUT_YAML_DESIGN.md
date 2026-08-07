@@ -44,7 +44,7 @@ jplot data / cap / man / explain / template / suggest   # 知识与起草
 ## 2. 非目标
 
 - 不新增 `jplot data digest` / `jplot agent-digest` 等带满参数的 CLI。  
-- 不把 `jplot context` 作为主入口（可保留 advanced / 后续删除；文档与 workflow **不再推荐**）。  
+- **`jplot context` 已删除**。数据形状用 `data describe`；词汇用 `cap`/`man`；点云摘要用 YAML `agent_output` + `jplot <file>`。  
 - 默认 **不**输出完整 Voronoi polygon 顶点（JSON 会再次膨胀）。  
 - Digest **不能**替代 `validate` / `doctor` / 最终 render 的科学正确性判断。  
 - 不在 doctor 中跑重型 density/profile 只为写 digest（与现有 heavy-skip / partial 语义一致）。
@@ -289,7 +289,7 @@ plots/profile.agent.json
 | `man` / `cap` / `data` / `explain` / `template` | 知识库；文档说明 `agent_output` |
 | `doctor` | + `exports[]` planned |
 | `jplot <file>` | 执行写 digest |
-| **`context`** | **非主路径**；help/workflow 去掉推荐；后续版本可删 |
+| **`context` CLI** | **已删除**（2026-08） |
 | 不新增 | `data digest` |
 
 `jplot man agent-output`（短卡）：如何写 `agent_output`、JSON 字段、与 doctor/render 分工。
@@ -317,7 +317,7 @@ plots/profile.agent.json
 | **A2** | Render 写 v1 digest（voronoi/bridson 摘要，无 polygon） | M |
 | **A3** | quantiles / top_cells / tails / ESS / categorical / 稳定 seed 测试 | M |
 | **A4** | 可选 `geometry: polygon`；`strict`；根级 defaults 精修 | S |
-| **A5** | 废弃 `context` 或移入 `man` 示例 only | S |
+| **A5** | ~~废弃 context~~ **done：命令已删除** | — |
 
 建议 **A1+A2** 为一版可交付；A3 锁科学摘要质量。
 
@@ -343,7 +343,7 @@ plots/profile.agent.json
 | Q2 | density 面积 | 优先 mesh cell area；否则 bbox 面积并 `flags: approx_area` |
 | Q3 | type 宏 vs layers 取点 | 展开后主数据层 / density 输入点（与 type 同源） |
 | Q4 | digest 失败是否 fail render | 默认否；`strict: true` 才是 |
-| Q5 | `context` 去留 | A5 删除或 hidden；A0 起文档不推荐 |
+| Q5 | `context` 去留 | **删除**（done） |
 
 ---
 
