@@ -326,11 +326,9 @@ profile_runtime.py 实际读:    bin coordinates empty_value fill_empty grid_poi
 
 ### 该删 / 该藏
 
-- **`jplot context`（478 行）**。它返回 16 个顶层键，全部是 `data describe` + `cap` + `template`
-  + `suggest` 的聚合。`jplot -h` 已经标了 "(advanced)"，`manual_cards/agent-output.yaml` 的
-  `anti_patterns` 里甚至写着 *"Do not use jplot context as the primary path for data shape."*
-  ——**产品自己在劝退它**。它是第二个聚合面，承担与 `man` 相同的漂移风险却没有 `man` 的契约纪律。
-  **建议：从 `jplot -h` 移除，保留命令但标 unstable，或直接折进 `man workflow`。**
+- **~~`jplot context`~~（已删除，2026-08）**。曾是 `data describe` + `cap` + `template` +
+  `suggest` 的聚合面；产品劝退后 **整命令移除**。替代：`data describe` / `cap` / `man` /
+  YAML `agent_output`。裸 `jplot context` 走 `RESERVED_NON_VERBS` 退出并提示替代路径。
 - **`decades` 字段**（`data describe` 输出）。既然判据要换（P1.1），这个用 min/max 算的量
   留在输出里只会诱导下游复用同一个错误启发式。**建议改为 `decades_q`（分位跨度）+ `shape_hint`。**
 
@@ -371,7 +369,7 @@ profile_runtime.py 实际读:    bin coordinates empty_value fill_empty grid_poi
    **不要据此改一份正确的 YAML。** 图内容看 `jplot <yaml>` 产物。
 2. **不准指望 `doctor` 写 `.agent.json`。** 它只 `status: planned`；只有 `jplot <yaml>` 写。
 3. **不准把 digest 的 `cells` 当原始样本。** 顶层 `lossy: true` 是硬约束。
-4. **不准用 `jplot context` 作为拿数据形状的主路径**（产品文档明文反对）。
+4. **不准假设存在 `jplot context`。** 已删除；用 describe / cap / man / agent_output。
 5. **不准假设存在 `jplot run`。** 渲染是裸路径 `jplot <file>`（DR-08）。
 6. **不准在检查阶段重跑 heavy**（无 `doctor --deep` / 等价物）。执行一次即可。
 
@@ -400,15 +398,14 @@ profile_runtime.py 实际读:    bin coordinates empty_value fill_empty grid_poi
 | 3 | P2.4 manual_cards 真实性 CI | S | 命令/topic 可解析 |
 | 4 | man anti_patterns：partial ≠ 图对/错 | XS | 锁 agent 纪律 |
 | 5 | 执行期 JP-VIZ → report/envelope（可选） | M | **仅** `jplot <yaml>` 内，不是 doctor 再跑 |
-| 6 | `context` 降级 unstable | S | 减聚合面 |
-| 7 | 更多 `type:` 宏 | M | 产品默认路径 |
+| 6 | 更多 `type:` 宏 | M | 产品默认路径 |
 
-### 明确不做（已从路线图删除）
+### 明确不做 / 已删除
 
 - ~~dryrun/doctor `--deep` / `--full`~~  
 - ~~检查阶段 full post-mesh JP-VIZ~~  
-- ~~为 type: 在 dryrun 接真 heavy 派发以「补全裁判」~~  
-- ~~「两条 transform 链合并」若意味着检查也跑 heavy~~（维护性合并若只影响 render 内部，另议）
+- ~~`jplot context` 聚合包~~ **已删除**  
+- ~~为 type: 在 dryrun 接真 heavy 派发以「补全裁判」~~
 
 ---
 
@@ -436,7 +433,7 @@ profile_runtime.py 实际读:    bin coordinates empty_value fill_empty grid_poi
 
 **4. 是否应删除或隐藏 `context`？**
 
-**隐藏，不删除。** 从 `jplot -h` 移除、标 unstable。产品 `anti_patterns` 已劝退；可择机并入 `man workflow`。
+**已删除。** 不再保留 unstable 别名；替代路径见 `RESERVED_NON_VERBS["context"]`。
 
 **5. `transform_contracts` / schema / runtime 三源会漂移吗？**
 

@@ -2,26 +2,42 @@
     "help_groups": [
         {
             "title": "Discover",
-            "commands": ["data", "cap", "man", "explain", "context"]
+            "commands": [
+                "data",
+                "cap",
+                "man",
+                "explain"
+            ]
         },
         {
             "title": "Draft & edit",
-            "commands": ["template", "suggest", "config"]
+            "commands": [
+                "template",
+                "suggest",
+                "config"
+            ]
         },
         {
             "title": "Judge",
-            "commands": ["validate", "dryrun", "doctor"]
+            "commands": [
+                "validate",
+                "dryrun",
+                "doctor"
+            ]
         },
         {
             "title": "Render",
-            "commands": ["file"]
+            "commands": [
+                "file"
+            ]
         },
         {
             "title": "Flowchart",
-            "commands": ["flowchart"]
+            "commands": [
+                "flowchart"
+            ]
         }
     ],
-
     "commands": [
         {
             "name": "data",
@@ -48,13 +64,6 @@
             "name": "explain",
             "help": "explain a JP-* code or expand type: figures to layers",
             "usage": "jplot explain <JP-CODE|yaml> [--json]",
-            "kind": "agent",
-            "group": "Discover"
-        },
-        {
-            "name": "context",
-            "help": "(advanced) discover pack; prefer man/cap + YAML agent_output for digests",
-            "usage": "jplot context --data <file> [--kind profile_2d] [--json]",
             "kind": "agent",
             "group": "Discover"
         },
@@ -108,7 +117,6 @@
             "group": "Flowchart"
         }
     ],
-
     "positionals": [
         {
             "name": "file",
@@ -148,7 +156,6 @@
             "help": "with --parse-data: output YAML path; with flowchart: image path. Does NOT redirect normal figure PNG/PDF (those use YAML output.dir)",
             "action": "store",
             "metavar": "PATH"
-
         },
         {
             "long": "--inplace",

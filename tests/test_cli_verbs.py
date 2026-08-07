@@ -93,6 +93,17 @@ def test_run_is_rejected_not_aliased(capsys):
     assert "run a scan" in err or "no `jplot run`" in err or "no jplot run" in err.lower()
 
 
+def test_context_verb_removed(capsys):
+    """Aggregated context pack was product-discouraged; command must not exist."""
+    assert is_verb("context") is False
+    handled, code = route(["context", "--data", "x.csv", "--json"])
+    assert handled is True
+    assert code == 2
+    err = capsys.readouterr().err
+    assert "context" in err.lower()
+    assert "data describe" in err or "agent_output" in err
+
+
 def test_main_rejects_run_verb(capsys):
     assert main(["run", "whatever.yaml"]) == 2
     err = capsys.readouterr().err

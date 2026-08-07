@@ -37,7 +37,6 @@ VERBS: dict[str, str] = {
     "doctor": "jarvisplot.verbs.doctor:run",
     "template": "jarvisplot.verbs.template:run",
     "suggest": "jarvisplot.verbs.suggest:run",
-    "context": "jarvisplot.verbs.context:run",
     "explain": "jarvisplot.verbs.explain:run",
     "config": "jarvisplot.verbs.config_cmd:run",
     "man": "jarvisplot.verbs.man:run",
@@ -51,6 +50,12 @@ RESERVED_NON_VERBS: dict[str, str] = {
         "(same as `Jarvis2 plot <file>`). "
         "There is no `jplot run` — under Jarvis2, `plot run` would blur "
         "'run a scan' with 'render a figure'."
+    ),
+    "context": (
+        "`jplot context` was removed. "
+        "Use `jplot data describe`, `jplot cap`, `jplot man`, and "
+        "YAML `agent_output` (written by `jplot <file>`) instead of an "
+        "aggregated context pack."
     ),
 }
 

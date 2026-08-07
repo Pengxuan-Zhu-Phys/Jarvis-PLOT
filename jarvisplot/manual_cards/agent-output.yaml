@@ -45,7 +45,7 @@ human:
         - "max_cells is an upper bound (xbin*ybin is only an alias for that budget)."
         - "lossy: true always — digests are not raw data."
         - "doctor status planned; only jplot <yaml> writes the file."
-        - "Do not use jplot context as the primary path for data shape."
+        - "There is no jplot context — use data describe + cap + man; digests via agent_output."
 agent:
   body_markdown: |
     Full design: docs/dev/AGENT_OUTPUT_YAML_DESIGN.md
@@ -53,3 +53,4 @@ agent:
     - Expecting doctor to write agent JSON
     - Treating digest cells as exact samples
     - Adding a separate data digest CLI for bins/weight
+    - Looking for jplot context (removed — use data describe, cap, man, agent_output)
