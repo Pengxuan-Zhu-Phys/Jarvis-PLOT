@@ -133,6 +133,22 @@ plots/profile.agent.json
 
 `include` 默认：`[quantiles, top_cells, tails, nan_stats, provenance]`。
 
+### 3.5 临时键 `_digest_axes`
+
+- **谁写**：`type:` 展开 / `config expand` 为了 digest 能找回展开前的 x/y/data。  
+- **谁删**：`jplot <yaml>` 成功画图后自动从内存与源 YAML 中移除（若仍写在文件里，agent 应删掉再提交）。  
+- **勿手改**；不是用户配置面。
+
+### 3.6 渲染体检报告 `--report`（临时文件）
+
+```bash
+jplot plot.yaml --report
+# → plot.yaml.render-report.json（或同 stem）
+```
+
+- 含执行期 JP-VIZ 与 layer 观测；**仅同一次 render 内采集**，检查阶段不重跑 mesh。  
+- 文件标 `ephemeral: true`：**最终出图接受后应删除**，不要当交付物入库。
+
 ---
 
 ## 4. Agent JSON 载荷（有损 digest）

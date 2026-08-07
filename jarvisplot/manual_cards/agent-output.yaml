@@ -46,6 +46,8 @@ human:
         - "lossy: true always — digests are not raw data."
         - "doctor status planned; only jplot <yaml> writes the file."
         - "There is no jplot context — use data describe + cap + man; digests via agent_output."
+        - "_digest_axes is temporary (expand stash); removed after plot — delete if still in YAML."
+        - "jplot <yaml> --report writes an ephemeral JP-VIZ report; delete after final plots."
 agent:
   body_markdown: |
     Full design: docs/dev/AGENT_OUTPUT_YAML_DESIGN.md
@@ -54,3 +56,4 @@ agent:
     - Treating digest cells as exact samples
     - Adding a separate data digest CLI for bins/weight
     - Looking for jplot context (removed — use data describe, cap, man, agent_output)
+    - Leaving _digest_axes or *.render-report.json in committed deliverables

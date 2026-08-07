@@ -203,7 +203,12 @@ def render_flowchart_help(*, prog: str = "jplot") -> str:
     ]
     return _render_help_page(
         title="flowchart",
-        usage=f"{prog} flowchart <flowchart_file>",
+        usage=(
+            f"{prog} flowchart <flowchart_file>\n"
+            f"\n"
+            f"Jarvis-HEP project-scan flowchart only "
+            f"(scene JSON from HEP scan tooling — not plot YAML)."
+        ),
         sections=sections,
     )
 

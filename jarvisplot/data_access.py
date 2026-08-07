@@ -742,7 +742,15 @@ def _column_records(df, *, stats: bool) -> list[dict[str, Any]]:
                 positive = bool(np.all(values > 0))
                 rec["positive"] = positive
                 if positive and rec["min"] > 0 and rec["max"] > 0:
+                    # min/max span only — outlier-sensitive. NOT a scale decision.
+                    # Log/linear for axes: jplot data suggest-axes (quantile + median/mean).
                     rec["decades"] = float(np.log10(rec["max"] / rec["min"]))
+                    rec["decades_basis"] = "min_max"
+                    rec["decades_note"] = (
+                        "decades uses min/max (outlier-sensitive). "
+                        "Do not use alone for log vs linear; "
+                        "run `jplot data suggest-axes` (q0.5%–q99.5% decades + median/mean)."
+                    )
             rec["role_hint"] = _role_hint(str(col), rec)
         else:
             try:

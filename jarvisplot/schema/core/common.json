@@ -97,7 +97,7 @@
           "x-jarvis-zone": "delegated",
           "x-jarvis-internal": true,
           "additionalProperties": true,
-          "description": "Stashed by type expand for digest axes; not user-facing."
+          "description": "Temporary stash written by type expand / config expand so agent_output digests keep pre-expand x/y/data. Not user-facing: jplot <yaml> removes it after a successful plot; if it remains in YAML, delete the key before the next edit."
         }
       },
       "additionalProperties": false

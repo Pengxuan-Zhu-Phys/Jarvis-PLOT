@@ -152,6 +152,7 @@ class JarvisPLOT():
 
     def plot(self):
         failures: list[str] = []
+        report_figures: list[dict] = []
         for fig in self.yaml.config["Figures"]:
             from .Figure.figure import Figure
             figobj = Figure()
@@ -173,13 +174,27 @@ class JarvisPLOT():
                 setup = figobj.from_dict(fig)
                 if setup:
                     self.logger.warning(f"Successfully loading figure -> {figobj.name} setting")
-                    # Collect post-transform observations during layer load (P0.2 root).
+                    # Collect post-transform observations during layer load.
                     figobj.health_observations = []
                     if isinstance(fig, dict) and isinstance(fig.get("frame"), dict):
                         figobj._yaml_frame = fig.get("frame")
                     figobj.plot()
                     self._evaluate_render_health(figobj)
                     self._maybe_write_agent_digest(fig, figobj)
+                    # Always drop temporary expand stash after a successful figure.
+                    if isinstance(fig, dict):
+                        from .agent_digest import strip_digest_axes_stash
+
+                        strip_digest_axes_stash(
+                            fig,
+                            yaml_path=getattr(self.yaml, "path", None),
+                            figure_name=str(getattr(figobj, "name", None) or fig_name),
+                            logger=self.logger,
+                        )
+                    if getattr(self.args, "report", False):
+                        report_figures.append(
+                            self._figure_report_block(figobj, fig_name)
+                        )
                 else:
                     if getattr(figobj, "_setup_status", None) == "disabled":
                         self.logger.warning(f"Skip figure {fig_name}: disabled in YAML.")
@@ -195,6 +210,8 @@ class JarvisPLOT():
 
                     self.logger.debug(traceback.format_exc())
                 continue
+        if report_figures and getattr(self.args, "report", False):
+            self._write_render_report(report_figures, failures=failures)
         if failures:
             self.logger.error(
                 f"Render failed for {len(failures)} figure(s): {', '.join(failures)}"
@@ -221,6 +238,49 @@ class JarvisPLOT():
                     self.logger.info(msg)
         except Exception as exc:
             self.logger.debug(f"render health evaluation skipped: {exc}")
+
+    def _figure_report_block(self, figobj, fig_name: str) -> dict:
+        from .render_health import report_to_dict
+
+        bag = getattr(figobj, "health_diagnostics", None)
+        observations = getattr(figobj, "health_observations", None) or []
+        block = report_to_dict(observations, diagnostics=bag)
+        block["figure"] = str(fig_name)
+        return block
+
+    def _write_render_report(self, figures: list, *, failures: list[str]) -> None:
+        """Ephemeral JP-VIZ / layer ledger for agents; delete after final plots."""
+        import json
+        from pathlib import Path
+
+        yaml_path = getattr(self.yaml, "path", None)
+        if yaml_path:
+            out = Path(str(yaml_path)).expanduser().with_suffix(".render-report.json")
+        else:
+            out = Path(self.workdir or ".") / "jplot.render-report.json"
+        payload = {
+            "kind": "jplot_render_report",
+            "ephemeral": True,
+            "note": (
+                "Ephemeral render-health report (JP-VIZ + layer observations). "
+                "Delete this file after final plots are accepted — not part of "
+                "the deliverable figure set."
+            ),
+            "yaml_path": str(yaml_path) if yaml_path else None,
+            "failures": list(failures),
+            "figures": figures,
+        }
+        try:
+            out.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2, default=str) + "\n",
+                encoding="utf-8",
+            )
+            self.logger.warning(
+                f"Render report written -> {out} "
+                "(ephemeral: delete after final plots)"
+            )
+        except Exception as exc:
+            self.logger.warning(f"could not write --report file: {exc}")
 
     def _maybe_write_agent_digest(self, figure_cfg, figobj) -> None:
         """Write figure-level agent_output digest after a successful plot."""

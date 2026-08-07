@@ -55,6 +55,137 @@ def _normalize_column_list(spec):
     return [sval] if sval else []
 
 
+#: Steps doctor/dryrun may execute. Everything else is heavy or unknown and is
+#: skipped in the check phase (mesh/profile only on ``jplot <yaml>``).
+LIGHT_TRANSFORM_KEYS = frozenset(
+    {"filter", "sortby", "add_column", "keep_columns", "drop_columns"}
+)
+
+HEAVY_TRANSFORM_KEYS = frozenset(
+    {
+        "profile",
+        "make_density_core",
+        "posterior_density",
+        "make_interp_2d",
+        "type",
+    }
+)
+
+
+class _NullLogger:
+    def debug(self, *a, **k):
+        return None
+
+    def info(self, *a, **k):
+        return None
+
+    def warning(self, *a, **k):
+        return None
+
+    def error(self, *a, **k):
+        return None
+
+
+def apply_light_transforms(df, transform, logger=None):
+    """Run only light pipeline steps; skip heavy mesh/profile steps.
+
+    Shared by dryrun/doctor (check phase) so light logic is not forked from
+    the render runtime helpers. Returns ``(df, step_records, heavy_skipped)``
+    where each step_record is ``{name, detail, rows_in, rows_out}``.
+    """
+    log = logger if logger is not None else _NullLogger()
+    if transform is None:
+        return df, [], []
+    if not isinstance(transform, list):
+        try:
+            log.warning(f"Illegal transform format, list required -> {transform}")
+        except Exception:
+            pass
+        return df, [], []
+
+    steps: list[dict] = []
+    heavy_skipped: list[str] = []
+    work = df
+    for step in transform:
+        if not isinstance(step, Mapping):
+            continue
+        try:
+            rows_in = int(len(work))
+        except Exception:
+            rows_in = 0
+        name = next(iter(step.keys()), "unknown")
+        detail = ""
+        try:
+            if "filter" in step:
+                detail = str(step.get("filter"))
+                work = filter_df(work, step["filter"], log)
+            elif "sortby" in step:
+                detail = str(step.get("sortby"))
+                work = sort_by(work, step["sortby"], log)
+            elif "add_column" in step:
+                detail = str((step.get("add_column") or {}).get("name", ""))
+                work = add_column(work, step["add_column"], log)
+            elif "keep_columns" in step:
+                detail = str(step.get("keep_columns"))
+                work = keep_columns(work, step.get("keep_columns"), log)
+            elif "drop_columns" in step:
+                detail = str(step.get("drop_columns"))
+                work = drop_columns(work, step.get("drop_columns"), log)
+            elif any(k in step for k in HEAVY_TRANSFORM_KEYS) or (
+                "type" in step
+                and str(step.get("type") or "")
+                in {
+                    "make_density_core",
+                    "posterior_density",
+                    "make_interp_2d",
+                }
+            ):
+                heavy_name = str(name)
+                heavy_skipped.append(heavy_name)
+                steps.append(
+                    {
+                        "name": heavy_name,
+                        "detail": "skipped in check phase (heavy step)",
+                        "rows_in": rows_in,
+                        "rows_out": rows_in,
+                    }
+                )
+                continue
+            else:
+                steps.append(
+                    {
+                        "name": str(name),
+                        "detail": "unknown step skipped",
+                        "rows_in": rows_in,
+                        "rows_out": rows_in,
+                    }
+                )
+                continue
+        except Exception as exc:
+            steps.append(
+                {
+                    "name": str(name),
+                    "detail": f"failed: {exc}",
+                    "rows_in": rows_in,
+                    "rows_out": 0,
+                }
+            )
+            continue
+        try:
+            rows_out = int(len(work))
+        except Exception:
+            rows_out = 0
+        steps.append(
+            {
+                "name": str(name),
+                "detail": detail,
+                "rows_in": rows_in,
+                "rows_out": rows_out,
+            }
+        )
+    return work, steps, heavy_skipped
+
+
 def filter_df(df, condition, logger):
     try:
         if isinstance(condition, bool):
