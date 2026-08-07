@@ -21,7 +21,9 @@ from typing import Any
 
 __all__ = [
     "TRANSFORM_NAMES",
+    "RUNTIME_TOP_LEVEL_KEYS",
     "contract_for",
+    "contract_top_level_keys",
     "list_contracts",
 ]
 
@@ -203,7 +205,6 @@ TRANSFORM_CONTRACTS: dict[str, dict[str, Any]] = {
                 "default": "bridson",
             },
             "bin": {"type": "int", "description": "mesh density parameter", "default": 100},
-            "bins": {"type": "int", "description": "alias of bin"},
             "objective": {
                 "type": "enum",
                 "description": "how z is reduced inside a cell",
@@ -220,7 +221,29 @@ TRANSFORM_CONTRACTS: dict[str, dict[str, Any]] = {
                 "default": False,
             },
             "empty_value": {"type": "number", "description": "value for empty cells when fill_empty"},
-            "seed": {"type": "int", "description": "RNG seed for bridson"},
+            "pregrid": {
+                "type": "object|bool",
+                "description": (
+                    "Optional coarse pre-binning before Bridson/grid profile "
+                    "(large tables). Mapping: {bin, enable}; false disables; "
+                    "omit for auto-prebin from row count."
+                ),
+                "properties": {
+                    "bin": {
+                        "type": "int",
+                        "description": "pre-bin count (overrides auto rule)",
+                    },
+                    "enable": {
+                        "type": "bool",
+                        "default": True,
+                        "description": "set false to skip pregrid while keeping other keys",
+                    },
+                },
+            },
+            "pregrid_bin": {
+                "type": "int",
+                "description": "Shorthand for pregrid.bin (same effect as pregrid: {bin: N}).",
+            },
         },
         defaults={
             "method": "bridson",
@@ -249,11 +272,27 @@ TRANSFORM_CONTRACTS: dict[str, dict[str, Any]] = {
                     "        y: {expr: tanb, lim: [1, 60]}\n"
                     "        z: {expr: LogL, name: z}\n"
                 ),
-            }
+            },
+            {
+                "title": "large table with explicit pregrid",
+                "yaml": (
+                    "transform:\n"
+                    "  - profile:\n"
+                    "      method: bridson\n"
+                    "      bin: 100\n"
+                    "      pregrid: {bin: 300, enable: true}\n"
+                    "      coordinates:\n"
+                    "        x: {expr: m_A}\n"
+                    "        y: {expr: tanb}\n"
+                    "        z: {expr: LogL}\n"
+                ),
+            },
         ],
         notes=[
             "Heavy step: dryrun skips it (doctor status=partial is expected).",
             "Prefer type: profile_2d unless you need custom layer stacks.",
+            "pregrid / pregrid_bin are user-writable (profile_runtime); no bins/seed on profile "
+            "(those belong to make_density_core / posterior_density).",
         ],
     ),
     "make_density_core": _c(
@@ -483,6 +522,90 @@ TRANSFORM_CONTRACTS: dict[str, dict[str, Any]] = {
 TRANSFORM_NAMES: tuple[str, ...] = tuple(sorted(TRANSFORM_CONTRACTS))
 
 
+#: Top-level config keys each heavy runtime is allowed to advertise.
+#: Nested axis fields live under ``coordinates.*`` / axis mappings (see ``_COORD_AXIS``).
+#: CI asserts ``contract_top_level_keys(name) == RUNTIME_TOP_LEVEL_KEYS[name]``.
+#: For ``profile`` the set was grepped from ``Figure/profile_runtime.py`` (user-facing
+#: ``prof.get(...)`` / ``"pregrid_bin" in prof``) — no ghost ``bins``/``seed``.
+RUNTIME_TOP_LEVEL_KEYS: dict[str, frozenset[str]] = {
+    "profile": frozenset(
+        {
+            "method",
+            "bin",
+            "coordinates",
+            "objective",
+            "grid_points",
+            "fill_empty",
+            "empty_value",
+            "pregrid",
+            "pregrid_bin",
+        }
+    ),
+    "make_density_core": frozenset(
+        {
+            "x",
+            "y",
+            "weight",
+            "method",
+            "bins",
+            "bin",
+            "normalize",
+            "diagnostics",
+            "seed",
+            "output",
+            "voronoi",
+            "adaptive",
+            "kde",
+            "bw_method",
+            "coordinates",
+            "domain",
+        }
+    ),
+    "posterior_density": frozenset(
+        {
+            "x",
+            "y",
+            "weight",
+            "method",
+            "bins",
+            "bin",
+            "grid",
+            "normalize",
+            "diagnostics",
+            "seed",
+            "output",
+            "nan_policy",
+            "voronoi",
+            "adaptive",
+            "kde",
+            "bw_method",
+            "coordinates",
+        }
+    ),
+    "make_interp_2d": frozenset(
+        {
+            "coordinates",
+            "method",
+            "grid",
+            "bins",
+            "bin",
+            "nx",
+            "ny",
+            "nan_policy",
+            "as_density",
+            "normalize",
+            "diagnostics",
+            "output",
+            "output_z",
+            "backend_options",
+            "triangulation",
+            "griddata",
+            "kind",
+        }
+    ),
+}
+
+
 def contract_for(name: str) -> dict[str, Any] | None:
     key = str(name).strip()
     base = TRANSFORM_CONTRACTS.get(key)
@@ -491,6 +614,19 @@ def contract_for(name: str) -> dict[str, Any] | None:
     out = dict(base)
     out["name"] = key
     return out
+
+
+def contract_top_level_keys(name: str) -> set[str]:
+    """Union of required + optional top-level keys for one contract."""
+    c = contract_for(name)
+    if c is None:
+        return set()
+    keys: set[str] = set()
+    for block in ("required", "optional"):
+        block_map = c.get(block) or {}
+        if isinstance(block_map, dict):
+            keys.update(block_map.keys())
+    return keys
 
 
 def list_contracts() -> list[dict[str, Any]]:

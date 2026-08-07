@@ -35,6 +35,8 @@ human:
       items:
         - Required slots: data, x, y, z.
         - Default mesh path is Bridson + natural neighbor + pcolormesh.
+        - "Hand-written layer profile steps may set pregrid: {bin, enable} or pregrid_bin for large tables (see jplot man transform.profile --json)."
 agent:
   anti_patterns:
     - Passing weight instead of z for profile_2d
+    - "Using bins/seed on profile (density/posterior keys; profile uses bin + pregrid)"
