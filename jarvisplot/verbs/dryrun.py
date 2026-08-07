@@ -28,7 +28,7 @@ def build_parser(prog: str = "jplot dryrun") -> argparse.ArgumentParser:
             "emit a row ledger and JP-VIZ health diagnostics."
         ),
         rich_title="dryrun",
-        rich_usage=f"{prog} <file> [--json] [--with-data]",
+        rich_usage=f"{prog} <file> [--json] [--with-data] [--deep]",
     )
     parser.add_argument("file", help="path to a YAML plotting configuration")
     parser.add_argument(
@@ -46,6 +46,15 @@ def build_parser(prog: str = "jplot dryrun") -> argparse.ArgumentParser:
         default=None,
         help="directory for --with-data twins (default: <yaml-dir>/.cache/agent_twins)",
     )
+    parser.add_argument(
+        "--deep",
+        action="store_true",
+        help=(
+            "run heavy transforms (profile/density/interp) via the same "
+            "preprocessor path as render; full JP-VIZ on type: figures "
+            "(default for `jplot doctor`)"
+        ),
+    )
     return parser
 
 
@@ -61,6 +70,7 @@ def run(argv: Sequence[str], *, prog: str = "jplot dryrun") -> int:
         args.file,
         with_data=bool(args.with_data),
         out_dir=args.out_dir,
+        deep=bool(args.deep),
     )
     # Prefer the tri-state verdict from dryrun_config (None = partial coverage).
     verdict = report.get("ok")
@@ -80,6 +90,7 @@ def run(argv: Sequence[str], *, prog: str = "jplot dryrun") -> int:
         "status_note": report.get("status_note"),
         "type_expanded": report.get("type_expanded") or [],
         "heavy_skipped": report.get("heavy_skipped") or [],
+        "deep": bool(report.get("deep")),
         "datasets": report.get("datasets") or {},
         "layers": report.get("layers") or [],
         "twins": report.get("twins") or {},

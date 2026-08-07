@@ -173,7 +173,12 @@ class JarvisPLOT():
                 setup = figobj.from_dict(fig)
                 if setup:
                     self.logger.warning(f"Successfully loading figure -> {figobj.name} setting")
+                    # Collect post-transform observations during layer load (P0.2 root).
+                    figobj.health_observations = []
+                    if isinstance(fig, dict) and isinstance(fig.get("frame"), dict):
+                        figobj._yaml_frame = fig.get("frame")
                     figobj.plot()
+                    self._evaluate_render_health(figobj)
                     self._maybe_write_agent_digest(fig, figobj)
                 else:
                     if getattr(figobj, "_setup_status", None) == "disabled":
@@ -195,6 +200,28 @@ class JarvisPLOT():
                 f"Render failed for {len(failures)} figure(s): {', '.join(failures)}"
             )
             sys.exit(1)
+    def _evaluate_render_health(self, figobj) -> None:
+        """Run JP-VIZ rules on post-transform observations collected during plot."""
+        try:
+            from .render_health import evaluate_health
+
+            observations = getattr(figobj, "health_observations", None) or []
+            if not observations:
+                return
+            bag = evaluate_health(observations)
+            figobj.health_diagnostics = bag
+            for diag in bag:
+                level = str(getattr(diag, "level", "") or "").lower()
+                msg = f"{diag.code}: {diag.message}"
+                if level == "error":
+                    self.logger.error(msg)
+                elif level == "warning":
+                    self.logger.warning(msg)
+                else:
+                    self.logger.info(msg)
+        except Exception as exc:
+            self.logger.debug(f"render health evaluation skipped: {exc}")
+
     def _maybe_write_agent_digest(self, figure_cfg, figobj) -> None:
         """Write figure-level agent_output digest after a successful plot."""
         try:

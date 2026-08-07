@@ -10,7 +10,7 @@ render hooks when those are wired.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Any, Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence
 
 from .diagnostics import DiagnosticBag
 
@@ -18,6 +18,7 @@ __all__ = [
     "LayerObservation",
     "TransformStepObs",
     "evaluate_health",
+    "observe_layer_dataframe",
     "report_to_dict",
 ]
 
@@ -119,6 +120,183 @@ def evaluate_health(
         _viz_009_legend(obs, path, bag)
     _viz_006_occlusion(observations, bag)
     return bag
+
+
+def observe_layer_dataframe(
+    *,
+    figure: str,
+    layer: Mapping[str, Any] | dict[str, Any],
+    df: Any,
+    frame_cfg: Mapping[str, Any] | dict[str, Any] | None = None,
+    source: str = "",
+    steps: Sequence[TransformStepObs] | None = None,
+    incomplete: bool = False,
+    notes: Sequence[str] | None = None,
+    twin_path: str | None = None,
+) -> LayerObservation:
+    """Build a :class:`LayerObservation` from a post-transform dataframe.
+
+    This is the shared hook for dryrun (deep/shallow) and Figure render paths:
+    observations must describe the table that methods will consume, not a
+    parallel dryrun-only projection.
+    """
+    import numpy as np
+
+    from .utils.expression import eval_dataframe_expression
+
+    layer_name = str(layer.get("name") or "layer")
+    method = str(layer.get("method") or "")
+    frame_cfg = frame_cfg if isinstance(frame_cfg, Mapping) else {}
+    n_points = 0
+    finite_ratio = 1.0
+    nan_ratio = 0.0
+    data_bbox = None
+    c_min = c_max = None
+    grid_nan_ratio = None
+
+    coords = layer.get("coordinates") if isinstance(layer.get("coordinates"), dict) else {}
+    x_vals = _eval_axis_expr(df, coords, "x", eval_dataframe_expression)
+    y_vals = _eval_axis_expr(df, coords, "y", eval_dataframe_expression)
+    if x_vals is None and "left" in coords:
+        x_vals = _eval_axis_expr(df, coords, "left", eval_dataframe_expression)
+    if y_vals is None and "right" in coords:
+        y_vals = _eval_axis_expr(df, coords, "right", eval_dataframe_expression)
+    z_vals = _eval_axis_expr(df, coords, "z", eval_dataframe_expression)
+    c_vals = _eval_axis_expr(df, coords, "c", eval_dataframe_expression)
+
+    try:
+        n_points = int(len(df)) if df is not None else 0
+    except Exception:
+        n_points = 0
+
+    if x_vals is not None and y_vals is not None:
+        x = np.asarray(x_vals, dtype=float).reshape(-1)
+        y = np.asarray(y_vals, dtype=float).reshape(-1)
+        n = min(x.size, y.size)
+        x, y = x[:n], y[:n]
+        finite = np.isfinite(x) & np.isfinite(y)
+        n_points = int(finite.sum())
+        finite_ratio = float(finite.mean()) if n else 0.0
+        nan_ratio = 1.0 - finite_ratio
+        if n_points:
+            xf, yf = x[finite], y[finite]
+            data_bbox = (
+                float(xf.min()),
+                float(xf.max()),
+                float(yf.min()),
+                float(yf.max()),
+            )
+
+    for name, arr in (("z", z_vals), ("c", c_vals)):
+        if arr is None:
+            continue
+        a = np.asarray(arr, dtype=float).reshape(-1)
+        finite = np.isfinite(a)
+        if name == "z" and a.size:
+            grid_nan_ratio = float(1.0 - finite.mean())
+        if name in {"c", "z"} and finite.any():
+            lo, hi = float(a[finite].min()), float(a[finite].max())
+            if c_min is None:
+                c_min, c_max = lo, hi
+            else:
+                c_min = min(c_min, lo)
+                c_max = max(c_max, hi)
+
+    axes_name = str(layer.get("axes") or "ax")
+    ax_frame = frame_cfg.get(axes_name) if isinstance(frame_cfg.get(axes_name), dict) else {}
+    axes_lim = None
+    if isinstance(ax_frame, dict):
+        xlim = ax_frame.get("xlim")
+        ylim = ax_frame.get("ylim")
+        if isinstance(xlim, (list, tuple)) and isinstance(ylim, (list, tuple)) and len(xlim) == 2 and len(ylim) == 2:
+            try:
+                axes_lim = {
+                    "x": [float(xlim[0]), float(xlim[1])],
+                    "y": [float(ylim[0]), float(ylim[1])],
+                }
+            except Exception:
+                axes_lim = None
+    xscale = str(ax_frame.get("xscale") or "linear") if isinstance(ax_frame, dict) else "linear"
+    yscale = str(ax_frame.get("yscale") or "linear") if isinstance(ax_frame, dict) else "linear"
+
+    cb_name = str(layer.get("colorbar") or "axc")
+    cb_frame = frame_cfg.get(cb_name) if isinstance(frame_cfg.get(cb_name), dict) else {}
+    color_cfg = {}
+    if isinstance(cb_frame, dict):
+        color_cfg = cb_frame.get("color") if isinstance(cb_frame.get("color"), dict) else {}
+    cb_vmin = _as_float_opt(color_cfg.get("vmin"))
+    cb_vmax = _as_float_opt(color_cfg.get("vmax"))
+
+    zorder = 0.0
+    style_label = None
+    style = layer.get("style")
+    if isinstance(style, dict):
+        if "zorder" in style:
+            try:
+                zorder = float(style["zorder"])
+            except Exception:
+                pass
+        if style.get("label") is not None:
+            style_label = str(style["label"])
+
+    legend_labels = None
+    if isinstance(ax_frame, dict) and isinstance(ax_frame.get("legend"), dict):
+        raw = ax_frame["legend"].get("labels")
+        if isinstance(raw, list):
+            legend_labels = [str(x) for x in raw]
+        elif raw is None and "labels" in ax_frame["legend"]:
+            legend_labels = []
+
+    return LayerObservation(
+        figure=figure,
+        layer=layer_name,
+        method=method,
+        source=source,
+        axes=axes_name,
+        n_points=n_points,
+        finite_ratio=finite_ratio,
+        nan_ratio=nan_ratio,
+        data_bbox=data_bbox,
+        axes_lim=axes_lim,
+        xscale=xscale,
+        yscale=yscale,
+        zorder=zorder,
+        c_min=c_min,
+        c_max=c_max,
+        colorbar_vmin=cb_vmin,
+        colorbar_vmax=cb_vmax,
+        grid_nan_ratio=grid_nan_ratio,
+        style_label=style_label,
+        legend_labels=legend_labels,
+        steps=list(steps or ()),
+        twin_path=twin_path,
+        incomplete=incomplete,
+        notes=list(notes or ()),
+    )
+
+
+def _eval_axis_expr(df, coordinates: Mapping[str, Any], name: str, eval_fn) -> Any:
+    if name not in coordinates:
+        return None
+    spec = coordinates[name]
+    expr = spec.get("expr") if isinstance(spec, Mapping) else spec
+    if expr is None and isinstance(spec, Mapping):
+        expr = spec.get("name")
+    if expr is None:
+        return None
+    try:
+        return eval_fn(df, expr)
+    except Exception:
+        return None
+
+
+def _as_float_opt(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except Exception:
+        return None
 
 
 def _viz_001_empty(obs: LayerObservation, path: str, bag: DiagnosticBag) -> None:
