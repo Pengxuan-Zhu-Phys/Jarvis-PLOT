@@ -85,7 +85,11 @@ def resolve_method_token(token: str) -> str | None:
             return method_topic_id(name)
         near = did_you_mean(name, list_method_names())
         hint = f"; did you mean {near[0]!r}?" if near else ""
-        raise ValueError(f"unknown drawing method {name!r}{hint}")
+        raise ValueError(
+            f"unknown drawing method {name!r}{hint}. "
+            "Use the jplot CLI for full usage and information "
+            "(`jplot -h`, `jplot man --json`, `jplot cap --json`)."
+        )
     # bare method name: scatter, pcolormesh, …
     if text in _methods_by_name():
         return method_topic_id(text)
@@ -195,7 +199,11 @@ def load_method_card(name: str) -> dict[str, Any]:
     if entry is None:
         near = did_you_mean(name, list_method_names())
         hint = f"; did you mean {near[0]!r}?" if near else ""
-        raise KeyError(f"unknown drawing method {name!r}{hint}")
+        raise KeyError(
+            f"unknown drawing method {name!r}{hint}. "
+            "Use the jplot CLI for full usage and information "
+            "(`jplot -h`, `jplot man --json`, `jplot cap --json`)."
+        )
 
     coords = entry.get("coordinates") or {}
     required = list(coords.get("required") or ())

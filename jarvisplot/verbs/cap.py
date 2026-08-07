@@ -94,14 +94,15 @@ def run(argv: Sequence[str], *, prog: str = "jplot cap") -> int:
                 pass
             kind = f"cap.{name}"
         else:
+            from . import CLI_USAGE_HINT
+
             env = envelope(
                 "cap",
                 False,
                 data={"section": name, "available": ["all", *SECTIONS]},
                 error=error_payload(
                     "UsageError",
-                    f"unknown cap section {name!r}; "
-                    f"choose all | {' | '.join(SECTIONS)}",
+                    f"unknown cap section {name!r}. {CLI_USAGE_HINT}",
                 ),
             )
             if as_json:

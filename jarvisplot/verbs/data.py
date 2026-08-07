@@ -168,13 +168,14 @@ def run(argv: Sequence[str], *, prog: str = "jplot data") -> int:
     }
     handler = handlers.get(action)
     if handler is None:
+        from . import CLI_USAGE_HINT
+
         env = envelope(
             f"data.{action or 'unknown'}",
             False,
             error=error_payload(
                 "UsageError",
-                f"data action {action!r} is not implemented yet "
-                f"(available: describe, head, eval, suggest-axes)",
+                f"unknown data action {action!r}. {CLI_USAGE_HINT}",
             ),
         )
         return emit(env) if as_json else _usage_err(env)

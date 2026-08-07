@@ -19,10 +19,12 @@ import sys
 from typing import Callable, Sequence
 
 __all__ = [
+    "CLI_USAGE_HINT",
     "RESERVED_NON_VERBS",
     "VERBS",
     "is_verb",
     "route",
+    "unknown_command_message",
     "verb_names",
 ]
 
@@ -42,21 +44,26 @@ VERBS: dict[str, str] = {
     "man": "jarvisplot.verbs.man:run",
 }
 
-#: Tokens that must never become verbs or silent aliases. Map to a short
-#: user-facing reason (printed on stderr, exit 2).
-RESERVED_NON_VERBS: dict[str, str] = {
-    "run": (
-        "Render is the bare path: `jplot <file>` "
-        "(same as `Jarvis2 plot <file>`). "
-        "There is no `jplot run` — under Jarvis2, `plot run` would blur "
-        "'run a scan' with 'render a figure'."
-    ),
-    "context": (
-        "unknown command 'context'. "
-        "Use the jplot CLI for full usage and information "
-        "(`jplot -h`, `jplot man --json`, `jplot cap --json`)."
-    ),
-}
+#: Tokens that must never become verbs or silent aliases (exit 2).
+#: Message is the same as any other unknown command — no cookbook.
+RESERVED_NON_VERBS: frozenset[str] = frozenset({"run", "context"})
+
+#: Point agents at the CLI surface; do not invent feature-specific recipes.
+CLI_USAGE_HINT = (
+    "Use the jplot CLI for full usage and information "
+    "(`jplot -h`, `jplot man --json`, `jplot cap --json`)."
+)
+
+
+def unknown_command_message(
+    name: str,
+    *,
+    prog: str = "jplot",
+    near: str | None = None,
+) -> str:
+    """Short rejection for missing top-level commands (and reserved non-verbs)."""
+    hint = f"; did you mean {near!r}?" if near else ""
+    return f"{prog}: unknown command {name!r}{hint}. {CLI_USAGE_HINT}"
 
 #: Bare tokens that are not agent verbs but are still legal CLI heads owned by
 #: the render/legacy path (must not be "unknown command").
@@ -88,11 +95,8 @@ def route(argv: Sequence[str], *, prog: str = "jplot") -> tuple[bool, int]:
     silently-different meaning is the exact failure mode this track exists to
     remove.
 
-    The reserved token ``run`` is **rejected** (not aliased) so
-    ``Jarvis2 plot run scene.yaml`` cannot silently mean render.
-
-    Bare unknown words (e.g. ``jplot whaat``) are rejected with did-you-mean
-    instead of being treated as a missing YAML path.
+    Reserved tokens (``run``, ``context``) and bare unknown words are rejected
+    with the same short message — point at the CLI, no feature cookbook.
     """
     tokens = list(argv)
     if not tokens:
@@ -100,7 +104,7 @@ def route(argv: Sequence[str], *, prog: str = "jplot") -> tuple[bool, int]:
 
     head = tokens[0]
     if head in RESERVED_NON_VERBS:
-        print(f"{prog}: {RESERVED_NON_VERBS[head]}", file=sys.stderr)
+        print(unknown_command_message(head, prog=prog), file=sys.stderr)
         return True, 2
 
     if is_verb(head):
@@ -115,12 +119,12 @@ def route(argv: Sequence[str], *, prog: str = "jplot") -> tuple[bool, int]:
         from ..diagnostics import did_you_mean
 
         near = did_you_mean(
-            head, verb_names() + list(RESERVED_NON_VERBS) + sorted(LEGACY_COMMANDS)
+            head, verb_names() + sorted(RESERVED_NON_VERBS) + sorted(LEGACY_COMMANDS)
         )
-        hint = f"; did you mean {near[0]!r}?" if near else ""
         print(
-            f"{prog}: unknown command {head!r}{hint}\n"
-            f"  try `{prog} -h` or `{prog} man --json`",
+            unknown_command_message(
+                head, prog=prog, near=near[0] if near else None
+            ),
             file=sys.stderr,
         )
         return True, 2
