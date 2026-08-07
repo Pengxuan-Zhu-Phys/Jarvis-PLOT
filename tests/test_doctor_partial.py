@@ -61,6 +61,50 @@ def test_dryrun_profile_2d_partial_renderable(tmp_path, capsys):
     assert "JP-VIZ-010" in codes
 
 
+def test_doctor_type_path_flags_pretransform_clip(tmp_path, capsys):
+    """Even with heavy skip, tight lims on type: figures should raise JP-VIZ-002."""
+    csv = tmp_path / "s.csv"
+    # data mostly in [0, 10] × [0, 10]
+    rows = ["a,b,c"] + [f"{i},{i},{i}" for i in range(0, 11)]
+    csv.write_text("\n".join(rows) + "\n", encoding="utf-8")
+    path = tmp_path / "clip.yaml"
+    path.write_text(
+        textwrap.dedent(
+            f"""
+            DataSet:
+              - {{name: samples, path: {csv.name}, type: csv}}
+            Figures:
+              - name: p
+                type: profile_2d
+                data: samples
+                x: {{expr: a, lim: [0, 10]}}
+                y: {{expr: b, lim: [0, 10]}}
+                z: {{expr: c}}
+                style: [a4paper_2x1, rectcmap]
+                frame:
+                  ax:
+                    xlim: [100, 200]
+                    ylim: [100, 200]
+            """
+        ).lstrip(),
+        encoding="utf-8",
+    )
+    rc = main(["doctor", str(path), "--json"])
+    env = json.loads(capsys.readouterr().out)
+    codes = [d.get("code") for d in env.get("diagnostics") or []]
+    assert "JP-VIZ-002" in codes, env.get("diagnostics")
+    # Should still be failed (clip is a real error), not silent partial_renderable-only
+    assert env["ok"] is False or any(
+        d.get("code") == "JP-VIZ-002" and d.get("level") == "error"
+        for d in env.get("diagnostics") or []
+    )
+    ctx = next(
+        (d.get("context") or {} for d in env.get("diagnostics") or [] if d.get("code") == "JP-VIZ-002"),
+        {},
+    )
+    assert ctx.get("basis") == "pre-transform"
+
+
 def test_doctor_bad_column_still_failed(tmp_path, capsys):
     csv = tmp_path / "s.csv"
     csv.write_text("a,b,c\n1,2,3\n", encoding="utf-8")

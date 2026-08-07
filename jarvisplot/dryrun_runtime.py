@@ -143,6 +143,22 @@ def dryrun_config(
             if twin_meta:
                 twins[f"{fig_name}/{obs.layer if obs else layer_index}"] = twin_meta
 
+        # When heavy transforms are skipped, layer coords are often mesh columns
+        # (x,y after density) that do not exist on the raw source — so JP-VIZ-002
+        # never fires on the product default type: path. Check frame lims against
+        # pre-transform input axes (type stash or profile/density transform x/y).
+        # Only on heavy-skip figures: full-coverage layers already get JP-VIZ via
+        # evaluate_health on post-transform observations.
+        fig_heavy = any(h.startswith(f"{fig_name}/") for h in heavy_skipped)
+        if fig_heavy:
+            _pretransform_lim_check(
+                figure=figure,
+                figure_index=figure_index,
+                fig_name=fig_name,
+                frames=frames,
+                bag=bag,
+            )
+
     evaluate_health(observations, bag=bag)
     # Tri-state ok + coverage (partial ≠ failed).
     if not bag.ok:
@@ -268,6 +284,178 @@ _HEAVY_TRANSFORM_KEYS = frozenset(
         "to_parquet",
     }
 )
+
+
+def _pretransform_lim_check(
+    *,
+    figure: dict[str, Any],
+    figure_index: int,
+    fig_name: str,
+    frames: dict[str, Any],
+    bag: DiagnosticBag,
+) -> None:
+    """JP-VIZ-002 on input axes when heavy transforms leave dryrun blind.
+
+    Uses type-expand stash (``agent_output._digest_axes``) or the first heavy
+    step's ``coordinates.x/y`` / top-level x/y against ``frame.ax`` lims.
+    Marked ``basis: pre-transform`` so agents know this is not post-mesh.
+    """
+    frame = figure.get("frame") if isinstance(figure.get("frame"), dict) else {}
+    ax = frame.get("ax") if isinstance(frame.get("ax"), dict) else {}
+    xlim = ax.get("xlim")
+    ylim = ax.get("ylim")
+    if not (isinstance(xlim, (list, tuple)) and len(xlim) == 2):
+        return
+    if not (isinstance(ylim, (list, tuple)) and len(ylim) == 2):
+        return
+
+    source, x_expr, y_expr = _figure_input_xy(figure)
+    if not source or not x_expr or not y_expr:
+        return
+    df = frames.get(source)
+    if df is None:
+        return
+    try:
+        from .utils.expression import eval_dataframe_expression
+
+        xv = eval_dataframe_expression(df, x_expr)
+        yv = eval_dataframe_expression(df, y_expr)
+        import numpy as np
+
+        x = np.asarray(xv, dtype=float).reshape(-1)
+        y = np.asarray(yv, dtype=float).reshape(-1)
+        n = min(x.size, y.size)
+        if n <= 0:
+            return
+        x, y = x[:n], y[:n]
+        finite = np.isfinite(x) & np.isfinite(y)
+        if not finite.any():
+            return
+        xf, yf = x[finite], y[finite]
+        xmin, xmax = float(xf.min()), float(xf.max())
+        ymin, ymax = float(yf.min()), float(yf.max())
+    except Exception:
+        return
+
+    x0, x1 = float(xlim[0]), float(xlim[1])
+    y0, y1 = float(ylim[0]), float(ylim[1])
+    if x1 < x0:
+        x0, x1 = x1, x0
+    if y1 < y0:
+        y0, y1 = y1, y0
+
+    path = f"$.Figures[{figure_index}]"
+    fully_out = xmax < x0 or xmin > x1 or ymax < y0 or ymin > y1
+    if fully_out:
+        bag.error(
+            "JP-VIZ-002",
+            path,
+            f"figure {fig_name!r}: pre-transform data bbox lies entirely outside "
+            f"frame.ax lim (data=[{xmin:.4g},{xmax:.4g}]×[{ymin:.4g},{ymax:.4g}], "
+            f"lim=[{x0:.4g},{x1:.4g}]×[{y0:.4g},{y1:.4g}]; basis=pre-transform)",
+            suggestion=(
+                "Widen frame.ax.xlim/ylim (or type x/y lim). Checked on raw source "
+                "columns because dryrun skipped heavy transforms."
+            ),
+            context={
+                "figure": fig_name,
+                "basis": "pre-transform",
+                "clip_fraction_est": 1.0,
+                "x_expr": x_expr,
+                "y_expr": y_expr,
+            },
+        )
+        return
+
+    ox0, ox1 = max(xmin, x0), min(xmax, x1)
+    oy0, oy1 = max(ymin, y0), min(ymax, y1)
+    data_area = max(xmax - xmin, 0.0) * max(ymax - ymin, 0.0)
+    overlap = max(ox1 - ox0, 0.0) * max(oy1 - oy0, 0.0)
+    if data_area <= 0:
+        return
+    outside = 1.0 - (overlap / data_area)
+    if outside >= 0.9:
+        bag.error(
+            "JP-VIZ-002",
+            path,
+            f"figure {fig_name!r}: ~{outside:.0%} of pre-transform data extent "
+            f"is outside frame.ax lim (basis=pre-transform)",
+            suggestion="Expand xlim/ylim so most of the source data is visible.",
+            context={
+                "figure": fig_name,
+                "basis": "pre-transform",
+                "clip_fraction_est": outside,
+            },
+        )
+    elif outside >= 0.5:
+        bag.warning(
+            "JP-VIZ-002",
+            path,
+            f"figure {fig_name!r}: ~{outside:.0%} of pre-transform data extent "
+            f"is outside frame.ax lim (basis=pre-transform)",
+            suggestion="Consider expanding xlim/ylim; more than half the source extent is clipped.",
+            context={
+                "figure": fig_name,
+                "basis": "pre-transform",
+                "clip_fraction_est": outside,
+            },
+        )
+
+
+def _figure_input_xy(figure: Mapping[str, Any]) -> tuple[str | None, str | None, str | None]:
+    """Return (source_name, x_expr, y_expr) for pre-transform checks."""
+
+    def _expr(field: Any) -> str | None:
+        if field is None:
+            return None
+        if isinstance(field, Mapping):
+            e = field.get("expr", field.get("name"))
+            return str(e) if e is not None else None
+        return str(field)
+
+    ao = figure.get("agent_output") if isinstance(figure.get("agent_output"), Mapping) else {}
+    stash = ao.get("_digest_axes") if isinstance(ao, Mapping) else None
+    if isinstance(stash, Mapping):
+        src = stash.get("data")
+        if isinstance(src, list):
+            src = src[0] if src else None
+        if isinstance(src, str) and src.strip():
+            xe, ye = _expr(stash.get("x")), _expr(stash.get("y"))
+            if xe and ye:
+                return src.strip(), xe, ye
+
+    # Expanded type figures keep layers with heavy transforms on the raw source.
+    for layer in figure.get("layers") or ():
+        if not isinstance(layer, Mapping):
+            continue
+        for block in layer.get("data") or ():
+            if not isinstance(block, Mapping):
+                continue
+            src = block.get("source")
+            if isinstance(src, list):
+                src = src[0] if src else None
+            if not isinstance(src, str) or not src.strip():
+                continue
+            for step in block.get("transform") or ():
+                if not isinstance(step, Mapping):
+                    continue
+                for heavy in ("profile", "posterior_density", "make_density_core"):
+                    if heavy not in step:
+                        continue
+                    cfg = step.get(heavy)
+                    if not isinstance(cfg, Mapping):
+                        continue
+                    # top-level x/y or coordinates.x/y
+                    xe = _expr(cfg.get("x"))
+                    ye = _expr(cfg.get("y"))
+                    coords = cfg.get("coordinates") if isinstance(cfg.get("coordinates"), Mapping) else {}
+                    if xe is None:
+                        xe = _expr(coords.get("x"))
+                    if ye is None:
+                        ye = _expr(coords.get("y"))
+                    if xe and ye:
+                        return src.strip(), xe, ye
+    return None, None, None
 
 
 def _observe_layer(

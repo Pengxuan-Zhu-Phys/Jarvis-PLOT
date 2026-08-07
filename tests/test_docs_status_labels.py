@@ -12,6 +12,7 @@ ALLOWED_STATUSES = {
     "implemented",
     "implemented but mixed",
     "partial",
+    "review",
     "spec only",
     "historical",
 }

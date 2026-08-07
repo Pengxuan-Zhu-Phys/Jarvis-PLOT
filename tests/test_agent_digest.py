@@ -44,6 +44,27 @@ def test_build_voronoi_digest_respects_max_cells():
     assert "vertices" not in payload["cells"][0]
 
 
+def test_top_density_ignores_degenerate_point_cells():
+    """Point-like cells must not win top_density with density~1e60."""
+    # Many points in a blob + a few isolated outliers → isolated sites get count=1
+    rng = np.random.default_rng(42)
+    n = 2000
+    x = np.concatenate([rng.normal(0, 1, n), np.array([100.0, 101.0, -100.0])])
+    y = np.concatenate([rng.normal(0, 1, n), np.array([100.0, 101.0, -100.0])])
+    w = np.ones_like(x)
+    payload = build_voronoi_digest(x=x, y=y, weight=w, max_cells=64, seed=0, figure_name="t")
+    tops = payload.get("highlights", {}).get("top_density") or []
+    assert tops, "expected some rankable density cells"
+    for item in tops:
+        assert item.get("count", 0) >= 3 or item.get("density", 0) < 1e6
+    # No degenerate flag in top_density ranking
+    by_i = {c["i"]: c for c in payload["cells"]}
+    for item in tops:
+        cell = by_i[item["cell_index"]]
+        assert "degenerate" not in (cell.get("flags") or [])
+        assert (cell.get("density") or 0) < 1e10
+
+
 def test_plan_agent_exports_planned(tmp_path):
     cfg = {
         "output": {"dir": str(tmp_path / "plots")},
