@@ -1,6 +1,8 @@
 id: validate
 title: validate and doctor
-summary: Shape + columns gate without rendering; doctor = validate + dryrun.
+summary: >
+  Shape + columns gate without rendering. doctor = validate + light dryrun.
+  Never re-runs heavy transforms; execute with jplot <yaml>.
 role: how-to
 priority: 50
 see_also: [dryrun-viz, diagnostics, workflow]
@@ -12,7 +14,7 @@ related_cli:
   - argv: [jplot, validate, "<yaml>", "--fix", "--write"]
     why: apply certain fixes
   - argv: [jplot, doctor, "<yaml>", "--json"]
-    why: validate + dryrun combined
+    why: validate + light dryrun combined
 live_sources:
   - verb: validate
     truth: schema + ownership + column existence
@@ -22,19 +24,26 @@ human:
       title: When
       body: |
         Run validate after every YAML edit. Prefer --json for agents.
-        doctor is the usual one-shot gate before human eyeballing.
+        doctor is the usual one-shot structure gate before jplot <file>.
+        Check phase does not re-run profile/density/interp.
     - kind: steps
       title: Commands
       items:
         - "jplot validate plot.yaml --json"
         - "jplot validate plot.yaml --fix --diff   # preview"
         - "jplot doctor plot.yaml --json"
+        - "jplot plot.yaml   # only execution path for heavy work + digest"
     - kind: notes
-      title: Exit codes
+      title: Exit codes and partial
       items:
-        - "0 = ok; 1 = failed verdict; 2 = usage / parse error"
+        - "0 = ok or partial_renderable (structure ok); 1 = failed; 2 = usage"
+        - "ok null + status partial_renderable on type: figures is expected — not a broken YAML"
         - "--no-columns skips file reads (shape only)"
 agent:
+  anti_patterns:
+    - Rewriting good YAML because doctor ok is null / coverage is partial
+    - Expecting doctor to write agent_output JSON (only jplot <yaml> writes)
+    - Looking for doctor --deep or full mesh re-run in the check phase
   diagnostics:
     - code: JP-OWN-001
       when: ignored keys on layer coordinates

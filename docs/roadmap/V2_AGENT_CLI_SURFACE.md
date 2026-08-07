@@ -78,9 +78,9 @@ jplot <yaml> --report               渲染 + 体检报告（规划中）
 jplot <yaml> --rebuild-cache        渲染前重建 cache
 
 # 非渲染动词（可出现在 Jarvis2 plot <verb> … 下，语义仍清晰）
-jplot validate <yaml>               零 I/O 校验
-jplot dryrun <yaml>                 读数据、跑 transform、不渲染
-jplot doctor <yaml>                 validate + dryrun + 渲染体检，一条命令拿全部
+jplot validate <yaml>               形状/schema/列（检查阶段，不渲染）
+jplot dryrun <yaml>                 读数据 + 轻 transform 账本；跳过 profile/density/interp
+jplot doctor <yaml>                 validate + dryrun 合一；不重跑 heavy（执行用 jplot <file>）
 jplot explain <code|type|yaml>      错误码知识库 / type 糖展开
 
 jplot data  describe <file>         列/dtype/行数/分位数/HDF5 树
@@ -271,7 +271,7 @@ jplot examples show posterior_2d_basic --json
 | 动词 | I/O | matplotlib | 用途 |
 |---|---|---|---|
 | `validate` | 无（列名对照缓存的 describe） | 不 import | 每次编辑后都跑，秒级 |
-| `dryrun` | 读数据、跑 transform | 不 import | 确认管线没把数据滤空 |
+| `dryrun` | 读数据、只跑轻 transform（跳过 heavy） | 不 import | 确认列/filter 等不把表滤空；mesh 只在 render |
 | `run` | 全部 | 是 | 真出图 |
 
 **Agent 应该挑能回答问题的最便宜那档。** 今天只有第三档，所以一个 10 图的 YAML 要跑 10 轮才收敛。
@@ -318,9 +318,14 @@ Agent 一眼看到"filter 把数据滤光了"，而不是拿到一张空白 PNG 
 > 现有规格给了 `--with-data`（数值孪生 sidecar），但**数值 ≠ 判断**：
 > agent 拿到一张表，仍然不知道"这图画对了没有"。
 
-### 6.1 渲染体检 `JP-VIZ-*`
+### 6.1 渲染体检 `JP-VIZ-*`（执行期，不是 doctor 重跑）
 
-`jplot <yaml> --report --json` 在渲染过程中顺手采集，几乎零额外成本（数据都在手上）：
+**纪律**：检查阶段（`validate` / `dryrun` / `doctor`）**禁止**为体检再跑 profile /
+density / interp。全套 post-mesh JP-VIZ 只发生在 **`jplot <yaml>` 执行路径**
+（或规划中的 `--report`，仍是同一次 render 内采集）。
+
+`doctor` / `dryrun` 只做轻步骤账本 + 可负担的代理（例如重步骤跳过时的
+`JP-VIZ-002` pre-transform lim）。`type:` 上 `coverage: partial` **是设计结果**。
 
 | 码 | 检查 | 为什么 agent 看不见 |
 |---|---|---|
@@ -334,9 +339,8 @@ Agent 一眼看到"filter 把数据滤光了"，而不是拿到一张空白 PNG 
 | `JP-VIZ-008` | 所有数据点落在 <1% 的轴面积内（lim 量级错了） | 一个点 |
 | `JP-VIZ-009` | 图例引用了不存在的 label / 没有任何 handle | |
 
-**这是我认为整个 agent 通道里最有价值的一块**：它把"agent 看不见图"从一个不可解的多模态问题，
-变成了一组可枚举的确定性检查。Agent 拿到 `JP-VIZ-004` 就知道去调 `colorbar.vmax`，
-不需要眼睛。
+**价值**：把「看不见图」变成可枚举码。**采集时机**必须是 render 已有的数组，
+不是 doctor 再算一遍（重算 = 第二条流水线 = 必然漂移，且违背检查/执行分离）。
 
 ### 6.2 低保真视觉：ASCII 缩略图
 

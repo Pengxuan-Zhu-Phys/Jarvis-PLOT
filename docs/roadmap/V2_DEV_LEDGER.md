@@ -375,38 +375,27 @@ M0+M1 **不破坏任何兼容**，可以在 1.5.x 发布。M4 才是 2.0。
 | E5 | ASCII 缩略图原型 | M3 | E1 | S | 否 | ⊘ DR-04 |
 
 **E1 — 渲染期观测点采集**
-- 产物：`jarvisplot/Figure/render_observations.py`——在 adapter 调用 matplotlib 之前，记录每层的
-  `n_points / finite_ratio / data_bbox / axes_lim / zorder / nan_ratio / cmap_range`。
-- 验收：渲染任一 example 后能拿到每层观测记录。
-- 测试：`tests/test_render_observations.py`。
-- 备注：**渲染时这些数据全在手上，采集成本几乎为零。**所有权纪律：观测点必须取**送进 matplotlib 的
-  那份数组**，不能重算（重算 = 第二条流水线 = 必然漂移）。
+- 产物：在 adapter 调用 matplotlib 之前记录每层
+  `n_points / finite_ratio / data_bbox / axes_lim / zorder / nan_ratio / …`
+  （实现可落在 `render_health.observe_layer_dataframe` + Figure 钩子，不必单独文件名）。
+- 验收：渲染后能拿到每层观测；**采集只在 `jplot <yaml>` 执行路径**。
+- 备注：**渲染时数据全在手上，成本≈0。**必须取**送进 matplotlib 的那份数组**，
+  不能在 doctor/dryrun 里重算 mesh（重算 = 第二条流水线；检查阶段禁止 heavy）。
 
 **E2 — `JP-VIZ-001…009` 体检规则** ⭐
-- 产物：把"图画错了"从不可解的多模态问题降成**可枚举的确定性检查**：
-
-  | 码 | 症状 |
-  |---|---|
-  | `JP-VIZ-001` | 该 axes 上零个可见元素（空图） |
-  | `JP-VIZ-002` | N% 的点落在 `lim` 外被裁掉（阈值 >50% 报 warning，>90% 报 error） |
-  | `JP-VIZ-003` | transform 后行数归零 |
-  | `JP-VIZ-004` | colorbar `vmax` 远小于数据 max → 大面积饱和成同一色 |
-  | `JP-VIZ-005` | `scale: log` 但该轴有非正值，被 matplotlib 静默丢弃 |
-  | `JP-VIZ-006` | 某层被更高 zorder 的层完全遮挡（画了等于没画） |
-  | `JP-VIZ-007` | 插值网格 NaN 占比过高（凸包外） |
-  | `JP-VIZ-008` | 全部数据点集中在 <1% 的 axes 面积内 |
-  | `JP-VIZ-009` | legend 引用了不存在或不可见的 handle |
-
-- 验收：为每个码造一个必然触发的 fixture YAML，`jplot doctor` 能报出对应码。
-- 测试：`tests/test_render_health.py`，9 个 fixture。
-- 备注：**这是整套方案里我最看好的一条。**现有规格的 `--with-data` 只给数值孪生——**数值 ≠ 判断**，
-  agent 拿到一张数组表仍然不知道图对不对。`JP-VIZ-004` 直接告诉它"去调 vmax"。
+- 产物：把"图画错了"降成可枚举确定性检查（码表同前）。
+- **分轨**：
+  - **检查阶段**（doctor/dryrun）：轻步骤账本 + 可选 pre-transform lim 等**不重跑 heavy** 的代理；
+    `type:` 上 `coverage: partial` 是设计结果。
+  - **执行阶段**（`jplot <yaml>`）：post-mesh 全套 JP-VIZ 的合法采集点。
+- 验收：fixture 在**对应阶段**触发对应码；**不得**要求 doctor 默认报出需 mesh 的码。
+- 测试：`tests/test_render_health.py` 等。
+- **明确不做**：`doctor --deep` / dryrun 真跑 profile·density·interp 以「补全裁判」。
 
 **E3 — 行数账本**
-- 产物：每步 transform 前后行数，`filter "LogL > -100": 204,132 → 0 ⚠ JP-VIZ-003`。
-- 验收：`jplot dryrun` 输出账本。
-- 测试：`tests/test_row_ledger.py`。
-- 备注：空图的头号成因就是某步 filter 把数据滤光了。
+- 产物：轻 transform 前后行数，`filter "LogL > -100": 204,132 → 0 ⚠ JP-VIZ-003`。
+- 验收：`jplot dryrun` 输出账本；heavy 步骤标 skipped / partial，不静默假装跑过。
+- 备注：空图头号成因仍是 filter 滤光——这属于**轻步骤**，检查阶段该抓。
 
 **E4 — 数值孪生 `--with-data`**
 - 产物：每层 parquet sidecar（复用已有 `to_parquet`）。
@@ -776,5 +765,8 @@ brainstorm §3.3a 说列存在性校验可以复用 `plan_dataset_required_colum
 - **第二条渲染流水线**。所有观测点（E1/E4）必须取送进 matplotlib 的那份数组。
   沿用 `IMPLEMENTATION_ROADMAP.md` §4 的既有纪律：*"keep Agent Data API as a thin skin over
   existing loaders/transforms/cache, never a pipeline fork."*
+- **检查阶段 heavy 重跑**（`doctor --deep` / dryrun 真跑 profile·density·interp）。
+  Agent 闭环是：写 YAML → 结构/轻检查 → **一次** `jplot <yaml>`。
+  doctor 的 `partial_renderable` 是设计信号，不是要靠重跑补全的洞。
 - **给 `layers[].style` 写穷举 schema**。它是 `delegated` zone，下游是 matplotlib kwargs。
   PLOT 只管所有权冲突（`JP-OWN-002`），不管 kwargs 合法性。
