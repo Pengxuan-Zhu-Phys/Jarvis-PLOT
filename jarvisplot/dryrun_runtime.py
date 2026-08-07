@@ -282,18 +282,6 @@ def _load_datasets(
     return meta, frames
 
 
-_HEAVY_TRANSFORM_KEYS = frozenset(
-    {
-        "profile",
-        "make_density_core",
-        "posterior_density",
-        "make_interp_2d",
-        "to_csv",
-        "to_parquet",
-    }
-)
-
-
 def _pretransform_lim_check(
     *,
     figure: dict[str, Any],
@@ -595,86 +583,21 @@ def _apply_simple_transforms(
     df,
     transform: Sequence[Mapping[str, Any]],
 ) -> tuple[Any, list[TransformStepObs], list[str]]:
-    """Apply the cheap transform subset; skip density/profile/interp (noted).
+    """Light transforms only — shared with preprocessor_runtime.apply_light_transforms."""
+    from .Figure.preprocessor_runtime import apply_light_transforms
 
-    Doctor/dryrun must never re-run heavy mesh steps — only ``jplot <yaml>`` does.
-
-    Returns ``(df, steps, heavy_step_names_skipped)``.
-    """
-    from .Figure.preprocessor_runtime import (
-        add_column,
-        drop_columns,
-        filter_df,
-        keep_columns,
-        sort_by,
+    work, raw_steps, heavy_skipped = apply_light_transforms(
+        df, transform, logger=None
     )
-
-    steps: list[TransformStepObs] = []
-    heavy_skipped: list[str] = []
-    work = df
-    for step in transform:
-        if not isinstance(step, Mapping):
-            continue
-        rows_in = int(len(work))
-        name = next(iter(step.keys()), "unknown")
-        detail = ""
-        try:
-            if "filter" in step:
-                detail = str(step.get("filter"))
-                work = filter_df(work, step["filter"], logger=None)
-            elif "sortby" in step:
-                detail = str(step.get("sortby"))
-                work = sort_by(work, step["sortby"], logger=None)
-            elif "add_column" in step:
-                detail = str((step.get("add_column") or {}).get("name", ""))
-                work = add_column(work, step["add_column"], logger=None)
-            elif "keep_columns" in step:
-                detail = str(step.get("keep_columns"))
-                work = keep_columns(work, step.get("keep_columns"), logger=None)
-            elif "drop_columns" in step:
-                detail = str(step.get("drop_columns"))
-                work = drop_columns(work, step.get("drop_columns"), logger=None)
-            elif any(k in step for k in _HEAVY_TRANSFORM_KEYS):
-                heavy_name = str(name)
-                heavy_skipped.append(heavy_name)
-                steps.append(
-                    TransformStepObs(
-                        name=heavy_name,
-                        detail="skipped in dryrun (heavy step)",
-                        rows_in=rows_in,
-                        rows_out=rows_in,
-                    )
-                )
-                continue
-            else:
-                steps.append(
-                    TransformStepObs(
-                        name=str(name),
-                        detail="unknown step skipped",
-                        rows_in=rows_in,
-                        rows_out=rows_in,
-                    )
-                )
-                continue
-        except Exception as exc:
-            steps.append(
-                TransformStepObs(
-                    name=str(name),
-                    detail=f"failed: {exc}",
-                    rows_in=rows_in,
-                    rows_out=0,
-                )
-            )
-            # leave work unchanged on failure
-            continue
-        steps.append(
-            TransformStepObs(
-                name=str(name),
-                detail=detail,
-                rows_in=rows_in,
-                rows_out=int(len(work)),
-            )
+    steps = [
+        TransformStepObs(
+            name=str(s.get("name") or "unknown"),
+            detail=str(s.get("detail") or ""),
+            rows_in=int(s.get("rows_in") or 0),
+            rows_out=int(s.get("rows_out") or 0),
         )
+        for s in raw_steps
+    ]
     return work, steps, heavy_skipped
 
 

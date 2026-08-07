@@ -18,6 +18,28 @@ from jarvisplot.client import main
 from jarvisplot.diagnostics import DiagnosticBag
 
 
+def test_strip_digest_axes_stash_removes_key(tmp_path):
+    from jarvisplot.agent_digest import strip_digest_axes_stash
+
+    yaml_path = tmp_path / "p.yaml"
+    yaml_path.write_text(
+        "Figures:\n"
+        "  - name: f1\n"
+        "    agent_output:\n"
+        "      method: voronoi\n"
+        "      _digest_axes: {x: a, y: b}\n",
+        encoding="utf-8",
+    )
+    fig = {
+        "name": "f1",
+        "agent_output": {"method": "voronoi", "_digest_axes": {"x": "a", "y": "b"}},
+    }
+    assert strip_digest_axes_stash(fig, yaml_path=str(yaml_path), figure_name="f1") is True
+    assert "_digest_axes" not in fig["agent_output"]
+    text = yaml_path.read_text(encoding="utf-8")
+    assert "_digest_axes" not in text
+
+
 def test_build_voronoi_digest_respects_max_cells():
     rng = np.random.default_rng(0)
     n = 5000

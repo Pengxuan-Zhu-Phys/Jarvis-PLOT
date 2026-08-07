@@ -28,6 +28,7 @@ __all__ = [
     "parse_agent_output",
     "plan_agent_exports",
     "resolve_export_path",
+    "strip_digest_axes_stash",
     "write_digest_json",
 ]
 
@@ -615,7 +616,88 @@ def maybe_write_figure_digest(
             f"Agent digest written -> {written} "
             f"(cells={payload['algorithm']['actual_cells']}/{payload['algorithm']['max_cells']})"
         )
+    # Temporary expand stash: drop after successful digest so user YAML stays clean.
+    strip_digest_axes_stash(
+        figure_cfg if isinstance(figure_cfg, dict) else None,
+        yaml_path=yaml_path,
+        figure_name=spec.figure_name,
+        logger=logger,
+    )
     return written
+
+
+def strip_digest_axes_stash(
+    figure_cfg: dict[str, Any] | None,
+    *,
+    yaml_path: str | None = None,
+    figure_name: str | None = None,
+    logger=None,
+) -> bool:
+    """Remove ``agent_output._digest_axes`` after a successful plot.
+
+    The key is a temporary expand→digest bridge. Prefer automatic strip from the
+    in-memory figure and (when possible) the source YAML; tip agents to delete
+    it if it remains in hand-edited YAML.
+    """
+    removed_mem = False
+    if isinstance(figure_cfg, dict):
+        ao = figure_cfg.get("agent_output")
+        if isinstance(ao, dict) and "_digest_axes" in ao:
+            ao.pop("_digest_axes", None)
+            removed_mem = True
+
+    removed_disk = False
+    if yaml_path and figure_name:
+        try:
+            removed_disk = _strip_digest_axes_in_yaml_file(
+                yaml_path, figure_name=str(figure_name)
+            )
+        except Exception as exc:
+            if logger:
+                logger.debug(f"could not strip _digest_axes from YAML: {exc}")
+
+    if removed_mem or removed_disk:
+        if logger:
+            logger.info(
+                "Removed temporary agent_output._digest_axes after plot "
+                f"(figure={figure_name!r}, yaml={bool(removed_disk)}). "
+                "If that key remains in your YAML, delete it before the next edit."
+            )
+        return True
+    return False
+
+
+def _strip_digest_axes_in_yaml_file(yaml_path: str, *, figure_name: str) -> bool:
+    """Best-effort: drop _digest_axes under the named figure's agent_output."""
+    from .yaml_io import dump_yaml_doc, load_yaml_doc
+
+    path = Path(yaml_path).expanduser()
+    if not path.is_file():
+        return False
+    doc, meta = load_yaml_doc(path)
+    if not isinstance(doc, dict):
+        return False
+    figures = doc.get("Figures")
+    if not isinstance(figures, list):
+        return False
+    changed = False
+    for fig in figures:
+        if not isinstance(fig, dict):
+            continue
+        name = str(fig.get("name") or "")
+        if name != figure_name:
+            continue
+        ao = fig.get("agent_output")
+        if isinstance(ao, dict) and "_digest_axes" in ao:
+            del ao["_digest_axes"]
+            changed = True
+    if not changed:
+        return False
+    text = dump_yaml_doc(doc, meta=meta)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(path)
+    return True
 
 
 def _resolve_axes_and_exprs(

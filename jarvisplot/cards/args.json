@@ -111,7 +111,7 @@
         },
         {
             "name": "flowchart",
-            "help": "render a Jarvis-HEP flowchart scene JSON",
+            "help": "Jarvis-HEP project-scan flowchart only (scene JSON from HEP scan tooling — not general plot YAML)",
             "usage": "jplot flowchart <flowchart_file>",
             "kind": "legacy",
             "group": "Flowchart"
@@ -125,7 +125,7 @@
         },
         {
             "name": "flowchart_file",
-            "help": "path to the input flowchart scene JSON",
+            "help": "Jarvis-HEP scan flowchart scene JSON (not a plot config)",
             "nargs": "?"
         }
     ],
@@ -173,6 +173,12 @@
             "long": "--rebuild-cache",
             "dest": "rebuild_cache",
             "help": "rebuild the project cache before plotting",
+            "action": "store_true"
+        },
+        {
+            "long": "--report",
+            "dest": "report",
+            "help": "write ephemeral render-health report JSON next to the YAML (JP-VIZ etc.); delete after final plots",
             "action": "store_true"
         }
     ]
