@@ -707,7 +707,7 @@ def load_bool_df(fig, df, transform):
         return df
 
 
-def load_layer_runtime_data(fig, layer_info):
+def load_layer_runtime_data(fig, layer_info, *, observe: bool = True):
     if layer_info.get("data_loaded", False):
         return layer_info.get("data")
     layer = layer_info.get("layer_spec", {})
@@ -721,9 +721,16 @@ def load_layer_runtime_data(fig, layer_info):
     layer_info["data_loaded"] = True
     layer_info["share_cache_ref"] = cache_ref
     fig._store_share_data_if_needed(layer, data, cache_ref=cache_ref)
-    # P0.2 root: post-transform observation on the same table methods consume.
+    # Post-transform observation for --report / render health.
+    # Colorbar prescan also loads layers then releases them; pass observe=False
+    # there so the main render loop does not append a second LayerObservation.
     collector = getattr(fig, "health_observations", None)
-    if collector is not None and data is not None and not isinstance(data, dict):
+    if (
+        observe
+        and collector is not None
+        and data is not None
+        and not isinstance(data, dict)
+    ):
         try:
             from ..render_health import observe_layer_dataframe
 
