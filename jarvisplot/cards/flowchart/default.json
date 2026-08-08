@@ -14,7 +14,7 @@
     "variable_dx": 2.55,
     "input_variable_dx": 2.55,
     "output_variable_dx": 3.25,
-    "bridge_y_offset": 0.45,
+    "bridge_y_offset": 0.55,
     "bridge_output_pad": 0.18,
     "module_icon_size": 0.9,
     "module_label_dy": -0.45,
