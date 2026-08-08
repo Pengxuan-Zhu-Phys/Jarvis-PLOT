@@ -158,7 +158,10 @@ def test_flowchart_synthesizes_missing_bridge_for_cross_layer_file_input():
         ],
     }
 
-    graph = _ClassicGraph(scene, {"classic": {"synthesize_missing_bridges": True}})
+    graph = _ClassicGraph(
+        scene,
+        {"classic": {"synthesize_missing_bridges": True, "bridge_y_offset": 0.6}},
+    )
 
     bridge_id = "bridge::x::L2"
     assert bridge_id in graph.nodes
@@ -180,6 +183,66 @@ def test_flowchart_synthesizes_missing_bridge_for_cross_layer_file_input():
         and edge["target"]["node"] == "file::SecondModule::input::second_input"
         for edge in graph.edges
     )
+
+    graph.layout()
+    module_top = graph.mains["FirstModule"]["pos"][1] + graph.module_icon_size / 2.0
+    bridge_y = graph.bridges[bridge_id]["pos"][1]
+    assert abs(bridge_y - module_top - 0.6) < 1e-9
+
+
+def test_flowchart_orders_bridge_chain_by_previous_layer_y_position():
+    scene = {
+        "schema": "jarvisplot.scene/v1",
+        "scene_type": "flowchart",
+        "layers": [
+            {"id": "layer_1", "index": 1, "nodes": ["Parameters", "var::top", "var::bottom"]},
+            {"id": "layer_2", "index": 2, "nodes": []},
+            {"id": "layer_3", "index": 3, "nodes": []},
+            {
+                "id": "layer_4",
+                "index": 4,
+                "nodes": ["FinalModule", "file::FinalModule::input::final_input"],
+            },
+        ],
+        "nodes": [
+            {"id": "Parameters", "kind": "source", "label": "Parameters", "layer": "layer_1"},
+            {"id": "var::top", "kind": "variable", "role": "parameter", "label": "top", "layer": "layer_1"},
+            {"id": "var::bottom", "kind": "variable", "role": "parameter", "label": "bottom", "layer": "layer_1"},
+            {"id": "FinalModule", "kind": "module", "label": "FinalModule", "layer": "layer_4"},
+            {
+                "id": "file::FinalModule::input::final_input",
+                "kind": "file",
+                "role": "input_file",
+                "label": "final_input",
+                "layer": "layer_4",
+            },
+        ],
+        "edges": [
+            {"source": {"node": "Parameters", "port": "top"}, "target": {"node": "var::top", "port": "in"}, "role": "parameterflow"},
+            {"source": {"node": "Parameters", "port": "bottom"}, "target": {"node": "var::bottom", "port": "in"}, "role": "parameterflow"},
+            {
+                "source": {"node": "var::bottom", "port": "out"},
+                "target": {"node": "file::FinalModule::input::final_input", "port": "in"},
+                "role": "fileflow",
+                "metadata": {"variable": "bottom"},
+            },
+            {
+                "source": {"node": "var::top", "port": "out"},
+                "target": {"node": "file::FinalModule::input::final_input", "port": "in"},
+                "role": "fileflow",
+                "metadata": {"variable": "top"},
+            },
+        ],
+    }
+
+    graph = _ClassicGraph(scene, {"classic": {"synthesize_missing_bridges": True}})
+    graph.layout()
+
+    layer_2_bridges = graph._standalone_bridges("layer_2")
+    layer_3_bridges = graph._standalone_bridges("layer_3")
+    assert layer_2_bridges == ["bridge::top::L2", "bridge::bottom::L2"]
+    assert layer_3_bridges == ["bridge::top::L3", "bridge::bottom::L3"]
+    assert graph.bridges["bridge::top::L3"]["pos"][1] > graph.bridges["bridge::bottom::L3"]["pos"][1]
 
 
 def test_flowchart_uses_triangle_for_file_output_variables():

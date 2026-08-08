@@ -412,6 +412,7 @@ class _ClassicGraph:
         self.output_variable_dx = float(self.classic.get("output_variable_dx", self.variable_dx))
         self.bridge_y_offset = float(self.classic.get("bridge_y_offset", 0.45))
         self.bridge_output_pad = float(self.classic.get("bridge_output_pad", 0.18))
+        self.module_icon_size = float(self.classic.get("module_icon_size", 0.9))
         self.mains: dict[str, dict] = {}
         self.files: dict[str, dict] = {}
         self.variables: dict[str, dict] = {}
@@ -585,7 +586,7 @@ class _ClassicGraph:
                 y = cursor - height / 2.0
                 self._place_main_group(main_id, x, y, height)
                 cursor -= height + self.group_gap
-            self._place_standalone_bridges(layer_id, x, max_height)
+            self._place_standalone_bridges(layer_id, x, max_height, layer_groups.get(layer_id, []))
 
         self._place_unpositioned_variables(max_height)
         self._compute_bounds(max_height)
@@ -704,11 +705,20 @@ class _ClassicGraph:
                 self._place_variable(var_id, x - self.input_variable_dx, y, align="right")
         self._place_variables(self._direct_output_variables(main_id), x + self.output_variable_dx, y, align="right")
 
-    def _place_standalone_bridges(self, layer_id: str, x: float, max_height: float) -> None:
+    def _place_standalone_bridges(self, layer_id: str, x: float, max_height: float, main_ids: list[str]) -> None:
         bridges = self._standalone_bridges(layer_id)
         if not bridges:
             return
-        ys = self._spread_y(max_height / 2.0 + self.bridge_y_offset, len(bridges), self.var_gap)
+        main_items = [self.mains[main_id] for main_id in main_ids if main_id in self.mains]
+        if main_items:
+            module_top = max(item["pos"][1] + self.module_icon_size / 2.0 for item in main_items)
+            lowest_bridge_y = module_top + self.bridge_y_offset
+            ys = [
+                lowest_bridge_y + (len(bridges) - 1 - idx) * self.var_gap
+                for idx in range(len(bridges))
+            ]
+        else:
+            ys = self._spread_y(max_height / 2.0 + self.bridge_y_offset, len(bridges), self.var_gap)
         for node_id, y in zip(bridges, ys):
             label = str(self.nodes[node_id].get("label") or "")
             self.bridges[node_id] = {
@@ -823,12 +833,18 @@ class _ClassicGraph:
                 return [str(node_id) for node_id in layer.get("nodes", [])]
         return []
 
-    def _bridge_order_key(self, bridge_id: str) -> tuple[int, int, str]:
+    def _bridge_order_key(self, bridge_id: str) -> tuple[float, float, str]:
         source_id = None
         for edge in self.edges:
             if str(edge.get("target", {}).get("node")) == bridge_id:
                 source_id = str(edge.get("source", {}).get("node"))
                 break
+
+        source_item = self.variables.get(source_id or "") or self.bridges.get(source_id or "")
+        if source_item is not None:
+            # Preserve the actual top-to-bottom order of the previous layer.
+            return (0.0, -float(source_item["pos"][1]), bridge_id)
+
         source_node = self.nodes.get(source_id or "")
         source_layer = str(source_node.get("layer", "")) if isinstance(source_node, Mapping) else ""
         layer_ids = self._layer_node_ids(source_layer)
@@ -841,7 +857,7 @@ class _ClassicGraph:
             if str(layer.get("id")) == source_layer:
                 layer_pos = idx
                 break
-        return (layer_pos, source_pos, bridge_id)
+        return (float(layer_pos + 1), float(source_pos), bridge_id)
 
     def _incoming_variables(self, target_id: str) -> list[str]:
         return self._unique(
