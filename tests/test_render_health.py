@@ -2,11 +2,61 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+import pandas as pd
+
+from jarvisplot.Figure import layer_runtime
 from jarvisplot.render_health import (
     LayerObservation,
     TransformStepObs,
     evaluate_health,
 )
+
+
+def test_load_layer_runtime_data_prescan_does_not_double_observe(monkeypatch):
+    """Colorbar prescan must not append LayerObservation (report duplicate bug)."""
+    df = pd.DataFrame({"x": [0.0, 1.0], "y": [0.0, 1.0], "z": [1.0, 2.0]})
+    monkeypatch.setattr(
+        layer_runtime,
+        "load_layer_data",
+        lambda fig, layer: (df, None),
+    )
+
+    fig = SimpleNamespace(
+        name="f1",
+        health_observations=[],
+        frame={"ax": {"xlim": [0, 1], "ylim": [0, 1]}},
+        _yaml_frame={"ax": {"xlim": [0, 1], "ylim": [0, 1]}},
+        logger=SimpleNamespace(debug=lambda *a, **k: None),
+        _store_share_data_if_needed=lambda *a, **k: None,
+    )
+    layer_info = {
+        "name": "_density",
+        "layer_spec": {
+            "name": "_density",
+            "method": "pcolormesh",
+            "data": [{"source": "s"}],
+            "coordinates": {
+                "x": {"expr": "x"},
+                "y": {"expr": "y"},
+                "z": {"expr": "z"},
+            },
+        },
+        "data_loaded": False,
+    }
+
+    # Prescan path (figure._prescan_colorbar_ranges)
+    layer_runtime.load_layer_runtime_data(fig, layer_info, observe=False)
+    assert len(fig.health_observations) == 0
+    layer_runtime.release_layer_runtime_data(fig, layer_info, consume_sources=False)
+    assert layer_info.get("data_loaded") is False
+
+    # Render loop path (default observe=True) — exactly one observation
+    layer_runtime.load_layer_runtime_data(fig, layer_info)
+    assert len(fig.health_observations) == 1
+    assert fig.health_observations[0].layer == "_density"
+
 
 
 def test_viz_001_empty_layer():
