@@ -730,8 +730,9 @@ class Figure:
             if style.get("cmap") is not None:
                 cb_style_cmaps.setdefault(cb_name, style.get("cmap"))
 
-            # Load data (pipeline cache hit on second call in render loop)
-            runtime_load_layer_runtime_data(self, ly)
+            # Load data for color range only — do not append health observations
+            # (render loop will load again and observe once).
+            runtime_load_layer_runtime_data(self, ly, observe=False)
             df = ly.get("data")
             if df is not None:
                 df = self._ensure_pandas_data(df, reason="prescan:colorbar")
