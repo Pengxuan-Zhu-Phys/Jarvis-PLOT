@@ -285,10 +285,21 @@ class JarvisPLOT():
     def _maybe_write_agent_digest(self, figure_cfg, figobj) -> None:
         """Write figure-level agent_output digest after a successful plot."""
         try:
-            from .agent_digest import load_figure_source_dataframe, maybe_write_figure_digest
+            from .agent_digest import (
+                load_figure_source_dataframe,
+                maybe_write_figure_digest,
+                parse_agent_output,
+            )
             from .cli import JPLOT_VERSION
 
             if not isinstance(figure_cfg, dict):
+                return
+            # Do not load the source dataframe just to discover that no agent
+            # digest was requested. This matters after rendering releases the
+            # last layer's source data.
+            root_config = getattr(self.yaml, "config", {}) or {}
+            root_output = root_config.get("output", {}) if isinstance(root_config, dict) else {}
+            if parse_agent_output(figure_cfg, root_output=root_output) is None:
                 return
             # Prefer raw YAML figure block (pre type-expand may have type: fields).
             # After expand_figure_types, config figures are already expanded; still OK.

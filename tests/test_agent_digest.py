@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import textwrap
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -16,6 +17,30 @@ from jarvisplot.agent_digest import (
 )
 from jarvisplot.client import main
 from jarvisplot.diagnostics import DiagnosticBag
+
+
+def test_render_skips_agent_digest_source_load_when_not_requested(monkeypatch):
+    from jarvisplot.core import JarvisPLOT
+
+    core = JarvisPLOT()
+    core.yaml = SimpleNamespace(config={"output": {}})
+    core.logger = SimpleNamespace(warning=lambda *args, **kwargs: None)
+
+    def fail_if_source_is_loaded(*args, **kwargs):
+        raise AssertionError("agent digest source should not load when disabled")
+
+    monkeypatch.setattr(
+        "jarvisplot.agent_digest.load_figure_source_dataframe",
+        fail_if_source_is_loaded,
+    )
+
+    core._maybe_write_agent_digest(
+        {
+            "name": "plain_plot",
+            "layers": [{"data": [{"source": "samples"}]}],
+        },
+        SimpleNamespace(),
+    )
 
 
 def test_strip_digest_axes_stash_removes_key(tmp_path):

@@ -61,6 +61,19 @@ def apply_axis_title(fig, ax_obj, ax_name: str) -> None:
     ax_obj.text(s=str(title), **text_params)
 
 
+def hide_log_minor_tick_labels(ax_obj, which: str) -> None:
+    """Keep log minor tick marks, but hide their labels by default."""
+    target = ax_obj.ax if hasattr(ax_obj, "ax") else ax_obj
+    if which == "x":
+        target.tick_params(
+            axis="x", which="minor", labelbottom=False, labeltop=False
+        )
+    elif which == "y":
+        target.tick_params(
+            axis="y", which="minor", labelleft=False, labelright=False
+        )
+
+
 def ensure_numbered_rect_axes(fig, ax_name: str, kwgs: dict):
     if not is_numbered_ax(ax_name):
         raise ValueError(f"Illegal dynamic axes name '{ax_name}'. Only ax<NUMBER> is allowed.")
@@ -88,12 +101,14 @@ def ensure_numbered_rect_axes(fig, ax_name: str, kwgs: dict):
     if fig.frame.get(ax_name, {}).get("yscale", "").lower() == "log":
         ax_obj.set_yscale("log")
         ax_obj.yaxis.set_minor_locator(LogLocator(subs="auto"))
+        hide_log_minor_tick_labels(ax_obj, "y")
     else:
         ax_obj.yaxis.set_minor_locator(AutoMinorLocator())
 
     if fig.frame.get(ax_name, {}).get("xscale", "").lower() == "log":
         ax_obj.set_xscale("log")
         ax_obj.xaxis.set_minor_locator(LogLocator(subs="auto"))
+        hide_log_minor_tick_labels(ax_obj, "x")
     else:
         ax_obj.xaxis.set_minor_locator(AutoMinorLocator())
 
