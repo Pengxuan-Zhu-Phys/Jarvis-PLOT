@@ -26,6 +26,7 @@ from .layout_runtime import (
     apply_manual_ticks,
     ensure_numbered_rect_axes,
     has_manual_ticks,
+    hide_log_minor_tick_labels,
     is_numbered_ax,
 )
 from .colorbar_runtime import (
@@ -802,6 +803,7 @@ class Figure:
             self.ax.set_yscale("log")
             from matplotlib.ticker import LogLocator
             self.ax.yaxis.set_minor_locator(LogLocator(subs='auto'))
+            hide_log_minor_tick_labels(self.ax, "y")
         else:
             self.ax.yaxis.set_minor_locator(AutoMinorLocator())
         
@@ -809,6 +811,7 @@ class Figure:
             self.ax.set_xscale("log")
             from matplotlib.ticker import LogLocator
             self.ax.xaxis.set_minor_locator(LogLocator(subs='auto'))
+            hide_log_minor_tick_labels(self.ax, "x")
         else:
             self.ax.xaxis.set_minor_locator(AutoMinorLocator())
         
@@ -838,8 +841,8 @@ class Figure:
 
         # Apply manual ticks here at initialization if provided in YAML
         ax_ticks_cfg = self.frame.get('ax', {}).get('ticks', {})
-        # self._apply_manual_ticks(self.ax, "x", ax_ticks_cfg.get('x', {}))
-        # self._apply_manual_ticks(self.ax, "y", ax_ticks_cfg.get('y', {}))
+        self._apply_manual_ticks(self.ax, "x", ax_ticks_cfg.get('x', {}))
+        self._apply_manual_ticks(self.ax, "y", ax_ticks_cfg.get('y', {}))
 
 
         self.ax.tick_params(**self.frame['ax']['ticks'].get("both", {}))

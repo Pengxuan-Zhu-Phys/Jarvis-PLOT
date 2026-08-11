@@ -716,6 +716,39 @@ def test_colorbar_manual_y_ticks_override_auto_ticks(axc_name):
     plt.close(fig.fig)
 
 
+def test_main_axis_manual_log_x_ticks_are_applied_and_preserved():
+    positions = [0.1, 1.0, 5.0]
+    labels = ["0.1", "1", "5"]
+
+    fig = Figure()
+    fig.logger = _logger()
+    fig.frame = {
+        "figure": {"figsize": (2, 2)},
+        "ax": {
+            "labels": {"x": "", "y": ""},
+            "xlim": [0.1, 5.0],
+            "ylim": [0.1, 5.0],
+            "xscale": "log",
+            "yscale": "linear",
+            "ticks": {"x": {"positions": positions, "labels": labels}},
+        },
+    }
+    fig.fig = plt.figure(figsize=(2, 2))
+    fig.axes = {}
+    fig.ax = {"rect": [0.1, 0.1, 0.8, 0.8]}
+
+    fig.render()
+    fig.fig.canvas.draw()
+
+    np.testing.assert_allclose(fig.ax.xaxis.get_majorticklocs(), positions)
+    assert [label.get_text() for label in fig.ax.get_xticklabels()] == labels
+    assert all(
+        not tick.label1.get_visible() and not tick.label2.get_visible()
+        for tick in fig.ax.xaxis.get_minor_ticks()
+    )
+    plt.close(fig.fig)
+
+
 @pytest.mark.parametrize("ax_type", ["rect", "tri"])
 def test_render_layer_does_not_mutate_layer_data(monkeypatch, ax_type):
     original_data = object()
