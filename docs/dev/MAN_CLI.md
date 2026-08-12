@@ -345,7 +345,7 @@ Agent 的 `body_markdown` / 多 examples **不**全部打进 human 页。
 强制叙事（与用户产品判断一致）：
 
 1. **Discover** — `data describe` + `cap all`（或 man 提示的子集）。  
-2. **Author** — 在工作区直接写/改 `*.yaml`（**不**要求 `config set`）。  
+2. **Author** — 在工作区直接写/改 `*.yaml`（**不**要求 `config set`）。叶子级标量 `list` / `dict` 使用紧凑 flow style，例如 `xlim: [0.1, 5.0]`、`labels: {x: $x$, y: $y$}`；复杂父级结构保持展开。
 3. **Judge** — `validate --json` → `dryrun --json` 或 `doctor --json`。  
 4. **Render** — `jplot <file>` 仅在需要出图时。  
 5. **Learn errors** — `explain <JP-*>` 或 `man diagnostics`。

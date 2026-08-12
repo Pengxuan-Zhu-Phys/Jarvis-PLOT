@@ -226,3 +226,48 @@ def test_config_rm_layer(tmp_path, capsys):
 def test_ruamel_roundtrip_engine_when_installed():
     # smoke: load/dump path works either way
     assert isinstance(has_ruamel(), bool)
+
+
+def test_dump_yaml_doc_compacts_leaf_collections(tmp_path):
+    path = tmp_path / "compact.yaml"
+    path.write_text(
+        textwrap.dedent(
+            """
+            frame:
+              ax:
+                xlim:
+                - 0.1
+                - 5.0
+                ylim:
+                - 0.0
+                - 5.0
+                ticks:
+                  x:
+                    positions:
+                    - 0.1
+                    - 1
+                    - 5
+                    labels:
+                    - '0.1'
+                    - '1'
+                    - '5'
+                labels:
+                  x: $x$
+                  y: $y$
+                coordinates:
+                  x:
+                    expr: xx
+            """
+        ).lstrip(),
+        encoding="utf-8",
+    )
+
+    doc, meta = load_yaml_doc(path)
+    text = dump_yaml_doc(doc, meta=meta)
+
+    assert "xlim: [0.1, 5.0]" in text
+    assert "ylim: [0.0, 5.0]" in text
+    assert "positions: [0.1, 1, 5]" in text
+    assert "labels: ['0.1', '1', '5']" in text
+    assert "labels: {x: $x$, y: $y$}" in text
+    assert "x: {expr: xx}" in text

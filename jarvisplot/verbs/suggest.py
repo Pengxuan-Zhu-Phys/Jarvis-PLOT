@@ -23,6 +23,7 @@ from ..diagnostics import Diagnostic, DiagnosticBag
 from ..templates_catalog import get_template, list_templates, render_template_yaml
 from ..validation import validate_config
 from ..data_access import describe_file, suggest_axes
+from ..yaml_io import dump_yaml_doc
 
 __all__ = ["SuggestError", "build_parser", "run", "suggest_config"]
 
@@ -438,9 +439,7 @@ def suggest_config(
     if ylim:
         frame_ax["ylim"] = list(ylim)
     fig0.setdefault("frame", {})["ax"] = frame_ax
-    yaml_text = yaml.safe_dump(
-        config, sort_keys=False, allow_unicode=True, default_flow_style=False
-    )
+    yaml_text = dump_yaml_doc(config, meta={"engine": "pyyaml"})
 
     return {
         "kind": kind,

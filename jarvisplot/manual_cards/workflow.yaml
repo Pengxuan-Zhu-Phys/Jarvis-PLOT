@@ -65,6 +65,7 @@ human:
       title: Rules
       items:
         - Never invent method, style, or cmap strings — use jplot cap.
+        - 'Write scalar-only leaf lists/maps in compact flow style: xlim: [0.1, 5.0] and labels: {x: $x$, y: $y$}; keep complex parent structures expanded.'
         - Bare path renders: jplot plot.yaml (there is no jplot run).
         - Optional tools: suggest, config set/expand — not the main author path.
         - Need layers control: jplot config expand plot.yaml --figure NAME --write
@@ -72,7 +73,7 @@ agent:
   body_markdown: |
     ## Full agent playbook
     1. **Discover** — `data describe` + `cap` subsets.
-    2. **Author** — edit `*.yaml` in the workspace (type macros preferred).
+    2. **Author** — edit `*.yaml` in the workspace (type macros preferred); write scalar-only leaf lists/maps in compact flow style, e.g. `xlim: [0.1, 5.0]` and `labels: {x: $x$, y: $y$}`.
     3. **Judge (light only)** — `validate` / `doctor --json`. No heavy re-run; partial on type: is OK.
     4. **Execute once** — `jplot <file>` for PNG/PDF + agent_output digest.
     5. **Learn** — `explain JP-*` or `man diagnostics`; figure content from digest, not doctor mesh.

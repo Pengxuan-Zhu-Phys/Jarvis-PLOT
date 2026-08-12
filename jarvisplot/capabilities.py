@@ -15,7 +15,8 @@ Two rules keep this honest:
   derived from the registry, card directory or schema that the runtime actually
   consults, and ``tests/test_capabilities.py`` fails if the two drift apart.
 - **Stay cheap.** Agents call this constantly, so the collectors read JSON and
-  module-level dicts; nothing here imports matplotlib.
+  module-level dicts. The cmap collector also inspects Matplotlib's live
+  registry because agents may need the complete built-in cmap vocabulary.
 """
 
 from __future__ import annotations
@@ -226,9 +227,42 @@ def _cmaps() -> dict[str, Any]:
         for entry in entries
         if isinstance(entry, dict) and entry.get("name")
     )
+    jarvis_and_reversed = set(names) | {f"{name}_r" for name in names}
+    matplotlib_entries: list[dict[str, Any]] = []
+    try:
+        from matplotlib import colormaps
+
+        matplotlib_names = sorted(
+            str(name) for name in colormaps if str(name) not in jarvis_and_reversed
+        )
+        matplotlib_registry = set(str(name) for name in colormaps)
+        for name in matplotlib_names:
+            cmap = colormaps[name]
+            if name.endswith("_r") and name[:-2] in matplotlib_registry:
+                reverse = name[:-2]
+            elif f"{name}_r" in matplotlib_registry:
+                reverse = f"{name}_r"
+            else:
+                reverse = None
+            samples = getattr(cmap, "N", None)
+            matplotlib_entries.append(
+                {
+                    "name": name,
+                    "type": type(cmap).__name__,
+                    "N": int(samples) if isinstance(samples, int) else samples,
+                    "reverse": reverse,
+                }
+            )
+        matplotlib_note = (
+            "Matplotlib registry entries include the normal and _r reverse names."
+        )
+    except Exception as exc:
+        matplotlib_note = f"Matplotlib registry unavailable: {exc}"
     return {
         "jarvis": names,
         "jarvis_reversed": [f"{name}_r" for name in names],
+        "matplotlib": matplotlib_entries,
+        "matplotlib_note": matplotlib_note,
         "note": (
             "Every matplotlib colormap is also available. Jarvis colormaps are "
             "registered from cards/colors/colormaps.json; each has an _r reverse."

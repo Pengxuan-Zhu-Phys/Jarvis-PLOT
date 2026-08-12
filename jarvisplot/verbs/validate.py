@@ -16,11 +16,10 @@ import sys
 from pathlib import Path
 from typing import Any, Sequence
 
-import yaml
-
 from ..agent_io import EXIT_FAILED, EXIT_OK, EXIT_USAGE, emit, envelope, system_exit_code
 from ..fix_apply import apply_fixes, planned_fixes
 from ..validation import validate_config, validate_file
+from ..yaml_io import dump_yaml_doc
 
 __all__ = ["build_parser", "run"]
 
@@ -191,12 +190,7 @@ def _run_fix(
 
 
 def _dump_yaml(config: Any) -> str:
-    return yaml.safe_dump(
-        config,
-        sort_keys=False,
-        allow_unicode=True,
-        default_flow_style=False,
-    )
+    return dump_yaml_doc(config, meta={"engine": "pyyaml"})
 
 
 def _print_human(path: str, bag) -> None:

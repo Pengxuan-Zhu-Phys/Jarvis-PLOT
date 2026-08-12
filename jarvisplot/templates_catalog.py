@@ -7,6 +7,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+from .yaml_io import dump_yaml_doc
+
 __all__ = [
     "TEMPLATE_KINDS",
     "get_template",
@@ -42,20 +44,13 @@ def get_template(kind: str) -> dict[str, Any]:
 
 def render_template_yaml(kind: str, *, values: dict[str, Any] | None = None) -> str:
     """Fill slot defaults with ``values`` and return YAML text."""
-    import yaml
-
     spec = get_template(kind)
     slots = {s["name"]: s.get("default") for s in spec.get("slots") or []}
     if values:
         slots.update({k: v for k, v in values.items() if v is not None})
     body = deepcopy(spec["skeleton"])
     _apply_slots(body, slots)
-    return yaml.safe_dump(
-        body,
-        sort_keys=False,
-        allow_unicode=True,
-        default_flow_style=False,
-    )
+    return dump_yaml_doc(body, meta={"engine": "pyyaml"})
 
 
 def _apply_slots(node: Any, slots: dict[str, Any]) -> None:
