@@ -530,7 +530,7 @@ def _to_plain(doc: Any) -> Any:
 
 def _print_value(value: Any) -> None:
     if isinstance(value, (dict, list)):
-        print(yaml.safe_dump(value, sort_keys=False, allow_unicode=True), end="")
+        print(dump_yaml_doc(value, meta={"engine": "pyyaml"}), end="")
     else:
         print(value)
 

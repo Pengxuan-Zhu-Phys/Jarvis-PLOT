@@ -21,6 +21,7 @@ from ..agent_io import (
 )
 from ..cli_help import RichArgumentParser
 from ..diagnostic_guidance import KNOWN_CODES, guidance_for
+from ..yaml_io import dump_yaml_doc
 
 __all__ = ["build_parser", "run"]
 
@@ -191,9 +192,7 @@ def _explain_expand(target: str, *, as_json: bool) -> int:
         )
         return emit(env) if as_json else _fail(env)
 
-    yaml_text = yaml.safe_dump(
-        config, sort_keys=False, allow_unicode=True, default_flow_style=False
-    )
+    yaml_text = dump_yaml_doc(config, meta={"engine": "pyyaml"})
     data = {
         "mode": "expand",
         "source": base,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 
 import pytest
 
@@ -55,6 +56,12 @@ def test_cmaps_include_jarvis_and_reversed():
     jarvis = cmaps["jarvis"]
     assert jarvis
     assert cmaps["jarvis_reversed"] == [f"{n}_r" for n in jarvis]
+    matplotlib = cmaps["matplotlib"]
+    assert matplotlib
+    by_name = {entry["name"]: entry for entry in matplotlib}
+    assert by_name["viridis"]["type"] == "ListedColormap"
+    assert by_name["viridis"]["N"] == 256
+    assert by_name["viridis"]["reverse"] == "viridis_r"
 
 
 def test_funcs_are_nonempty():
@@ -108,6 +115,68 @@ def test_jplot_cap_bare_is_index_not_full_dump(capsys):
     assert not isinstance(env["data"].get("methods"), list)
 
 
+def test_jplot_cap_bare_human_is_a_rich_section_card(monkeypatch, capsys):
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+    assert main(["cap"]) == 0
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "jplot cap" in captured.err
+    assert "Sections · jplot cap" in captured.err
+    assert "Open next" in captured.err
+    assert "methods" in captured.err
+    assert "cap.all" not in captured.err
+
+
+def test_jplot_cap_methods_human_uses_table_and_man_links(monkeypatch, capsys):
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+    assert main(["cap", "methods"]) == 0
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Methods · jplot cap methods" in captured.err
+    assert "Required" in captured.err
+    assert "scatter" in captured.err
+    assert "jplot man scatter" in captured.err
+    assert not captured.err.lstrip().startswith("{")
+
+
+def test_jplot_cap_all_human_is_summary_card(monkeypatch, capsys):
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+    assert main(["cap", "all"]) == 0
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Capabilities · jplot cap all" in captured.err
+    assert "Digest:" in captured.err
+    assert "methods" in captured.err
+    assert "jplot cap all --json" in captured.err
+
+
+def test_jplot_cap_cmaps_human_lists_each_name(monkeypatch, capsys):
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+    assert main(["cap", "cmaps"]) == 0
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Colormaps · jplot cap cmaps" in captured.err
+    assert "Jarvis reversed" not in captured.err
+    for name in section("cmaps")["jarvis"]:
+        assert name in captured.err
+    assert "Diverging red" in captured.err
+    assert "automatic _r reverse" in captured.err
+
+
+def test_jplot_cap_cmaps_human_separates_matplotlib_registry(monkeypatch, capsys):
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+    assert main(["cap", "cmaps"]) == 0
+    captured = capsys.readouterr()
+    out = captured.err
+    assert "viridis" in out
+    assert "viridis_r" in out
+    assert "Matplotlib ListedColormap" in out
+    assert "Matplotlib-defined" in out
+    assert out.index("RdBuB") < out.index("viridis")
+    # The SIMPLE_HEAVY table has a horizontal section rule between registries.
+    assert out.count("━━━━━━━━") >= 2
+
+
 def test_jplot_cap_styles_json_marks_broken_cards(capsys):
     assert main(["cap", "styles", "--json"]) == 0
     env = json.loads(capsys.readouterr().out)
@@ -117,6 +186,22 @@ def test_jplot_cap_styles_json_marks_broken_cards(capsys):
     assert broken
     axc_cards = [s for s in styles if "axc" in (s.get("axes") or [])]
     assert axc_cards
+
+
+def test_jplot_cap_cmaps_json_includes_matplotlib_registry(capsys):
+    assert main(["cap", "cmaps", "--json"]) == 0
+    env = json.loads(capsys.readouterr().out)
+    cmaps = env["data"]["cmaps"]
+    entries = cmaps["matplotlib"]
+    assert len(entries) >= 100
+    by_name = {entry["name"]: entry for entry in entries}
+    assert by_name["viridis"] == {
+        "name": "viridis",
+        "type": "ListedColormap",
+        "N": 256,
+        "reverse": "viridis_r",
+    }
+    assert "matplotlib_note" in cmaps
 
 
 def test_jplot_cap_unknown_section_is_usage(capsys):
