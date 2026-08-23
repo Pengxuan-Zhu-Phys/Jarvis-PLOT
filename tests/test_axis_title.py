@@ -74,6 +74,16 @@ def test_a4paper_2x1_rect_cards_define_default_title_params():
         assert not {"x", "y", "ha", "va"}.intersection(title_params)
 
 
+def test_a4paper_2x1_rect_default_axis_labels_are_centered():
+    cards_dir = Path(__file__).resolve().parents[1] / "jarvisplot" / "cards" / "a4paper" / "2x1"
+    card = json.loads((cards_dir / "rect.json").read_text(encoding="utf-8"))
+    labels = card["Frame"]["ax"]["labels"]
+
+    assert labels["xlabel"]["loc"] == "center"
+    assert labels["ylabel"]["loc"] == "center"
+    assert labels["ylabel_coords"]["y"] == 0.5
+
+
 @pytest.mark.parametrize("axis_name", ["ax1", "ax2", "ax3", "ax4"])
 def test_numbered_axis_titles_only_render_on_ax0(axis_name):
     warnings = []

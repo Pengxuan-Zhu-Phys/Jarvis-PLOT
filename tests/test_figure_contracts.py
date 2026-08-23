@@ -22,6 +22,7 @@ from jarvisplot.Figure.method_registry import resolve_method
 from jarvisplot.Figure.preprocessor import DataPreprocessor
 from jarvisplot.Figure.profile_runtime import regular_grid_mesh
 from jarvisplot.core import _format_console_record
+from jarvisplot.core_assets import load_styles
 from jarvisplot.data_loader import JP_ROW_IDX
 
 
@@ -599,6 +600,10 @@ def test_colorbar_log_scale_uses_positive_subset_for_limits():
     assert fig.axc._cb["vmin"] == 1.0
     assert fig.axc._cb["vmax"] == 10.0
     assert fig.axc.get_yscale() == "log"
+    assert fig.axc.yaxis.get_ticks_position() == "right"
+    assert fig.axc.yaxis.get_label_position() == "right"
+    assert all(not tick.label1.get_visible() for tick in fig.axc.yaxis.get_major_ticks())
+    assert all(tick.label2.get_visible() for tick in fig.axc.yaxis.get_major_ticks())
 
 
 def test_colorbar_legacy_axis_scale_is_ignored_without_color_scale():
@@ -713,6 +718,91 @@ def test_colorbar_manual_y_ticks_override_auto_ticks(axc_name):
 
     np.testing.assert_allclose(axc.yaxis.get_majorticklocs(), positions)
     assert [label.get_text() for label in axc.get_yticklabels()] == labels
+    plt.close(fig.fig)
+
+
+def test_colorbar_tick_side_follows_merged_rectcmap_json():
+    fig = Figure()
+    fig.logger = _logger()
+    fig.jpstyles = load_styles(fig.load_path)
+    fig.style = ["a4paper_2x1", "rectcmap"]
+    fig.fig = plt.figure(**fig.frame["figure"])
+    fig.load_axes()
+
+    assert fig.frame["axc"]["ticks"]["ticks_position"] == "right"
+
+    collect_and_attach_colorbar(
+        fig,
+        style={},
+        coor={"z": {"expr": "z"}},
+        method_key="voronoi",
+        df=pd.DataFrame({"z": [1.0, 2.0, 10.0]}),
+    )
+    fig._finalize_axc("axc")
+    fig._apply_auto_ticks(fig.axc, "y")
+
+    assert fig.axc.yaxis.get_ticks_position() == "right"
+    assert fig.axc.yaxis.get_label_position() == "right"
+    assert all(not tick.label1.get_visible() for tick in fig.axc.yaxis.get_major_ticks())
+    assert all(tick.label2.get_visible() for tick in fig.axc.yaxis.get_major_ticks())
+    plt.close(fig.fig)
+
+
+def test_colorbar_tick_side_is_applied_to_empty_design_axis():
+    fig = Figure()
+    fig.logger = _logger()
+    fig.jpstyles = load_styles(fig.load_path)
+    fig.style = ["a4paper_2x1", "rectcmap"]
+    fig.fig = plt.figure(**fig.frame["figure"])
+    fig.load_axes()
+
+    # The design-reference example deliberately has no layers, so no
+    # colorbar is finalized.  The visible axc must still honor the card.
+    fig.render()
+
+    assert fig.axc._cb["used"] is False
+    assert fig.axc.yaxis.get_ticks_position() == "right"
+    assert fig.axc.yaxis.get_label_position() == "right"
+    assert all(not tick.label1.get_visible() for tick in fig.axc.yaxis.get_major_ticks())
+    assert all(tick.label2.get_visible() for tick in fig.axc.yaxis.get_major_ticks())
+    plt.close(fig.fig)
+
+
+def test_colorbar_tick_side_falls_back_to_json_both_flags():
+    fig = Figure()
+    fig.logger = _logger()
+    fig.frame = {
+        "figure": {"figsize": (2, 2)},
+        "axc": {
+            "label": {"ylabel": ""},
+            "ticks": {
+                "both": {
+                    "left": True,
+                    "right": False,
+                    "top": False,
+                    "bottom": False,
+                    "which": "both",
+                }
+            },
+            "color": {"scale": "linear", "cmap": "viridis", "vmin": 0.0, "vmax": 1.0},
+        },
+    }
+    fig.fig = plt.figure(figsize=(2, 2))
+    fig.axes = {}
+    fig.axc = {"rect": [0.1, 0.1, 0.2, 0.8]}
+    collect_and_attach_colorbar(
+        fig,
+        style={},
+        coor={"z": {"expr": "z"}},
+        method_key="voronoi",
+        df=pd.DataFrame({"z": [0.0, 0.5, 1.0]}),
+    )
+    fig._finalize_axc("axc")
+
+    assert fig.axc.yaxis.get_ticks_position() == "left"
+    assert fig.axc.yaxis.get_label_position() == "left"
+    assert all(tick.label1.get_visible() for tick in fig.axc.yaxis.get_major_ticks())
+    assert all(not tick.label2.get_visible() for tick in fig.axc.yaxis.get_major_ticks())
     plt.close(fig.fig)
 
 

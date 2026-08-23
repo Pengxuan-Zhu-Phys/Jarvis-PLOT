@@ -1,9 +1,11 @@
 # Jarvis-PLOT — design-reference debug examples
 
 One example per style card. Each figure sets `debug: true`, which draws the
-**design-reference overlay**: every axis is outlined and annotated with its
-`rect = [left, bottom, width, height]` (figure fractions), its width/height in
-centimetres, the figure size, and the margin / colorbar-gap dimension lines.
+**design-reference overlay**: every axis is outlined, while all axes'
+`rect = [left, bottom, width, height]` (figure fractions) and width/height in
+centimetres are listed sequentially in one panel inside the primary `ax`.
+The figure size and margin / colorbar-gap dimension lines remain on the outer
+overlay.
 
 The figures have **no data layers** on purpose — they are pure layout references
 for each style card.
