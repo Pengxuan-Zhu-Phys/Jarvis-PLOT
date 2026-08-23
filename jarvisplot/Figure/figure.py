@@ -53,6 +53,51 @@ except Exception:
 _JPLOT_VERSION_CACHE = None
 
 
+def _resolve_colorbar_tick_position(
+    ticks_cfg: Mapping, default: str, *, horizontal: bool = False
+) -> str:
+    """Resolve a colorbar tick side from the merged JSON configuration.
+
+    ``ticks_position`` is the explicit contract when present. Older cards
+    only expressed the side through ``ticks.both.left/right``; preserve that
+    form instead of letting the vertical default move those labels to the
+    right.
+    """
+    raw_position = ticks_cfg.get("ticks_position")
+    valid_positions = (
+        {"top", "bottom", "both", "default", "none"}
+        if horizontal
+        else {"left", "right", "both", "default", "none"}
+    )
+    if raw_position is not None:
+        position = str(raw_position).strip().lower()
+        if position in valid_positions:
+            return position
+
+    both_cfg = ticks_cfg.get("both", {})
+    if isinstance(both_cfg, Mapping):
+        if horizontal:
+            top = bool(both_cfg.get("top", False))
+            bottom = bool(both_cfg.get("bottom", False))
+            if top and not bottom:
+                return "top"
+            if bottom and not top:
+                return "bottom"
+            if top and bottom:
+                return "both"
+        else:
+            left = bool(both_cfg.get("left", False))
+            right = bool(both_cfg.get("right", False))
+            if left and not right:
+                return "left"
+            if right and not left:
+                return "right"
+            if left and right:
+                return "both"
+
+    return default
+
+
 def _resolve_jplot_version() -> str:
     """Return the source/package version used for figure metadata."""
     global _JPLOT_VERSION_CACHE
@@ -616,8 +661,94 @@ class Figure:
             "used":   False,
         }
         self.axes[name] = axc_obj
+        # Apply the card's tick/label contract immediately.  Design-reference
+        # figures can intentionally have no coloured layers, so waiting for
+        # colorbar finalization would leave this visible axes at Matplotlib's
+        # default (left-side labels for a raw vertical axes).
+        self._apply_axc_tick_config(name, axc_obj)
         if self.logger:
             self.logger.debug(f"Created named colorbar axes -> {name}")
+
+    def _apply_axc_tick_config(self, name: str, axc_obj) -> None:
+        """Apply the merged JSON tick and label configuration to an axc axis."""
+        cb_frame = self.frame.get(name, {})
+        is_h = axc_is_horizontal(self.frame, name)
+        ticks_cfg = cb_frame.get("ticks", {}) if isinstance(cb_frame, dict) else {}
+        if not isinstance(ticks_cfg, dict):
+            ticks_cfg = {}
+
+        if not is_h:
+            _tp = _resolve_colorbar_tick_position(ticks_cfg, "right")
+            axc_obj.yaxis.set_ticks_position(_tp)
+            if _tp in {"left", "right"}:
+                axc_obj.yaxis.set_label_position(_tp)
+            axc_obj.tick_params(**ticks_cfg.get("both", {}))
+            axc_obj.tick_params(**ticks_cfg.get("major", {}))
+            axc_obj.tick_params(**ticks_cfg.get("minor", {}))
+            # Re-assert the JSON-selected side after all style tick_params;
+            # this prevents a broad ``both`` config from moving labels back
+            # to the opposite side of a vertical colorbar.
+            if _tp == "left":
+                axc_obj.tick_params(
+                    axis="y", which="both",
+                    left=True, right=False, labelleft=True, labelright=False,
+                )
+            elif _tp == "right":
+                axc_obj.tick_params(
+                    axis="y", which="both",
+                    left=False, right=True, labelleft=False, labelright=True,
+                )
+            elif _tp == "both":
+                axc_obj.tick_params(axis="y", which="both", left=True, right=True)
+            elif _tp == "none":
+                axc_obj.tick_params(
+                    axis="y", which="both",
+                    left=False, right=False, labelleft=False, labelright=False,
+                )
+            label_cfg = cb_frame.get("label", {}) if isinstance(cb_frame, dict) else {}
+            if not isinstance(label_cfg, dict):
+                label_cfg = {}
+            if label_cfg:
+                label_kwargs = dict(label_cfg)
+                label_text = label_kwargs.pop("ylabel", "")
+                axc_obj.set_ylabel(label_text if label_text is not None else "", **label_kwargs)
+            ylabel_coords = cb_frame.get("ylabel_coords") if isinstance(cb_frame, dict) else None
+            if ylabel_coords:
+                axc_obj.yaxis.set_label_coords(ylabel_coords["x"], ylabel_coords["y"])
+            self._apply_manual_ticks(axc_obj, "y", ticks_cfg.get("y", {}))
+        else:
+            _tp = _resolve_colorbar_tick_position(ticks_cfg, "top", horizontal=True)
+            axc_obj.xaxis.set_ticks_position(_tp)
+            if _tp in {"top", "bottom"}:
+                axc_obj.xaxis.set_label_position(_tp)
+            axc_obj.tick_params(**ticks_cfg.get("both", {}))
+            axc_obj.tick_params(**ticks_cfg.get("major", {}))
+            axc_obj.tick_params(**ticks_cfg.get("minor", {}))
+            if _tp == "top":
+                axc_obj.tick_params(
+                    axis="x", which="both",
+                    top=True, bottom=False, labeltop=True, labelbottom=False,
+                )
+            elif _tp == "bottom":
+                axc_obj.tick_params(
+                    axis="x", which="both",
+                    top=False, bottom=True, labeltop=False, labelbottom=True,
+                )
+            elif _tp == "both":
+                axc_obj.tick_params(axis="x", which="both", top=True, bottom=True)
+            elif _tp == "none":
+                axc_obj.tick_params(
+                    axis="x", which="both",
+                    top=False, bottom=False, labeltop=False, labelbottom=False,
+                )
+            label_cfg = cb_frame.get("label", {}) if isinstance(cb_frame, dict) else {}
+            if not isinstance(label_cfg, dict):
+                label_cfg = {}
+            if cb_frame.get("isxlabel") and label_cfg:
+                label_kwargs = dict(label_cfg)
+                label_text = label_kwargs.pop("xlabel", "")
+                axc_obj.set_xlabel(label_text if label_text is not None else "", **label_kwargs)
+            self._apply_manual_ticks(axc_obj, "x", ticks_cfg.get("x", {}))
 
     def _finalize_axc(self, name: str) -> None:
         """Draw the colorbar for a named axc* axes using its pre-built _cb state."""
@@ -627,11 +758,7 @@ class Figure:
         if not axc_obj._cb.get("used"):
             return
 
-        cb_frame = self.frame.get(name, {})
         is_h = axc_is_horizontal(self.frame, name)
-        ticks_cfg = cb_frame.get("ticks", {}) if isinstance(cb_frame, dict) else {}
-        if not isinstance(ticks_cfg, dict):
-            ticks_cfg = {}
 
         mappable = mpl.cm.ScalarMappable(
             cmap=axc_obj._cb.get("cmap") or mpl.rcParams.get("image.cmap", "rainbow"),
@@ -650,23 +777,7 @@ class Figure:
             else:
                 from matplotlib.ticker import AutoMinorLocator
                 axc_obj.yaxis.set_minor_locator(AutoMinorLocator())
-            _tp = ticks_cfg.get("ticks_position", "right")
-            axc_obj.yaxis.set_ticks_position(_tp)
-            axc_obj.yaxis.set_label_position("left" if _tp == "left" else "right")
-            axc_obj.tick_params(**ticks_cfg.get("both", {}))
-            axc_obj.tick_params(**ticks_cfg.get("major", {}))
-            axc_obj.tick_params(**ticks_cfg.get("minor", {}))
-            label_cfg = cb_frame.get("label", {}) if isinstance(cb_frame, dict) else {}
-            if not isinstance(label_cfg, dict):
-                label_cfg = {}
-            if label_cfg:
-                label_kwargs = dict(label_cfg)
-                label_text = label_kwargs.pop("ylabel", "")
-                axc_obj.set_ylabel(label_text if label_text is not None else "", **label_kwargs)
-            ylabel_coords = cb_frame.get("ylabel_coords") if isinstance(cb_frame, dict) else None
-            if ylabel_coords:
-                axc_obj.yaxis.set_label_coords(ylabel_coords["x"], ylabel_coords["y"])
-            self._apply_manual_ticks(axc_obj, "y", ticks_cfg.get("y", {}))
+            self._apply_axc_tick_config(name, axc_obj)
         else:
             cbar = self.fig.colorbar(mappable, cax=axc_obj, orientation="horizontal")
             cbar.minorticks_on()
@@ -678,20 +789,7 @@ class Figure:
             else:
                 from matplotlib.ticker import AutoMinorLocator
                 axc_obj.xaxis.set_minor_locator(AutoMinorLocator())
-            _tp = ticks_cfg.get("ticks_position", "top")
-            axc_obj.xaxis.set_ticks_position(_tp)
-            axc_obj.xaxis.set_label_position("top" if _tp == "top" else "bottom")
-            axc_obj.tick_params(**ticks_cfg.get("both", {}))
-            axc_obj.tick_params(**ticks_cfg.get("major", {}))
-            axc_obj.tick_params(**ticks_cfg.get("minor", {}))
-            label_cfg = cb_frame.get("label", {}) if isinstance(cb_frame, dict) else {}
-            if not isinstance(label_cfg, dict):
-                label_cfg = {}
-            if cb_frame.get("isxlabel") and label_cfg:
-                label_kwargs = dict(label_cfg)
-                label_text = label_kwargs.pop("xlabel", "")
-                axc_obj.set_xlabel(label_text if label_text is not None else "", **label_kwargs)
-            self._apply_manual_ticks(axc_obj, "x", ticks_cfg.get("x", {}))
+            self._apply_axc_tick_config(name, axc_obj)
 
         if self.logger:
             self.logger.debug(f"Finalized colorbar axes -> {name}")
