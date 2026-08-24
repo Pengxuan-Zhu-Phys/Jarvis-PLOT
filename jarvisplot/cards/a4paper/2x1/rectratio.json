@@ -1,0 +1,219 @@
+{
+    "Frame": {
+        "figure": {
+            "figsize": [
+                3.3,
+                3.3
+            ]
+        },
+        "axes": {
+            "axlogo": {
+                "rect": [
+                    0.01,
+                    0.01,
+                    0.06,
+                    0.06
+                ],
+                "frameon": false,
+                "yticks": [],
+                "xticks": [],
+                "xlim": [
+                    0,
+                    1024
+                ],
+                "ylim": [
+                    1024,
+                    0
+                ]
+            },
+            "ax": {
+                "rect": [
+                    0.14,
+                    0.333,
+                    0.84,
+                    0.62
+                ]
+            },
+            "axr": {
+                "rect": [
+                    0.14,
+                    0.168,
+                    0.84,
+                    0.155
+                ]
+            }
+        },
+        "ax": {
+            "title_params": {
+                "position": "top",
+                "fontsize": "small",
+                "fontfamily": "Fira code",
+                "fontweight": "normal",
+                "clip_on": false,
+                "zorder": 1000
+            },
+            "frame": {
+                "linewidth": 0.8,
+                "solid_capstyle": "projecting",
+                "solid_joinstyle": "miter",
+                "clip_on": false,
+                "c": "#21171A",
+                "zorder": 100
+            },
+            "grid": {
+                "sep": 0.1,
+                "style": {
+                    "color": "#C2C2C269",
+                    "linewidth": 0.3,
+                    "linestyle": "--"
+                }
+            },
+            "ticks": {
+                "both": {
+                    "labelsize": 6,
+                    "direction": "in",
+                    "labelfontfamily": "sans",
+                    "top": true,
+                    "left": true,
+                    "right": true,
+                    "bottom": true,
+                    "labeltop": false,
+                    "labelbottom": false,
+                    "which": "both"
+                },
+                "major": {
+                    "which": "major",
+                    "length": 4,
+                    "width": 0.4,
+                    "color": "black"
+                },
+                "minor": {
+                    "which": "minor",
+                    "length": 2,
+                    "width": 0.4,
+                    "color": "black"
+                }
+            },
+            "labels": {
+                "xlabel": {
+                    "loc": "center",
+                    "fontsize": 12,
+                    "fontfamily": "STIXGeneral"
+                },
+                "ylabel": {
+                    "loc": "center",
+                    "fontsize": 12,
+                    "fontfamily": "STIXGeneral"
+                },
+                "ylabel_coords": {
+                    "x": -0.1,
+                    "y": 0.5
+                }
+            }
+        },
+        "axr": {
+            "title_params": {
+                "position": "top",
+                "fontsize": "small",
+                "fontfamily": "Fira code",
+                "fontweight": "normal",
+                "clip_on": false,
+                "zorder": 1000
+            },
+            "frame": {
+                "linewidth": 0.8,
+                "solid_capstyle": "projecting",
+                "solid_joinstyle": "miter",
+                "clip_on": false,
+                "c": "#21171A",
+                "zorder": 100
+            },
+            "grid": {
+                "sep": 0.1,
+                "style": {
+                    "color": "#C2C2C269",
+                    "linewidth": 0.3,
+                    "linestyle": "--"
+                }
+            },
+            "ticks": {
+                "both": {
+                    "labelsize": 6,
+                    "direction": "in",
+                    "labelfontfamily": "sans",
+                    "top": true,
+                    "left": true,
+                    "right": true,
+                    "bottom": true,
+                    "which": "both"
+                },
+                "major": {
+                    "which": "major",
+                    "length": 4,
+                    "width": 0.4,
+                    "color": "black"
+                },
+                "minor": {
+                    "which": "minor",
+                    "length": 2,
+                    "width": 0.4,
+                    "color": "black"
+                }
+            },
+            "labels": {
+                "xlabel": {
+                    "loc": "center",
+                    "fontsize": 12,
+                    "fontfamily": "STIXGeneral"
+                },
+                "ylabel": {
+                    "loc": "center",
+                    "fontsize": 12,
+                    "fontfamily": "STIXGeneral"
+                },
+                "ylabel_coords": {
+                    "x": -0.1,
+                    "y": 0.5
+                }
+            }
+        },
+        "axlogo": {
+            "file": "&JP/jarvisplot/cards/icons/JarvisHEP.png",
+            "text": [
+                {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "s": "Jarvis-HEP",
+                    "ha": "left",
+                    "va": "bottom",
+                    "fontfamily": "Fira code",
+                    "fontsize": "x-small",
+                    "fontstyle": "normal",
+                    "fontweight": "bold"
+                },
+                {
+                    "x": 1.0,
+                    "y": 0.9,
+                    "s": "       Powered by",
+                    "ha": "left",
+                    "va": "top",
+                    "color": "black",
+                    "fontfamily": "Fira code",
+                    "fontsize": 4,
+                    "fontstyle": "normal",
+                    "fontweight": "normal"
+                }
+            ]
+        }
+    },
+    "Style": {
+        "scatter": {
+            "s": 1.0,
+            "marker": "^",
+            "linewidths": 0.02,
+            "alpha": 1.0,
+            "zorder": 30,
+            "edgecolor": "white"
+        }
+    }
+}
