@@ -21,6 +21,10 @@ aliases:
   agent: agent-output
   agent_output: agent-output
   digest: agent-output
+  # design-reference overlay
+  debug: debug-overlay
+  overlay: debug-overlay
+  design-reference: debug-overlay
 topics:
   - workflow
   - yaml-root
@@ -36,3 +40,4 @@ topics:
   - dryrun-viz
   - diagnostics
   - cli-map
+  - debug-overlay

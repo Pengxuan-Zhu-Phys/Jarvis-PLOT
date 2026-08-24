@@ -205,6 +205,10 @@ def _styles() -> list[dict[str, Any]]:
             if figsize:
                 entry["figsize"] = figsize
             entry["styled_methods"] = sorted(card.get("Style", {}))
+            # Which debug-overlay groups this card configures. `Figures[].debug`
+            # turns the overlay on; these are the groups a card (or a `debug:`
+            # mapping) can tune, each with its own `show` switch.
+            entry["debug_groups"] = sorted(card.get("Debug", {}))
             out.append(entry)
     return out
 

@@ -1,0 +1,61 @@
+id: debug-overlay
+title: Design-reference overlay (debug mode)
+summary: >-
+  Figures[].debug draws dimension annotations over a finished figure; the style
+  card's Debug block decides what they look like and which ones appear.
+role: how-to
+priority: 46
+see_also:
+  - yaml-root
+  - style-axes
+  - workflow
+related_cli:
+  - argv: ["jplot", "cap", "styles", "--json"]
+    why: "each card's debug_groups"
+  - argv: ["jplot", "<file>"]
+    why: "render path; the overlay is drawn just before saving"
+live_sources:
+  - verb: cap.styles
+    truth: "which Debug groups a card configures"
+human:
+  panels:
+    - kind: overview
+      title: Principle
+      body: |
+        YAML says whether to draw the overlay. JSON says what it looks like.
+        A style card cannot suppress a debug: true that you wrote.
+    - kind: yaml
+      title: Turning it on
+      lexer: yaml
+      body: |
+        Figures:
+          - name: layout_check
+            debug: true                 # card settings
+            style: [a4paper_2x1, rect]
+            layers: []                  # a pure layout reference needs no data
+
+          - name: quieter
+            debug:                      # same, minus the information panel
+              panel: {show: false}
+              palette: {dimension: "#888888"}
+            style: [a4paper_2x1, rectcmap]
+            layers: []
+    - kind: notes
+      title: Rules
+      items:
+        - "debug: true | false, or a mapping that overrides the card for one figure."
+        - "show: false inside the mapping keeps the overrides but leaves it off."
+        - "Precedence: packaged defaults < style card Debug < YAML debug mapping."
+        - "Every element takes show; absent means on."
+        - "show is a veto, not a command -- a colorbar gap needs a colorbar."
+        - "Groups: primary_order, palette, zorder, units, labelstyle, labelbox, figure, axes, dimension, margins, colorbar_gap, numbered_axes, panel, ternary."
+        - "Keys inside *style / bbox are matplotlib kwargs, passed through unchecked."
+        - "A bad Debug key warns and falls back; the overlay never breaks a plot."
+agent:
+  body_markdown: |
+    Full card contract: docs/specs/STYLE_SCHEMA.md, section "The Debug Block".
+  anti_patterns:
+    - "Expecting jplot --debug (the CLI flag) to draw the overlay -- it only raises the log level"
+    - "Editing a card to switch the overlay off for one figure; use a debug: mapping"
+    - "Setting ternary.* on a rect card -- that group only ships where an axtri axes exists"
+    - "Assuming a Debug typo will error; it warns and falls back to the default"
