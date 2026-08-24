@@ -18,8 +18,11 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Mapping
 
+from ..diagnostics import did_you_mean
+
 __all__ = [
     "DEFAULT_DEBUG",
+    "DELEGATED_LEAVES",
     "PALETTE_ROLES",
     "merge_debug_config",
     "resolve_debug_config",
@@ -104,25 +107,86 @@ DEFAULT_DEBUG = {
 
 
 
-def merge_debug_config(base: Mapping, override: Mapping | None) -> dict:
-    """Merge a style-card ``Debug`` block over the runtime defaults."""
+#: Leaf blocks whose keys are matplotlib kwargs, not Jarvis-PLOT vocabulary.
+#: The merge stops validating inside these, the same way ``layers[].style`` is a
+#: delegated zone in the YAML schema -- Jarvis-PLOT does not enumerate what
+#: matplotlib accepts.
+DELEGATED_LEAVES = ("bbox", "boxstyle_kwargs")
+
+
+def _is_delegated(key: str) -> bool:
+    return key.endswith("style") or key in DELEGATED_LEAVES
+
+
+def merge_debug_config(
+    base: Mapping,
+    override: Mapping | None,
+    *,
+    path: str = "",
+    problems: list[str] | None = None,
+) -> tuple[dict, list[str]]:
+    """Merge a ``Debug`` block over the defaults, reporting what it had to drop.
+
+    Returns ``(merged, problems)``. Two things used to fail in silence here and
+    now surface instead:
+
+    - a key the defaults do not define was carried through as inert junk, so a
+      typo looked exactly like a working override;
+    - a scalar written where the defaults hold a mapping was discarded outright.
+
+    Neither ever raises. A bad ``Debug`` block degrades to the defaults and says
+    so once, because a debug overlay must never be able to break a plot.
+    """
+    problems = [] if problems is None else problems
     merged = deepcopy(dict(base))
     if not isinstance(override, Mapping):
-        return merged
+        return merged, problems
+
     for key, value in override.items():
-        if isinstance(merged.get(key), Mapping):
-            if isinstance(value, Mapping):
-                merged[key] = merge_debug_config(merged[key], value)
+        where = f"{path}{key}"
+        if key not in merged:
+            hint = did_you_mean(str(key), [str(k) for k in merged])
+            suffix = f" Did you mean {hint[0]!r}?" if hint else ""
+            problems.append(f"{where}: unknown Debug key, ignored.{suffix}")
             continue
-        merged[key] = value
-    return merged
+
+        if _is_delegated(str(key)):
+            # matplotlib kwargs: take the override wholesale, validate nothing.
+            if isinstance(merged[key], Mapping) and isinstance(value, Mapping):
+                merged[key] = {**merged[key], **deepcopy(dict(value))}
+            else:
+                merged[key] = deepcopy(value)
+            continue
+
+        if isinstance(merged[key], Mapping):
+            if isinstance(value, Mapping):
+                merged[key], _ = merge_debug_config(
+                    merged[key], value, path=f"{where}.", problems=problems
+                )
+            else:
+                problems.append(
+                    f"{where}: expected a mapping, got "
+                    f"{type(value).__name__}; kept the default."
+                )
+            continue
+
+        merged[key] = deepcopy(value)
+
+    return merged, problems
 
 
 def resolve_debug_config(fig) -> dict:
-    """Return the selected style card's debug settings with safe defaults."""
-    return merge_debug_config(
+    """Return the merged debug settings, logging anything the merge dropped."""
+    merged, problems = merge_debug_config(
         DEFAULT_DEBUG,
         getattr(fig, "debug_config", getattr(fig, "_debug_config", None)),
     )
-
-
+    if problems:
+        logger = getattr(fig, "logger", None)
+        warn = getattr(logger, "warning", None)
+        if callable(warn):
+            try:
+                warn("Debug config:\n\t" + "\n\t".join(problems))
+            except Exception:
+                pass
+    return merged
