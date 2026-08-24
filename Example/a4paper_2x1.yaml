@@ -1,0 +1,64 @@
+# Design-reference debug examples for all a4paper_2x1 style cards.
+#
+#   Run:    jplot Example/a4paper_2x1.yaml
+#
+# Each figure is a pure layout reference with debug overlay enabled.
+
+version: '0.3'
+project:
+  name: a4paper_2x1
+Functions: []
+DataSet: []
+Figures:
+  - name: a4paper_2x1_Ternary
+    debug: true                      # draw the design-reference dimension overlay
+    style: [a4paper_2x1, Ternary]
+    frame:
+      axtri: {labels: {left: "A", bottom: "B", right: "C"}}
+    layers: []                       # empty -- layout reference only
+
+  - name: a4paper_2x1_TernaryCmap
+    debug: true                      # draw the design-reference dimension overlay
+    style: [a4paper_2x1, TernaryCmap]
+    frame:
+      axtri: {labels: {left: "A", bottom: "B", right: "C"}}
+      axc: {label: {ylabel: "$z$"}}
+    layers: []                       # empty -- layout reference only
+
+  - name: a4paper_2x1_dynesty_runplot
+    debug: true                      # draw the design-reference dimension overlay
+    style: [a4paper_2x1, dynesty_runplot]
+    layers: []                       # empty -- layout reference only
+
+  - name: a4paper_2x1_rect
+    debug: true                      # draw the design-reference dimension overlay
+    style: [a4paper_2x1, rect]
+    frame:
+      ax: {labels: {x: "$x$", y: "$y$"}}
+    layers: []                       # empty -- layout reference only
+  - name: a4paper_2x1_rectRatio
+    debug: true                      # draw the design-reference dimension overlay
+    style: [a4paper_2x1, rectRatio]
+    layers: []                       # empty -- layout reference only
+
+
+
+  - name: a4paper_2x1_rect_5x1
+    debug: true                      # draw the design-reference dimension overlay
+    style: [a4paper_2x1, rect_5x1]
+    layers: []                       # empty -- layout reference only
+
+  - name: a4paper_2x1_rectcmap
+    debug: true                      # draw the design-reference dimension overlay
+    style: [a4paper_2x1, rectcmap]
+    frame:
+      ax: {labels: {x: "$x$", y: "$y$"}}
+      axc: {label: {ylabel: "$z$"}}
+    layers: []                       # empty -- layout reference only
+
+output:
+  dir: ./plots
+  dpi: 150
+  formats:
+    - png
+    - pdf
