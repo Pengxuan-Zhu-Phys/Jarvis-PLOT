@@ -226,6 +226,10 @@ DEFAULT_DEBUG = {
     "margins": {
         "template": "%.3f cm",
         "label_side": "right",
+        # Axes that get no margin dimensions at all. A logo plate is placed by
+        # eye in a corner, not designed against the page edges, so measuring it
+        # only adds a column that collides with the ones that matter.
+        "exclude": ["axlogo"],
         # Axes that end at the same x would draw on top of each other, so each
         # one after the first steps this far further inside the border.
         "marker_step": 0.040,

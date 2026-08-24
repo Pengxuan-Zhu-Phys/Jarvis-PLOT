@@ -157,13 +157,17 @@ def test_primary_top_and_bottom_margins_ride_the_axes_right_border():
     assert sorted(narrow) == [0.043, 0.472]
 
 
-def _vertical_dimension_labels(axes_rects):
+def _vertical_dimension_labels(axes_rects, debug_config=None):
     """Map x -> the rotated dimension labels drawn there, for one layout."""
     raw_fig = plt.figure(figsize=(3.3, 2.75))
     wrapper = SimpleNamespace(
         fig=raw_fig,
         axes={name: raw_fig.add_axes(rect) for name, rect in axes_rects.items()},
-        logger=SimpleNamespace(debug=lambda *args, **kwargs: None),
+        _debug_config=debug_config or {},
+        logger=SimpleNamespace(
+            debug=lambda *args, **kwargs: None,
+            warning=lambda *args, **kwargs: None,
+        ),
     )
     try:
         draw_design_reference(wrapper)
@@ -176,20 +180,40 @@ def _vertical_dimension_labels(axes_rects):
         plt.close(raw_fig)
 
 
+LAYOUT_WITH_LOGO = {
+    "axlogo": [0.010, 0.010, 0.060, 0.072],
+    "ax": [0.142, 0.168, 0.680, 0.775],
+    "axc": [0.827, 0.182, 0.036, 0.746],
+}
+
+
 def test_every_axes_gets_its_own_top_and_bottom_margin_dimensions():
     """Not just the primary: a helper axes' offsets are part of the design."""
-    by_x = _vertical_dimension_labels({
-        "axlogo": [0.010, 0.010, 0.060, 0.072],
-        "ax": [0.142, 0.168, 0.680, 0.775],
-        "axc": [0.827, 0.182, 0.036, 0.746],
-    })
+    by_x = _vertical_dimension_labels(LAYOUT_WITH_LOGO)
 
     # the total-height marker, then one column per axes on its right border
-    # (right - corner_gap 0.018 + label_gap 0.008).  axlogo's own border sits
-    # 0.017 from the height marker, so it steps clear to 0.092.
-    assert sorted(by_x) == [0.043, 0.100, 0.812, 0.853]
-    assert [len(by_x[x]) for x in (0.100, 0.812, 0.853)] == [2, 2, 2]
+    # (right - corner_gap 0.018 + label_gap 0.008).  axlogo is excluded.
+    assert sorted(by_x) == [0.043, 0.812, 0.853]
+    assert [len(by_x[x]) for x in (0.812, 0.853)] == [2, 2]
     assert len(by_x[0.043]) == 1
+
+
+def test_margins_exclude_keeps_the_logo_plate_out_of_the_columns():
+    """A logo is placed by eye, not designed against the page edges.
+
+    It is the one axes the shipped default leaves alone; emptying the list
+    brings it back, so this is a card setting and not a rule in the code.
+    """
+    default = _vertical_dimension_labels(LAYOUT_WITH_LOGO)
+    included = _vertical_dimension_labels(
+        LAYOUT_WITH_LOGO, {"margins": {"exclude": []}}
+    )
+
+    assert sorted(default) == [0.043, 0.812, 0.853]
+    # axlogo's own border is 0.017 from the height marker, so it steps clear
+    # to 0.092 rather than landing on it.
+    assert sorted(included) == [0.043, 0.100, 0.812, 0.853]
+    assert len(included[0.100]) == 2
 
 
 def test_axes_that_share_a_right_border_step_apart():

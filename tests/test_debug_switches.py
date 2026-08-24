@@ -129,12 +129,12 @@ def test_colorbar_gap_off_removes_its_dimension(baseline):
     assert after["panels"] == baseline["panels"]
 
 
-@pytest.mark.parametrize("side, removed", [("left", 1), ("top", 3), ("bottom", 3)])
+@pytest.mark.parametrize("side, removed", [("left", 1), ("top", 2), ("bottom", 2)])
 def test_each_margin_switch_removes_exactly_its_own_labels(baseline, side, removed):
     """`left` is the primary axes' inset alone; top/bottom cover every axes.
 
-    The fixture has three -- axlogo, ax, axc -- so each of those two switches
-    takes three labels with it.
+    The fixture has three -- axlogo, ax, axc -- and `margins.exclude` leaves
+    the logo plate out, so each of those two switches takes two labels.
     """
     after = _census_with({"margins": {side: {"show": False}}})
     assert after["labels"] == baseline["labels"] - removed

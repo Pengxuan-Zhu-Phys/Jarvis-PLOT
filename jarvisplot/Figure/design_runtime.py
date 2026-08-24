@@ -289,18 +289,22 @@ def _draw(fig) -> None:
     primary_pos = positions_by_name.get(primary) if primary else None
     corner_gap = float(dimension_cfg["corner_gap"])
 
-    # Every axes gets its top/bottom margins against its own right border.
-    # Numbered axes are a stack that ends at one x, so they keep the single
-    # staggered column below; the rest claim a column here, in card order,
+    # Every axes gets its top/bottom margins against its own right border,
+    # bar the ones ``margins.exclude`` names.  Numbered axes are a stack that
+    # ends at one x, so they keep the single staggered column below; the rest
+    # claim a column here, in card order,
     # each stepping clear of the markers already claimed -- including the
     # figure height marker, which a corner axes like axlogo lands on.
     margin_step = float(margins_cfg["marker_step"])
     margin_side = _label_side(margins_cfg["label_side"])
+    margin_exclude = {str(n) for n in margins_cfg["exclude"]}
     margin_columns = {}
     _claimed = []
     if _shown(figure_cfg["height_marker"]):
         _claimed.append(float(figure_cfg["height_marker"]["x"]))
     for _name, (_l, _b, _w, _h) in axis_positions:
+        if _name in margin_exclude:
+            continue
         if _name.startswith("ax") and _name[2:].isdigit():
             continue
         _x = _free_column(_l + _w - corner_gap, _claimed, margin_step)
@@ -350,7 +354,7 @@ def _draw(fig) -> None:
                 ov.plot([x, x], [ya, yb], **tick_style)
 
         yt = b + h
-        if name == primary and _shown(margins_cfg["left"]):
+        if name == primary and name not in margin_exclude and _shown(margins_cfg["left"]):
             # The horizontal inset is measured along the top edge, left of the
             # axes, and lands on the left spine just below the corner.
             dim(0.0, yt, l, yt,
