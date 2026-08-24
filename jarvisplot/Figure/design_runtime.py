@@ -74,6 +74,12 @@ def _text(template, values, fig=None) -> str:
         return str(values)
 
 
+def _label_side(value) -> str:
+    """Which side of a vertical dimension line its label sits on."""
+    side = str(value).lower()
+    return side if side in {"left", "right"} else "left"
+
+
 def _raw(ax):
     """Return the underlying matplotlib Axes for an adapter or raw Axes."""
     return getattr(ax, "ax", ax)
@@ -310,31 +316,32 @@ def _draw(fig) -> None:
 
         if name == primary:
             yt = b + h
-            # Keep the two margin dimensions off the shared top-left corner:
-            # the horizontal one lands on the left spine below the corner,
-            # while the vertical ones land on the top/bottom spines to its
-            # right.
+            # The horizontal inset is measured along the top edge, left of the
+            # axes, and lands on the left spine just below the corner.
             if _shown(margins_cfg["left"]):
                 dim(0.0, yt, l, yt,
                     _text(margins_cfg["template"], l * w_cm, fig),
                     line_offset=-corner_gap)
-            # Numbered axes get their top/bottom edge dimensions in the
-            # right-hand column group below.  Keep the original primary-axis
-            # top/bottom dimensions for an unnumbered ``ax`` layout.
+            # The top/bottom pair used to sit on the left spine, right on top
+            # of where the axes-layout panel begins.  Anchor it to the right
+            # edge instead, the same column the numbered axes already use, so
+            # every top/bottom distance in the overlay reads from one side.
             if not (name.startswith("ax") and name[2:].isdigit()):
+                margin_x = float(margins_cfg["right_edge"]) - corner_gap
+                margin_side = _label_side(margins_cfg["label_side"])
                 if _shown(margins_cfg["top"]):
                     dim(
-                        l, yt, l, 1.0,
+                        margin_x, yt, margin_x, 1.0,
                         _text(margins_cfg["template"], (1.0 - yt) * h_cm, fig),
                         vertical=True,
-                        line_offset=corner_gap,
+                        vertical_label_side=margin_side,
                     )
                 if _shown(margins_cfg["bottom"]):
                     dim(
-                        l, 0.0, l, b,
+                        margin_x, 0.0, margin_x, b,
                         _text(margins_cfg["template"], b * h_cm, fig),
                         vertical=True,
-                        line_offset=corner_gap,
+                        vertical_label_side=margin_side,
                     )
         elif name.startswith("axc") and primary_pos is not None:
             # gap between the primary axes' right edge and this colorbar's left edge
@@ -367,9 +374,7 @@ def _draw(fig) -> None:
         right_edge = float(numbered_cfg["right_edge"])
         marker_step = float(numbered_cfg["marker_step"])
         base_marker_x = right_edge - corner_gap
-        label_side = str(numbered_cfg["label_side"]).lower()
-        if label_side not in {"left", "right"}:
-            label_side = "left"
+        label_side = _label_side(numbered_cfg["label_side"])
         for number, _name, pos in numbered_axes:
             _left, bottom, _width, height = pos
             marker_x = base_marker_x - number * marker_step

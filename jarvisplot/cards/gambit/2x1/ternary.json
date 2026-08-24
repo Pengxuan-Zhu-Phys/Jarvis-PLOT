@@ -355,6 +355,8 @@
         },
         "margins": {
             "template": "%.3f cm",
+            "right_edge": 1.0,
+            "label_side": "left",
             "left": {
                 "show": true
             },
