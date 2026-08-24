@@ -586,3 +586,64 @@ def _draw(fig) -> None:
                 cursor_y -= detail_size * detail_leading / figure_height_pt
                 if index < len(entries) - 1:
                     cursor_y -= entry_gap / figure_height_pt
+
+
+# --------------------------------------------------------------------------- #
+# Ternary design reference
+# --------------------------------------------------------------------------- #
+
+
+def draw_ternary_reference(fig, tick_anchors) -> None:
+    """Mark the ternary tick anchors and draw leaders out to the axis labels.
+
+    Called from the ``axtri`` setter, *during* axes construction rather than
+    from the post-render overlay pass. That placement is deliberate: these
+    artists sit underneath the data layers, and moving them to the overlay
+    would silently put them on top.
+
+    ``tick_anchors`` is the ``(x, y)`` pairs the caller already computed for the
+    bottom / right / left tick labels.
+    """
+    try:
+        _draw_ternary(fig, tick_anchors)
+    except Exception as exc:  # never break a real plot because of the overlay
+        logger = getattr(fig, "logger", None)
+        if logger is not None:
+            try:
+                logger.debug(f"ternary design reference skipped: {exc}")
+            except Exception:
+                pass
+
+
+#: Each leader runs from the opposite vertex, through the midpoint of the edge
+#: it labels, out to the label anchor. The first two points are pure triangle
+#: geometry; the third comes from the style card.
+_TERNARY_LEADERS = {
+    "right": ((0.0, 0.0), (0.75, 0.5)),
+    "bottom": ((0.5, 1.0), (0.5, 0.0)),
+    "left": ((1.0, 0.0), (0.25, 0.5)),
+}
+
+
+def _draw_ternary(fig, tick_anchors) -> None:
+    cfg = _debug_config(fig).get("ternary", {})
+    axtri = fig.axtri
+
+    anchors_cfg = cfg.get("tick_anchors", {})
+    if _shown(anchors_cfg):
+        style = anchors_cfg.get("style", {})
+        for xs, ys in tick_anchors:
+            axtri.scatter(x=xs, y=ys, **style)
+
+    leaders_cfg = cfg.get("label_leaders", {})
+    if not _shown(leaders_cfg):
+        return
+    style = leaders_cfg.get("style", {})
+    labels = (fig.frame.get("axtri", {}) or {}).get("labels", {}) or {}
+    for side, ((x0, y0), (x1, y1)) in _TERNARY_LEADERS.items():
+        spec = labels.get(f"{side}style") or {}
+        try:
+            x2, y2 = float(spec["x"]), float(spec["y"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        axtri.plot(x=[x0, x1, x2], y=[y0, y1, y2], **style)

@@ -682,12 +682,11 @@ class Figure:
             self.axtri.text(x, y, label, **self.frame['axtri']['ticks']['leftticklables'])
 
         if self.debug:
-            self.axtri.scatter(x=lbx, y=lby, s=1.0, marker='.', c="#FF42A1", clip_on=False)
-            self.axtri.scatter(x=lrx, y=lry, s=1.0, marker='.', c="#FF42A1", clip_on=False)
-            self.axtri.scatter(x=llx, y=lly, s=1.0, marker='.', c="#FF42A1", clip_on=False)
-            self.axtri.plot(x=[0., 0.75, 0.84], y=[0., 0.5, 0.56], marker=".", linestyle="-", lw=0.3, markersize=1, c="#FF42A1", clip_on=False)
-            self.axtri.plot(x=[0.5, 0.5, 0.5], y=[1., 0.0, -0.12], marker=".", linestyle="-", lw=0.3, markersize=1, c="#FF42A1", clip_on=False)
-            self.axtri.plot(x=[1., 0.25, 0.16], y=[0., 0.5, 0.56], marker=".", linestyle="-", lw=0.3, markersize=1, c="#FF42A1", clip_on=False)
+            from .design_runtime import draw_ternary_reference
+
+            draw_ternary_reference(
+                self, ((lbx, lby), (lrx, lry), (llx, lly))
+            )
        
     @property
     def axc(self):
