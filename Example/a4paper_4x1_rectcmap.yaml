@@ -1,6 +1,6 @@
 # Design-reference debug example  --  style [a4paper_4x1, rectcmap]
 #
-#   Run:    jplot a4paper_4x1_rectcmap.yaml
+#   Run:    jplot Example/a4paper_4x1_rectcmap.yaml
 #   Shows:  the axes layout of this style card -- every axis box with its
 #           rect [left, bottom, width, height] and width/height in cm, the
 #           figure size, margins and colorbar gap -- drawn by `debug: true`.

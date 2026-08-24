@@ -13,25 +13,20 @@ for each style card.
 ## Run
 
 ```bash
-jplot a4paper_2x1_rectcmap.yaml      # → plots/a4paper_2x1_rectcmap.png
+jplot Example/a4paper_2x1.yaml
 ```
 
 (`plots/` and `.cache/` are created on the fly and are git-ignored.)
 
 ## Styles covered
 
-| File | Style `[family, variant]` |
+Examples are grouped by geometry family and paper ratio:
+
+| YAML | Style `[family, variant]` |
 |------|---------------------------|
-| `a4paper_2x1_rect.yaml`            | `[a4paper_2x1, rect]` |
-| `a4paper_2x1_rectcmap.yaml`        | `[a4paper_2x1, rectcmap]` |
-| `a4paper_2x1_Ternary.yaml`         | `[a4paper_2x1, Ternary]` |
-| `a4paper_2x1_TernaryCmap.yaml`     | `[a4paper_2x1, TernaryCmap]` |
-| `a4paper_2x1_rect_5x1.yaml`        | `[a4paper_2x1, rect_5x1]` (5 panels) |
-| `a4paper_2x1_dynesty_runplot.yaml` | `[a4paper_2x1, dynesty_runplot]` (5 panels) |
-| `a4paper_4x1_rectcmap.yaml`        | `[a4paper_4x1, rectcmap]` |
-| `gambit_2x1_rectcmap.yaml`         | `[gambit_2x1, rectcmap]` |
-| `gambit_2x1_Ternary.yaml`          | `[gambit_2x1, Ternary]` |
-| `gambit_2x1_TernaryCmap.yaml`      | `[gambit_2x1, TernaryCmap]` |
+| `a4paper_2x1.yaml` | All `a4paper_2x1` cards: `rect`, `rectRatio`, `rectcmap`, `Ternary`, `TernaryCmap`, `rect_5x1`, `dynesty_runplot` |
+| `a4paper_4x1_rectcmap.yaml` | `[a4paper_4x1, rectcmap]` |
+| `gambit_2x1.yaml` | All `gambit_2x1` cards: `rectcmap`, `Ternary`, `TernaryCmap` |
 
 These are every style registered in `jarvisplot/cards/style_preference.json`,
 except `a4paper_1x1/Ternary` and `gambit_1x1/Ternary`, whose card JSONs are still
