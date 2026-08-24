@@ -26,24 +26,46 @@ so a failure here can never break a normal plot.
 
 from __future__ import annotations
 
-from copy import deepcopy
 from collections.abc import Mapping
 
 import matplotlib as mpl
 
 
-# overlay palette
-from .debug_config import (
-    BOX as _BOX,
-    DEFAULT_DEBUG as _DEFAULT_DEBUG,
-    DIM as _DIM,
-    MARGIN as _MARGIN,
-    NAME as _NAME,
-    PALETTE_ROLES,
-    PANEL as _PANEL,
-    PRIMARY_ORDER as _PRIMARY_ORDER,
-    resolve_debug_config as _debug_config,
-)
+from .debug_config import resolve_debug_config as _debug_config
+
+
+def _shown(cfg) -> bool:
+    """Whether a JSON-declared annotation element is switched on.
+
+    Absent means on, so a card written before an element existed keeps drawing
+    it. The switch is a veto, not a command: the structural conditions in
+    :func:`_draw` (which axes is primary, which is a colorbar, whether an axes
+    has a frame) still decide whether the element applies at all.
+    """
+    if not isinstance(cfg, Mapping):
+        return bool(cfg)
+    return bool(cfg.get("show", True))
+
+
+def _text(template, values, fig=None) -> str:
+    """Render a JSON printf template, falling back to a readable string.
+
+    Cards are not schema-validated, so a template with the wrong number of
+    conversions would otherwise raise inside the overlay and -- because
+    :func:`draw_design_reference` swallows everything -- silently erase the
+    whole annotation layer instead of just this one label.
+    """
+    try:
+        return str(template) % values
+    except (TypeError, ValueError) as exc:
+        logger = getattr(fig, "logger", None)
+        warn = getattr(logger, "warning", None)
+        if callable(warn):
+            try:
+                warn(f"Debug: bad template {template!r} ({exc}); using raw values.")
+            except Exception:
+                pass
+        return str(values)
 
 
 def _raw(ax):
@@ -59,13 +81,13 @@ def _position(ax):
         return None
 
 
-def _axis_info_lines(name, pos, w_cm, h_cm):
+def _axis_info_lines(name, pos, w_cm, h_cm, *, rect_template, size_template, fig=None):
     """Return the three-line layout entry used in the information panel."""
     l, b, w, h = pos
     return (
         name,
-        f"  rect=[{l:.3f}, {b:.3f}, {w:.3f}, {h:.3f}]",
-        f"  width: {w * w_cm:.3f} cm  height: {h * h_cm:.3f} cm",
+        _text(rect_template, (l, b, w, h), fig),
+        _text(size_template, (w * w_cm, h * h_cm), fig),
     )
 
 
@@ -85,7 +107,6 @@ def draw_design_reference(fig) -> None:
 def _draw(fig) -> None:
     F = fig.fig
     w_in, h_in = (float(v) for v in F.get_size_inches())
-    w_cm, h_cm = w_in * 2.54, h_in * 2.54
     debug = _debug_config(fig)
     palette = debug["palette"]
     figure_cfg = debug["figure"]
@@ -93,24 +114,44 @@ def _draw(fig) -> None:
     dimension_cfg = debug["dimension"]
     numbered_cfg = debug["numbered_axes"]
     panel_cfg = debug["panel"]
+    margins_cfg = debug["margins"]
+    colorbar_cfg = debug["colorbar_gap"]
+    zorder_cfg = debug["zorder"]
+    units_cfg = debug["units"]
+    label_cfg = debug["labelstyle"]
+    labelbox_cfg = debug["labelbox"]
+    z_overlay = int(zorder_cfg["overlay"])
+    z_artist = int(zorder_cfg["artist"])
+    z_text = int(zorder_cfg["text"])
+    pt_per_inch = float(units_cfg["pt_per_inch"])
+    cm_per_inch = float(units_cfg["cm_per_inch"])
+    w_cm, h_cm = w_in * cm_per_inch, h_in * cm_per_inch
     dimension_color = palette["dimension"]
     box_color = palette["box"]
     name_color = palette["name"]
     margin_color = palette["margin"]
 
-    ov = F.add_axes([0.0, 0.0, 1.0, 1.0], zorder=10_000)
+    ov = F.add_axes([0.0, 0.0, 1.0, 1.0], zorder=z_overlay)
     ov.set_xlim(0.0, 1.0)
     ov.set_ylim(0.0, 1.0)
     ov.set_axis_off()
     ov.patch.set_alpha(0.0)
 
-    def label(x, y, text, *, color=_DIM, size=5.0, ha="center", va="center",
-              rotation=0, weight="normal", family="monospace", boxed=True,
-              box_alpha=0.82):
-        bbox = dict(boxstyle="square,pad=0.12", fc="white", ec="none", alpha=box_alpha) if boxed else None
-        ov.text(x, y, text, color=color, fontsize=size, ha=ha, va=va,
-                rotation=rotation, fontweight=weight, family=family, bbox=bbox,
-                zorder=10_002, clip_on=False)
+    def label(x, y, text, *, style=None, boxed=True, box_alpha=None):
+        """Draw one dimension label.
+
+        ``style`` is splatted straight into ``Axes.text``; anything it omits
+        comes from ``labelstyle``. Colour falls back to ``palette.dimension``
+        so a card that recolours the palette actually recolours the labels.
+        """
+        kwargs = {**label_cfg, **(style or {})}
+        kwargs.setdefault("color", palette["dimension"])
+        if boxed:
+            bbox = dict(labelbox_cfg)
+            if box_alpha is not None:
+                bbox["alpha"] = box_alpha
+            kwargs["bbox"] = bbox
+        ov.text(x, y, text, zorder=z_text, **kwargs)
 
     def dim(x0, y0, x1, y1, text, *, vertical=False, line_offset=0.0,
             vertical_label_side="right"):
@@ -132,35 +173,35 @@ def _draw(fig) -> None:
         line_width = float(dimension_cfg["line_width"])
         cap_half_pt = float(dimension_cfg["cap_half_pt"])
         if vertical:
-            cap_half = cap_half_pt / (w_in * 72.0)
+            cap_half = cap_half_pt / (w_in * pt_per_inch)
             ov.plot(
                 [x0 - cap_half, x0 + cap_half], [y0, y0],
-                color=dimension_color, lw=line_width, solid_capstyle="projecting",
-                zorder=10_001, clip_on=False,
+                color=dimension_color, lw=line_width,
+                zorder=z_artist, **dimension_cfg["linestyle"],
             )
             ov.plot(
                 [x1 - cap_half, x1 + cap_half], [y1, y1],
-                color=dimension_color, lw=line_width, solid_capstyle="projecting",
-                zorder=10_001, clip_on=False,
+                color=dimension_color, lw=line_width,
+                zorder=z_artist, **dimension_cfg["linestyle"],
             )
             span = abs(y1 - y0)
-            span_pt = span * h_in * 72.0
-            arrow_unit = float(dimension_cfg["narrow_length_pt"]) / (h_in * 72.0)
+            span_pt = span * h_in * pt_per_inch
+            arrow_unit = float(dimension_cfg["narrow_length_pt"]) / (h_in * pt_per_inch)
         else:
-            cap_half = cap_half_pt / (h_in * 72.0)
+            cap_half = cap_half_pt / (h_in * pt_per_inch)
             ov.plot(
                 [x0, x0], [y0 - cap_half, y0 + cap_half],
-                color=dimension_color, lw=line_width, solid_capstyle="projecting",
-                zorder=10_001, clip_on=False,
+                color=dimension_color, lw=line_width,
+                zorder=z_artist, **dimension_cfg["linestyle"],
             )
             ov.plot(
                 [x1, x1], [y1 - cap_half, y1 + cap_half],
-                color=dimension_color, lw=line_width, solid_capstyle="projecting",
-                zorder=10_001, clip_on=False,
+                color=dimension_color, lw=line_width,
+                zorder=z_artist, **dimension_cfg["linestyle"],
             )
             span = abs(x1 - x0)
-            span_pt = span * w_in * 72.0
-            arrow_unit = float(dimension_cfg["narrow_length_pt"]) / (w_in * 72.0)
+            span_pt = span * w_in * pt_per_inch
+            arrow_unit = float(dimension_cfg["narrow_length_pt"]) / (w_in * pt_per_inch)
 
         narrow_scale = min(
             float(dimension_cfg["narrow_scale_max"]),
@@ -179,8 +220,8 @@ def _draw(fig) -> None:
             return value
 
         arrow_props = dict(
-            arrowstyle="-|>", color=dimension_color, lw=line_width,
-            shrinkA=0, shrinkB=0, mutation_scale=narrow_scale,
+            color=dimension_color, lw=line_width, mutation_scale=narrow_scale,
+            **dimension_cfg["narrowarrowstyle"],
         )
         if span_pt < float(dimension_cfg["narrow_threshold_pt"]):
             # Put the arrow tips exactly on the endpoint bars while extending
@@ -193,12 +234,12 @@ def _draw(fig) -> None:
                 ov.annotate(
                     "",
                     xy=(x0, y0), xytext=(x0, tail0),
-                    arrowprops=arrow_props, zorder=10_001,
+                    arrowprops=arrow_props, zorder=z_artist,
                 )
                 ov.annotate(
                     "",
                     xy=(x1, y1), xytext=(x1, tail1),
-                    arrowprops=arrow_props, zorder=10_001,
+                    arrowprops=arrow_props, zorder=z_artist,
                 )
             else:
                 direction = 1.0 if x1 >= x0 else -1.0
@@ -207,22 +248,22 @@ def _draw(fig) -> None:
                 ov.annotate(
                     "",
                     xy=(x0, y0), xytext=(tail0, y0),
-                    arrowprops=arrow_props, zorder=10_001,
+                    arrowprops=arrow_props, zorder=z_artist,
                 )
                 ov.annotate(
                     "",
                     xy=(x1, y1), xytext=(tail1, y1),
-                    arrowprops=arrow_props, zorder=10_001,
+                    arrowprops=arrow_props, zorder=z_artist,
                 )
         else:
             ov.annotate(
                 "", xy=(x1, y1), xytext=(x0, y0),
                 arrowprops=dict(
-                    arrowstyle="<|-|>", color=dimension_color, lw=line_width,
-                    shrinkA=0, shrinkB=0,
+                    color=dimension_color, lw=line_width,
                     mutation_scale=float(dimension_cfg["wide_scale"]),
+                    **dimension_cfg["widearrowstyle"],
                 ),
-                zorder=10_001,
+                zorder=z_artist,
             )
         label_gap = float(dimension_cfg["label_gap"])
         if vertical:
@@ -236,10 +277,7 @@ def _draw(fig) -> None:
                 label_x,
                 (y0 + y1) / 2.0,
                 text,
-                rotation=90,
-                ha=label_ha,
-                boxed=True,
-                color=dimension_color,
+                style={"rotation": 90, "ha": label_ha, "color": dimension_color},
                 box_alpha=float(dimension_cfg["label_box_alpha"]),
             )
         else:
@@ -247,32 +285,38 @@ def _draw(fig) -> None:
                 (x0 + x1) / 2.0,
                 (y0 + y1) / 2.0 - label_gap,
                 text,
-                va="top",
-                boxed=True,
-                color=dimension_color,
+                style={"va": "top", "color": dimension_color},
                 box_alpha=float(dimension_cfg["label_box_alpha"]),
             )
 
     # figure border + size caption
-    ov.add_patch(mpl.patches.Rectangle(
-        (0, 0), 1, 1, fill=False, ec=margin_color,
-        lw=float(figure_cfg["border_linewidth"]), zorder=10_001,
-    ))
-    label(
-        float(figure_cfg["caption_x"]),
-        float(figure_cfg["caption_y"]),
-        f"design reference  ·  figure {w_cm:.2f} cm × {h_cm:.2f} cm",
-        color=margin_color,
-        size=float(figure_cfg["caption_size"]),
-        va="top",
-        weight="bold",
-        family="DejaVu Sans",
-    )
+    border_cfg = figure_cfg["border"]
+    if _shown(border_cfg):
+        ov.add_patch(mpl.patches.Rectangle(
+            (0, 0), 1, 1, ec=margin_color,
+            lw=float(figure_cfg["border_linewidth"]), zorder=z_artist,
+            **border_cfg["style"],
+        ))
+
+    caption_cfg = figure_cfg["caption"]
+    if _shown(caption_cfg):
+        label(
+            float(figure_cfg["caption_x"]),
+            float(figure_cfg["caption_y"]),
+            _text(caption_cfg["template"], (w_cm, h_cm), fig),
+            style={
+                "color": margin_color,
+                "fontsize": float(figure_cfg["caption_size"]),
+                **caption_cfg["style"],
+            },
+        )
 
     # total figure height marker on the far left
-    height_marker_x = float(figure_cfg["height_marker_x"])
-    dim(height_marker_x, 0.0, height_marker_x, 1.0,
-        f"{h_cm:.2f} cm", vertical=True)
+    height_cfg = figure_cfg["height_marker"]
+    if _shown(height_cfg):
+        height_marker_x = float(figure_cfg["height_marker_x"])
+        dim(height_marker_x, 0.0, height_marker_x, 1.0,
+            _text(height_cfg["template"], h_cm, fig), vertical=True)
 
     # Resolve positions once.  ``fig.axes`` is the Jarvis-PLOT named-axis
     # mapping, not matplotlib's list of raw axes (which also gains ``ov``).
@@ -286,7 +330,7 @@ def _draw(fig) -> None:
     # panel.  The fallback keeps debug rendering useful for unusual cards that
     # do not define the conventional ``ax``/``ax0`` names.
     primary = next(
-        (n for n in _PRIMARY_ORDER if any(name == n for name, _ in axis_positions)),
+        (n for n in debug["primary_order"] if any(name == n for name, _ in axis_positions)),
         axis_positions[0][0] if axis_positions else None,
     )
     positions_by_name = dict(axis_positions)
@@ -303,12 +347,14 @@ def _draw(fig) -> None:
         get_frame_on = getattr(raw_axis, "get_frame_on", None)
         frame_on = bool(get_frame_on()) if callable(get_frame_on) else True
         outline_color = box_color if frame_on else margin_color
-        ov.add_patch(mpl.patches.Rectangle((l, b), w, h, fill=False,
-                                           ec=outline_color,
-                                           lw=float(axes_cfg["outline_linewidth"]),
-                                           zorder=10_001))
+        if _shown(axes_cfg["outline"]):
+            ov.add_patch(mpl.patches.Rectangle(
+                (l, b), w, h, ec=outline_color,
+                lw=float(axes_cfg["outline_linewidth"]), zorder=z_artist,
+                **axes_cfg["outline"]["style"],
+            ))
 
-        if not frame_on:
+        if not frame_on and _shown(axes_cfg["corner_ticks"]):
             # Only frameless axes get the hash-like endpoint treatment.
             # Framed axes already have their own complete border.
             extension = min(
@@ -326,9 +372,8 @@ def _draw(fig) -> None:
                 (l + w, l + w + extension, b + h),
             ):
                 ov.plot([xa, xb], [y, y], color=outline_color,
-                        lw=float(axes_cfg["outline_linewidth"]),
-                        solid_capstyle="projecting", zorder=10_001,
-                        clip_on=False)
+                        lw=float(axes_cfg["outline_linewidth"]), zorder=z_artist,
+                        **axes_cfg["corner_ticks"]["style"])
             for ya, yb, x in (
                 (b - extension, b, l),
                 (b + h, b + h + extension, l),
@@ -336,9 +381,8 @@ def _draw(fig) -> None:
                 (b + h, b + h + extension, l + w),
             ):
                 ov.plot([x, x], [ya, yb], color=outline_color,
-                        lw=float(axes_cfg["outline_linewidth"]),
-                        solid_capstyle="projecting", zorder=10_001,
-                        clip_on=False)
+                        lw=float(axes_cfg["outline_linewidth"]), zorder=z_artist,
+                        **axes_cfg["corner_ticks"]["style"])
 
         if name == primary:
             yt = b + h
@@ -346,40 +390,39 @@ def _draw(fig) -> None:
             # the horizontal one lands on the left spine below the corner,
             # while the vertical ones land on the top/bottom spines to its
             # right.
-            dim(0.0, yt, l, yt, f"{l * w_cm:.3f} cm", line_offset=-corner_gap)
+            if _shown(margins_cfg["left"]):
+                dim(0.0, yt, l, yt,
+                    _text(margins_cfg["template"], l * w_cm, fig),
+                    line_offset=-corner_gap)
             # Numbered axes get their top/bottom edge dimensions in the
             # right-hand column group below.  Keep the original primary-axis
             # top/bottom dimensions for an unnumbered ``ax`` layout.
             if not (name.startswith("ax") and name[2:].isdigit()):
-                dim(
-                    l,
-                    yt,
-                    l,
-                    1.0,
-                    f"{(1.0 - yt) * h_cm:.3f} cm",
-                    vertical=True,
-                    line_offset=corner_gap,
-                )
-                dim(
-                    l,
-                    0.0,
-                    l,
-                    b,
-                    f"{b * h_cm:.3f} cm",
-                    vertical=True,
-                    line_offset=corner_gap,
-                )
+                if _shown(margins_cfg["top"]):
+                    dim(
+                        l, yt, l, 1.0,
+                        _text(margins_cfg["template"], (1.0 - yt) * h_cm, fig),
+                        vertical=True,
+                        line_offset=corner_gap,
+                    )
+                if _shown(margins_cfg["bottom"]):
+                    dim(
+                        l, 0.0, l, b,
+                        _text(margins_cfg["template"], b * h_cm, fig),
+                        vertical=True,
+                        line_offset=corner_gap,
+                    )
         elif name.startswith("axc") and primary_pos is not None:
             # gap between the primary axes' right edge and this colorbar's left edge
             pl, pb, pw, ph = primary_pos
             ygap = b + h / 2.0
-            if l > pl + pw:
+            if l > pl + pw and _shown(colorbar_cfg):
                 dim(
                     pl + pw,
                     ygap,
                     l,
                     ygap,
-                    f"{(l - (pl + pw)) * w_cm:.3f} cm",
+                    _text(colorbar_cfg["template"], (l - (pl + pw)) * w_cm, fig),
                     line_offset=float(dimension_cfg["colorbar_line_offset"]),
                 )
 
@@ -396,7 +439,7 @@ def _draw(fig) -> None:
         for name, _ in axis_positions
         if name.startswith("ax") and name[2:].isdigit()
     )
-    if primary_pos is not None and numbered_axes:
+    if primary_pos is not None and numbered_axes and _shown(numbered_cfg):
         right_edge = float(numbered_cfg["right_edge"])
         marker_step = float(numbered_cfg["marker_step"])
         base_marker_x = right_edge - corner_gap
@@ -406,36 +449,37 @@ def _draw(fig) -> None:
         for number, _name, pos in numbered_axes:
             _left, bottom, _width, height = pos
             marker_x = base_marker_x - number * marker_step
-            dim(
-                marker_x,
-                0.0,
-                marker_x,
-                bottom,
-                f"{bottom * h_cm:.3f} cm",
-                vertical=True,
-                vertical_label_side=label_side,
-            )
-            dim(
-                marker_x,
-                bottom + height,
-                marker_x,
-                1.0,
-                f"{(1.0 - bottom - height) * h_cm:.3f} cm",
-                vertical=True,
-                vertical_label_side=label_side,
-            )
+            if _shown(numbered_cfg["bottom"]):
+                dim(
+                    marker_x, 0.0, marker_x, bottom,
+                    _text(numbered_cfg["template"], bottom * h_cm, fig),
+                    vertical=True,
+                    vertical_label_side=label_side,
+                )
+            if _shown(numbered_cfg["top"]):
+                dim(
+                    marker_x, bottom + height, marker_x, 1.0,
+                    _text(numbered_cfg["template"], (1.0 - bottom - height) * h_cm, fig),
+                    vertical=True,
+                    vertical_label_side=label_side,
+                )
 
     # Put every axes' identifying information in the main plotting area.  The
     # primary axis is listed first, followed by the remaining axes in the
     # style-card order, so the panel is deterministic and easy to scan.
-    if primary_pos is not None:
+    if primary_pos is not None and _shown(panel_cfg):
         pl, pb, pw, ph = primary_pos
         ordered_names = [primary] + [
             name for name, _ in axis_positions if name != primary
         ]
-        header = "axes layout"
+        header = str(panel_cfg["header"])
         entries = [
-            _axis_info_lines(name, positions_by_name[name], w_cm, h_cm)
+            _axis_info_lines(
+                name, positions_by_name[name], w_cm, h_cm,
+                rect_template=panel_cfg["rect_template"],
+                size_template=panel_cfg["size_template"],
+                fig=fig,
+            )
             for name in ordered_names
         ]
 
@@ -456,8 +500,8 @@ def _draw(fig) -> None:
         panel_h = ph - 2.0 * pad_y
 
         if panel_w > 0.0 and panel_h > 0.0:
-            available_w_pt = panel_w * w_in * 72.0
-            available_h_pt = panel_h * h_in * 72.0
+            available_w_pt = panel_w * w_in * pt_per_inch
+            available_h_pt = panel_h * h_in * pt_per_inch
             max_detail_chars = max(
                 len(line)
                 for entry in entries
@@ -478,12 +522,18 @@ def _draw(fig) -> None:
             target_height = (
                 header_target * header_leading
                 + len(entries)
-                * (name_target * name_leading + 2.0 * detail_target * detail_leading)
+                * (
+                    name_target * name_leading
+                    + float(panel_cfg["detail_lines_per_entry"])
+                    * detail_target
+                    * detail_leading
+                )
                 + max(0, len(entries) - 1) * entry_gap_target
             )
             size_from_height = available_h_pt / max(1.0, target_height)
             size_from_width = available_w_pt / max(
-                1.0, 0.62 * detail_target * max_detail_chars
+                1.0,
+                float(panel_cfg["char_width_factor"]) * detail_target * max_detail_chars,
             )
             scale = min(1.0, size_from_height, size_from_width)
             header_size = max(float(panel_cfg["min_header_size"]), header_target * scale)
@@ -498,15 +548,20 @@ def _draw(fig) -> None:
                     panel_h,
                     boxstyle=str(panel_cfg["boxstyle"]),
                     facecolor=palette["panel"],
-                    edgecolor="none",
-                    linewidth=0.0,
                     alpha=float(panel_cfg["alpha"]),
-                    zorder=10_001,
+                    zorder=z_artist,
+                    **panel_cfg["boxstyle_kwargs"],
                 )
             )
-            text_x = panel_x + min(0.008, panel_w * 0.02)
-            cursor_y = panel_y - min(0.006, panel_h * 0.03)
-            figure_height_pt = h_in * 72.0
+            text_x = panel_x + min(
+                float(panel_cfg["text_inset_x_max"]),
+                panel_w * float(panel_cfg["text_inset_x_factor"]),
+            )
+            cursor_y = panel_y - min(
+                float(panel_cfg["text_inset_y_max"]),
+                panel_h * float(panel_cfg["text_inset_y_factor"]),
+            )
+            figure_height_pt = h_in * pt_per_inch
 
             def panel_text(text, size, *, weight="normal"):
                 ov.text(
@@ -515,12 +570,9 @@ def _draw(fig) -> None:
                     text,
                     color=name_color,
                     fontsize=size,
-                    ha="left",
-                    va="top",
                     fontweight=weight,
-                    family="monospace",
-                    zorder=10_002,
-                    clip_on=True,
+                    zorder=z_text,
+                    **panel_cfg["textstyle"],
                 )
 
             panel_text(header, header_size, weight="bold")
