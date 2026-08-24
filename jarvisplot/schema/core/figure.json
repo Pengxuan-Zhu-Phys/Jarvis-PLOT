@@ -4,7 +4,9 @@
   "title": "One entry of the root Figures list",
   "type": "object",
   "x-jarvis-zone": "closed",
-  "required": ["name"],
+  "required": [
+    "name"
+  ],
   "properties": {
     "name": {
       "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/identifier",
@@ -33,7 +35,9 @@
     },
     "layers": {
       "type": "array",
-      "items": { "$ref": "https://jarvis-plot.org/schema/v2/core/layer.json" }
+      "items": {
+        "$ref": "https://jarvis-plot.org/schema/v2/core/layer.json"
+      }
     },
     "data": {
       "description": "type: macro dataset ref (DataSet.name) or inline source block. Expanded away before render.",
@@ -76,7 +80,9 @@
     "extra_layers": {
       "type": "array",
       "description": "Additional hand-written layers appended after type expansion.",
-      "items": { "$ref": "https://jarvis-plot.org/schema/v2/core/layer.json" }
+      "items": {
+        "$ref": "https://jarvis-plot.org/schema/v2/core/layer.json"
+      }
     },
     "credible_region": {
       "x-jarvis-zone": "delegated",
@@ -107,8 +113,17 @@
       "description": "type: profile_2d style overrides for the voronoi layer."
     },
     "debug": {
-      "type": "boolean",
-      "description": "Draw the design-reference overlay showing every axes box and its dimensions."
+      "description": "true draws the design-reference overlay showing every axes box and its dimensions. A mapping turns it on and overrides the style card's Debug block for this figure only; `show: false` inside the mapping keeps the overrides but leaves the overlay off. `if`/`then` rather than `oneOf`, so the mapping form keeps precise unknown-key errors instead of degrading to 'not valid under any of the given schemas'.",
+      "type": [
+        "boolean",
+        "object"
+      ],
+      "if": {
+        "type": "object"
+      },
+      "then": {
+        "$ref": "#/$defs/debugOverride"
+      }
     },
     "agent_output": {
       "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/agentOutput",
@@ -118,10 +133,116 @@
       "x-jarvis-ignored": "frame.<axes>.legend",
       "description": "Not read here. The renderer only looks for a legend under frame.<axes>.legend."
     },
-    "yaml_dir": { "x-jarvis-internal": true },
-    "_yaml_dir": { "x-jarvis-internal": true },
-    "yaml_path": { "x-jarvis-internal": true }
+    "yaml_dir": {
+      "x-jarvis-internal": true
+    },
+    "_yaml_dir": {
+      "x-jarvis-internal": true
+    },
+    "yaml_path": {
+      "x-jarvis-internal": true
+    }
   },
   "additionalProperties": false,
-  "x-jarvis-example": "- name: EggBox\n  type: posterior_2d\n  style: [a4paper_2x1, rectcmap]\n  data: samples\n  x: {expr: m_A}\n  y: {expr: tanb}\n  weight: {expr: exp(LogL)}\n  agent_output: {method: voronoi, max_cells: 1024, path: auto}"
+  "x-jarvis-example": "- name: EggBox\n  type: posterior_2d\n  style: [a4paper_2x1, rectcmap]\n  data: samples\n  x: {expr: m_A}\n  y: {expr: tanb}\n  weight: {expr: exp(LogL)}\n  agent_output: {method: voronoi, max_cells: 1024, path: auto}",
+  "$defs": {
+    "debugOverride": {
+      "title": "Per-figure debug overlay override",
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "show": {
+          "type": "boolean",
+          "description": "Master switch when the mapping form is used. Defaults to true."
+        },
+        "primary_order": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Axes names in the order the overlay looks for the primary axes."
+        },
+        "palette": {
+          "type": "object",
+          "x-jarvis-zone": "delegated",
+          "additionalProperties": true,
+          "description": "Debug 'palette' group. Keys are validated at runtime against the packaged defaults, which report unknown keys with a did-you-mean; see jarvisplot/Figure/debug_config.py."
+        },
+        "zorder": {
+          "type": "object",
+          "x-jarvis-zone": "delegated",
+          "additionalProperties": true,
+          "description": "Debug 'zorder' group. Keys are validated at runtime against the packaged defaults, which report unknown keys with a did-you-mean; see jarvisplot/Figure/debug_config.py."
+        },
+        "units": {
+          "type": "object",
+          "x-jarvis-zone": "delegated",
+          "additionalProperties": true,
+          "description": "Debug 'units' group. Keys are validated at runtime against the packaged defaults, which report unknown keys with a did-you-mean; see jarvisplot/Figure/debug_config.py."
+        },
+        "labelstyle": {
+          "type": "object",
+          "x-jarvis-zone": "delegated",
+          "additionalProperties": true,
+          "description": "Debug 'labelstyle' group. Keys are validated at runtime against the packaged defaults, which report unknown keys with a did-you-mean; see jarvisplot/Figure/debug_config.py."
+        },
+        "labelbox": {
+          "type": "object",
+          "x-jarvis-zone": "delegated",
+          "additionalProperties": true,
+          "description": "Debug 'labelbox' group. Keys are validated at runtime against the packaged defaults, which report unknown keys with a did-you-mean; see jarvisplot/Figure/debug_config.py."
+        },
+        "figure": {
+          "type": "object",
+          "x-jarvis-zone": "delegated",
+          "additionalProperties": true,
+          "description": "Debug 'figure' group. Keys are validated at runtime against the packaged defaults, which report unknown keys with a did-you-mean; see jarvisplot/Figure/debug_config.py."
+        },
+        "axes": {
+          "type": "object",
+          "x-jarvis-zone": "delegated",
+          "additionalProperties": true,
+          "description": "Debug 'axes' group. Keys are validated at runtime against the packaged defaults, which report unknown keys with a did-you-mean; see jarvisplot/Figure/debug_config.py."
+        },
+        "dimension": {
+          "type": "object",
+          "x-jarvis-zone": "delegated",
+          "additionalProperties": true,
+          "description": "Debug 'dimension' group. Keys are validated at runtime against the packaged defaults, which report unknown keys with a did-you-mean; see jarvisplot/Figure/debug_config.py."
+        },
+        "margins": {
+          "type": "object",
+          "x-jarvis-zone": "delegated",
+          "additionalProperties": true,
+          "description": "Debug 'margins' group. Keys are validated at runtime against the packaged defaults, which report unknown keys with a did-you-mean; see jarvisplot/Figure/debug_config.py."
+        },
+        "colorbar_gap": {
+          "type": "object",
+          "x-jarvis-zone": "delegated",
+          "additionalProperties": true,
+          "description": "Debug 'colorbar_gap' group. Keys are validated at runtime against the packaged defaults, which report unknown keys with a did-you-mean; see jarvisplot/Figure/debug_config.py."
+        },
+        "numbered_axes": {
+          "type": "object",
+          "x-jarvis-zone": "delegated",
+          "additionalProperties": true,
+          "description": "Debug 'numbered_axes' group. Keys are validated at runtime against the packaged defaults, which report unknown keys with a did-you-mean; see jarvisplot/Figure/debug_config.py."
+        },
+        "panel": {
+          "type": "object",
+          "x-jarvis-zone": "delegated",
+          "additionalProperties": true,
+          "description": "Debug 'panel' group. Keys are validated at runtime against the packaged defaults, which report unknown keys with a did-you-mean; see jarvisplot/Figure/debug_config.py."
+        },
+        "ternary": {
+          "type": "object",
+          "x-jarvis-zone": "delegated",
+          "additionalProperties": true,
+          "description": "Debug 'ternary' group. Keys are validated at runtime against the packaged defaults, which report unknown keys with a did-you-mean; see jarvisplot/Figure/debug_config.py."
+        }
+      },
+      "additionalProperties": false,
+      "x-jarvis-example": "debug:\n  panel: {show: false}\n  palette: {dimension: \"#888888\"}"
+    }
+  }
 }
