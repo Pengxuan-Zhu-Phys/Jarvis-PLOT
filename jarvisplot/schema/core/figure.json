@@ -162,35 +162,17 @@
           },
           "description": "Axes names in the order the overlay looks for the primary axes."
         },
-        "palette": {
-          "type": "object",
-          "x-jarvis-zone": "delegated",
-          "additionalProperties": true,
-          "description": "Debug 'palette' group. Keys are validated at runtime against the packaged defaults, which report unknown keys with a did-you-mean; see jarvisplot/Figure/debug_config.py."
-        },
-        "zorder": {
-          "type": "object",
-          "x-jarvis-zone": "delegated",
-          "additionalProperties": true,
-          "description": "Debug 'zorder' group. Keys are validated at runtime against the packaged defaults, which report unknown keys with a did-you-mean; see jarvisplot/Figure/debug_config.py."
-        },
         "units": {
           "type": "object",
           "x-jarvis-zone": "delegated",
           "additionalProperties": true,
           "description": "Debug 'units' group. Keys are validated at runtime against the packaged defaults, which report unknown keys with a did-you-mean; see jarvisplot/Figure/debug_config.py."
         },
-        "labelstyle": {
+        "overlay": {
           "type": "object",
           "x-jarvis-zone": "delegated",
           "additionalProperties": true,
-          "description": "Debug 'labelstyle' group. Keys are validated at runtime against the packaged defaults, which report unknown keys with a did-you-mean; see jarvisplot/Figure/debug_config.py."
-        },
-        "labelbox": {
-          "type": "object",
-          "x-jarvis-zone": "delegated",
-          "additionalProperties": true,
-          "description": "Debug 'labelbox' group. Keys are validated at runtime against the packaged defaults, which report unknown keys with a did-you-mean; see jarvisplot/Figure/debug_config.py."
+          "description": "Debug 'overlay' group. Keys are validated at runtime against the packaged defaults, which report unknown keys with a did-you-mean; see jarvisplot/Figure/debug_config.py."
         },
         "figure": {
           "type": "object",
@@ -242,7 +224,7 @@
         }
       },
       "additionalProperties": false,
-      "x-jarvis-example": "debug:\n  panel: {show: false}\n  palette: {dimension: \"#888888\"}"
+      "x-jarvis-example": "debug:\n  panel: {show: false}\n  dimension: {cap: {plot: {color: \"#888888\"}}}"
     }
   }
 }

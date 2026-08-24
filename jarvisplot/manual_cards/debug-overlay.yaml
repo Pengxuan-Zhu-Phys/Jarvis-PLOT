@@ -37,7 +37,7 @@ human:
           - name: quieter
             debug:                      # same, minus the information panel
               panel: {show: false}
-              palette: {dimension: "#888888"}
+              dimension: {cap: {plot: {color: "#888888"}}}
             style: [a4paper_2x1, rectcmap]
             layers: []
     - kind: notes
@@ -48,8 +48,9 @@ human:
         - "Precedence: packaged defaults < style card Debug < YAML debug mapping."
         - "Every element takes show; absent means on."
         - "show is a veto, not a command -- a colorbar gap needs a colorbar."
-        - "Groups: primary_order, palette, zorder, units, labelstyle, labelbox, figure, axes, dimension, margins, colorbar_gap, numbered_axes, panel, ternary."
-        - "Keys inside *style / bbox are matplotlib kwargs, passed through unchecked."
+        - "Groups: primary_order, units, overlay, figure, axes, dimension, margins, colorbar_gap, numbered_axes, panel, ternary."
+        - "Style lives in a block named after the matplotlib call: plot, text, annotate, scatter, Rectangle, FancyBboxPatch, add_axes."
+        - "That block holds the call kwargs verbatim and is passed through unchecked."
         - "A bad Debug key warns and falls back; the overlay never breaks a plot."
 agent:
   body_markdown: |
@@ -58,4 +59,5 @@ agent:
     - "Expecting jplot --debug (the CLI flag) to draw the overlay -- it only raises the log level"
     - "Editing a card to switch the overlay off for one figure; use a debug: mapping"
     - "Setting ternary.* on a rect card -- that group only ships where an axtri axes exists"
+    - "Looking for a palette group -- each call block writes its own colours"
     - "Assuming a Debug typo will error; it warns and falls back to the default"

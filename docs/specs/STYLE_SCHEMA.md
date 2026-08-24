@@ -58,13 +58,11 @@ mapping. Every key is optional; anything absent falls back.
 | Group | Owns |
 |---|---|
 | `primary_order` | which axes gets fully dimensioned and hosts the info panel |
-| `palette` | the five overlay colours (`dimension`, `box`, `name`, `margin`, `panel`) |
-| `zorder` | the overlay / artist / text stacking order |
 | `units` | `cm_per_inch`, `pt_per_inch` |
-| `labelstyle`, `labelbox` | dimension-label typography and its background box |
+| `overlay` | the transparent full-figure axes every annotation is drawn onto |
 | `figure` | border, size caption, total-height marker |
-| `axes` | per-axes outline and the frameless corner ticks |
-| `dimension` | dimension-line geometry, cap size, arrowheads |
+| `axes` | per-axes outline (framed / frameless) and the frameless corner ticks |
+| `dimension` | cap bars, arrowheads and labels -- every measured distance uses these |
 | `margins` | the primary axes' left / top / bottom insets |
 | `colorbar_gap` | gap between the primary axes and a colorbar |
 | `numbered_axes` | the staggered edge dimensions for `ax0`, `ax1`, … |
@@ -75,20 +73,41 @@ mapping. Every key is optional; anything absent falls back.
 
 ### Two shapes inside a group
 
-Following the ternary renderer's convention: **geometry is a named scalar,
-appearance is a `*style` block splatted straight into the matplotlib call.**
+**Appearance lives in a block named after the matplotlib callable that
+consumes it, and is splatted straight into that call. Geometry stays a named
+scalar beside it.**
 
 ```json
 "axes": {
-  "outline_linewidth": 0.45,
-  "outline": { "show": true, "style": { "fill": false } },
-  "corner_ticks": { "show": true, "style": { "solid_capstyle": "projecting" } }
+  "frameless_extension_max": 0.018,
+  "outline": {
+    "show": true,
+    "framed":    { "Rectangle": { "fill": false, "ec": "#111111", "lw": 0.45, "zorder": 10001 } },
+    "frameless": { "Rectangle": { "fill": false, "ec": "#FF3FA4", "lw": 0.45, "zorder": 10001 } }
+  },
+  "corner_ticks": {
+    "show": true,
+    "plot": { "color": "#FF3FA4", "lw": 0.45, "solid_capstyle": "projecting", "zorder": 10001 }
+  }
 }
 ```
 
-Keys inside `*style`, `bbox` and `boxstyle_kwargs` are matplotlib's vocabulary
-and are passed through unchecked, the same way `layers[].style` is in the YAML
-schema.
+The drawing code is then literally `ov.plot(xs, ys, **cfg["corner_ticks"]["plot"])`.
+One drawn thing owns one complete kwargs table: colour, width and stacking order
+are written where they are used, not inherited from a palette the card would
+have to know about.
+
+The call blocks are `add_axes`, `annotate`, `plot`, `scatter`, `text`,
+`Rectangle` and `FancyBboxPatch`. Their keys -- including nested `bbox` and
+`arrowprops` -- are matplotlib's vocabulary and are passed through unchecked,
+the same way `layers[].style` is in the YAML schema. An override inside a call
+block is layered key by key, so a card may change one arrow property without
+restating the rest.
+
+Two kwargs are Python's to supply because they depend on what is being
+measured: the narrow arrowhead's `mutation_scale` (from the span, bounded by
+`dimension.narrow_scale_min` / `_max`) and the panel text's `fontsize` (from
+`panel.<part>.size`, shrunk together but never below `min_size`).
 
 ### Switching annotations off
 

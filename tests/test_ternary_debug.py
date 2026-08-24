@@ -108,7 +108,7 @@ def test_anchors_are_marked_once_per_tick_group():
 def test_style_comes_from_json():
     fig = _fig(
         {"axtri": {"labels": _labels_from("a4paper/2x1/ternary.json")}},
-        debug_config={"ternary": {"tick_anchors": {"style": {"c": "#00FF00", "s": 9.0}}}},
+        debug_config={"ternary": {"tick_anchors": {"scatter": {"c": "#00FF00", "s": 9.0}}}},
     )
     draw_ternary_reference(fig, ANCHORS)
     assert fig.axtri.scatters[0][2]["c"] == "#00FF00"

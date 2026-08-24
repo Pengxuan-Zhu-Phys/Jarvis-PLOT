@@ -61,11 +61,11 @@ def test_debug_stays_a_bool_so_the_master_switch_is_one_thing():
 
 def test_yaml_override_wins_over_the_style_card():
     fig = Figure()
-    fig._debug_config = {"panel": {"right": 0.70, "alpha": 0.5}}
+    fig._debug_config = {"panel": {"right": 0.70, "entry_gap": 3.0}}
     fig.debug = {"panel": {"right": 0.40}}
     merged = fig.debug_config
     assert merged["panel"]["right"] == 0.40
-    assert merged["panel"]["alpha"] == 0.5, "sibling card keys survive"
+    assert merged["panel"]["entry_gap"] == 3.0, "sibling card keys survive"
 
 
 def test_card_wins_over_the_packaged_defaults():
@@ -74,16 +74,16 @@ def test_card_wins_over_the_packaged_defaults():
     fig.debug = True
     resolved = resolve_debug_config(fig)
     assert resolved["panel"]["right"] == 0.33
-    assert resolved["panel"]["alpha"] == DEFAULT_DEBUG["panel"]["alpha"]
+    assert resolved["panel"]["entry_gap"] == DEFAULT_DEBUG["panel"]["entry_gap"]
 
 
 def test_full_precedence_chain():
     fig = Figure()
-    fig._debug_config = {"panel": {"right": 0.33, "alpha": 0.9}}
+    fig._debug_config = {"panel": {"right": 0.33, "entry_gap": 9.0}}
     fig.debug = {"panel": {"right": 0.11}}
     resolved = resolve_debug_config(fig)
     assert resolved["panel"]["right"] == 0.11, "YAML wins"
-    assert resolved["panel"]["alpha"] == 0.9, "card wins where YAML is silent"
+    assert resolved["panel"]["entry_gap"] == 9.0, "card wins where YAML is silent"
     assert resolved["panel"]["header"] == DEFAULT_DEBUG["panel"]["header"], "defaults fill the rest"
 
 
@@ -130,7 +130,7 @@ def _validate(debug_literal):
 @pytest.mark.parametrize(
     "literal",
     ["true", "false", "{panel: {show: false}}", "{show: false}",
-     '{palette: {dimension: "#888888"}}', "{primary_order: [axtri]}"],
+     '{dimension: {cap: {plot: {color: "#888888"}}}}', "{primary_order: [axtri]}"],
 )
 def test_schema_accepts_both_forms(literal):
     assert [d.code for d in _validate(literal)] == []

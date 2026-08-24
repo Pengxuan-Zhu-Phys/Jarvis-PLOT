@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import pytest
 
 from jarvisplot.Figure.figure import Figure
+from jarvisplot.core_assets import load_styles
 
 
 def _logger():
@@ -82,6 +83,75 @@ def test_a4paper_2x1_rect_default_axis_labels_are_centered():
     assert labels["xlabel"]["loc"] == "center"
     assert labels["ylabel"]["loc"] == "center"
     assert labels["ylabel_coords"]["y"] == 0.5
+
+
+def test_a4paper_2x1_rect_debug_parameters_are_loaded_from_style_card():
+    cards_dir = Path(__file__).resolve().parents[1] / "jarvisplot" / "cards" / "a4paper" / "2x1"
+    card = json.loads((cards_dir / "rect.json").read_text(encoding="utf-8"))
+    debug = card["Debug"]
+
+    fig = Figure()
+    fig.logger = _logger()
+    fig.jpstyles = load_styles(fig.load_path)
+    fig.style = ["a4paper_2x1", "rect"]
+
+    assert fig._debug_config["numbered_axes"]["marker_step"] == debug["numbered_axes"]["marker_step"]
+    assert fig._debug_config["panel"]["entry_gap"] == debug["panel"]["entry_gap"]
+
+
+def test_a4paper_2x1_rectratio_card_loads_axr_as_rect_axes():
+    cards_dir = Path(__file__).resolve().parents[1] / "jarvisplot" / "cards" / "a4paper" / "2x1"
+    card = json.loads((cards_dir / "rectratio.json").read_text(encoding="utf-8"))
+
+    assert "axr" in card["Frame"]["axes"]
+    assert card["Frame"]["ax"]["ticks"]["both"]["labeltop"] is False
+    assert card["Frame"]["ax"]["ticks"]["both"]["labelbottom"] is False
+    assert card["Frame"]["axr"]["ticks"]["both"]["bottom"] is True
+    assert card["Frame"]["axr"]["labels"]["xlabel"]["loc"] == "center"
+
+    fig = Figure()
+    fig.logger = _logger()
+    fig.jpstyles = load_styles(fig.load_path)
+    fig.style = ["a4paper_2x1", "rectRatio"]
+    fig.fig = plt.figure(**fig.frame["figure"])
+    fig.load_axes()
+
+    assert "axr" in fig.axes
+    assert fig.axes["axr"]._type == "rect"
+    assert fig.axes["axr"].get_position().bounds == pytest.approx(
+        card["Frame"]["axes"]["axr"]["rect"]
+    )
+    plt.close(fig.fig)
+
+
+def test_axlogo_scales_to_replacement_icon_dimensions():
+    raw_fig = plt.figure(figsize=(3.3, 2.75))
+    fig = Figure()
+    fig.logger = _logger()
+    fig.fig = raw_fig
+    fig.frame = {
+        "axlogo": {"file": "&JP/jarvisplot/cards/icons/JarvisHEP.png"},
+    }
+
+    # Deliberately retain the legacy card limits.  The logo loader must use
+    # the actual replacement image dimensions instead of 0..1024.
+    fig.axlogo = {
+        "rect": [0.01, 0.01, 0.06, 0.072],
+        "frameon": False,
+        "xlim": [0, 1024],
+        "ylim": [1024, 0],
+    }
+
+    raw_ax = fig.axes["axlogo"]
+    image = raw_ax.images[0]
+    image_height, image_width = image.get_array().shape[:2]
+    assert raw_ax.get_xlim() == pytest.approx((0.0, image_width))
+    assert raw_ax.get_ylim() == pytest.approx((image_height, 0.0))
+    assert image.get_interpolation() == "none"
+    assert image.get_extent() == pytest.approx(
+        (0.0, image_width, image_height, 0.0)
+    )
+    plt.close(raw_fig)
 
 
 @pytest.mark.parametrize("axis_name", ["ax1", "ax2", "ax3", "ax4"])
