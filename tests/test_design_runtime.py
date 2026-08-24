@@ -72,6 +72,7 @@ def test_design_reference_collects_all_axes_info_inside_primary_ax():
             if patch.__class__.__name__ == "FancyBboxPatch"
         )
         assert info_panel.get_x() + info_panel.get_width() <= 0.70
+        assert info_panel.get_facecolor() == to_rgba("#FFEC73", alpha=0.5)
 
         # axlogo is represented once, in the aggregate panel, instead of
         # receiving an annotation placed over its tiny image axes.
@@ -81,5 +82,37 @@ def test_design_reference_collects_all_axes_info_inside_primary_ax():
         info_x, info_y = info.get_position()
         assert ax_left < info_x < ax_left + ax_width
         assert ax_bottom < info_y < ax_bottom + ax_height
+    finally:
+        plt.close(raw_fig)
+
+
+def test_numbered_axes_get_top_bottom_figure_edge_dimensions_in_order():
+    raw_fig = plt.figure(figsize=(4.0, 4.0))
+    axes = {
+        "ax0": raw_fig.add_axes([0.20, 0.70, 0.70, 0.20]),
+        "ax1": raw_fig.add_axes([0.20, 0.40, 0.70, 0.20]),
+        "ax2": raw_fig.add_axes([0.20, 0.10, 0.70, 0.20]),
+    }
+    wrapper = SimpleNamespace(
+        fig=raw_fig,
+        axes=axes,
+        logger=SimpleNamespace(debug=lambda *args, **kwargs: None),
+    )
+
+    try:
+        draw_design_reference(wrapper)
+        overlay = raw_fig.axes[-1]
+
+        labels = {}
+        for text in overlay.texts:
+            if text.get_color() == "#1F21E9":
+                labels.setdefault(text.get_text(), []).append(
+                    round(text.get_position()[0], 3)
+                )
+        # 4 inches = 10.16 cm; ax0 is the rightmost column and ax1, ax2,
+        # ... are shifted a further 0.040 figure fraction to the left.
+        assert sorted(labels["1.016 cm"]) == [0.894, 0.974]
+        assert sorted(labels["7.112 cm"]) == [0.894, 0.974]
+        assert labels["4.064 cm"] == [0.934, 0.934]
     finally:
         plt.close(raw_fig)

@@ -475,7 +475,7 @@
             "colorbar_line_offset": 0.024,
             "cap": {
                 "plot": {
-                    "color": "#0A7FB6",
+                    "color": "#1F21E9",
                     "lw": 0.7,
                     "solid_capstyle": "projecting",
                     "clip_on": false,
@@ -489,7 +489,7 @@
                         "arrowstyle": "-|>",
                         "shrinkA": 0,
                         "shrinkB": 0,
-                        "color": "#0A7FB6",
+                        "color": "#1F21E9",
                         "lw": 0.7
                     }
                 }
@@ -501,7 +501,7 @@
                         "arrowstyle": "<|-|>",
                         "shrinkA": 0,
                         "shrinkB": 0,
-                        "color": "#0A7FB6",
+                        "color": "#1F21E9",
                         "lw": 0.7,
                         "mutation_scale": 6.0
                     }
@@ -514,7 +514,7 @@
                     "family": "monospace",
                     "clip_on": false,
                     "zorder": 10002,
-                    "color": "#0A7FB6",
+                    "color": "#1F21E9",
                     "ha": "center",
                     "va": "top",
                     "rotation": 0,
@@ -533,7 +533,7 @@
                     "family": "monospace",
                     "clip_on": false,
                     "zorder": 10002,
-                    "color": "#0A7FB6",
+                    "color": "#1F21E9",
                     "ha": "right",
                     "va": "center",
                     "rotation": 90,
@@ -552,7 +552,7 @@
                     "family": "monospace",
                     "clip_on": false,
                     "zorder": 10002,
-                    "color": "#0A7FB6",
+                    "color": "#1F21E9",
                     "ha": "left",
                     "va": "center",
                     "rotation": 90,
