@@ -219,9 +219,13 @@ DEFAULT_DEBUG = {
         "top": {"show": True},
         "bottom": {"show": True},
     },
-    # Primary-axes margin dimensions.
+    # Primary-axes margin dimensions. The top/bottom pair is anchored to the
+    # right edge, like the numbered-axes column, so it stays clear of the
+    # axes-layout panel; ``left`` measures along the top edge and stays put.
     "margins": {
         "template": "%.3f cm",
+        "right_edge": 1.0,
+        "label_side": "left",
         "left": {"show": True},
         "top": {"show": True},
         "bottom": {"show": True},
