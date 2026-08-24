@@ -10,6 +10,11 @@ def is_numbered_ax(name: str) -> bool:
     return isinstance(name, str) and re.fullmatch(r"ax\d+", name) is not None
 
 
+def is_rect_ax(name: str) -> bool:
+    """Return True for dynamically supported rectangular axes."""
+    return is_numbered_ax(name) or name == "axr"
+
+
 _TITLE_POSITION_PARAMS = {
     # `top` is the historical top-left placement used by the cards.
     "top": {"x": 0.005, "y": 1.0, "ha": "left", "va": "bottom"},
@@ -74,9 +79,11 @@ def hide_log_minor_tick_labels(ax_obj, which: str) -> None:
         )
 
 
-def ensure_numbered_rect_axes(fig, ax_name: str, kwgs: dict):
-    if not is_numbered_ax(ax_name):
-        raise ValueError(f"Illegal dynamic axes name '{ax_name}'. Only ax<NUMBER> is allowed.")
+def ensure_rect_axes(fig, ax_name: str, kwgs: dict):
+    if not is_rect_ax(ax_name):
+        raise ValueError(
+            f"Illegal dynamic axes name '{ax_name}'. Only 'axr' or ax<NUMBER> is allowed."
+        )
 
     if ax_name not in fig.axes.keys():
         raw_ax = fig.fig.add_axes(**kwgs)
@@ -136,10 +143,14 @@ def ensure_numbered_rect_axes(fig, ax_name: str, kwgs: dict):
     if ylim:
         ax_obj.set_ylim(list(map(_safe_cast, ylim)))
 
-    if fig.frame.get(ax_name, {}).get("labels", {}).get("x"):
-        ax_obj.set_xlabel(fig.frame[ax_name]["labels"]["x"], **fig.frame[ax_name]["labels"]["xlabel"])
-    if fig.frame.get(ax_name, {}).get("labels", {}).get("y"):
-        ax_obj.set_ylabel(fig.frame[ax_name]["labels"]["y"], **fig.frame[ax_name]["labels"]["ylabel"])
+    labels_cfg = fig.frame.get(ax_name, {}).get("labels", {})
+    if labels_cfg.get("x"):
+        ax_obj.set_xlabel(labels_cfg["x"], **labels_cfg.get("xlabel", {}))
+    if labels_cfg.get("y"):
+        ax_obj.set_ylabel(labels_cfg["y"], **labels_cfg.get("ylabel", {}))
+        ylabel_coords = labels_cfg.get("ylabel_coords")
+        if isinstance(ylabel_coords, dict) and {"x", "y"} <= set(ylabel_coords):
+            ax_obj.yaxis.set_label_coords(ylabel_coords["x"], ylabel_coords["y"])
 
     ax_obj.tick_params(**fig.frame.get(ax_name, {}).get("ticks", {}).get("both", {}))
     ax_obj.tick_params(**fig.frame.get(ax_name, {}).get("ticks", {}).get("major", {}))
@@ -163,10 +174,19 @@ def ensure_numbered_rect_axes(fig, ax_name: str, kwgs: dict):
     return ax_obj
 
 
+def ensure_numbered_rect_axes(fig, ax_name: str, kwgs: dict):
+    """Backward-compatible wrapper for numbered rectangular axes."""
+    if not is_numbered_ax(ax_name):
+        raise ValueError(f"Illegal numbered axes name '{ax_name}'. Only ax<NUMBER> is allowed.")
+    return ensure_rect_axes(fig, ax_name, kwgs)
+
+
 def has_manual_ticks(frame: Mapping[str, Any], ax_key: str, which: str) -> bool:
     try:
-        if ax_key == "ax":
+        if ax_key in {"ax", "axr"}:
             ticks_cfg = frame.get("ax", {}).get("ticks", {})
+            if ax_key == "axr":
+                ticks_cfg = frame.get("axr", {}).get("ticks", {})
         elif isinstance(ax_key, str) and ax_key.startswith("axc"):
             # Colorbars can be named axc, axc2, etc.  Each must read its
             # own frame node so a later auto-tick pass cannot replace YAML
