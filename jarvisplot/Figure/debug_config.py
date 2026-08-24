@@ -219,13 +219,13 @@ DEFAULT_DEBUG = {
         "top": {"show": True},
         "bottom": {"show": True},
     },
-    # Primary-axes margin dimensions. The top/bottom pair is anchored to the
-    # right edge, like the numbered-axes column, so it stays clear of the
-    # axes-layout panel; ``left`` measures along the top edge and stays put.
+    # Primary-axes margin dimensions. The top/bottom pair rides the primary
+    # axes' right border -- just inside it, mirroring where ``left`` sits --
+    # so it tracks the axes it measures and leaves the layout panel the whole
+    # left side. ``left`` measures along the top edge and keeps its own place.
     "margins": {
         "template": "%.3f cm",
-        "right_edge": 1.0,
-        "label_side": "left",
+        "label_side": "right",
         "left": {"show": True},
         "top": {"show": True},
         "bottom": {"show": True},

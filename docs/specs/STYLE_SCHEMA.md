@@ -63,7 +63,7 @@ mapping. Every key is optional; anything absent falls back.
 | `figure` | border, size caption, total-height marker |
 | `axes` | per-axes outline (framed / frameless) and the frameless corner ticks |
 | `dimension` | cap bars, arrowheads and labels -- every measured distance uses these |
-| `margins` | the primary axes' left / top / bottom insets; `right_edge` and `label_side` anchor the top/bottom pair to the right, clear of the panel |
+| `margins` | the primary axes' left / top / bottom insets; the top/bottom pair rides the axes' right border, `label_side` picks which side of it the label sits on |
 | `colorbar_gap` | gap between the primary axes and a colorbar |
 | `numbered_axes` | the staggered edge dimensions for `ax0`, `ax1`, … |
 | `panel` | the "axes layout" information card |

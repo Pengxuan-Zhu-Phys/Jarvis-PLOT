@@ -323,17 +323,19 @@ def _draw(fig) -> None:
                     _text(margins_cfg["template"], l * w_cm, fig),
                     line_offset=-corner_gap)
             # The top/bottom pair used to sit on the left spine, right on top
-            # of where the axes-layout panel begins.  Anchor it to the right
-            # edge instead, the same column the numbered axes already use, so
-            # every top/bottom distance in the overlay reads from one side.
+            # of where the axes-layout panel begins.  Put it just outside the
+            # axes' right edge instead, so it stays with the axes it measures
+            # while leaving the panel the whole left side.
             if not (name.startswith("ax") and name[2:].isdigit()):
-                margin_x = float(margins_cfg["right_edge"]) - corner_gap
+                margin_x = l + w
                 margin_side = _label_side(margins_cfg["label_side"])
+                # mirrors ``left``: inside the border, not off the page
                 if _shown(margins_cfg["top"]):
                     dim(
                         margin_x, yt, margin_x, 1.0,
                         _text(margins_cfg["template"], (1.0 - yt) * h_cm, fig),
                         vertical=True,
+                        line_offset=-corner_gap,
                         vertical_label_side=margin_side,
                     )
                 if _shown(margins_cfg["bottom"]):
@@ -341,6 +343,7 @@ def _draw(fig) -> None:
                         margin_x, 0.0, margin_x, b,
                         _text(margins_cfg["template"], b * h_cm, fig),
                         vertical=True,
+                        line_offset=-corner_gap,
                         vertical_label_side=margin_side,
                     )
         elif name.startswith("axc") and primary_pos is not None:

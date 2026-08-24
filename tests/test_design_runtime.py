@@ -118,39 +118,40 @@ def test_numbered_axes_get_top_bottom_figure_edge_dimensions_in_order():
         plt.close(raw_fig)
 
 
-def test_primary_top_and_bottom_margins_share_the_numbered_axes_column():
-    """They used to sit on the left spine, where the layout panel starts.
+def test_primary_top_and_bottom_margins_ride_the_axes_right_border():
+    """They used to sit on the left spine, where the layout panel begins.
 
-    Both are anchored to the right edge now, at the same x the numbered-axes
-    column puts ax0, so every top/bottom distance in the overlay reads from
-    one side.  The left inset is horizontal and keeps its own place.
+    They follow the primary axes' right border now -- the axes' border, not
+    the page's -- so a narrower axes carries them inward with it.  The left
+    inset is horizontal and keeps its own place.
     """
-    raw_fig = plt.figure(figsize=(3.3, 2.75))
-    axes = {"ax": raw_fig.add_axes([0.142, 0.168, 0.680, 0.775])}
-    wrapper = SimpleNamespace(
-        fig=raw_fig,
-        axes=axes,
-        logger=SimpleNamespace(debug=lambda *args, **kwargs: None),
-    )
+    def margin_label_x(rect):
+        raw_fig = plt.figure(figsize=(3.3, 2.75))
+        wrapper = SimpleNamespace(
+            fig=raw_fig,
+            axes={"ax": raw_fig.add_axes(rect)},
+            logger=SimpleNamespace(debug=lambda *args, **kwargs: None),
+        )
+        try:
+            draw_design_reference(wrapper)
+            overlay = raw_fig.axes[-1]
+            by_x = {}
+            for text in overlay.texts:
+                if text.get_color() == "#1F21E9" and text.get_rotation() == 90:
+                    by_x.setdefault(round(text.get_position()[0], 3), []).append(text)
+            return by_x
+        finally:
+            plt.close(raw_fig)
 
-    try:
-        draw_design_reference(wrapper)
-        overlay = raw_fig.axes[-1]
+    by_x = margin_label_x([0.142, 0.168, 0.680, 0.775])
+    # (left 0.142 + width 0.680) - corner_gap 0.018 + label_gap 0.008
+    assert sorted(by_x) == [0.043, 0.812]
+    margins = by_x[0.812]
+    assert len(margins) == 2, "the top and bottom insets"
+    assert {text.get_ha() for text in margins} == {"left"}, "label right of the line"
+    assert len(by_x[0.043]) == 1, "the total-height marker keeps the far left"
 
-        vertical = [
-            text for text in overlay.texts
-            if text.get_color() == "#1F21E9" and text.get_rotation() == 90
-        ]
-        by_x = {}
-        for text in vertical:
-            by_x.setdefault(round(text.get_position()[0], 3), []).append(text)
-
-        # right_edge 1.0 - corner_gap 0.018 - label_gap 0.008
-        assert sorted(by_x) == [0.043, 0.974]
-        margins = by_x[0.974]
-        assert len(margins) == 2, "the top and bottom insets"
-        assert {text.get_ha() for text in margins} == {"right"}, "label left of the line"
-        # ax0's column in test_numbered_axes_... lands on the same 0.974.
-        assert len(by_x[0.043]) == 1, "the total-height marker keeps the far left"
-    finally:
-        plt.close(raw_fig)
+    # Halve the axes and the pair comes with it; a page-anchored column would
+    # have stayed put.
+    narrow = margin_label_x([0.142, 0.168, 0.340, 0.775])
+    assert sorted(narrow) == [0.043, 0.472]
