@@ -38,14 +38,14 @@ def test_override_wins_on_a_leaf_and_leaves_siblings_alone():
     merged, problems = _merge({"panel": {"right": 0.55}})
     assert problems == []
     assert merged["panel"]["right"] == 0.55
-    assert merged["panel"]["alpha"] == DEFAULT_DEBUG["panel"]["alpha"]
+    assert merged["panel"]["entry_gap"] == DEFAULT_DEBUG["panel"]["entry_gap"]
     assert merged["dimension"] == DEFAULT_DEBUG["dimension"]
 
 
 def test_merge_does_not_mutate_the_defaults():
-    merged, _ = _merge({"palette": {"panel": "#000000"}})
-    assert merged["palette"]["panel"] == "#000000"
-    assert DEFAULT_DEBUG["palette"]["panel"] == "#FFEC73"
+    merged, _ = _merge({"figure": {"caption": {"x": 0.1}}})
+    assert merged["figure"]["caption"]["x"] == 0.1
+    assert DEFAULT_DEBUG["figure"]["caption"]["x"] == 0.5
 
 
 # --------------------------------------------------------------------------- #
@@ -71,8 +71,8 @@ def test_unknown_nested_key_reports_its_full_path():
 
 def test_scalar_over_mapping_is_reported_instead_of_discarded():
     """It used to `continue` past this, keeping the default and saying nothing."""
-    merged, problems = _merge({"palette": "#ffffff"})
-    assert merged["palette"] == DEFAULT_DEBUG["palette"]
+    merged, problems = _merge({"panel": "#ffffff"})
+    assert merged["panel"] == DEFAULT_DEBUG["panel"]
     assert len(problems) == 1
     assert "expected a mapping" in problems[0]
 
@@ -88,18 +88,26 @@ def test_unknown_key_with_no_close_match_still_reports():
 # --------------------------------------------------------------------------- #
 
 
-def test_style_leaves_accept_arbitrary_matplotlib_kwargs():
-    """`*style` blocks are matplotlib's vocabulary, not Jarvis-PLOT's."""
-    base = {"outline": {"style": {"linewidth": 0.45}}}
-    merged, problems = merge_debug_config(base, {"outline": {"style": {"hatch": "//"}}})
+def test_call_blocks_accept_arbitrary_matplotlib_kwargs():
+    """A call block is matplotlib's vocabulary, not Jarvis-PLOT's."""
+    base = {"outline": {"Rectangle": {"linewidth": 0.45}}}
+    merged, problems = merge_debug_config(base, {"outline": {"Rectangle": {"hatch": "//"}}})
     assert problems == []
-    assert merged["outline"]["style"] == {"linewidth": 0.45, "hatch": "//"}
+    assert merged["outline"]["Rectangle"] == {"linewidth": 0.45, "hatch": "//"}
 
 
-def test_delegated_leaf_merges_rather_than_replaces():
-    base = {"caption": {"style": {"fontsize": 6.0, "va": "top"}}}
-    merged, _ = merge_debug_config(base, {"caption": {"style": {"fontsize": 9.0}}})
-    assert merged["caption"]["style"] == {"fontsize": 9.0, "va": "top"}
+def test_call_block_merges_rather_than_replaces():
+    base = {"caption": {"text": {"fontsize": 6.0, "va": "top"}}}
+    merged, _ = merge_debug_config(base, {"caption": {"text": {"fontsize": 9.0}}})
+    assert merged["caption"]["text"] == {"fontsize": 9.0, "va": "top"}
+
+
+def test_a_nested_call_block_leaf_keeps_the_keys_the_override_omits():
+    """`bbox` and `arrowprops` sit inside a call block; a partial override
+    must not wipe the rest of them."""
+    base = {"hlabel": {"text": {"bbox": {"fc": "white", "alpha": 0.5}}}}
+    merged, _ = merge_debug_config(base, {"hlabel": {"text": {"bbox": {"alpha": 0.9}}}})
+    assert merged["hlabel"]["text"]["bbox"] == {"fc": "white", "alpha": 0.9}
 
 
 # --------------------------------------------------------------------------- #
@@ -124,12 +132,12 @@ def test_resolve_falls_back_to_the_private_attribute():
 def test_resolve_warns_once_about_everything_it_dropped():
     warnings = []
     fig = SimpleNamespace(
-        _debug_config={"pannel": {}, "palette": 1},
+        _debug_config={"pannel": {}, "panel": 1},
         logger=SimpleNamespace(warning=warnings.append),
     )
     resolve_debug_config(fig)
     assert len(warnings) == 1
-    assert "pannel" in warnings[0] and "palette" in warnings[0]
+    assert "pannel" in warnings[0] and "expected a mapping" in warnings[0]
 
 
 @pytest.mark.parametrize("logger", [None, SimpleNamespace(), object()])
