@@ -35,9 +35,9 @@ def test_no_override_returns_the_defaults():
 
 
 def test_override_wins_on_a_leaf_and_leaves_siblings_alone():
-    merged, problems = _merge({"panel": {"right": 0.55}})
+    merged, problems = _merge({"panel": {"char_width_factor": 0.55}})
     assert problems == []
-    assert merged["panel"]["right"] == 0.55
+    assert merged["panel"]["char_width_factor"] == 0.55
     assert merged["panel"]["entry_gap"] == DEFAULT_DEBUG["panel"]["entry_gap"]
     assert merged["dimension"] == DEFAULT_DEBUG["dimension"]
 
@@ -55,7 +55,7 @@ def test_merge_does_not_mutate_the_defaults():
 
 def test_unknown_key_is_reported_with_a_suggestion_and_dropped():
     """It used to be carried through as inert junk -- a typo looked like a win."""
-    merged, problems = _merge({"pannel": {"right": 0.5}})
+    merged, problems = _merge({"pannel": {"entry_gap": 0.5}})
     assert "pannel" not in merged
     assert len(problems) == 1
     assert "unknown Debug key" in problems[0]
@@ -63,10 +63,10 @@ def test_unknown_key_is_reported_with_a_suggestion_and_dropped():
 
 
 def test_unknown_nested_key_reports_its_full_path():
-    merged, problems = _merge({"panel": {"rigth": 0.5}})
-    assert "rigth" not in merged["panel"]
-    assert problems and problems[0].startswith("panel.rigth:")
-    assert "'right'" in problems[0]
+    merged, problems = _merge({"panel": {"entry_gpa": 0.5}})
+    assert "entry_gpa" not in merged["panel"]
+    assert problems and problems[0].startswith("panel.entry_gpa:")
+    assert "'entry_gap'" in problems[0]
 
 
 def test_scalar_over_mapping_is_reported_instead_of_discarded():
@@ -117,16 +117,16 @@ def test_a_nested_call_block_leaf_keeps_the_keys_the_override_omits():
 
 def test_resolve_reads_the_public_attribute_first():
     fig = SimpleNamespace(
-        debug_config={"panel": {"right": 0.4}},
-        _debug_config={"panel": {"right": 0.9}},
+        debug_config={"panel": {"entry_gap": 0.4}},
+        _debug_config={"panel": {"entry_gap": 0.9}},
         logger=None,
     )
-    assert resolve_debug_config(fig)["panel"]["right"] == 0.4
+    assert resolve_debug_config(fig)["panel"]["entry_gap"] == 0.4
 
 
 def test_resolve_falls_back_to_the_private_attribute():
-    fig = SimpleNamespace(_debug_config={"panel": {"right": 0.9}}, logger=None)
-    assert resolve_debug_config(fig)["panel"]["right"] == 0.9
+    fig = SimpleNamespace(_debug_config={"panel": {"entry_gap": 0.9}}, logger=None)
+    assert resolve_debug_config(fig)["panel"]["entry_gap"] == 0.9
 
 
 def test_resolve_warns_once_about_everything_it_dropped():

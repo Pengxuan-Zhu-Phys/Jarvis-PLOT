@@ -10,13 +10,14 @@ card is outlined and annotated with
     (exactly the ``Frame.axes.<name>.rect`` value from the style JSON card), and
   - its width / height converted to centimetres from ``figure.figsize``.
 
-The primary axes additionally gets margin dimension lines (left / top / bottom
-insets), numbered subplot axes get their top / bottom distances to the figure
-edges in successive columns, and colorbar axes get a gap dimension to the
-primary axes.  The per-axes geometry is collected into one compact, ordered
-panel inside the primary ``ax`` (or the first available primary-style axes).
-Keeping this information in one place prevents small helper axes such as
-``axlogo`` from being covered by their own annotations.
+Every axes gets its top / bottom distance to the figure edges, drawn against
+its own right border; the primary axes additionally gets the left inset, and
+colorbar axes get a gap dimension to the primary axes.  Numbered subplot axes
+(``ax0``, ``ax1``, ...) share one staggered column instead, since they sit in
+a stack and end at the same x.  The per-axes geometry is collected into one
+ordered panel anchored inside the primary ``ax`` (or the first available
+primary-style axes).  Keeping this information in one place prevents small
+helper axes such as ``axlogo`` from being covered by their own annotations.
 
 Nothing here decides what an annotation looks like.  Geometry is computed
 below; every appearance kwarg is splatted out of a block named after the
@@ -72,6 +73,22 @@ def _text(template, values, fig=None) -> str:
             except Exception:
                 pass
         return str(values)
+
+
+def _free_column(x0, placed, step):
+    """First free slot for a vertical marker, starting at ``x0``.
+
+    Two markers closer than ``step`` overlap once their rotated labels are
+    drawn, so a column that lands on top of one already placed walks outward
+    -- inward first, then out -- until it finds room on the page.
+    """
+    for k in range(9):
+        for candidate in (x0,) if k == 0 else (x0 - k * step, x0 + k * step):
+            if 0.0 <= candidate <= 1.0 and all(
+                abs(candidate - p) >= step for p in placed
+            ):
+                return candidate
+    return x0
 
 
 def _label_side(value) -> str:
@@ -272,6 +289,24 @@ def _draw(fig) -> None:
     primary_pos = positions_by_name.get(primary) if primary else None
     corner_gap = float(dimension_cfg["corner_gap"])
 
+    # Every axes gets its top/bottom margins against its own right border.
+    # Numbered axes are a stack that ends at one x, so they keep the single
+    # staggered column below; the rest claim a column here, in card order,
+    # each stepping clear of the markers already claimed -- including the
+    # figure height marker, which a corner axes like axlogo lands on.
+    margin_step = float(margins_cfg["marker_step"])
+    margin_side = _label_side(margins_cfg["label_side"])
+    margin_columns = {}
+    _claimed = []
+    if _shown(figure_cfg["height_marker"]):
+        _claimed.append(float(figure_cfg["height_marker"]["x"]))
+    for _name, (_l, _b, _w, _h) in axis_positions:
+        if _name.startswith("ax") and _name[2:].isdigit():
+            continue
+        _x = _free_column(_l + _w - corner_gap, _claimed, margin_step)
+        _claimed.append(_x)
+        margin_columns[_name] = _x
+
     for name, pos in axis_positions:
         l, b, w, h = pos
 
@@ -314,39 +349,35 @@ def _draw(fig) -> None:
             ):
                 ov.plot([x, x], [ya, yb], **tick_style)
 
-        if name == primary:
-            yt = b + h
+        yt = b + h
+        if name == primary and _shown(margins_cfg["left"]):
             # The horizontal inset is measured along the top edge, left of the
             # axes, and lands on the left spine just below the corner.
-            if _shown(margins_cfg["left"]):
-                dim(0.0, yt, l, yt,
-                    _text(margins_cfg["template"], l * w_cm, fig),
-                    line_offset=-corner_gap)
-            # The top/bottom pair used to sit on the left spine, right on top
-            # of where the axes-layout panel begins.  Put it just outside the
-            # axes' right edge instead, so it stays with the axes it measures
-            # while leaving the panel the whole left side.
-            if not (name.startswith("ax") and name[2:].isdigit()):
-                margin_x = l + w
-                margin_side = _label_side(margins_cfg["label_side"])
-                # mirrors ``left``: inside the border, not off the page
-                if _shown(margins_cfg["top"]):
-                    dim(
-                        margin_x, yt, margin_x, 1.0,
-                        _text(margins_cfg["template"], (1.0 - yt) * h_cm, fig),
-                        vertical=True,
-                        line_offset=-corner_gap,
-                        vertical_label_side=margin_side,
-                    )
-                if _shown(margins_cfg["bottom"]):
-                    dim(
-                        margin_x, 0.0, margin_x, b,
-                        _text(margins_cfg["template"], b * h_cm, fig),
-                        vertical=True,
-                        line_offset=-corner_gap,
-                        vertical_label_side=margin_side,
-                    )
-        elif name.startswith("axc") and primary_pos is not None:
+            dim(0.0, yt, l, yt,
+                _text(margins_cfg["template"], l * w_cm, fig),
+                line_offset=-corner_gap)
+
+        if name in margin_columns:
+            # Ride this axes' right border, just inside it -- mirroring where
+            # ``left`` sits on the top edge.  A zero-width gap has nothing to
+            # dimension; drawing it would leave two arrowheads on one point.
+            margin_x = margin_columns[name]
+            if _shown(margins_cfg["top"]) and yt < 1.0:
+                dim(
+                    margin_x, yt, margin_x, 1.0,
+                    _text(margins_cfg["template"], (1.0 - yt) * h_cm, fig),
+                    vertical=True,
+                    vertical_label_side=margin_side,
+                )
+            if _shown(margins_cfg["bottom"]) and b > 0.0:
+                dim(
+                    margin_x, 0.0, margin_x, b,
+                    _text(margins_cfg["template"], b * h_cm, fig),
+                    vertical=True,
+                    vertical_label_side=margin_side,
+                )
+
+        if name.startswith("axc") and primary_pos is not None:
             # gap between the primary axes' right edge and this colorbar's left edge
             pl, pb, pw, ph = primary_pos
             ygap = b + h / 2.0
@@ -427,86 +458,69 @@ def _draw(fig) -> None:
         )
         panel_x = pl + pad_x
         panel_y = pb + ph - pad_y
-        # Keep the layout information card compact by default.  This is the
-        # overlay card's bound only; it does not change the real axes limits.
-        panel_right = min(pl + pw - pad_x, float(panel_cfg["right"]))
-        panel_w = panel_right - panel_x
-        panel_h = ph - 2.0 * pad_y
 
-        if panel_w > 0.0 and panel_h > 0.0:
-            available_w_pt = panel_w * w_in * pt_per_inch
-            available_h_pt = panel_h * h_in * pt_per_inch
-            max_detail_chars = max(
-                len(line)
-                for entry in entries
-                for line in entry[1:]
+        # One type scale on every figure.  The panel used to shrink its text
+        # to fit the axes, so the same numbers came out at a different size on
+        # each card and the short ones were unreadable.  The sizes are now
+        # used as written and the box is measured from its content, which is
+        # free to run past the axes it is anchored in.
+        header_size = float(header_cfg["size"])
+        name_size = float(name_cfg["size"])
+        detail_size = float(detail_cfg["size"])
+        entry_gap = float(panel_cfg["entry_gap"])
+        header_leading = float(header_cfg["leading"])
+        name_leading = float(name_cfg["leading"])
+        detail_leading = float(detail_cfg["leading"])
+        max_detail_chars = max(
+            len(line)
+            for entry in entries
+            for line in entry[1:]
+        )
+        content_h_pt = (
+            header_size * header_leading
+            + len(entries)
+            * (
+                name_size * name_leading
+                + float(panel_cfg["detail_lines_per_entry"])
+                * detail_size
+                * detail_leading
             )
+            + max(0, len(entries) - 1) * entry_gap
+        )
+        content_w_pt = (
+            float(panel_cfg["char_width_factor"]) * detail_size * max_detail_chars
+        )
+        inset_x = float(panel_cfg["text_inset_x"])
+        inset_y = float(panel_cfg["text_inset_y"])
+        figure_height_pt = h_in * pt_per_inch
+        panel_w = content_w_pt / (w_in * pt_per_inch) + 2.0 * inset_x
+        panel_h = content_h_pt / figure_height_pt + 2.0 * inset_y
 
-            # Preserve the visual hierarchy: the axis name is larger and bold,
-            # its rect and cm dimensions smaller.  Shrink the complete group
-            # only when a short multi-panel axis cannot fit all entries at
-            # those sizes.
-            header_target = float(header_cfg["size"])
-            name_target = float(name_cfg["size"])
-            detail_target = float(detail_cfg["size"])
-            entry_gap_target = float(panel_cfg["entry_gap"])
-            header_leading = float(header_cfg["leading"])
-            name_leading = float(name_cfg["leading"])
-            detail_leading = float(detail_cfg["leading"])
-            target_height = (
-                header_target * header_leading
-                + len(entries)
-                * (
-                    name_target * name_leading
-                    + float(panel_cfg["detail_lines_per_entry"])
-                    * detail_target
-                    * detail_leading
-                )
-                + max(0, len(entries) - 1) * entry_gap_target
+        ov.add_patch(
+            mpl.patches.FancyBboxPatch(
+                (panel_x, panel_y - panel_h),
+                panel_w,
+                panel_h,
+                **panel_cfg["box"]["FancyBboxPatch"],
             )
-            size_from_height = available_h_pt / max(1.0, target_height)
-            size_from_width = available_w_pt / max(
-                1.0,
-                float(panel_cfg["char_width_factor"]) * detail_target * max_detail_chars,
-            )
-            scale = min(1.0, size_from_height, size_from_width)
-            header_size = max(float(header_cfg["min_size"]), header_target * scale)
-            name_size = max(float(name_cfg["min_size"]), name_target * scale)
-            detail_size = max(float(detail_cfg["min_size"]), detail_target * scale)
-            entry_gap = entry_gap_target * scale
+        )
+        text_x = panel_x + inset_x
+        cursor_y = panel_y - inset_y
 
-            ov.add_patch(
-                mpl.patches.FancyBboxPatch(
-                    (panel_x, panel_y - panel_h),
-                    panel_w,
-                    panel_h,
-                    **panel_cfg["box"]["FancyBboxPatch"],
-                )
-            )
-            text_x = panel_x + min(
-                float(panel_cfg["text_inset_x_max"]),
-                panel_w * float(panel_cfg["text_inset_x_factor"]),
-            )
-            cursor_y = panel_y - min(
-                float(panel_cfg["text_inset_y_max"]),
-                panel_h * float(panel_cfg["text_inset_y_factor"]),
-            )
-            figure_height_pt = h_in * pt_per_inch
+        def panel_text(text, size, style):
+            ov.text(text_x, cursor_y, text, fontsize=size, **style)
 
-            def panel_text(text, size, style):
-                ov.text(text_x, cursor_y, text, fontsize=size, **style)
-
-            panel_text(header, header_size, header_cfg["text"])
-            cursor_y -= header_size * header_leading / figure_height_pt
-            for index, (name, rect_line, size_line) in enumerate(entries):
-                panel_text(name, name_size, name_cfg["text"])
-                cursor_y -= name_size * name_leading / figure_height_pt
-                panel_text(rect_line, detail_size, detail_cfg["text"])
-                cursor_y -= detail_size * detail_leading / figure_height_pt
-                panel_text(size_line, detail_size, detail_cfg["text"])
-                cursor_y -= detail_size * detail_leading / figure_height_pt
-                if index < len(entries) - 1:
-                    cursor_y -= entry_gap / figure_height_pt
+        panel_text(header, header_size, header_cfg["text"])
+        cursor_y -= header_size * header_leading / figure_height_pt
+        for index, (name, rect_line, size_line) in enumerate(entries):
+            panel_text(name, name_size, name_cfg["text"])
+            cursor_y -= name_size * name_leading / figure_height_pt
+            panel_text(rect_line, detail_size, detail_cfg["text"])
+            cursor_y -= detail_size * detail_leading / figure_height_pt
+            panel_text(size_line, detail_size, detail_cfg["text"])
+            cursor_y -= detail_size * detail_leading / figure_height_pt
+            if index < len(entries) - 1:
+                cursor_y -= entry_gap / figure_height_pt
 
 
 # --------------------------------------------------------------------------- #

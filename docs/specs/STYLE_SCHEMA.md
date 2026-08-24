@@ -63,10 +63,10 @@ mapping. Every key is optional; anything absent falls back.
 | `figure` | border, size caption, total-height marker |
 | `axes` | per-axes outline (framed / frameless) and the frameless corner ticks |
 | `dimension` | cap bars, arrowheads and labels -- every measured distance uses these |
-| `margins` | the primary axes' left / top / bottom insets; the top/bottom pair rides the axes' right border, `label_side` picks which side of it the label sits on |
+| `margins` | **every** axes' top / bottom insets, each riding that axes' own right border (`marker_step` separates axes that end at the same x); plus the primary axes' left inset |
 | `colorbar_gap` | gap between the primary axes and a colorbar |
 | `numbered_axes` | the staggered edge dimensions for `ax0`, `ax1`, … |
-| `panel` | the "axes layout" information card |
+| `panel` | the "axes layout" information card: one type scale on every figure, box measured from its content, free to run past the axes |
 | `ternary` | tick anchors and label leaders; only on cards with an `axtri` axes |
 
 `jplot cap styles --json` reports each card's `debug_groups`.
@@ -105,9 +105,11 @@ block is layered key by key, so a card may change one arrow property without
 restating the rest.
 
 Two kwargs are Python's to supply because they depend on what is being
-measured: the narrow arrowhead's `mutation_scale` (from the span, bounded by
-`dimension.narrow_scale_min` / `_max`) and the panel text's `fontsize` (from
-`panel.<part>.size`, shrunk together but never below `min_size`).
+measured: the narrow arrowhead's `mutation_scale`, from the span, bounded by
+`dimension.narrow_scale_min` / `_max`. The panel text's `fontsize` is also
+supplied by Python, but it is `panel.<part>.size` verbatim -- the panel no
+longer rescales itself to fit, so the same numbers read at the same size on
+every card.
 
 ### Switching annotations off
 

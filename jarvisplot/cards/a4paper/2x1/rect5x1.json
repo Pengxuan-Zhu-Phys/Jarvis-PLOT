@@ -581,6 +581,7 @@
         "margins": {
             "template": "%.3f cm",
             "label_side": "right",
+            "marker_step": 0.04,
             "left": {
                 "show": true
             },
@@ -597,7 +598,6 @@
         },
         "panel": {
             "show": true,
-            "right": 0.7,
             "pad_x_max": 0.018,
             "pad_x_min": 0.004,
             "pad_x_factor": 0.025,
@@ -607,10 +607,8 @@
             "entry_gap": 5.0,
             "char_width_factor": 0.62,
             "detail_lines_per_entry": 2.0,
-            "text_inset_x_max": 0.008,
-            "text_inset_x_factor": 0.02,
-            "text_inset_y_max": 0.006,
-            "text_inset_y_factor": 0.03,
+            "text_inset_x": 0.008,
+            "text_inset_y": 0.006,
             "box": {
                 "FancyBboxPatch": {
                     "boxstyle": "round,pad=0.004",
@@ -624,7 +622,6 @@
             "header": {
                 "label": "axes layout",
                 "size": 6.0,
-                "min_size": 2.2,
                 "leading": 1.2,
                 "text": {
                     "color": "#1A237E",
@@ -638,7 +635,6 @@
             },
             "name": {
                 "size": 7.0,
-                "min_size": 2.2,
                 "leading": 1.15,
                 "text": {
                     "color": "#1A237E",
@@ -652,7 +648,6 @@
             },
             "detail": {
                 "size": 4.6,
-                "min_size": 1.8,
                 "leading": 1.08,
                 "rect_template": "  rect=[%.3f, %.3f, %.3f, %.3f]",
                 "size_template": "  width: %.3f cm  height: %.3f cm",
