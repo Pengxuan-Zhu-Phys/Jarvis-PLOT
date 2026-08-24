@@ -42,7 +42,6 @@ from .debug_config import (
     PALETTE_ROLES,
     PANEL as _PANEL,
     PRIMARY_ORDER as _PRIMARY_ORDER,
-    merge_debug_config as _merge_debug_config,
     resolve_debug_config as _debug_config,
 )
 
