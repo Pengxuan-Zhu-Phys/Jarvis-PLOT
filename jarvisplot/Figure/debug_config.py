@@ -46,7 +46,7 @@ __all__ = [
 # Colours are written out in full inside every call block below; these names
 # exist only to keep that table readable and to make the roles obvious. They
 # are not a runtime indirection -- a card overrides the block, not a palette.
-_DIM = "#0A7FB6"      # dimension lines, arrowheads and their labels
+_DIM = "#1F21E9"      # dimension lines, arrowheads and their labels
 _BOX = "#111111"      # outline of a framed axes
 _MARGIN = "#FF3FA4"   # figure border, caption, frameless-axes outline
 _NAME = "#1A237E"     # text inside the axes-layout panel
