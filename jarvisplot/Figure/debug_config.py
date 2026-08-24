@@ -23,6 +23,7 @@ from ..diagnostics import did_you_mean
 __all__ = [
     "DEFAULT_DEBUG",
     "DELEGATED_LEAVES",
+    "deep_update",
     "PALETTE_ROLES",
     "merge_debug_config",
     "resolve_debug_config",
@@ -187,6 +188,29 @@ DEFAULT_DEBUG = {
 #: delegated zone in the YAML schema -- Jarvis-PLOT does not enumerate what
 #: matplotlib accepts.
 DELEGATED_LEAVES = ("bbox", "boxstyle_kwargs")
+
+
+def deep_update(base: Mapping, override: Mapping | None) -> dict:
+    """Layer one override mapping over another, without validating either.
+
+    Used to combine a style card's ``Debug`` block with a figure's YAML
+    ``debug:`` mapping. Validation is deliberately not done here: both are
+    partial by design, so checking them against each other would report every
+    key the card happens not to mention. :func:`merge_debug_config` validates
+    the combined result against :data:`DEFAULT_DEBUG` once, later.
+
+    Non-mapping values replace rather than merge -- notably lists, so a card
+    overriding ``primary_order`` sets it instead of appending to it.
+    """
+    merged = deepcopy(dict(base))
+    if not isinstance(override, Mapping):
+        return merged
+    for key, value in override.items():
+        if isinstance(value, Mapping) and isinstance(merged.get(key), Mapping):
+            merged[key] = deep_update(merged[key], value)
+        else:
+            merged[key] = deepcopy(value)
+    return merged
 
 
 def _is_delegated(key: str) -> bool:

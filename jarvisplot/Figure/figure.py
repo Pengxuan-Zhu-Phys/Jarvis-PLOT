@@ -24,6 +24,7 @@ from .layout_runtime import (
     apply_auto_ticks,
     apply_axis_title,
     apply_manual_ticks,
+    ensure_rect_axes,
     ensure_numbered_rect_axes,
     has_manual_ticks,
     hide_log_minor_tick_labels,
@@ -194,6 +195,10 @@ class Figure:
     def _ensure_numbered_rect_axes(self, ax_name: str, kwgs: dict):
         """Create/configure a numbered rectangular axes (ax1, ax2, ...) using layout helpers."""
         return ensure_numbered_rect_axes(self, ax_name, kwgs)
+
+    def _ensure_rect_axes(self, ax_name: str, kwgs: dict):
+        """Create/configure the ratio rectangular axes ``axr``."""
+        return ensure_rect_axes(self, ax_name, kwgs)
     def _has_manual_ticks(self, ax_key: str, which: str) -> bool:
         """Return True if YAML provides manual tick positions for given axis."""
         return has_manual_ticks(self.frame, ax_key, which)
@@ -231,6 +236,9 @@ class Figure:
         self._name: Optional[str]       = None
         self._jpstyles: Optional[dict]  = None
         self._style: Optional[dict]     = {}
+        self._debug_config: dict         = {}
+        self._debug_overrides: dict      = {}
+        self._debug: bool               = False
         self._default_layers = []
         self.print      = False
         self.mode       = "Jarvis"
@@ -241,7 +249,6 @@ class Figure:
         self._output_metadata = {}
         self._yaml_dir  = None  # directory of the active YAML file (used to resolve relative paths)
         self.axes       = {}
-        self.debug      = False
         # self._axtri     = None
         self._layers    = {}
         self._render_queue = []
@@ -300,6 +307,38 @@ class Figure:
             self._logger = value 
 
     @property
+    def debug(self) -> bool:
+        """Master switch for the design-reference overlay."""
+        return self._debug
+
+    @debug.setter
+    def debug(self, value) -> None:
+        """Accept ``debug: true`` or a ``debug: {...}`` per-figure override.
+
+        The mapping form turns the overlay on and overrides the style card's
+        ``Debug`` block for this figure only. It is stored in its own slot:
+        ``apply_figure_config`` assigns ``debug`` *before* ``style``, and the
+        style setter overwrites ``_debug_config`` wholesale, so writing the
+        override there would silently lose it.
+        """
+        if isinstance(value, Mapping):
+            overrides = {k: v for k, v in value.items() if k != "show"}
+            self._debug = bool(value.get("show", True))
+            self._debug_overrides = deepcopy(overrides)
+            return
+        self._debug = bool(value)
+        self._debug_overrides = {}
+
+    @property
+    def debug_config(self) -> dict:
+        """Style-card ``Debug`` block with this figure's YAML override applied."""
+        from .debug_config import deep_update
+
+        if not self._debug_overrides:
+            return self._debug_config
+        return deep_update(self._debug_config, self._debug_overrides)
+
+    @property
     def frame(self):
         return self._frame 
     
@@ -324,6 +363,7 @@ class Figure:
         family, selected, bundle = resolve_style_bundle_payload(self.jpstyles, value)
         self._frame = deepcopy(bundle["Frame"])
         self._style = deepcopy(bundle["Style"])
+        self._debug_config = deepcopy(bundle.get("Debug", {}))
         self._default_layers = deepcopy(bundle.get("Layers", []))
         if self.logger:
             self.logger.debug("Style: [{} : {}] used for figure -> {}".format(family, selected, self.name))
@@ -461,7 +501,24 @@ class Figure:
         from PIL import Image
         with Image.open(jhlogo) as image:
             arr = np.asarray(image.convert("RGBA"))
-            self.axlogo.imshow(arr)
+            image_height, image_width = arr.shape[:2]
+
+            # Logo cards historically used a 1024x1024 coordinate system.
+            # Keep the image axes tied to the actual source dimensions so a
+            # replacement icon (for example a 58x58 PNG) is not rendered as
+            # a tiny patch in the lower-left corner.
+            self.axlogo.imshow(
+                arr,
+                extent=(0.0, float(image_width), float(image_height), 0.0),
+                origin="upper",
+                # Preserve the source pixels.  Matplotlib's default
+                # ``auto`` interpolation downsamples this small icon to the
+                # output DPI; the PDF backend then embeds a blurry 30x30
+                # image instead of the original icon.
+                interpolation="none",
+            )
+            self.axlogo.set_xlim(0.0, float(image_width))
+            self.axlogo.set_ylim(float(image_height), 0.0)
             if self.frame['axlogo'].get("text"):
                 for txt in self.frame['axlogo']['text']:
                     self.axlogo.text(**txt,  transform=self.axlogo.transAxes)
@@ -1065,11 +1122,15 @@ class Figure:
                 self._init_axc_axes(ax, kws)
             elif ax == "ax":
                 self.ax     = kws
+            elif ax == "axr":
+                self._ensure_rect_axes(ax, kws)
             elif self._is_numbered_ax(ax):
                 self._ensure_numbered_rect_axes(ax, kws)
             else:
                 try:
-                    self.logger.warning(f"Unsupported axes key '{ax}'. Only 'ax' or 'ax<NUMBER>' are allowed.")
+                    self.logger.warning(
+                        f"Unsupported axes key '{ax}'. Only 'ax', 'axr', or 'ax<NUMBER>' are allowed."
+                    )
                 except Exception:
                     pass
         
@@ -1137,10 +1198,10 @@ class Figure:
         # ---- Finalize axes that want it ----
         for name, ax in self.axes.items():
             # Auto ticks only if user did not provide manual ticks for this axis
-            if name == 'ax':
-                if not self._has_manual_ticks('ax', 'x'):
+            if name in {'ax', 'axr'}:
+                if not self._has_manual_ticks(name, 'x'):
                     self._apply_auto_ticks(ax, 'x')
-                if not self._has_manual_ticks('ax', 'y'):
+                if not self._has_manual_ticks(name, 'y'):
                     self._apply_auto_ticks(ax, 'y')
             elif name == "axc" or (name.startswith("axc") and len(name) > 3):
                 axc_tick_axis = 'x' if axc_is_horizontal(self.frame, name) else 'y'
