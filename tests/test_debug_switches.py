@@ -129,10 +129,15 @@ def test_colorbar_gap_off_removes_its_dimension(baseline):
     assert after["panels"] == baseline["panels"]
 
 
-@pytest.mark.parametrize("side", ["left", "top", "bottom"])
-def test_each_primary_margin_can_be_switched_off_independently(baseline, side):
+@pytest.mark.parametrize("side, removed", [("left", 1), ("top", 3), ("bottom", 3)])
+def test_each_margin_switch_removes_exactly_its_own_labels(baseline, side, removed):
+    """`left` is the primary axes' inset alone; top/bottom cover every axes.
+
+    The fixture has three -- axlogo, ax, axc -- so each of those two switches
+    takes three labels with it.
+    """
     after = _census_with({"margins": {side: {"show": False}}})
-    assert after["labels"] == baseline["labels"] - 1
+    assert after["labels"] == baseline["labels"] - removed
 
 
 def test_numbered_axes_off_removes_the_whole_column():
@@ -171,5 +176,5 @@ def test_all_switches_off_draws_nothing_but_does_not_raise():
 
 def test_absent_show_key_means_on(baseline):
     """A card written before an element existed must keep drawing it."""
-    after = _census_with({"panel": {"right": 0.70}})
+    after = _census_with({"panel": {"entry_gap": 5.0}})
     assert after == baseline

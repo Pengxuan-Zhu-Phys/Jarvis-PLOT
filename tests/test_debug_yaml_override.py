@@ -37,7 +37,7 @@ from jarvisplot.validation import validate_config
         ({}, True, {}),
         ({"panel": {"show": False}}, True, {"panel": {"show": False}}),
         ({"show": False}, False, {}),
-        ({"show": False, "panel": {"right": 0.4}}, False, {"panel": {"right": 0.4}}),
+        ({"show": False, "panel": {"entry_gap": 4.0}}, False, {"panel": {"entry_gap": 4.0}}),
     ],
 )
 def test_debug_setter_forms(value, expected_on, expected_overrides):
@@ -61,35 +61,35 @@ def test_debug_stays_a_bool_so_the_master_switch_is_one_thing():
 
 def test_yaml_override_wins_over_the_style_card():
     fig = Figure()
-    fig._debug_config = {"panel": {"right": 0.70, "entry_gap": 3.0}}
-    fig.debug = {"panel": {"right": 0.40}}
+    fig._debug_config = {"panel": {"entry_gap": 3.0, "char_width_factor": 0.7}}
+    fig.debug = {"panel": {"entry_gap": 4.0}}
     merged = fig.debug_config
-    assert merged["panel"]["right"] == 0.40
-    assert merged["panel"]["entry_gap"] == 3.0, "sibling card keys survive"
+    assert merged["panel"]["entry_gap"] == 4.0
+    assert merged["panel"]["char_width_factor"] == 0.7, "sibling card keys survive"
 
 
 def test_card_wins_over_the_packaged_defaults():
     fig = Figure()
-    fig._debug_config = {"panel": {"right": 0.33}}
+    fig._debug_config = {"panel": {"char_width_factor": 0.33}}
     fig.debug = True
     resolved = resolve_debug_config(fig)
-    assert resolved["panel"]["right"] == 0.33
+    assert resolved["panel"]["char_width_factor"] == 0.33
     assert resolved["panel"]["entry_gap"] == DEFAULT_DEBUG["panel"]["entry_gap"]
 
 
 def test_full_precedence_chain():
     fig = Figure()
-    fig._debug_config = {"panel": {"right": 0.33, "entry_gap": 9.0}}
-    fig.debug = {"panel": {"right": 0.11}}
+    fig._debug_config = {"panel": {"char_width_factor": 0.33, "entry_gap": 9.0}}
+    fig.debug = {"panel": {"char_width_factor": 0.11}}
     resolved = resolve_debug_config(fig)
-    assert resolved["panel"]["right"] == 0.11, "YAML wins"
+    assert resolved["panel"]["char_width_factor"] == 0.11, "YAML wins"
     assert resolved["panel"]["entry_gap"] == 9.0, "card wins where YAML is silent"
     assert resolved["panel"]["header"] == DEFAULT_DEBUG["panel"]["header"], "defaults fill the rest"
 
 
 def test_override_does_not_leak_between_figures():
     a, b = Figure(), Figure()
-    a.debug = {"panel": {"right": 0.1}}
+    a.debug = {"panel": {"entry_gap": 1.0}}
     b.debug = True
     assert b.debug_config == {}
 
@@ -97,9 +97,9 @@ def test_override_does_not_leak_between_figures():
 def test_a_later_style_assignment_does_not_clobber_the_yaml_override():
     """The ordering trap: config_runtime sets debug first, style second."""
     fig = Figure()
-    fig.debug = {"panel": {"right": 0.42}}
-    fig._debug_config = {"panel": {"alpha": 0.7}}  # what the style setter does
-    assert fig.debug_config["panel"]["right"] == 0.42
+    fig.debug = {"panel": {"entry_gap": 4.2}}
+    fig._debug_config = {"panel": {"char_width_factor": 0.7}}  # the style setter
+    assert fig.debug_config["panel"]["entry_gap"] == 4.2
 
 
 def test_list_valued_keys_are_replaced_not_appended():

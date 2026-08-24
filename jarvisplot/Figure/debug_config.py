@@ -226,14 +226,20 @@ DEFAULT_DEBUG = {
     "margins": {
         "template": "%.3f cm",
         "label_side": "right",
+        # Axes that end at the same x would draw on top of each other, so each
+        # one after the first steps this far further inside the border.
+        "marker_step": 0.040,
         "left": {"show": True},
         "top": {"show": True},
         "bottom": {"show": True},
     },
     "colorbar_gap": {"show": True, "template": "%.3f cm"},
+    # The layout panel. One type scale for every figure: the box is sized to
+    # its content and may run past the axes, rather than shrinking its text to
+    # fit a short axes and printing the same numbers at a different size on
+    # every card.
     "panel": {
         "show": True,
-        "right": 0.70,
         "pad_x_max": 0.018,
         "pad_x_min": 0.004,
         "pad_x_factor": 0.025,
@@ -243,10 +249,8 @@ DEFAULT_DEBUG = {
         "entry_gap": 5.0,
         "char_width_factor": 0.62,
         "detail_lines_per_entry": 2.0,
-        "text_inset_x_max": 0.008,
-        "text_inset_x_factor": 0.02,
-        "text_inset_y_max": 0.006,
-        "text_inset_y_factor": 0.03,
+        "text_inset_x": 0.008,
+        "text_inset_y": 0.006,
         "box": {
             "FancyBboxPatch": {
                 "boxstyle": "round,pad=0.004",
@@ -257,13 +261,11 @@ DEFAULT_DEBUG = {
                 "zorder": _Z_ARTIST,
             },
         },
-        # ``size`` is the target; the whole group shrinks together, but never
-        # below ``min_size``, when a short axes cannot fit every entry.
-        # ``fontsize`` is therefore the one text kwarg Python supplies.
+        # ``size`` is used as written on every figure; ``fontsize`` is the one
+        # text kwarg Python supplies, and it supplies exactly this.
         "header": {
             "label": "axes layout",
             "size": 6.0,
-            "min_size": 2.2,
             "leading": 1.20,
             "text": {
                 "color": _NAME,
@@ -277,7 +279,6 @@ DEFAULT_DEBUG = {
         },
         "name": {
             "size": 7.0,
-            "min_size": 2.2,
             "leading": 1.15,
             "text": {
                 "color": _NAME,
@@ -291,7 +292,6 @@ DEFAULT_DEBUG = {
         },
         "detail": {
             "size": 4.6,
-            "min_size": 1.8,
             "leading": 1.08,
             "rect_template": "  rect=[%.3f, %.3f, %.3f, %.3f]",
             "size_template": "  width: %.3f cm  height: %.3f cm",
