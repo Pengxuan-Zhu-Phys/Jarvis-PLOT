@@ -48,6 +48,7 @@ human:
         - "Precedence: packaged defaults < style card Debug < YAML debug mapping."
         - "Every element takes show; absent means on."
         - "show is a veto, not a command -- a colorbar gap needs a colorbar."
+        - "Every axes is dimensioned top and bottom except those margins.exclude names (axlogo by default)."
         - "Groups: primary_order, units, overlay, figure, axes, dimension, margins, colorbar_gap, numbered_axes, panel, ternary."
         - "Style lives in a block named after the matplotlib call: plot, text, annotate, scatter, Rectangle, FancyBboxPatch, add_axes."
         - "That block holds the call kwargs verbatim and is passed through unchecked."

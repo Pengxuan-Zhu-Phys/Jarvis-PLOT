@@ -383,6 +383,9 @@
         "margins": {
             "template": "%.3f cm",
             "label_side": "right",
+            "exclude": [
+                "axlogo"
+            ],
             "marker_step": 0.04,
             "left": {
                 "show": true
