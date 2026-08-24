@@ -314,7 +314,6 @@ def _draw(fig) -> None:
             figure_height_pt = h_in * 72.0
 
             def panel_text(text, size, *, weight="normal"):
-                nonlocal cursor_y
                 ov.text(
                     text_x,
                     cursor_y,
