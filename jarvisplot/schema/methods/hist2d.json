@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/methods/hist2d.json",
+  "title": "method: hist2d",
+  "description": "Coordinate contract for layers[].method='hist2d' (matplotlib: hist2d). Required axes must appear under coordinates.",
+  "x-jarvis-zone": "closed",
+  "x-jarvis-method": "hist2d",
+  "x-jarvis-mpl": "hist2d",
+  "x-jarvis-axes-types": [
+    "rect",
+    "any"
+  ],
+  "x-jarvis-coordinates": {
+    "required": [
+      "x",
+      "y"
+    ],
+    "optional": [
+      "weights"
+    ],
+    "alternatives": []
+  },
+  "x-jarvis-example": "method: hist2d\ncoordinates:\n  x: {expr: x}\n  y: {expr: y}",
+  "type": "object",
+  "properties": {
+    "method": {
+      "const": "hist2d"
+    },
+    "coordinates": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "additionalProperties": true,
+      "description": "Required axes for hist2d: x, y. Optional: weights."
+    }
+  },
+  "additionalProperties": true
+}

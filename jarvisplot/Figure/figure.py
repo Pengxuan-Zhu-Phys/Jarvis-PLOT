@@ -23,6 +23,7 @@ from .layout_runtime import (
     apply_axis_endpoints,
     apply_auto_ticks,
     apply_axis_title,
+    apply_grid,
     apply_manual_ticks,
     SIDE_AXES,
     ensure_rect_axes,
@@ -33,6 +34,7 @@ from .layout_runtime import (
 )
 from .colorbar_runtime import (
     axc_color_config,
+    layer_cmap_wins,
     axc_is_horizontal,
     collect_layer_color_range,
     layer_uses_color,
@@ -246,6 +248,10 @@ class Figure:
         # self._jpdatas:  Optional[list]  =   []
         self._logger    = None
         self._frame     = {}
+        # Colorbar axes whose cmap the project YAML names outright.  A cmap
+        # that only came from the style card is a preset the layer may
+        # override; one written here is not.
+        self._yaml_axc_cmaps: set = set()
         self._outinfo   = {}
         self._output_metadata = {}
         self._yaml_dir  = None  # directory of the active YAML file (used to resolve relative paths)
@@ -348,8 +354,17 @@ class Figure:
         if self._frame is None:
             self._frame = value
         else:
+            for _name, _node in (value or {}).items():
+                _color = _node.get("color") if isinstance(_node, dict) else None
+                if isinstance(_color, dict) and "cmap" in _color:
+                    self._yaml_axc_cmaps.add(str(_name))
             from deepmerge import always_merger
             self._frame = always_merger.merge(self._frame, value)
+
+    @property
+    def yaml_colorbar_cmaps(self) -> set:
+        """Colorbar axes whose cmap came from the YAML rather than the card."""
+        return self._yaml_axc_cmaps
             
     @property
     def style(self) -> Optional[dict]: 
@@ -363,6 +378,7 @@ class Figure:
             raise TypeError
         family, selected, bundle = resolve_style_bundle_payload(self.jpstyles, value)
         self._frame = deepcopy(bundle["Frame"])
+        self._yaml_axc_cmaps = set()
         self._style = deepcopy(bundle["Style"])
         self._debug_config = deepcopy(bundle.get("Debug", {}))
         self._default_layers = deepcopy(bundle.get("Layers", []))
@@ -883,7 +899,9 @@ class Figure:
             if not layer_uses_color(style, coor, method_key):
                 continue
 
-            if style.get("cmap") is not None:
+            if style.get("cmap") is not None and layer_cmap_wins(
+                self, cb_name, axc_color_config(self.frame, cb_name)
+            ):
                 cb_style_cmaps.setdefault(cb_name, style.get("cmap"))
 
             # Load data for color range only — do not append health observations
@@ -893,7 +911,9 @@ class Figure:
             if df is not None:
                 df = self._ensure_pandas_data(df, reason="prescan:colorbar")
                 color_cfg = axc_color_config(self.frame, cb_name)
-                lo, hi = collect_layer_color_range(df, coor, style, scale=color_cfg.get("scale"))
+                lo, hi = collect_layer_color_range(
+                    df, coor, style, scale=color_cfg.get("scale"), method_key=method_key
+                )
                 if lo is not None or hi is not None:
                     cb_ranges.setdefault(cb_name, []).append((lo, hi))
             # Release immediately to preserve memory profile
@@ -905,7 +925,7 @@ class Figure:
             if axc_obj is None or not hasattr(axc_obj, "_cb"):
                 continue
             color_cfg = axc_color_config(self.frame, cb_name)
-            if color_cfg.get("cmap") is None and cb_name in cb_style_cmaps:
+            if cb_name in cb_style_cmaps and layer_cmap_wins(self, cb_name, color_cfg):
                 color_cfg["cmap"] = cb_style_cmaps[cb_name]
             axc_obj._cb.update(
                 precompute_colorbar_cb(color_cfg, ranges, logger=self.logger)
@@ -1004,6 +1024,8 @@ class Figure:
         self.ax.tick_params(**self.frame['ax']['ticks'].get("major", {}))
         self.ax.tick_params(**self.frame['ax']['ticks'].get("minor", {}))
         
+        apply_grid(self, self.axes['ax'], 'ax')
+
         self._apply_axis_endpoints(self.axes['ax'], self.frame['ax'].get('xaxis', {}), "x")
         self._apply_axis_endpoints(self.axes['ax'], self.frame['ax'].get('yaxis', {}), "y")
 

@@ -74,6 +74,18 @@ hist:
   traps:
     - "Not a substitute for 2D density — use posterior_2d / profile for maps."
 
+hist2d:
+  summary: "2D histogram of raw rows; bins x/y itself and colours the counts."
+  notes:
+    - "Bins at render time, so no precomputed z table is needed — unlike pcolormesh."
+    - "optional weights takes an expr, so per-row normalisation goes there."
+    - "The colorbar range is read off the binned counts, not off a z column."
+    - "style forwards bins / range / density / cmin / cmax straight to matplotlib."
+  traps:
+    - "range is nested for 2D: [[xmin, xmax], [ymin, ymax]], not a flat pair."
+    - "density=True normalises globally; per-column or per-row normalisation has to come from weights."
+    - "Signed weights can make a bin sum to <= 0; cmin blanks those out."
+
 errorbar:
   summary: "Points with error bars."
   notes:
