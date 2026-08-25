@@ -10,9 +10,15 @@ def is_numbered_ax(name: str) -> bool:
     return isinstance(name, str) and re.fullmatch(r"ax\d+", name) is not None
 
 
+#: Side panels a card may attach to the main axes: a ratio strip underneath,
+#: and the left / bottom marginal panels of a corner-plot layout.  Each is a
+#: full rectangular axes and reads its own ``Frame`` node.
+SIDE_AXES = ("axr", "axl", "axb")
+
+
 def is_rect_ax(name: str) -> bool:
     """Return True for dynamically supported rectangular axes."""
-    return is_numbered_ax(name) or name == "axr"
+    return is_numbered_ax(name) or name in SIDE_AXES
 
 
 _TITLE_POSITION_PARAMS = {
@@ -81,8 +87,9 @@ def hide_log_minor_tick_labels(ax_obj, which: str) -> None:
 
 def ensure_rect_axes(fig, ax_name: str, kwgs: dict):
     if not is_rect_ax(ax_name):
+        allowed = ", ".join(repr(n) for n in SIDE_AXES)
         raise ValueError(
-            f"Illegal dynamic axes name '{ax_name}'. Only 'axr' or ax<NUMBER> is allowed."
+            f"Illegal dynamic axes name '{ax_name}'. Only {allowed} or ax<NUMBER> is allowed."
         )
 
     if ax_name not in fig.axes.keys():
@@ -183,10 +190,10 @@ def ensure_numbered_rect_axes(fig, ax_name: str, kwgs: dict):
 
 def has_manual_ticks(frame: Mapping[str, Any], ax_key: str, which: str) -> bool:
     try:
-        if ax_key in {"ax", "axr"}:
-            ticks_cfg = frame.get("ax", {}).get("ticks", {})
-            if ax_key == "axr":
-                ticks_cfg = frame.get("axr", {}).get("ticks", {})
+        if ax_key == "ax" or ax_key in SIDE_AXES:
+            # Each side panel reads its own node, so a later auto-tick pass
+            # cannot hand it the main axes' positions.
+            ticks_cfg = frame.get(ax_key, {}).get("ticks", {})
         elif isinstance(ax_key, str) and ax_key.startswith("axc"):
             # Colorbars can be named axc, axc2, etc.  Each must read its
             # own frame node so a later auto-tick pass cannot replace YAML
