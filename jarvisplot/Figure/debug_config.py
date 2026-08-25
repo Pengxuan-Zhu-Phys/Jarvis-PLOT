@@ -238,6 +238,21 @@ DEFAULT_DEBUG = {
         "bottom": {"show": True},
     },
     "colorbar_gap": {"show": True, "template": "%.3f cm"},
+    # A layout reference has no layers, so nothing feeds the colorbar and it
+    # stays an empty box -- the one part of the page the reference cannot
+    # show.  Fill it with the card's own colormap.  A colorbar a layer did
+    # feed is a real result and is left alone.
+    "colorbar_preview": {
+        "show": True,
+        "samples": 256,
+        "fallback_cmap": "viridis",
+        "imshow": {
+            "aspect": "auto",
+            "interpolation": "bilinear",
+            "origin": "lower",
+            "zorder": 1,
+        },
+    },
     # The layout panel. One type scale for every figure: the box is sized to
     # its content and may run past the axes, rather than shrinking its text to
     # fit a short axes and printing the same numbers at a different size on
