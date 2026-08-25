@@ -41,6 +41,15 @@ Figures:
     style: [a4paper_2x1, rectRatio]
     layers: []                       # empty -- layout reference only
 
+  - name: a4paper_2x1_rectMarginal
+    debug: true                      # draw the design-reference dimension overlay
+    style: [a4paper_2x1, rectMarginal]
+    frame:
+      axl: {labels: {y: "$y$"}}      # the strips carry the shared axis' labels
+      axb: {labels: {x: "$x$"}}
+      axc: {label: {ylabel: "$z$"}}
+    layers: []                       # empty -- layout reference only
+
 
 
   - name: a4paper_2x1_rect_5x1

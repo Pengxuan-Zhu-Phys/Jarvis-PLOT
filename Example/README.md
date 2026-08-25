@@ -24,7 +24,7 @@ Examples are grouped by geometry family and paper ratio:
 
 | YAML | Style `[family, variant]` |
 |------|---------------------------|
-| `a4paper_2x1.yaml` | All `a4paper_2x1` cards: `rect`, `rectRatio`, `rectcmap`, `Ternary`, `TernaryCmap`, `rect_5x1`, `dynesty_runplot` |
+| `a4paper_2x1.yaml` | All `a4paper_2x1` cards: `rect`, `rectRatio`, `rectMarginal`, `rectcmap`, `Ternary`, `TernaryCmap`, `rect_5x1`, `dynesty_runplot` |
 | `a4paper_4x1_rectcmap.yaml` | `[a4paper_4x1, rectcmap]` |
 | `gambit_2x1.yaml` | All `gambit_2x1` cards: `rectcmap`, `Ternary`, `TernaryCmap` |
 
