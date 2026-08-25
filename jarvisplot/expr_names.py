@@ -9,7 +9,9 @@ numpy / sympy into the pure-shape validation path.
 
 from __future__ import annotations
 
-__all__ = ["EXPR_IDENTIFIER_IGNORE"]
+import re
+
+__all__ = ["EXPR_IDENTIFIER_IGNORE", "expr_identifiers"]
 
 #: Keep in lockstep with :func:`jarvisplot.utils.expression.build_eval_globals`
 #: and :data:`jarvisplot.inner_func._Inner_FCs` / ``_Constant``. Agents type
@@ -117,3 +119,28 @@ EXPR_IDENTIFIER_IGNORE: frozenset[str] = frozenset(
         "inf",
     }
 )
+
+
+#: Quoted spans: ``.transform('sum')`` names a pandas reduction, not a column.
+_STRING_LITERAL_RE = re.compile(r"'[^']*'|\"[^\"]*\"")
+
+#: A bare identifier.  The lookbehind rejects two things that are never column
+#: references: the tail of a longer identifier, and an attribute name -- the
+#: ``digitize`` of ``np.digitize`` or the ``groupby`` of ``weight.groupby``.
+#: Without it every method an expression calls has to be denylisted by hand,
+#: and one that is not yet listed becomes a phantom ``JP-COL-001``.
+_IDENTIFIER_RE = re.compile(r"(?<![\w.])[A-Za-z_][A-Za-z0-9_]*")
+
+
+def expr_identifiers(text: str) -> set[str]:
+    """Return the identifiers in an expression that could name a column.
+
+    Attribute names, quoted literals and the :data:`EXPR_IDENTIFIER_IGNORE`
+    table are all dropped, so what comes back is only what the caller should
+    look for among the data source's real columns.
+    """
+    stripped = _STRING_LITERAL_RE.sub(" ", str(text))
+    return {
+        t for t in _IDENTIFIER_RE.findall(stripped)
+        if t not in EXPR_IDENTIFIER_IGNORE
+    }

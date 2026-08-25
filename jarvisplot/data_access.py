@@ -12,12 +12,11 @@ from __future__ import annotations
 
 import json
 import os
-import re
 from pathlib import Path
 from typing import Any, Sequence
 
 from .diagnostics import did_you_mean
-from .expr_names import EXPR_IDENTIFIER_IGNORE
+from .expr_names import EXPR_IDENTIFIER_IGNORE, expr_identifiers
 
 __all__ = [
     "DESCRIBE_CACHE_VERSION",
@@ -782,7 +781,7 @@ def _role_hint(name: str, rec: dict[str, Any]) -> str | None:
 
 
 def _expr_symbols(expr: str) -> set[str]:
-    return set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", expr))
+    return expr_identifiers(expr)
 
 
 def _public_eval_function_names(*, limit: int = 24) -> list[str]:
