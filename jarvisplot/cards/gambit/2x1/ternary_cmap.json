@@ -142,6 +142,9 @@
             }
         },
         "axc": {
+            "color": {
+                "cmap": "gambit_cmap"
+            },
             "label": {
                 "ylabel": "",
                 "loc": "top",
@@ -416,6 +419,17 @@
         "colorbar_gap": {
             "show": true,
             "template": "%.3f cm"
+        },
+        "colorbar_preview": {
+            "show": true,
+            "samples": 256,
+            "fallback_cmap": "viridis",
+            "imshow": {
+                "aspect": "auto",
+                "interpolation": "bilinear",
+                "origin": "lower",
+                "zorder": 1
+            }
         },
         "panel": {
             "show": true,

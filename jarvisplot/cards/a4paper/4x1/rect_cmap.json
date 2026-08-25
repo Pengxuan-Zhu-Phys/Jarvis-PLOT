@@ -124,6 +124,9 @@
             ]
         },
         "axc": {
+            "color": {
+                "cmap": "jarvis_rainbow2"
+            },
             "orientation": "horizontal",
             "isylabel": false,
             "isxlabel": true,
@@ -385,6 +388,17 @@
         "colorbar_gap": {
             "show": true,
             "template": "%.3f cm"
+        },
+        "colorbar_preview": {
+            "show": true,
+            "samples": 256,
+            "fallback_cmap": "viridis",
+            "imshow": {
+                "aspect": "auto",
+                "interpolation": "bilinear",
+                "origin": "lower",
+                "zorder": 1
+            }
         },
         "panel": {
             "show": true,
