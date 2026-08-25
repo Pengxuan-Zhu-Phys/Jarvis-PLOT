@@ -65,6 +65,7 @@ mapping. Every key is optional; anything absent falls back.
 | `dimension` | cap bars, arrowheads and labels -- every measured distance uses these |
 | `margins` | **every** axes' top / bottom insets, each riding that axes' own right border (`marker_step` separates crowded columns, `exclude` names axes to leave alone -- `axlogo` by default); plus the primary axes' left inset |
 | `colorbar_gap` | gap between the primary axes and a colorbar |
+| `colorbar_preview` | fills a colorbar no layer fed with the card's own colormap, so a `layers: []` reference still shows the bar; only ships on cards that have an `axc` axes |
 | `numbered_axes` | the staggered edge dimensions for `ax0`, `ax1`, … |
 | `panel` | the "axes layout" information card: one type scale on every figure, box measured from its content, free to run past the axes |
 | `ternary` | tick anchors and label leaders; only on cards with an `axtri` axes |

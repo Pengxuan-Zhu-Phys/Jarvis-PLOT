@@ -36,6 +36,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 import matplotlib as mpl
+import numpy as np
 
 
 from .debug_config import resolve_debug_config as _debug_config
@@ -108,6 +109,51 @@ def _position(ax):
         return float(bb.x0), float(bb.y0), float(bb.width), float(bb.height)
     except Exception:
         return None
+
+
+def _preview_colorbar(fig, name, cfg):
+    """Paint an empty colorbar axes with the colormap its card would use.
+
+    ``Figure._finalize_axc`` returns early when no layer fed the bar, which is
+    always the case for a pure layout reference (``layers: []``).  The result
+    is a blank box exactly where the reader wants to judge the bar's width and
+    height, so fill it here.  A bar a layer really did feed keeps its result:
+    this only ever touches ``_cb['used'] is False``.
+    """
+    axc = fig.axes.get(name)
+    if axc is None:
+        return
+    if dict(getattr(axc, "_cb", None) or {}).get("used"):
+        return
+
+    from .colorbar_runtime import axc_color_config, axc_is_horizontal
+
+    cmap = axc_color_config(fig.frame, name).get("cmap") or cfg["fallback_cmap"]
+    is_h = axc_is_horizontal(fig.frame, name)
+    ramp = np.linspace(0.0, 1.0, int(cfg["samples"])).reshape(-1, 1)
+    if is_h:
+        ramp = ramp.reshape(1, -1)
+
+    raw = _raw(axc)
+    raw.imshow(
+        ramp,
+        cmap=cmap,
+        extent=(*raw.get_xlim(), *raw.get_ylim()),
+        **cfg["imshow"],
+    )
+
+    # ``_finalize_axc`` returns on ``_cb['used'] is False`` -- before it reaches
+    # ``minorticks_on`` and ``_apply_axc_tick_config``.  So an unfed colorbar
+    # keeps matplotlib's default ticks: both sides, pointing out, full-size
+    # labels, no minor locator.  The reference is meant to show the tick
+    # treatment the card asks for, so run the same two steps here.
+    from matplotlib.ticker import AutoMinorLocator
+
+    axis = raw.xaxis if is_h else raw.yaxis
+    axis.set_minor_locator(AutoMinorLocator())
+    apply = getattr(fig, "_apply_axc_tick_config", None)
+    if callable(apply):
+        apply(name, axc)
 
 
 def _axis_info_lines(name, pos, w_cm, h_cm, *, detail_cfg, fig=None):
@@ -380,6 +426,9 @@ def _draw(fig) -> None:
                     vertical=True,
                     vertical_label_side=margin_side,
                 )
+
+        if name.startswith("axc") and _shown(debug["colorbar_preview"]):
+            _preview_colorbar(fig, name, debug["colorbar_preview"])
 
         if name.startswith("axc") and primary_pos is not None:
             # gap between the primary axes' right edge and this colorbar's left edge
