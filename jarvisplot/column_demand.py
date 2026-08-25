@@ -18,7 +18,6 @@ Two consumers with different needs:
 
 from __future__ import annotations
 
-import re
 from typing import Any, Dict, Mapping, Set
 
 __all__ = [
@@ -33,10 +32,10 @@ __all__ = [
 def _expr_symbols(expr: Any) -> Set[str]:
     """Return the set of identifier tokens referenced in an expression string.
 
-    Function and namespace names are stripped using the same table the eval
-    surface publishes (:data:`jarvisplot.utils.expression.EXPR_IDENTIFIER_IGNORE`)
-    so tokens like ``ln``, ``log10``, ``Min`` are never reported as missing
-    columns.
+    Attribute names, quoted literals and the shared ignore table are stripped
+    by :func:`jarvisplot.expr_names.expr_identifiers`, so neither ``log10`` in
+    ``np.log10(x)`` nor ``groupby`` in ``w.groupby(...)`` is ever reported as a
+    missing column.
     """
     if expr is None:
         return set()
@@ -46,10 +45,9 @@ def _expr_symbols(expr: Any) -> Set[str]:
     if not text:
         return set()
     # expr_names is stdlib-only so this path never pulls numpy/sympy (B7).
-    from .expr_names import EXPR_IDENTIFIER_IGNORE
+    from .expr_names import expr_identifiers
 
-    toks = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", text))
-    return {t for t in toks if t not in EXPR_IDENTIFIER_IGNORE}
+    return expr_identifiers(text)
 
 
 def _profile_cfg_columns(cfg: Any) -> Set[str]:
