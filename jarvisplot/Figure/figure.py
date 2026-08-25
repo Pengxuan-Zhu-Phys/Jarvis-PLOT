@@ -24,6 +24,7 @@ from .layout_runtime import (
     apply_auto_ticks,
     apply_axis_title,
     apply_manual_ticks,
+    SIDE_AXES,
     ensure_rect_axes,
     ensure_numbered_rect_axes,
     has_manual_ticks,
@@ -197,7 +198,7 @@ class Figure:
         return ensure_numbered_rect_axes(self, ax_name, kwgs)
 
     def _ensure_rect_axes(self, ax_name: str, kwgs: dict):
-        """Create/configure the ratio rectangular axes ``axr``."""
+        """Create/configure a side rectangular axes (``axr`` / ``axl`` / ``axb``)."""
         return ensure_rect_axes(self, ax_name, kwgs)
     def _has_manual_ticks(self, ax_key: str, which: str) -> bool:
         """Return True if YAML provides manual tick positions for given axis."""
@@ -1121,14 +1122,16 @@ class Figure:
                 self._init_axc_axes(ax, kws)
             elif ax == "ax":
                 self.ax     = kws
-            elif ax == "axr":
+            elif ax in SIDE_AXES:
                 self._ensure_rect_axes(ax, kws)
             elif self._is_numbered_ax(ax):
                 self._ensure_numbered_rect_axes(ax, kws)
             else:
+                allowed = ", ".join(f"'{n}'" for n in SIDE_AXES)
                 try:
                     self.logger.warning(
-                        f"Unsupported axes key '{ax}'. Only 'ax', 'axr', or 'ax<NUMBER>' are allowed."
+                        f"Unsupported axes key '{ax}'. Only 'ax', {allowed}, "
+                        "or 'ax<NUMBER>' are allowed."
                     )
                 except Exception:
                     pass
