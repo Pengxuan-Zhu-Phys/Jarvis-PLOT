@@ -159,9 +159,16 @@ def ensure_rect_axes(fig, ax_name: str, kwgs: dict):
         if isinstance(ylabel_coords, dict) and {"x", "y"} <= set(ylabel_coords):
             ax_obj.yaxis.set_label_coords(ylabel_coords["x"], ylabel_coords["y"])
 
-    ax_obj.tick_params(**fig.frame.get(ax_name, {}).get("ticks", {}).get("both", {}))
-    ax_obj.tick_params(**fig.frame.get(ax_name, {}).get("ticks", {}).get("major", {}))
-    ax_obj.tick_params(**fig.frame.get(ax_name, {}).get("ticks", {}).get("minor", {}))
+    ticks_cfg = fig.frame.get(ax_name, {}).get("ticks", {})
+    ax_obj.tick_params(**ticks_cfg.get("both", {}))
+    ax_obj.tick_params(**ticks_cfg.get("major", {}))
+    ax_obj.tick_params(**ticks_cfg.get("minor", {}))
+
+    # `ticks.x/y.positions` was honoured on ax and on the colorbars but never
+    # here, so a side or numbered axes silently kept matplotlib's automatic
+    # locator -- even though has_manual_ticks already reads this same node.
+    apply_manual_ticks(fig, ax_obj, "x", ticks_cfg.get("x", {}) or {})
+    apply_manual_ticks(fig, ax_obj, "y", ticks_cfg.get("y", {}) or {})
 
     apply_axis_endpoints(fig, ax_obj, fig.frame.get(ax_name, {}).get("xaxis", {}), "x")
     apply_axis_endpoints(fig, ax_obj, fig.frame.get(ax_name, {}).get("yaxis", {}), "y")

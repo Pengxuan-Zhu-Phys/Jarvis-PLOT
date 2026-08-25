@@ -216,3 +216,44 @@ def test_title_params_explicit_position_keys_are_ignored_with_warning():
         "Ignoring title_params ['x', 'y', 'ha'] for axes 'ax'; use position instead."
     ]
     plt.close(raw_fig)
+
+
+def test_side_axes_honour_manual_tick_positions():
+    """`ticks.<axis>.positions` used to be read on ax and the colorbars only.
+
+    has_manual_ticks already looked at this node for axr/axl/axb, but nothing
+    applied it, so a side panel silently kept matplotlib's auto locator.
+    """
+    from types import SimpleNamespace
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    from jarvisplot.Figure.layout_runtime import ensure_rect_axes
+
+    raw_fig = plt.figure(figsize=(3.3, 3.0))
+    fig = SimpleNamespace(
+        fig=raw_fig,
+        axes={},
+        logger=_logger(),
+        frame={
+            "axl": {
+                "xlim": [0.0, 1.0],
+                "ylim": [-1.0, 1.0],
+                "ticks": {
+                    "y": {
+                        "positions": [-1.0, -0.5, 0.0, 0.5, 1.0],
+                        "labels": ["a", "b", "c", "d", "e"],
+                    }
+                },
+            }
+        },
+    )
+    try:
+        ax = ensure_rect_axes(fig, "axl", {"rect": [0.101, 0.226, 0.095, 0.722]})
+        assert list(ax.ax.get_yticks()) == [-1.0, -0.5, 0.0, 0.5, 1.0]
+        assert [t.get_text() for t in ax.ax.get_yticklabels()] == list("abcde")
+    finally:
+        plt.close(raw_fig)
