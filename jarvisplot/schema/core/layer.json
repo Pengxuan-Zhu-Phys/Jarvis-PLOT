@@ -61,6 +61,7 @@
         "fill_between",
         "fill_betweenx",
         "hist",
+        "hist2d",
         "imshow",
         "jpcontour",
         "jpcontourf",

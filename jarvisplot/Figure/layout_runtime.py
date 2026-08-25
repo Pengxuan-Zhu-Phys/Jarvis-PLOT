@@ -85,6 +85,42 @@ def hide_log_minor_tick_labels(ax_obj, which: str) -> None:
         )
 
 
+def apply_grid(fig, ax_obj, ax_name: str) -> None:
+    """Draw the configured major / minor grid on a rectangular axes.
+
+    Shaped like ``ticks``: one block per matplotlib call, splatted verbatim
+    into ``Axes.grid``.  Ternary cards keep their own hand-drawn grid under
+    ``grid.sep`` / ``grid.style``, so only the two call blocks are read here
+    and every other key in the node is left alone -- which is also why the
+    dead ``grid`` blocks the rect cards inherited stay dead.
+
+    ``axisbelow`` is a sibling key rather than a ``grid`` kwarg because it is
+    the only thing that decides whether the grid lands over or under the data:
+    a ``zorder`` passed to ``Axes.grid`` sets the gridline's own zorder, but
+    the Axis artist is drawn as a unit at the zorder ``set_axisbelow`` gives
+    it, so the kwarg alone never lifts a grid above a filled layer.
+    """
+    grid_cfg = fig.frame.get(ax_name, {}).get("grid", {})
+    if not isinstance(grid_cfg, dict):
+        return
+    target = ax_obj.ax if hasattr(ax_obj, "ax") else ax_obj
+
+    if "axisbelow" in grid_cfg:
+        target.set_axisbelow(grid_cfg["axisbelow"])
+
+    for which in ("major", "minor"):
+        block = grid_cfg.get(which)
+        if not isinstance(block, dict) or not block:
+            continue
+        try:
+            target.grid(**block)
+        except Exception as exc:
+            if getattr(fig, "logger", None):
+                fig.logger.warning(
+                    f"grid.{which} on axes '{ax_name}' ignored: {exc}"
+                )
+
+
 def ensure_rect_axes(fig, ax_name: str, kwgs: dict):
     if not is_rect_ax(ax_name):
         allowed = ", ".join(repr(n) for n in SIDE_AXES)
@@ -169,6 +205,8 @@ def ensure_rect_axes(fig, ax_name: str, kwgs: dict):
     # locator -- even though has_manual_ticks already reads this same node.
     apply_manual_ticks(fig, ax_obj, "x", ticks_cfg.get("x", {}) or {})
     apply_manual_ticks(fig, ax_obj, "y", ticks_cfg.get("y", {}) or {})
+
+    apply_grid(fig, ax_obj, ax_name)
 
     apply_axis_endpoints(fig, ax_obj, fig.frame.get(ax_name, {}).get("xaxis", {}), "x")
     apply_axis_endpoints(fig, ax_obj, fig.frame.get(ax_name, {}).get("yaxis", {}), "y")

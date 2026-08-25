@@ -56,6 +56,20 @@ def axc_color_config(frame: Mapping[str, Any], cb_name: str = "axc") -> dict:
     return out
 
 
+def layer_cmap_wins(fig, cb_name: str, color_cfg: Mapping[str, Any]) -> bool:
+    """Whether a layer's own ``cmap`` may override ``frame[cb_name].color.cmap``.
+
+    A cmap that reached the frame from the **style card** is a preset: the
+    card says what this colorbar normally looks like, and a layer naming its
+    own is the more specific statement, so the layer wins.  A cmap written in
+    the **project YAML** is the author talking about this one figure, so it
+    wins instead.  Same defaults < card < YAML order the Debug block uses.
+    """
+    if color_cfg.get("cmap") is None:
+        return True
+    return str(cb_name) not in (getattr(fig, "yaml_colorbar_cmaps", None) or set())
+
+
 # ---------------------------------------------------------------------------
 # Scalar helpers
 # ---------------------------------------------------------------------------
@@ -151,6 +165,55 @@ _CONTOUR_LIKE_METHODS = frozenset({
     "jpcontour", "jpcontourf",
 })
 
+#: Methods that bin their own data: the colour channel is the bin content, so
+#: there is no ``z`` column for the pre-scan to read.  It has to run the same
+#: binning matplotlib will run.
+_BINNED_COLOR_METHODS = frozenset({"hist2d"})
+
+
+def _hist2d_bin_values(df, coor: dict, style: dict):
+    """Reproduce the bin contents ``Axes.hist2d`` will colour.
+
+    ``Axes.hist2d`` is ``np.histogram2d`` followed by ``pcolormesh``, so the
+    same call with the same ``bins`` / ``range`` / ``density`` / ``weights``
+    gives the pre-scan the colour range without drawing anything.
+    """
+    if df is None:
+        return None
+
+    def _channel(key):
+        src = coor.get(key)
+        if isinstance(src, dict) and "expr" in src:
+            return eval_dataframe_expression(df, src["expr"], logger=None)
+        if src is None:
+            src = style.get(key)
+        if src is None or isinstance(src, str):
+            return None
+        return np.asarray(src, dtype=float)
+
+    x = _channel("x")
+    y = _channel("y")
+    if x is None or y is None:
+        return None
+
+    values, _, _ = np.histogram2d(
+        np.asarray(x, dtype=float),
+        np.asarray(y, dtype=float),
+        bins=style.get("bins", 10),
+        range=style.get("range"),
+        density=bool(style.get("density", False)),
+        weights=_channel("weights"),
+    )
+    # `cmin` / `cmax` blank a bin out entirely; a blanked bin must not drag the
+    # colorbar range with it.
+    cmin = style.get("cmin")
+    cmax = style.get("cmax")
+    if cmin is not None:
+        values = values[values >= float(cmin)]
+    if cmax is not None:
+        values = values[values <= float(cmax)]
+    return values
+
 
 def layer_uses_color(style: dict, coor: dict, method_key: str) -> bool:
     """Return True if this layer will need a colorbar."""
@@ -169,16 +232,30 @@ def layer_uses_color(style: dict, coor: dict, method_key: str) -> bool:
     if method_key in _COLORED_Z_METHODS and _is_numeric_color_source(style_z):
         return True
 
+    # A self-binning method always has a colour channel -- its own bin contents.
+    if method_key in _BINNED_COLOR_METHODS:
+        return True
+
     return False
 
 
-def collect_layer_color_range(df, coor: dict, style: dict, *, scale: str | None = None):
+def collect_layer_color_range(
+    df, coor: dict, style: dict, *, scale: str | None = None, method_key: str | None = None
+):
     """Extract (data_min, data_max) for the colour channel of a single layer.
 
     Returns (None, None) when no finite data is available.
     """
     arr = None
-    if isinstance(coor.get("z"), dict) and "expr" in coor["z"]:
+    if str(method_key or "").strip().lower() in _BINNED_COLOR_METHODS:
+        try:
+            arr = _hist2d_bin_values(df, coor, style)
+        except Exception:
+            # A malformed bins/range only stops the colorbar from being
+            # pre-sized.  Let the real draw call raise it, where the error
+            # names the layer instead of surfacing out of the pre-scan.
+            arr = None
+    elif isinstance(coor.get("z"), dict) and "expr" in coor["z"]:
         arr = eval_dataframe_expression(df, coor["z"]["expr"], logger=None)
     elif isinstance(coor.get("c"), dict) and "expr" in coor["c"]:
         arr = eval_dataframe_expression(df, coor["c"]["expr"], logger=None)
@@ -394,13 +471,14 @@ def collect_and_attach_colorbar(
     if not axc._cb.get("used"):
         frame = getattr(fig, "frame", {})
         color_cfg = axc_color_config(frame, cb_name)
-        if color_cfg.get("cmap") is None and style.get("cmap") is not None:
+        if style.get("cmap") is not None and layer_cmap_wins(fig, cb_name, color_cfg):
             color_cfg["cmap"] = style.get("cmap")
         data_range = collect_layer_color_range(
             df,
             coor,
             style,
             scale=color_cfg.get("scale"),
+            method_key=method_key,
         )
         if data_range != (None, None):
             axc._cb.update(

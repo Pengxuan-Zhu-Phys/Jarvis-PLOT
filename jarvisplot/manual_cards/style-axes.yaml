@@ -25,6 +25,8 @@ human:
       title: Traps
       items:
         - axc / colorbar only make sense with *cmap style families.
+        - Colorbar cmap: card frame.axc.color.cmap is a preset, a layer style cmap beats it, a YAML frame.axc.color.cmap beats both.
+        - A card may add side panels (axl / axb / axr); each reads its own frame.<name> node, not frame.ax.
         - Prefer cap styles over memorizing card filenames.
         - Unusable cards are reported by cap; do not force them.
 agent:
