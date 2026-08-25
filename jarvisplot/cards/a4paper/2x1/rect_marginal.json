@@ -78,11 +78,22 @@
                 "zorder": 100
             },
             "grid": {
-                "sep": 0.1,
-                "style": {
+                "axisbelow": false,
+                "major": {
+                    "visible": true,
+                    "which": "major",
+                    "axis": "both",
                     "color": "#C2C2C269",
                     "linewidth": 0.3,
                     "linestyle": "--"
+                },
+                "minor": {
+                    "visible": true,
+                    "which": "minor",
+                    "axis": "both",
+                    "color": "#C2C2C240",
+                    "linewidth": 0.2,
+                    "linestyle": ":"
                 }
             },
             "ticks": {
@@ -103,16 +114,16 @@
                 },
                 "major": {
                     "which": "major",
-                    "length": 4,
-                    "width": 0.4,
-                    "color": "black",
+                    "length": 8,
+                    "width": 0.6,
+                    "color": "#FCFFC1",
                     "zorder": 1000
                 },
                 "minor": {
                     "which": "minor",
-                    "length": 2,
-                    "width": 0.4,
-                    "color": "black",
+                    "length": 3,
+                    "width": 0.6,
+                    "color": "#FCFFC1",
                     "zorder": 1000
                 }
             },
@@ -138,16 +149,28 @@
                 "zorder": 100
             },
             "grid": {
-                "sep": 0.1,
-                "style": {
+                "axisbelow": false,
+                "major": {
+                    "visible": true,
+                    "which": "major",
+                    "axis": "both",
                     "color": "#C2C2C269",
                     "linewidth": 0.3,
                     "linestyle": "--"
+                },
+                "minor": {
+                    "visible": true,
+                    "which": "minor",
+                    "axis": "both",
+                    "color": "#C2C2C240",
+                    "linewidth": 0.2,
+                    "linestyle": ":"
                 }
             },
             "ticks": {
                 "both": {
-                    "labelsize": 6,
+                    "pad": 1.5,
+                    "labelsize": 4,
                     "direction": "in",
                     "labelfontfamily": "sans",
                     "top": true,
@@ -155,7 +178,7 @@
                     "right": true,
                     "bottom": true,
                     "which": "both",
-                    "labelbottom": false,
+                    "labelbottom": true,
                     "labeltop": false
                 },
                 "major": {
@@ -174,11 +197,11 @@
             "labels": {
                 "ylabel": {
                     "loc": "center",
-                    "fontsize": 11,
+                    "fontsize": 10,
                     "fontfamily": "STIXGeneral"
                 },
                 "ylabel_coords": {
-                    "x": -0.62,
+                    "x": -0.52,
                     "y": 0.5
                 }
             }
@@ -201,16 +224,28 @@
                 "zorder": 100
             },
             "grid": {
-                "sep": 0.1,
-                "style": {
+                "axisbelow": false,
+                "major": {
+                    "visible": true,
+                    "which": "major",
+                    "axis": "both",
                     "color": "#C2C2C269",
                     "linewidth": 0.3,
                     "linestyle": "--"
+                },
+                "minor": {
+                    "visible": true,
+                    "which": "minor",
+                    "axis": "both",
+                    "color": "#C2C2C240",
+                    "linewidth": 0.2,
+                    "linestyle": ":"
                 }
             },
             "ticks": {
                 "both": {
-                    "labelsize": 6,
+                    "pad": 1.5,
+                    "labelsize": 4,
                     "direction": "in",
                     "labelfontfamily": "sans",
                     "top": true,
@@ -219,7 +254,7 @@
                     "bottom": true,
                     "which": "both",
                     "labelleft": false,
-                    "labelright": false
+                    "labelright": true
                 },
                 "major": {
                     "which": "major",
@@ -237,7 +272,7 @@
             "labels": {
                 "xlabel": {
                     "loc": "center",
-                    "fontsize": 11,
+                    "fontsize": 10,
                     "fontfamily": "STIXGeneral"
                 }
             }
@@ -271,16 +306,21 @@
             ]
         },
         "axc": {
+            "color": {
+                "cmap": "jdistri"
+            },
             "label": {
                 "ylabel": "",
+                "labelpad": 1.5,
                 "loc": "center",
-                "fontsize": 11,
+                "fontsize": 10,
                 "fontfamily": "STIXGeneral"
             },
             "ticks": {
                 "ticks_position": "right",
                 "both": {
-                    "labelsize": 6,
+                    "pad": 1.0,
+                    "labelsize": 4,
                     "direction": "in",
                     "labelfontfamily": "sans",
                     "top": false,
@@ -293,13 +333,13 @@
                     "which": "major",
                     "length": 4,
                     "width": 0.4,
-                    "color": "black"
+                    "color": "white"
                 },
                 "minor": {
                     "which": "minor",
                     "length": 2,
                     "width": 0.4,
-                    "color": "black"
+                    "color": "white"
                 }
             }
         }
@@ -528,6 +568,17 @@
         "colorbar_gap": {
             "show": true,
             "template": "%.3f cm"
+        },
+        "colorbar_preview": {
+            "show": true,
+            "samples": 256,
+            "fallback_cmap": "viridis",
+            "imshow": {
+                "aspect": "auto",
+                "interpolation": "bilinear",
+                "origin": "lower",
+                "zorder": 1
+            }
         },
         "panel": {
             "show": true,

@@ -101,6 +101,8 @@
                     "left": true,
                     "right": true,
                     "bottom": true,
+                    "labelbottom": false,
+                    "labeltop": false,
                     "which": "both"
                 },
                 "major": {
@@ -155,6 +157,8 @@
                     "left": true,
                     "right": true,
                     "bottom": true,
+                    "labelbottom": false,
+                    "labeltop": false,
                     "which": "both"
                 },
                 "major": {
@@ -209,6 +213,8 @@
                     "left": true,
                     "right": true,
                     "bottom": true,
+                    "labelbottom": false,
+                    "labeltop": false,
                     "which": "both"
                 },
                 "major": {
@@ -263,6 +269,8 @@
                     "left": true,
                     "right": true,
                     "bottom": true,
+                    "labelbottom": false,
+                    "labeltop": false,
                     "which": "both"
                 },
                 "major": {

@@ -141,6 +141,9 @@
             }
         },
         "axc": {
+            "color": {
+                "cmap": "jarvis_rainbow2"
+            },
             "label": {
                 "ylabel": "",
                 "loc": "top",
