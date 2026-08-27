@@ -161,6 +161,65 @@ TRANSFORM_CONTRACTS: dict[str, dict[str, Any]] = {
             {"title": "drop", "yaml": "transform:\n  - drop_columns: [tmp, flag]\n"}
         ],
     ),
+    "duplicate": _c(
+        description=(
+            "Detach from a shared table before editing it. Use it as the first "
+            "step of a block whose source is a table another block published."
+        ),
+        form="scalar",
+        value={"type": "boolean", "description": "true to copy; false is a no-op"},
+        owner="Figure/preprocessor_runtime.py",
+        examples=[
+            {
+                "title": "work on a private copy",
+                "yaml": "transform:\n  - duplicate: true\n",
+            }
+        ],
+    ),
+    "to_df": _c(
+        description=(
+            "Publish this block's finished table under a name a later data[] "
+            "block can use as source. Must be the last step of its block."
+        ),
+        form="scalar|object",
+        value={"type": "string|object", "description": "name string or {name: ..., keep: ...}"},
+        optional={
+            "name": {"type": "identifier", "description": "table name"},
+            "keep": {
+                "type": "boolean",
+                "description": "also hand the table to the layer (default false)",
+            },
+        },
+        owner="Figure/preprocessor_runtime.py",
+        examples=[
+            {
+                "title": "produce a table for a later block",
+                "yaml": "transform:\n  - filter: 'split == \"test\"'\n  - to_df: sig_rows\n",
+            }
+        ],
+        notes=[
+            "By default the producing block draws nothing: it hands the table to "
+            "the name instead of to the layer.",
+            "The name carries a chain signature, so changing anything upstream "
+            "invalidates it in the cache without touching unrelated tables.",
+        ],
+    ),
+    "to_ds": _c(
+        description=(
+            "Store the finished table in this block's own in-memory DataSet entry "
+            "and release the scratch tables to_df published in this layer."
+        ),
+        form="scalar",
+        value={"type": "boolean", "description": "true to store and clean up"},
+        owner="Figure/preprocessor_runtime.py",
+        examples=[
+            {
+                "title": "settle the result into an env dataset",
+                "yaml": "transform:\n  - duplicate: true\n  - to_ds: true\n",
+            }
+        ],
+        notes=["Needs the block to name a single source (a `pd.DataFrame` entry)."],
+    ),
     "to_csv": _c(
         description=(
             "Write the table at this pipeline point to CSV (debug aid). "

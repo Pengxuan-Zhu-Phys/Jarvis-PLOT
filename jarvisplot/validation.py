@@ -284,6 +284,26 @@ def _collect_shared_names(config: dict[str, Any]) -> set[str]:
             shared = layer.get("share_data")
             if isinstance(shared, str) and shared.strip():
                 names.add(shared.strip())
+            names.update(_to_df_names(layer))
+    return names
+
+
+def _to_df_names(layer: dict[str, Any]) -> set[str]:
+    """Names a layer's ``to_df`` steps publish, usable as a later ``source``."""
+    names: set[str] = set()
+    for block in layer.get("data") or ():
+        if not isinstance(block, dict):
+            continue
+        steps = block.get("transform")
+        if not isinstance(steps, list):
+            continue
+        for step in steps:
+            if not isinstance(step, dict) or "to_df" not in step:
+                continue
+            spec = step.get("to_df")
+            name = spec.get("name") if isinstance(spec, dict) else spec
+            if isinstance(name, str) and name.strip():
+                names.add(name.strip())
     return names
 
 
@@ -324,7 +344,8 @@ def _check_layer_sources(
                         f"unknown dataset source {item!r}.{hint}",
                         suggestion=(
                             "data[].source must name a root DataSet entry, or a name "
-                            "published by another layer's share_data."
+                            "published by another layer's share_data or by a "
+                            "transform's to_df step."
                         ),
                         context={
                             "available_sources": sorted(known_sources),

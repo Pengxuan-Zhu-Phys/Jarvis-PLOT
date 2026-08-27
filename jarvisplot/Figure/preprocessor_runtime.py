@@ -68,6 +68,12 @@ HEAVY_TRANSFORM_KEYS = frozenset(
         "posterior_density",
         "make_interp_2d",
         "type",
+        # Not heavy to compute, but cross-block: what a ``to_df`` name resolves
+        # to, and the fact that a producing block hands the layer nothing, only
+        # exist once the whole layer runs.  dryrun models one block at a time,
+        # so it must report itself blind here rather than guess a row count.
+        "to_df",
+        "to_ds",
     }
 )
 
@@ -116,7 +122,14 @@ def apply_light_transforms(df, transform, logger=None):
         name = next(iter(step.keys()), "unknown")
         detail = ""
         try:
-            if "filter" in step:
+            if "duplicate" in step:
+                detail = str(step.get("duplicate"))
+                if step.get("duplicate") is not False:
+                    try:
+                        work = work.copy(deep=False)
+                    except Exception:
+                        pass
+            elif "filter" in step:
                 detail = str(step.get("filter"))
                 work = filter_df(work, step["filter"], log)
             elif "sortby" in step:
@@ -389,6 +402,9 @@ def _save_dataframe_csv(preprocessor, df, target: Any, *, stage: str, source_lab
 
 def resolve_source_data(preprocessor, source: Any, combine: str = "concat"):
     if isinstance(source, str):
+        published = preprocessor.named_table(source)
+        if published is not None:
+            return published
         return preprocessor.context.get(source)
 
     if isinstance(source, (list, tuple)):
@@ -476,7 +492,11 @@ def apply_transforms_impl(
             continue
         prev_df = df
 
-        if "filter" in trans:
+        if "duplicate" in trans:
+            # Detach from a shared table before anything downstream edits it.
+            if trans.get("duplicate") is not False:
+                df = preprocessor._clone_df(df)
+        elif "filter" in trans:
             df = filter_df(df, trans["filter"], preprocessor.logger)
         elif "profile" in trans:
             profile_cfg = trans.get("profile", {})
@@ -627,6 +647,79 @@ def apply_transforms_impl(
 
     return df
 
+def transform_publish_target(transform: Any) -> Optional[Dict[str, Any]]:
+    """The ``to_df`` / ``to_ds`` step that ends this chain, if there is one.
+
+    Both are terminal by construction: they name what the finished table *is*,
+    so allowing them mid-chain would only invite a half-built table to be
+    published under a settled name.  A misplaced one raises rather than being
+    silently skipped, unlike the rest of the if/elif chain.
+    """
+    if not isinstance(transform, list) or not transform:
+        return None
+    target = None
+    for index, step in enumerate(transform):
+        if not isinstance(step, Mapping):
+            continue
+        last = index == len(transform) - 1
+        if "to_df" in step:
+            if not last:
+                raise ValueError("transform step 'to_df' must be the last step of its block")
+            spec = step.get("to_df")
+            if isinstance(spec, Mapping):
+                name, keep = spec.get("name"), bool(spec.get("keep", False))
+            else:
+                name, keep = spec, False
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError("transform step 'to_df' needs a table name")
+            target = {"kind": "to_df", "name": name.strip(), "keep": keep}
+        elif "to_ds" in step:
+            if not last:
+                raise ValueError("transform step 'to_ds' must be the last step of its block")
+            if step.get("to_ds") is False:
+                continue
+            target = {"kind": "to_ds", "name": None, "keep": True}
+    return target
+
+
+def finish_pipeline(preprocessor, work, source, transform, key, hit):
+    """Register whatever this block publishes, then decide what it hands back."""
+    target = transform_publish_target(transform)
+    if target is None:
+        return work, key, hit
+
+    name = target["name"] or (source if isinstance(source, str) else None)
+    if not name:
+        preprocessor._warn("to_ds needs the data block to name a single source; skipped.")
+        return work, key, hit
+
+    signature = preprocessor._stable_hash(
+        {
+            "schema": "jp-named-table-v1",
+            "source": preprocessor._source_token(source),
+            "transform": transform,
+        }
+    )
+    if target["kind"] == "to_ds":
+        # The finished table takes over the block's own (in-memory) dataset, and
+        # the scratch tables that built it go away.
+        for scoped in preprocessor.scoped_table_names():
+            if scoped != name:
+                preprocessor.drop_named_table(scoped)
+        preprocessor._named_tables[str(name)] = work
+        preprocessor._named_table_signatures[str(name)] = signature
+        preprocessor.scope_table(str(name))
+        preprocessor._debug(f"to_ds stored the finished table under -> {name}")
+        return work, key, hit
+
+    preprocessor.publish_named_table(name, work, signature)
+    if target["keep"]:
+        return work, key, hit
+    # A producer block draws nothing: load_layer_data skips a None result, so the
+    # concat downstream sees only the blocks that actually carry rows.
+    return None, key, hit
+
+
 def apply_transforms(preprocessor, df, transform: Optional[Sequence[Mapping[str, Any]]]):
     """Prebuild pass: execute profile step as lightweight _preprofiling."""
     return apply_transforms_impl(preprocessor, df, transform, profile_mode="preprofile")
@@ -712,7 +805,17 @@ def run_pipeline(preprocessor,
                     extra={"source": preprocessor._runtime_source_label(source), "mode": mode},
                 )
                 cached = preprocessor._enrich_for_demand(cached, source, demand_columns)
-                return preprocessor._clone_df(cached), key, True
+                # A cache hit skips the transform loop, so publishing has to
+                # happen here as well -- otherwise the second run of a config
+                # would leave the named table undefined.
+                return finish_pipeline(
+                    preprocessor,
+                    preprocessor._clone_df(cached),
+                    source,
+                    effective_transform,
+                    key,
+                    True,
+                )
             reason = "cache-read-failed"
 
         if runtime_mode and runtime_sig is not None:
@@ -867,4 +970,4 @@ def run_pipeline(preprocessor,
         work,
         extra={"source": preprocessor._runtime_source_label(source), "mode": mode},
     )
-    return work, key, False
+    return finish_pipeline(preprocessor, work, source, effective_transform, key, False)
