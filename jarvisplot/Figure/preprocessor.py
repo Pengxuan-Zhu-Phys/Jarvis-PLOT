@@ -381,7 +381,50 @@ class DataPreprocessor:
             if icfg:
                 out.update(self._interp_2d_cfg_output_columns(icfg))
             out.update(self._bin_stat_cfg_columns(step, "output"))
+            out.update(self._significance_cfg_columns(step))
         return sorted(out)
+
+    def _transform_extra_source_tokens(self, transform: Any) -> list:
+        """Fingerprint the tables a step reads but its own block never names.
+
+        ``significance`` takes its two inputs by table name, so without this the
+        key would be blind to them: changing a file upstream of one of those
+        tables would leave this block's key untouched and serve a stale result.
+        """
+        from .significance_runtime import (
+            is_significance_transform,
+            significance_config,
+            significance_source_names,
+        )
+
+        if not isinstance(transform, list):
+            return []
+        out = []
+        for step in transform:
+            if not is_significance_transform(step):
+                continue
+            try:
+                names = significance_source_names(significance_config(step))
+            except Exception:
+                continue
+            for name in names:
+                out.append(self._source_token(name))
+        return out
+
+    @staticmethod
+    def _significance_cfg_columns(step: Any) -> set:
+        from .significance_runtime import (
+            is_significance_transform,
+            significance_config,
+            significance_output_columns,
+        )
+
+        if not is_significance_transform(step):
+            return set()
+        try:
+            return significance_output_columns(significance_config(step))
+        except Exception:
+            return set()
 
     @staticmethod
     def _transform_publishes(transform: Any) -> bool:
@@ -789,8 +832,9 @@ class DataPreprocessor:
     ) -> Dict[str, Any]:
         eff_transform = self._effective_transform(source, transform)
         return {
-            "schema": "jp-demand-v7",
+            "schema": "jp-demand-v8",
             "source": self._source_token(source, combine=combine),
+            "extra_sources": self._transform_extra_source_tokens(eff_transform),
             "transform": eff_transform,
             "combine": str(combine),
             "mode": str(mode),
