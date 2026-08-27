@@ -15,6 +15,7 @@ except Exception:
 from ..memtrace import memtrace_checkpoint, memtrace_object_inventory
 from ..utils.expression import eval_dataframe_expression
 from ..utils.pathing import resolve_project_path
+from .bin_stat_runtime import bin_stat, bin_stat_config, is_bin_stat_transform
 from .density_cell_runtime import (
     density_cell,
     density_cell_config,
@@ -144,6 +145,10 @@ def apply_light_transforms(df, transform, logger=None):
             elif "drop_columns" in step:
                 detail = str(step.get("drop_columns"))
                 work = drop_columns(work, step.get("drop_columns"), log)
+            elif is_bin_stat_transform(step):
+                cfg = bin_stat_config(step)
+                detail = str(cfg.get("x", ""))
+                work = bin_stat(work, cfg, log)
             elif any(k in step for k in HEAVY_TRANSFORM_KEYS) or (
                 "type" in step
                 and str(step.get("type") or "")
@@ -566,6 +571,16 @@ def apply_transforms_impl(
                         "bin": binv,
                     },
                 )
+        elif is_bin_stat_transform(trans):
+            before_rows = preprocessor._safe_nrows(df)
+            df = bin_stat(df, bin_stat_config(trans), preprocessor.logger)
+            preprocessor._debug(
+                "bin_stat:\n\t source \t-> {}\n\t rows \t\t-> {} -> {}".format(
+                    source_label or "<unknown>",
+                    before_rows if before_rows is not None else "NA",
+                    preprocessor._safe_nrows(df),
+                )
+            )
         elif is_density_cell_transform(trans):
             cfg = dict(density_cell_config(trans))
             cfg.setdefault("_base_dir", getattr(preprocessor, "base_dir", None))

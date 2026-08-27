@@ -161,6 +161,57 @@ TRANSFORM_CONTRACTS: dict[str, dict[str, Any]] = {
             {"title": "drop", "yaml": "transform:\n  - drop_columns: [tmp, flag]\n"}
         ],
     ),
+    "bin_stat": _c(
+        description=(
+            "Collapse the table into one row per bin of x (weighted, 1D). "
+            "Emits bin_index / x_lo / x_hi / x_center plus the binned column."
+        ),
+        form="object",
+        form_extra="single-key mapping or {type: bin_stat, ...}",
+        required={
+            "x": {"type": "string", "description": "column name or expression to bin along"},
+            "bins": {"type": "int|list", "description": "bin count, or explicit increasing edges"},
+        },
+        optional={
+            "weights": {
+                "type": "string",
+                "description": "column name or expression; omit to count each row as 1",
+            },
+            "range": {"type": "list", "description": "[lo, hi]; required when bins is a count"},
+            "out": {"type": "identifier", "description": "name of the binned column"},
+            "normalise": {"type": "string", "description": "sum | integral | none"},
+            "scale_to": {
+                "type": "object",
+                "description": "{name, value} -> add a column name = value * <out>",
+            },
+        },
+        defaults={"out": "density", "normalise": "sum"},
+        enums={"normalise": ["sum", "integral", "none"]},
+        output_kind="table (one row per bin)",
+        owner="Figure/bin_stat_runtime.py",
+        examples=[
+            {
+                "title": "weighted shape, rescaled to a total",
+                "yaml": (
+                    "transform:\n"
+                    "  - bin_stat:\n"
+                    "      x: score\n"
+                    "      weights: weight\n"
+                    "      bins: 25\n"
+                    "      range: [0.0, 1.0]\n"
+                    "      scale_to: {name: Sn, value: 10000}\n"
+                ),
+            }
+        ],
+        notes=[
+            "normalise: sum makes the bins add to 1, so scale_to.value * density is "
+            "the expected count in that bin. normalise: integral is matplotlib's "
+            "density=True and differs by a bin width.",
+            "Only rows landing inside the bin range take part in the normalisation.",
+            "scale_to.value may be a column, but it has to be constant over the "
+            "block -- filter first if it is not.",
+        ],
+    ),
     "duplicate": _c(
         description=(
             "Detach from a shared table before editing it. Use it as the first "

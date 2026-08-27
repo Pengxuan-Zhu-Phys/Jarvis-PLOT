@@ -255,6 +255,9 @@ def _collect_expr_columns(obj: Any, out: Set[str]) -> None:
             if key == "make_interp_2d":
                 out.update(_interp_2d_cfg_input_columns(v))
                 continue
+            if key == "bin_stat":
+                out.update(_bin_stat_cfg_columns(v, "input"))
+                continue
             _collect_expr_columns(v, out)
         return
     if isinstance(obj, (list, tuple)):
@@ -289,6 +292,17 @@ def _transform_columns(transform: Any) -> Set[str]:
     return out
 
 
+def _bin_stat_cfg_columns(cfg: Any, which: str) -> Set[str]:
+    from .Figure.bin_stat_runtime import bin_stat_input_columns, bin_stat_output_columns
+
+    if not isinstance(cfg, Mapping):
+        return set()
+    try:
+        return bin_stat_input_columns(cfg) if which == "input" else bin_stat_output_columns(cfg)
+    except Exception:
+        return set()
+
+
 def _transform_output_columns(transform: Any) -> Set[str]:
     """Return column names produced as outputs by a transform list."""
     out: Set[str] = set()
@@ -297,6 +311,8 @@ def _transform_output_columns(transform: Any) -> Set[str]:
     for step in transform:
         if not isinstance(step, Mapping):
             continue
+        if "bin_stat" in step:
+            out.update(_bin_stat_cfg_columns(step.get("bin_stat"), "output"))
         if "add_column" in step:
             add_cfg = step.get("add_column", {})
             if isinstance(add_cfg, Mapping):
@@ -445,13 +461,40 @@ def plan_source_demand(config: Mapping[str, Any]) -> Dict[str, SourceDemand]:
                     if not isinstance(source, str) or not source.strip():
                         continue
                     bucket = slot(source.strip())
-                    for column, path in by_path.items():
-                        bucket.note({column}, path)
-                    bucket.note(wanted - set(by_path), layer_path)
+                    published = _published_name(block)
+                    if published is None:
+                        for column, path in by_path.items():
+                            bucket.note({column}, path)
+                        bucket.note(wanted - set(by_path), layer_path)
+                    else:
+                        # The layer reads this block's table under another name,
+                        # so the coordinates are that table's problem, not this
+                        # source file's.
+                        slot(published).produced.update(step_outputs)
                     bucket.note(step_inputs, f"{block_path}.transform")
                     bucket.produced.update(step_outputs)
 
     return demand
+
+
+def _published_name(block: Mapping[str, Any]) -> Any:
+    """The ``to_df`` name this block publishes under, if it publishes at all."""
+    steps = block.get("transform")
+    if not isinstance(steps, list):
+        return None
+    for step in steps:
+        if not isinstance(step, Mapping):
+            continue
+        if "to_ds" in step and step.get("to_ds") is not False:
+            source = block.get("source")
+            return source.strip() if isinstance(source, str) and source.strip() else None
+        if "to_df" not in step:
+            continue
+        spec = step.get("to_df")
+        name = spec.get("name") if isinstance(spec, Mapping) else spec
+        if isinstance(name, str) and name.strip():
+            return name.strip()
+    return None
 
 
 def _note_type_figure_demand(
