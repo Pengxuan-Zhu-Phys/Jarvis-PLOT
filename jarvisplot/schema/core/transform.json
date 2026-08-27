@@ -39,6 +39,30 @@
     "drop_columns": {
       "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/stringOrStringList"
     },
+    "duplicate": {
+      "type": "boolean",
+      "description": "Detach from a shared table before editing it. Use it as the first step of a block whose source is a table another block published, so downstream steps cannot mutate what the other block still holds."
+    },
+    "to_df": {
+      "oneOf": [
+        { "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/identifier" },
+        {
+          "type": "object",
+          "x-jarvis-zone": "closed",
+          "required": ["name"],
+          "properties": {
+            "name": { "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/identifier" },
+            "keep": { "type": "boolean", "description": "Also hand the table to the layer. Default false: a producing block draws nothing." }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "description": "Publish this block's finished table under a name a later data[] block can use as `source`. Must be the last step of its block. The name carries a chain signature, so the cache invalidates it when anything upstream changes."
+    },
+    "to_ds": {
+      "type": "boolean",
+      "description": "Store the finished table in this block's own (in-memory) DataSet entry and release the scratch tables `to_df` published in this layer. Must be the last step of its block."
+    },
     "to_csv": {
       "description": "Write the table at this point of the pipeline (CSV). Debug aid, not a render step. Honoured at dataset load (data_loader_runtime) and in layer preprocess (preprocessor_runtime)."
     },

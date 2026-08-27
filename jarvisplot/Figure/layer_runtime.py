@@ -582,6 +582,22 @@ def _prepare_jpcontour_style(
 
 
 def load_layer_data(fig, layer):
+    """Load this layer's tables, with a scope for anything ``to_df`` publishes.
+
+    Scratch tables belong to the layer that built them: the scope is what
+    ``to_ds`` clears, and it also releases them when a layer forgets to.
+    """
+    pre = fig.preprocessor
+    if pre is None:
+        return _load_layer_data(fig, layer)
+    pre.begin_table_scope()
+    try:
+        return _load_layer_data(fig, layer)
+    finally:
+        pre.end_table_scope()
+
+
+def _load_layer_data(fig, layer):
     lyinfo = layer.get("data", False)
     lycomb = layer.get("combine", "concat")
     share_name = layer.get("share_data")

@@ -41,6 +41,12 @@ class DataPreprocessor:
         self._preprofile_alias_meta: Dict[str, Dict[str, Any]] = {}
         self._named_share_signatures: Dict[str, str] = {}
         self._named_share_sources: Dict[str, Any] = {}
+        # Tables published mid-figure by the ``to_df`` step, plus the chain
+        # signature that lets the cache tell one from another.  ``_table_scopes``
+        # is a stack: a layer opens one so ``to_ds`` knows what it may drop.
+        self._named_tables: Dict[str, Any] = {}
+        self._named_table_signatures: Dict[str, str] = {}
+        self._table_scopes: List[List[str]] = []
 
     def _debug(self, msg: str) -> None:
         if self.logger:
@@ -376,6 +382,16 @@ class DataPreprocessor:
         return sorted(out)
 
     @staticmethod
+    def _transform_publishes(transform: Any) -> bool:
+        """True when this block hands its table to a name rather than a layer."""
+        if not isinstance(transform, list):
+            return False
+        for step in transform:
+            if isinstance(step, Mapping) and ("to_df" in step or "to_ds" in step):
+                return True
+        return False
+
+    @staticmethod
     def _transform_requests_csv_export(transform: Any) -> bool:
         if not isinstance(transform, list):
             return False
@@ -450,6 +466,11 @@ class DataPreprocessor:
         return out if out else None
 
     def _runtime_projection(self, transform: Any, demand_columns: Optional[Sequence[str]]) -> Optional[List[str]]:
+        if self._transform_publishes(transform):
+            # The consumer of a published table is a different block with
+            # its own demand, so pruning to this block's columns would drop
+            # exactly what the table was built to carry.
+            return None
         out: set[str] = {JP_ROW_IDX}
         out.update(self._transform_input_columns(transform))
         out.update(self._transform_output_columns(transform))
@@ -458,6 +479,11 @@ class DataPreprocessor:
         return self._projection_list(sorted(out))
 
     def _runtime_cache_columns(self, transform: Any, demand_columns: Optional[Sequence[str]]) -> Optional[List[str]]:
+        if self._transform_publishes(transform):
+            # The consumer of a published table is a different block with
+            # its own demand, so pruning to this block's columns would drop
+            # exactly what the table was built to carry.
+            return None
         out: set[str] = {JP_ROW_IDX}
         out.update(self._transform_output_columns(transform))
         if demand_columns:
@@ -679,6 +705,15 @@ class DataPreprocessor:
             if dts is not None and hasattr(dts, "fingerprint"):
                 fp = dts.fingerprint(self.cache)
                 return {"source": source, "fingerprint": fp}
+            table_sig = self._named_table_signatures.get(source)
+            if table_sig:
+                # The signature already folds in this table's own source
+                # fingerprint and the steps that built it, so the chain reaches
+                # back to the file md5 without re-walking it here.
+                return {
+                    "source": source,
+                    "fingerprint": {"kind": "named_table", "signature": str(table_sig)},
+                }
             named_sig = self._named_share_signatures.get(source)
             if named_sig:
                 return {
@@ -985,6 +1020,69 @@ class DataPreprocessor:
                 return False, "cache-file-fingerprint-mismatch"
 
         return True, "ok"
+
+    # ------------------------------------------------------------------
+    # Tables published by transforms (``to_df`` / ``to_ds``)
+    # ------------------------------------------------------------------
+
+    def begin_table_scope(self) -> None:
+        """Open a scope so ``to_ds`` can drop what this layer published."""
+        self._table_scopes.append([])
+
+    def end_table_scope(self, drop: bool = True) -> None:
+        if not self._table_scopes:
+            return
+        names = self._table_scopes.pop()
+        if drop:
+            for name in names:
+                self.drop_named_table(name)
+
+    def publish_named_table(self, name: str, df, signature: str) -> None:
+        key = str(name).strip()
+        if not key:
+            return
+        if key in self.dataset_registry:
+            raise ValueError(
+                f"to_df name {key!r} collides with a DataSet entry; pick another name."
+            )
+        if key in self._named_share_signatures:
+            raise ValueError(
+                f"to_df name {key!r} collides with a share_data name; pick another name."
+            )
+        prior = self._named_table_signatures.get(key)
+        if prior is not None and prior != str(signature) and not self._in_current_scope(key):
+            raise ValueError(
+                f"to_df name {key!r} is already published by a different chain; pick another name."
+            )
+        self._named_tables[key] = df
+        self._named_table_signatures[key] = str(signature)
+        if self._table_scopes and key not in self._table_scopes[-1]:
+            self._table_scopes[-1].append(key)
+        self._debug(f"Published named table -> {key} (signature {str(signature)[:12]})")
+
+    def scope_table(self, name: str) -> None:
+        """Bind a name to the current layer so it is released when the layer ends.
+
+        ``to_ds`` writes into the block's own in-memory dataset, which the next
+        layer sources too: without this the second layer would start from the
+        first one's result instead of the empty table it declared.
+        """
+        if self._table_scopes and str(name) not in self._table_scopes[-1]:
+            self._table_scopes[-1].append(str(name))
+
+    def _in_current_scope(self, name: str) -> bool:
+        return bool(self._table_scopes) and str(name) in self._table_scopes[-1]
+
+    def named_table(self, name: str):
+        return self._named_tables.get(str(name).strip())
+
+    def drop_named_table(self, name: str) -> None:
+        key = str(name).strip()
+        self._named_tables.pop(key, None)
+        self._named_table_signatures.pop(key, None)
+
+    def scoped_table_names(self) -> List[str]:
+        return list(self._table_scopes[-1]) if self._table_scopes else []
 
     def load_named_layer(
         self,
