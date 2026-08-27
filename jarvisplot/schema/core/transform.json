@@ -39,6 +39,39 @@
     "drop_columns": {
       "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/stringOrStringList"
     },
+    "bin_stat": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "required": ["x", "bins"],
+      "properties": {
+        "x": { "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString", "description": "Column name or expression to bin along." },
+        "weights": { "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString", "description": "Column name or expression. Omit to count each row as 1. Signed weights are summed algebraically." },
+        "bins": {
+          "oneOf": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "array", "minItems": 2, "items": { "type": "number" }, "description": "Explicit increasing edges." }
+          ]
+        },
+        "range": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number" }, "description": "Required when `bins` is a count; ignored when it is an edge list." },
+        "out": { "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/identifier", "description": "Name of the binned column. Default `density`." },
+        "normalise": {
+          "enum": ["sum", "integral", "none"],
+          "description": "`sum` (default): the bins add to 1, so scale_to.value * density is the expected count in that bin. `integral`: matplotlib's density=True, the bins integrate to 1 -- a bin width apart from `sum`. `none`: the raw weighted sum."
+        },
+        "scale_to": {
+          "type": "object",
+          "x-jarvis-zone": "closed",
+          "required": ["name", "value"],
+          "properties": {
+            "name": { "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/identifier", "description": "Column to add, holding value * <out>." },
+            "value": { "description": "A number, or a column/expression that must be constant over the block." }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "description": "Collapse the table into one row per bin of `x`. Emits bin_index, x_lo, x_hi, x_center and the binned column."
+    },
     "duplicate": {
       "type": "boolean",
       "description": "Detach from a shared table before editing it. Use it as the first step of a block whose source is a table another block published, so downstream steps cannot mutate what the other block still holds."

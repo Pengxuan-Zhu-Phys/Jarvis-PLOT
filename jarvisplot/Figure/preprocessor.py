@@ -336,6 +336,7 @@ class DataPreprocessor:
             icfg = self._interp_2d_transform_config(step)
             if icfg:
                 out.update(self._interp_2d_cfg_input_columns(icfg))
+            out.update(self._bin_stat_cfg_columns(step, "input"))
         return sorted(out)
 
     def _transform_output_columns(self, transform: Any) -> List[str]:
@@ -379,6 +380,7 @@ class DataPreprocessor:
             icfg = self._interp_2d_transform_config(step)
             if icfg:
                 out.update(self._interp_2d_cfg_output_columns(icfg))
+            out.update(self._bin_stat_cfg_columns(step, "output"))
         return sorted(out)
 
     @staticmethod
@@ -464,6 +466,28 @@ class DataPreprocessor:
             return None
         out = sorted({str(c).strip() for c in columns if str(c).strip()})
         return out if out else None
+
+    @staticmethod
+    def _bin_stat_cfg_columns(step: Any, which: str) -> set:
+        """Columns a bin_stat step reads or writes, for the projection.
+
+        A step that is not declared here has its columns pruned before it runs
+        (inputs) or before the layer sees them (outputs).
+        """
+        from .bin_stat_runtime import (
+            bin_stat_config,
+            bin_stat_input_columns,
+            bin_stat_output_columns,
+            is_bin_stat_transform,
+        )
+
+        if not is_bin_stat_transform(step):
+            return set()
+        cfg = bin_stat_config(step)
+        try:
+            return bin_stat_input_columns(cfg) if which == "input" else bin_stat_output_columns(cfg)
+        except Exception:
+            return set()
 
     def _runtime_projection(self, transform: Any, demand_columns: Optional[Sequence[str]]) -> Optional[List[str]]:
         if self._transform_publishes(transform):
