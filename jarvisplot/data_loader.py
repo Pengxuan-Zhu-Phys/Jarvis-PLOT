@@ -8,6 +8,7 @@ import os
 import pandas as pd 
 import numpy as np
 from .memtrace import memtrace_checkpoint, memtrace_enabled, memtrace_object_inventory
+from .dataset_types import IN_MEMORY_DATASET_TYPES
 from .utils.dataframes import polars_to_pandas
 from .utils.pathing import resolve_project_path
 from . import data_loader_hdf5 as hdf5
@@ -49,11 +50,17 @@ class DataSet():
     def setinfo(self, dtinfo, rootpath, eager: bool = False, cache=None):
         self.cache = cache
         self.rootpath = str(rootpath) if rootpath is not None else None
-        raw_path = str(dtinfo['path'])
-        resolved = resolve_project_path(raw_path, base_dir=rootpath or ".")
-        self.file = str(resolved)
+        declared_type = str(dtinfo['type']).lower()
+        if declared_type in IN_MEMORY_DATASET_TYPES:
+            # No file to resolve: the table starts empty and is filled by
+            # transforms (see the ``to_df`` / ``to_ds`` steps).
+            self.file = None
+        else:
+            raw_path = str(dtinfo['path'])
+            resolved = resolve_project_path(raw_path, base_dir=rootpath or ".")
+            self.file = str(resolved)
         self.name = dtinfo['name']
-        self.type = dtinfo['type'].lower()
+        self.type = declared_type
         self.transform = dtinfo.get("transform", None)
         self.required_columns = None
         self.retained_columns = None
@@ -117,6 +124,12 @@ class DataSet():
                 except Exception as e:
                     if self.logger:
                         self.logger.warning(f"Dataset '{self.name}' lazy metadata failed: {e}")
+        elif self.type in IN_MEMORY_DATASET_TYPES:
+            self.keys = []
+            if self.logger:
+                self.logger.debug(
+                    f"Dataset '{self.name}' registered as an empty {self.type} (no file)."
+                )
         else:
             if self.logger:
                 self.logger.debug(f"Dataset '{self.name}' registered in lazy mode.")
@@ -131,6 +144,9 @@ class DataSet():
             "columns": self.columns,
             "full_load": bool(getattr(self, "full_load", False)),
         }
+        if self.type in IN_MEMORY_DATASET_TYPES:
+            # Nothing on disk to fingerprint; identity is the declaration alone.
+            return {"path": None, "size": None, "mtime_ns": None, "md5": None, **extra}
         if cache is not None:
             return cache.source_fingerprint(self.path, extra=extra)
         try:
@@ -154,10 +170,24 @@ class DataSet():
             self.load_parquet()
         elif self.type == "hdf5":
             self.load_hdf5()
+        elif self.type in IN_MEMORY_DATASET_TYPES:
+            self.load_in_memory()
         else:
             raise ValueError(f"Unsupported dataset type: {self.type}")
         self._loaded = True
         return self.data
+
+    def load_in_memory(self):
+        """Materialise the empty table declared by a pathless dataset entry."""
+        if self.type == "pd.series":
+            self.data = pd.Series(dtype="float64").to_frame(name="value")
+        else:
+            self.data = pd.DataFrame()
+        self.keys = list(self.data.columns)
+        if self.logger:
+            self.logger.debug(
+                "Dataset '{}' materialised as an empty {}.".format(self.name, self.type)
+            )
 
     def get_data(self):
         return self.load(force=False)
