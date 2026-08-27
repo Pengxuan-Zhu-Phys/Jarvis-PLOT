@@ -823,6 +823,51 @@ class Figure:
                 axc_obj.set_xlabel(label_text if label_text is not None else "", **label_kwargs)
             self._apply_manual_ticks(axc_obj, "x", ticks_cfg.get("x", {}))
 
+        self._apply_axc_offset_text(axc_obj, is_h, cb_frame, ticks_cfg)
+
+    def _apply_axc_offset_text(self, axc_obj, is_h: bool, cb_frame, ticks_cfg: dict) -> None:
+        """Keep the colorbar's ``x10^n`` offset text in scale with its tick labels.
+
+        ``tick_params(labelsize=...)`` never reaches ``axis.offsetText``, so a 4pt
+        colorbar would otherwise carry the 10pt rcParams default next to its
+        numbers.  The JSON ``offset_text`` block is splatted last and wins over
+        the inherited size; ``show: false`` drops the exponent entirely, for
+        cards that fold it into the label instead.
+        """
+        axis = axc_obj.xaxis if is_h else axc_obj.yaxis
+        cfg = cb_frame.get("offset_text") if isinstance(cb_frame, dict) else None
+        cfg = dict(cfg) if isinstance(cfg, dict) else {}
+        if cfg.pop("show", True) is False:
+            axis.offsetText.set_visible(False)
+            return
+        # A colorbar's exponent carries as much meaning as its numbers but is
+        # read once, so it is sized a notch above the ticks rather than level
+        # with them -- at 4-5pt, matching exactly is legible only under a loupe.
+        scale = float(cfg.pop("scale", 1.25))
+        if not {"fontsize", "size"} & set(cfg):
+            # ``major`` overrides ``both`` in tick_params, so read it first.
+            for block in ("major", "both"):
+                sub = ticks_cfg.get(block)
+                if isinstance(sub, dict) and sub.get("labelsize") is not None:
+                    cfg["fontsize"] = float(sub["labelsize"]) * scale
+                    break
+        # Matplotlib hangs a vertical colorbar's exponent off the *right* edge
+        # (x=1, ha="right"), so it grows leftwards into whatever sits beside the
+        # bar -- on the rect cards, the main axes.  Anchor it to the bar's left
+        # edge instead and close the 3pt gap, so it rides on top of the bar.
+        pad = cfg.pop("pad", None if is_h else 0.0)
+        if pad is not None:
+            axis.OFFSETTEXTPAD = float(pad)
+        if not is_h:
+            if "x" not in cfg:
+                cfg["x"] = 0.0
+            if not {"ha", "horizontalalignment"} & set(cfg):
+                cfg["ha"] = "left"
+            if not {"va", "verticalalignment"} & set(cfg):
+                cfg["va"] = "bottom"
+        if cfg:
+            axis.offsetText.set(**cfg)
+
     def _finalize_axc(self, name: str) -> None:
         """Draw the colorbar for a named axc* axes using its pre-built _cb state."""
         axc_obj = self.axes.get(name)
