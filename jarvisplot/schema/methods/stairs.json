@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/methods/stairs.json",
+  "title": "method: stairs",
+  "description": "Coordinate contract for layers[].method='stairs' (matplotlib: stairs). Required axes must appear under coordinates.",
+  "x-jarvis-zone": "closed",
+  "x-jarvis-method": "stairs",
+  "x-jarvis-mpl": "stairs",
+  "x-jarvis-axes-types": [
+    "any",
+    "rect"
+  ],
+  "x-jarvis-coordinates": {
+    "required": [
+      "x_lo",
+      "x_hi",
+      "y"
+    ],
+    "optional": [],
+    "alternatives": []
+  },
+  "x-jarvis-example": "method: stairs\ncoordinates:\n  x_lo: {expr: x_lo}\n  x_hi: {expr: x_hi}\n  y: {expr: zn}\nstyle: {baseline: null}",
+  "type": "object",
+  "properties": {
+    "method": {
+      "const": "stairs"
+    },
+    "coordinates": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "additionalProperties": true,
+      "description": "Required axes for stairs: x_lo, x_hi, y. Bins must be contiguous (x_hi[i] == x_lo[i+1]); a gap raises rather than being stitched over."
+    }
+  },
+  "additionalProperties": true
+}

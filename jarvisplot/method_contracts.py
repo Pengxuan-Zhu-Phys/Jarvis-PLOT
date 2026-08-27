@@ -38,6 +38,7 @@ METHOD_COORDINATES: dict[str, dict[str, Any]] = {
     },
     "hist": {"required": ("x",), "optional": ("weights",)},
     "hist2d": {"required": ("x", "y"), "optional": ("weights",)},
+    "stairs": {"required": ("x_lo", "x_hi", "y"), "optional": ()},
     "errorbar": {"required": ("x", "y"), "optional": ("xerr", "yerr")},
     "fill": {"required": ("x", "y"), "optional": ()},
     "fill_between": {"required": ("x", "y1", "y2"), "optional": ()},

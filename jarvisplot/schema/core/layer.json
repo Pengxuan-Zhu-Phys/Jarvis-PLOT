@@ -71,6 +71,7 @@
         "plot",
         "quiver",
         "scatter",
+        "stairs",
         "step",
         "tricontour",
         "tricontourf",

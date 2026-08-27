@@ -42,6 +42,7 @@ METHOD_DISPATCH: Dict[str, str] = {
     "scatter":      "scatter",
     "hist":         "hist",
     "hist2d":       "hist2d",
+    "stairs":       "stairs",
     "errorbar":     "errorbar",
     "fill":         "fill",
     "fill_between": "fill_between",
