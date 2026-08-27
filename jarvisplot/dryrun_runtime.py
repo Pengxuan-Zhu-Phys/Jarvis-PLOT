@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence
 
 from .diagnostics import DiagnosticBag
+from .dataset_types import is_in_memory_type
 from .render_health import (
     LayerObservation,
     TransformStepObs,
@@ -236,6 +237,11 @@ def _load_datasets(
         if not isinstance(name, str) or not name.strip():
             continue
         name = name.strip()
+        if is_in_memory_type(entry.get("type")):
+            # Declared empty on purpose; there is no file to open and no rows
+            # to count until a transform fills it.
+            meta[name] = {"path": None, "rows": 0, "in_memory": True}
+            continue
         raw_path = entry.get("path")
         if not isinstance(raw_path, str):
             bag.warning(

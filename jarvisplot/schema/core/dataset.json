@@ -4,7 +4,16 @@
   "title": "One entry of the root DataSet list",
   "type": "object",
   "x-jarvis-zone": "closed",
-  "required": ["name", "path", "type"],
+  "required": ["name", "type"],
+  "if": {
+    "properties": { "type": { "enum": ["pd.DataFrame", "pd.Series"] } },
+    "required": ["type"]
+  },
+  "then": {
+    "not": { "required": ["path"] },
+    "description": "In-memory entries declare an empty table; a path would have nothing to point at."
+  },
+  "else": { "required": ["path"] },
   "properties": {
     "name": {
       "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/identifier",
@@ -15,7 +24,8 @@
       "description": "Resolved relative to the config file. A list concatenates sources."
     },
     "type": {
-      "enum": ["csv", "hdf5", "parquet"]
+      "enum": ["csv", "hdf5", "parquet", "pd.DataFrame", "pd.Series"],
+      "description": "File-backed (csv / hdf5 / parquet) or in-memory. `pd.DataFrame` declares an empty table and `pd.Series` an empty single-column table; both take no `path` and are filled by transforms via `to_df` / `to_ds`."
     },
     "dataset": {
       "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString",
@@ -71,5 +81,5 @@
     }
   },
   "additionalProperties": false,
-  "x-jarvis-example": "- name: df\n  path: ./samples.hdf5\n  type: hdf5\n  dataset: data"
+  "x-jarvis-example": "- name: df\n  path: ./samples.hdf5\n  type: hdf5\n  dataset: data\n- name: env\n  type: pd.DataFrame"
 }

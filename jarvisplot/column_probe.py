@@ -62,7 +62,13 @@ class ColumnProbe:
 
 def probe_dataset_columns(entry: Mapping[str, Any], resolved_path: str) -> ColumnProbe:
     """Names an expression can legally use against this ``DataSet`` entry."""
+    from .dataset_types import IN_MEMORY_DATASET_TYPES
+
     kind = str(entry.get("type", "")).strip().lower()
+    if kind in IN_MEMORY_DATASET_TYPES:
+        # Declared empty; its columns only exist once transforms have run, so
+        # there is no header to check an expression against.
+        return ColumnProbe.unsupported(f"{kind} table is filled at transform time")
     if kind == "csv":
         return _probe_csv(resolved_path)
     if kind == "parquet":
