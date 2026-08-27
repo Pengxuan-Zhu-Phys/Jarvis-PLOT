@@ -1337,6 +1337,50 @@ class StdAxesAdapter:
         artists = self.ax.hist(*args, **kw)
         return _auto_clip(artists, self.ax, self._clip_path)
 
+    def stairs(self, x_lo, x_hi, y, **kwargs):
+        """One step per bin, drawn on the bin edges rather than on a centre.
+
+        Matplotlib wants N values and N+1 edges, which no single dataframe
+        column can hold, so this takes the two edge columns a binned table
+        already carries and keeps the layer's coordinates equal-length.  The
+        step then lands on the real boundary instead of the midpoint between
+        two centres -- the same place only while the bins are evenly spaced.
+
+        Everything else is matplotlib's: ``baseline`` still defaults to 0 and
+        closes the outline to zero, so a curve on a log axis wants
+        ``baseline: null``.
+        """
+        kw = self._merge("stairs", kwargs)
+        lo = np.asarray(x_lo, dtype=float).reshape(-1)
+        hi = np.asarray(x_hi, dtype=float).reshape(-1)
+        values = np.asarray(y, dtype=float).reshape(-1)
+        if not (lo.size == hi.size == values.size):
+            raise ValueError(
+                "stairs needs x_lo, x_hi and y of the same length "
+                f"(got {lo.size}, {hi.size}, {values.size})"
+            )
+        if lo.size == 0:
+            return []
+        if np.any(hi <= lo):
+            bad = int(np.argmax(hi <= lo))
+            raise ValueError(
+                f"stairs bin {bad} is empty or inverted: x_lo={lo[bad]:.6g} >= x_hi={hi[bad]:.6g}"
+            )
+        if lo.size > 1:
+            # A gap between bins has no staircase to draw: refuse rather than
+            # quietly stitching the edges into a shape the data never had.
+            scale = float(np.median(hi - lo))
+            gaps = ~np.isclose(hi[:-1], lo[1:], rtol=0.0, atol=1e-9 * max(scale, 1.0))
+            if gaps.any():
+                first = int(np.argmax(gaps))
+                raise ValueError(
+                    "stairs needs contiguous bins: "
+                    f"x_hi[{first}]={hi[first]:.6g} does not meet x_lo[{first + 1}]={lo[first + 1]:.6g}"
+                )
+        edges = np.concatenate([lo, hi[-1:]])
+        artists = self.ax.stairs(values, edges, **kw)
+        return _auto_clip(artists, self.ax, self._clip_path)
+
     def _get_default_colors(self, n):
         import matplotlib.pyplot as plt
         palette = self.config['hist']['color']

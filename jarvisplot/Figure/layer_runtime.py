@@ -938,8 +938,18 @@ def render_layer(fig, ax, layer_info):
                 return []
             return _call_with_layer_clip(ax, layer_clip_path, method, *contour_args, **style)
         else:
-            if not ({"x", "y"} <= set(coor.keys())):
-                raise ValueError("Rectangular layer must define coordinates: {x,y} with exprs.")
+            # Ask the method what it needs.  Hard-coding {x, y} here made every
+            # method with another coordinate pack unreachable -- fill_between
+            # (x/y1/y2) and stairs (x_lo/x_hi/y) among them -- however correctly
+            # their contracts were declared.
+            from ..method_contracts import missing_coordinates
+
+            absent = missing_coordinates(method_key, coor)
+            if absent:
+                raise ValueError(
+                    f"Layer method '{method_key}' needs coordinates: "
+                    f"{', '.join(absent)} (got: {', '.join(sorted(coor.keys())) or 'none'})."
+                )
 
             for kk, vv in coor.items():
                 if isinstance(vv, dict) and "expr" in vv:
