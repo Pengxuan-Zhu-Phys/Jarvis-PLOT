@@ -39,6 +39,44 @@
     "drop_columns": {
       "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/stringOrStringList"
     },
+    "significance": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "required": ["dfS", "dfB"],
+      "properties": {
+        "dfS": {
+          "type": "object",
+          "x-jarvis-zone": "closed",
+          "required": ["source"],
+          "properties": {
+            "source": { "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/identifier", "description": "Name of a table an earlier data block published with to_df." },
+            "Sn": { "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString", "description": "Column or expression on that table. Default `Sn`." },
+            "sigmaSn": { "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString", "description": "Optional uncertainty, column or expression on that table." }
+          },
+          "additionalProperties": false
+        },
+        "dfB": {
+          "type": "object",
+          "x-jarvis-zone": "closed",
+          "required": ["source"],
+          "properties": {
+            "source": { "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/identifier", "description": "Name of a table an earlier data block published with to_df." },
+            "Bn": { "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString", "description": "Column or expression on that table. Default `Bn`." },
+            "sigmaBn": { "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString", "description": "Optional uncertainty, column or expression on that table." }
+          },
+          "additionalProperties": false
+        },
+        "key": { "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/identifier", "description": "Column both tables align on. Default `bin_index`; an integer key rather than a float centre." },
+        "formula": {
+          "enum": ["s_over_sqrt_sb", "s_over_sqrt_b", "s_over_sqrt_b_syst", "asimov", "asimov_syst"],
+          "description": "Default `s_over_sqrt_sb`. The `_syst` forms need dfB.sigmaBn."
+        },
+        "cumulative": { "type": "boolean", "description": "Sum from the high end before evaluating, giving Z above each threshold instead of inside each bin. Default false." },
+        "drop_invalid": { "type": "boolean", "description": "Drop bins where Z is undefined. Default false, which leaves NaN so a step plot breaks the line instead of bridging the gap." }
+      },
+      "additionalProperties": false,
+      "description": "Align a binned signal table and a binned background table on the bin key and evaluate a figure of merit per bin."
+    },
     "bin_stat": {
       "type": "object",
       "x-jarvis-zone": "closed",

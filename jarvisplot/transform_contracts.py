@@ -161,6 +161,74 @@ TRANSFORM_CONTRACTS: dict[str, dict[str, Any]] = {
             {"title": "drop", "yaml": "transform:\n  - drop_columns: [tmp, flag]\n"}
         ],
     ),
+    "significance": _c(
+        description=(
+            "Align a binned signal table and a binned background table on the "
+            "bin key and evaluate a figure of merit per bin."
+        ),
+        form="object",
+        form_extra="single-key mapping or {type: significance, ...}",
+        required={
+            "dfS": {
+                "type": "object",
+                "description": "{source: <table>, Sn: <expr>, sigmaSn: <expr>}",
+            },
+            "dfB": {
+                "type": "object",
+                "description": "{source: <table>, Bn: <expr>, sigmaBn: <expr>}",
+            },
+        },
+        optional={
+            "key": {"type": "identifier", "description": "column both tables align on"},
+            "formula": {"type": "string", "description": "figure of merit"},
+            "cumulative": {
+                "type": "boolean",
+                "description": "Z above each threshold instead of inside each bin",
+            },
+            "drop_invalid": {
+                "type": "boolean",
+                "description": "drop bins where Z is undefined instead of leaving NaN",
+            },
+        },
+        defaults={
+            "key": "bin_index",
+            "formula": "s_over_sqrt_sb",
+            "cumulative": False,
+            "drop_invalid": False,
+        },
+        enums={
+            "formula": [
+                "s_over_sqrt_sb",
+                "s_over_sqrt_b",
+                "s_over_sqrt_b_syst",
+                "asimov",
+                "asimov_syst",
+            ]
+        },
+        input_kind="two published tables",
+        output_kind="table (one row per shared bin)",
+        owner="Figure/significance_runtime.py",
+        examples=[
+            {
+                "title": "signal and background from separate files",
+                "yaml": (
+                    "transform:\n"
+                    "  - significance:\n"
+                    "      dfS: {source: sig_bins, Sn: Sn}\n"
+                    "      dfB: {source: bkg_bins, Bn: Bn, sigmaBn: '0.2 * Bn'}\n"
+                    "      formula: s_over_sqrt_b_syst\n"
+                ),
+            }
+        ],
+        notes=[
+            "The two tables come from bin_stat and must share the same bins; the "
+            "step aligns on the integer bin index, not on a float bin centre.",
+            "Undefined bins stay NaN by default, so a step plot breaks the line "
+            "rather than bridging over them.",
+            "The _syst formulas need dfB.sigmaBn; asimov_syst reduces to asimov "
+            "as the uncertainty goes to zero.",
+        ],
+    ),
     "bin_stat": _c(
         description=(
             "Collapse the table into one row per bin of x (weighted, 1D). "

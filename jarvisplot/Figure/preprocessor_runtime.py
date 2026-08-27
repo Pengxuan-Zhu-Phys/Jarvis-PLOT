@@ -16,6 +16,11 @@ from ..memtrace import memtrace_checkpoint, memtrace_object_inventory
 from ..utils.expression import eval_dataframe_expression
 from ..utils.pathing import resolve_project_path
 from .bin_stat_runtime import bin_stat, bin_stat_config, is_bin_stat_transform
+from .significance_runtime import (
+    is_significance_transform,
+    significance,
+    significance_config,
+)
 from .density_cell_runtime import (
     density_cell,
     density_cell_config,
@@ -75,6 +80,9 @@ HEAVY_TRANSFORM_KEYS = frozenset(
         # so it must report itself blind here rather than guess a row count.
         "to_df",
         "to_ds",
+        # Reads tables other blocks published, so it is cross-block for the same
+        # reason to_df is.
+        "significance",
     }
 )
 
@@ -571,6 +579,21 @@ def apply_transforms_impl(
                         "bin": binv,
                     },
                 )
+        elif is_significance_transform(trans):
+            before_rows = preprocessor._safe_nrows(df)
+            df = significance(
+                df,
+                significance_config(trans),
+                preprocessor.logger,
+                tables=preprocessor._named_tables,
+            )
+            preprocessor._debug(
+                "significance:\n\t source \t-> {}\n\t rows \t\t-> {} -> {}".format(
+                    source_label or "<unknown>",
+                    before_rows if before_rows is not None else "NA",
+                    preprocessor._safe_nrows(df),
+                )
+            )
         elif is_bin_stat_transform(trans):
             before_rows = preprocessor._safe_nrows(df)
             df = bin_stat(df, bin_stat_config(trans), preprocessor.logger)
