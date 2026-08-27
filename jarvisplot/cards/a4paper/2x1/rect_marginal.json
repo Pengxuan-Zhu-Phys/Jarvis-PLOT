@@ -83,17 +83,17 @@
                     "visible": true,
                     "which": "major",
                     "axis": "both",
-                    "color": "#C2C2C269",
-                    "linewidth": 0.3,
-                    "linestyle": "--"
+                    "color": "#C2C2C250",
+                    "linewidth": 0.5,
+                    "linestyle": "-"
                 },
                 "minor": {
                     "visible": true,
                     "which": "minor",
                     "axis": "both",
-                    "color": "#C2C2C240",
+                    "color": "#C2C2C225",
                     "linewidth": 0.2,
-                    "linestyle": ":"
+                    "linestyle": "-"
                 }
             },
             "ticks": {
@@ -114,16 +114,16 @@
                 },
                 "major": {
                     "which": "major",
-                    "length": 8,
+                    "length": 5,
                     "width": 0.6,
-                    "color": "#FCFFC1",
+                    "color": "black",
                     "zorder": 1000
                 },
                 "minor": {
                     "which": "minor",
-                    "length": 3,
+                    "length": 2,
                     "width": 0.6,
-                    "color": "#FCFFC1",
+                    "color": "black",
                     "zorder": 1000
                 }
             },
@@ -154,17 +154,17 @@
                     "visible": true,
                     "which": "major",
                     "axis": "both",
-                    "color": "#C2C2C269",
-                    "linewidth": 0.3,
-                    "linestyle": "--"
+                    "color": "#C2C2C250",
+                    "linewidth": 0.5,
+                    "linestyle": "-"
                 },
                 "minor": {
                     "visible": true,
                     "which": "minor",
                     "axis": "both",
-                    "color": "#C2C2C240",
+                    "color": "#C2C2C225",
                     "linewidth": 0.2,
-                    "linestyle": ":"
+                    "linestyle": "-"
                 }
             },
             "ticks": {
@@ -201,7 +201,7 @@
                     "fontfamily": "STIXGeneral"
                 },
                 "ylabel_coords": {
-                    "x": -0.52,
+                    "x": -0.46,
                     "y": 0.5
                 }
             }
@@ -229,17 +229,17 @@
                     "visible": true,
                     "which": "major",
                     "axis": "both",
-                    "color": "#C2C2C269",
-                    "linewidth": 0.3,
-                    "linestyle": "--"
+                    "color": "#C2C2C250",
+                    "linewidth": 0.5,
+                    "linestyle": "-"
                 },
                 "minor": {
                     "visible": true,
                     "which": "minor",
                     "axis": "both",
-                    "color": "#C2C2C240",
+                    "color": "#C2C2C225",
                     "linewidth": 0.2,
-                    "linestyle": ":"
+                    "linestyle": "-"
                 }
             },
             "ticks": {
