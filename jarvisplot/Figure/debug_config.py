@@ -238,6 +238,34 @@ DEFAULT_DEBUG = {
         "bottom": {"show": True},
     },
     "colorbar_gap": {"show": True, "template": "%.3f cm"},
+    # Cards whose figure size is *solved* rather than authored (see
+    # `Contract.geometry: solved`) have a story the rest of the overlay cannot
+    # tell: the caption reports the size that came out, not the inputs it came
+    # out of, and on those cards the inputs are the design.  `lines` is the
+    # one part of `Debug` written by Python rather than by a card -- the
+    # solver fills it through the figure's own `debug:` mapping, so a card
+    # that solves nothing leaves it empty and this draws nothing at all.
+    "solved": {
+        "show": True,
+        "x": 0.5,
+        "y": 0.964,
+        "lines": [],
+        "text": {
+            "color": _MARGIN,
+            # Smaller than the caption: this block is several lines long and
+            # the narrowest figure it has to sit on is under 50 mm wide.
+            "fontsize": 4.5,
+            "ha": "center",
+            "va": "top",
+            "rotation": 0,
+            "fontweight": "normal",
+            "family": "monospace",
+            "linespacing": 1.35,
+            "clip_on": False,
+            "zorder": _Z_TEXT,
+            "bbox": {**_LABEL_BBOX, "alpha": 0.82},
+        },
+    },
     # A layout reference has no layers, so nothing feeds the colorbar and it
     # stays an empty box -- the one part of the page the reference cannot
     # show.  Fill it with the card's own colormap.  A colorbar a layer did

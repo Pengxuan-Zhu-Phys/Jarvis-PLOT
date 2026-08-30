@@ -55,6 +55,7 @@
         "barh",
         "contour",
         "contourf",
+        "corrplot",
         "dynesty_runplot",
         "errorbar",
         "fill",

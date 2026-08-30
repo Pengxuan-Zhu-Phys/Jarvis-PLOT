@@ -141,6 +141,20 @@
     },
     "yaml_path": {
       "x-jarvis-internal": true
+    },
+    "variables": {
+      "description": "type: correlation_matrix -- which columns go into the matrix. A list names them explicitly (and fixes their order); a mapping takes columns / regex / exclude. Expanded away before render.",
+      "x-jarvis-zone": "delegated"
+    },
+    "corrplot": {
+      "type": "object",
+      "description": "type: correlation_matrix -- R corrplot formals (method, type, diag, order, addrect, addCoef.col, sig.level, col, ...). Becomes the layer's style. Run `jplot man corrplot`. Expanded away before render.",
+      "x-jarvis-zone": "delegated"
+    },
+    "correlation": {
+      "type": "object",
+      "description": "type: correlation_matrix -- options for the `correlation` transform itself (missing, min_periods, triangle, include_diagonal). Column selection lives in `variables`. Expanded away before render.",
+      "x-jarvis-zone": "delegated"
     }
   },
   "additionalProperties": false,

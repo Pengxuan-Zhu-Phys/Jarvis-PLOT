@@ -40,6 +40,7 @@ import numpy as np
 
 
 from .debug_config import resolve_debug_config as _debug_config
+from .layout_runtime import is_colorbar_ax
 
 
 def _shown(cfg) -> bool:
@@ -309,6 +310,20 @@ def _draw(fig) -> None:
             **caption_cfg["text"],
         )
 
+    # What the size was solved *from*, on the cards that solve it.  Sits under
+    # the caption because it is the same subject: the caption is the answer,
+    # this is the working.  The lines are written by whoever ran the solve --
+    # nothing here computes them, and a card that solves nothing has none.
+    solved_cfg = debug["solved"]
+    solved_lines = [str(line) for line in (solved_cfg.get("lines") or ())]
+    if _shown(solved_cfg) and solved_lines:
+        ov.text(
+            float(solved_cfg["x"]),
+            float(solved_cfg["y"]),
+            "\n".join(solved_lines),
+            **solved_cfg["text"],
+        )
+
     # total figure height marker on the far left
     height_cfg = figure_cfg["height_marker"]
     if _shown(height_cfg):
@@ -427,10 +442,10 @@ def _draw(fig) -> None:
                     vertical_label_side=margin_side,
                 )
 
-        if name.startswith("axc") and _shown(debug["colorbar_preview"]):
+        if is_colorbar_ax(name) and _shown(debug["colorbar_preview"]):
             _preview_colorbar(fig, name, debug["colorbar_preview"])
 
-        if name.startswith("axc") and primary_pos is not None:
+        if is_colorbar_ax(name) and primary_pos is not None:
             # gap between the primary axes' right edge and this colorbar's left edge
             pl, pb, pw, ph = primary_pos
             ygap = b + h / 2.0

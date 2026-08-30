@@ -25,6 +25,7 @@ __all__ = [
     "layer_columns",
     "plan_source_demand",
     "transform_columns",
+    "transform_needs_all_columns",
     "transform_output_columns",
 ]
 
@@ -258,6 +259,9 @@ def _collect_expr_columns(obj: Any, out: Set[str]) -> None:
             if key == "bin_stat":
                 out.update(_bin_stat_cfg_columns(v, "input"))
                 continue
+            if key == "correlation":
+                out.update(_correlation_cfg_columns(v, "input"))
+                continue
             _collect_expr_columns(v, out)
         return
     if isinstance(obj, (list, tuple)):
@@ -283,6 +287,9 @@ def _transform_columns(transform: Any) -> Set[str]:
         icfg = _interp_2d_transform_config(step)
         if icfg:
             out.update(_interp_2d_cfg_input_columns(icfg))
+        ccfg = _correlation_transform_config(step)
+        if ccfg is not None:
+            out.update(_correlation_cfg_columns(ccfg, "input"))
         if "add_column" in step:
             add_cfg = step.get("add_column", {})
             if isinstance(add_cfg, Mapping):
@@ -303,6 +310,61 @@ def _bin_stat_cfg_columns(cfg: Any, which: str) -> Set[str]:
         return set()
 
 
+def _correlation_transform_config(step: Any):
+    """The step's config in either spelling, or None when it is not this step.
+
+    ``columns`` is optional, so ``correlation: {}`` is a complete and
+    meaningful step -- returning a falsy mapping for it would make every
+    ``if cfg:`` caller skip the one config that asks for the whole table.
+    """
+    if not isinstance(step, Mapping):
+        return None
+    if "correlation" in step:
+        cfg = step.get("correlation")
+        return cfg if isinstance(cfg, Mapping) else {}
+    if str(step.get("type", "")).strip().lower() == "correlation":
+        return step
+    return None
+
+
+def _correlation_cfg_columns(cfg: Any, which: str) -> Set[str]:
+    from .Figure.correlation_runtime import (
+        correlation_input_columns,
+        correlation_output_columns,
+    )
+
+    if not isinstance(cfg, Mapping):
+        return set()
+    try:
+        return correlation_input_columns(cfg) if which == "input" else correlation_output_columns(cfg)
+    except Exception:
+        return set()
+
+
+def _transform_needs_all_columns(transform: Any) -> bool:
+    """Whether any step in this pipeline picks its inputs from the table itself.
+
+    Column projection works by unioning the names the YAML mentions, which is
+    exactly the wrong answer for a step that says "every numeric column" or
+    "everything matching this pattern": the projection would prune the source
+    down to the handful of names written elsewhere in the config and then hand
+    the step a table with its features already gone.  There is no set of names
+    that expresses "whatever is there", so the only safe projection is none.
+    """
+    if not isinstance(transform, list):
+        return False
+    for step in transform:
+        if not isinstance(step, Mapping):
+            continue
+        ccfg = _correlation_transform_config(step)
+        if ccfg is not None:
+            from .Figure.correlation_runtime import correlation_selects_dynamically
+
+            if correlation_selects_dynamically(ccfg):
+                return True
+    return False
+
+
 def _transform_output_columns(transform: Any) -> Set[str]:
     """Return column names produced as outputs by a transform list."""
     out: Set[str] = set()
@@ -313,6 +375,9 @@ def _transform_output_columns(transform: Any) -> Set[str]:
             continue
         if "bin_stat" in step:
             out.update(_bin_stat_cfg_columns(step.get("bin_stat"), "output"))
+        ccfg = _correlation_transform_config(step)
+        if ccfg is not None:
+            out.update(_correlation_cfg_columns(ccfg, "output"))
         if "add_column" in step:
             add_cfg = step.get("add_column", {})
             if isinstance(add_cfg, Mapping):
@@ -366,6 +431,7 @@ def _layer_columns(layer: Any) -> Set[str]:
 layer_columns = _layer_columns
 transform_columns = _transform_columns
 transform_output_columns = _transform_output_columns
+transform_needs_all_columns = _transform_needs_all_columns
 
 
 class SourceDemand:

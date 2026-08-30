@@ -178,6 +178,7 @@
             }
         },
         "axlogo": {
+            "clip": false,
             "file": "&JP/jarvisplot/cards/icons/gambit_small.png",
             "text": [
                 {

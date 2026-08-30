@@ -805,3 +805,69 @@ def _preprofiling(df, prof, logger):
     if logger:
         logger.debug(f"After preprofiling ({prebin}x{prebin}) -> {reduced.shape}")
     return reduced
+
+
+def grid_from_metadata(z, df):
+    """Fold a long table's ``z`` column back into the matrix behind it.
+
+    The producer says how big the grid is (``__grid_nx__`` / ``__grid_ny__``,
+    or ``__grid_bin__`` for the square case) and where each row sits in it
+    (``__grid_ix__`` / ``__grid_iy__``).  Cells nobody emitted stay masked
+    rather than being filled from a neighbour, so a ``triangle`` selection
+    draws as the triangle it is.
+
+    Returns ``(array, extent)`` -- ``extent`` is ``None`` when the table does
+    not carry one -- or ``None`` when the table has no cell indices at all,
+    so the caller can say the shape is unknown instead of inventing one.
+    """
+    if df is None or not hasattr(df, "columns"):
+        return None
+    cols = set(getattr(df, "columns", []))
+    if not {"__grid_ix__", "__grid_iy__"} <= cols:
+        return None
+
+    z = np.asarray(z, dtype=float).reshape(-1)
+    ix = np.asarray(df["__grid_ix__"]).reshape(-1)
+    iy = np.asarray(df["__grid_iy__"]).reshape(-1)
+    n = min(ix.size, iy.size, z.size)
+    if n == 0:
+        return None
+    try:
+        ix = np.asarray(ix[:n], dtype=np.int64)
+        iy = np.asarray(iy[:n], dtype=np.int64)
+    except (TypeError, ValueError):
+        return None
+    z = z[:n]
+
+    def _count(*names):
+        for name in names:
+            if name in cols:
+                try:
+                    return int(np.asarray(df[name])[0])
+                except Exception:
+                    return None
+        return None
+
+    nx = _count("__grid_nx__", "__grid_bin__")
+    ny = _count("__grid_ny__", "__grid_bin__")
+    if nx is None:
+        nx = int(ix.max()) + 1
+    if ny is None:
+        ny = int(iy.max()) + 1
+    if nx < 1 or ny < 1:
+        return None
+
+    keep = (ix >= 0) & (ix < nx) & (iy >= 0) & (iy < ny)
+    if not np.any(keep):
+        return None
+    grid = np.full((ny, nx), np.nan, dtype=float)
+    grid[iy[keep], ix[keep]] = z[keep]
+
+    extent = None
+    bounds = ("__grid_xmin__", "__grid_xmax__", "__grid_ymin__", "__grid_ymax__")
+    if all(name in cols for name in bounds):
+        try:
+            extent = tuple(float(np.asarray(df[name])[0]) for name in bounds)
+        except Exception:
+            extent = None
+    return np.ma.masked_invalid(grid), extent

@@ -16,6 +16,7 @@ from ..memtrace import memtrace_checkpoint, memtrace_object_inventory
 from ..utils.expression import eval_dataframe_expression
 from ..utils.pathing import resolve_project_path
 from .bin_stat_runtime import bin_stat, bin_stat_config, is_bin_stat_transform
+from .correlation_runtime import correlation, correlation_config, is_correlation_transform
 from .significance_runtime import (
     is_significance_transform,
     significance,
@@ -157,6 +158,10 @@ def apply_light_transforms(df, transform, logger=None):
                 cfg = bin_stat_config(step)
                 detail = str(cfg.get("x", ""))
                 work = bin_stat(work, cfg, log)
+            elif is_correlation_transform(step):
+                cfg = correlation_config(step)
+                detail = str(len(cfg.get("columns", []) if isinstance(cfg, Mapping) else []))
+                work = correlation(work, cfg, log)
             elif any(k in step for k in HEAVY_TRANSFORM_KEYS) or (
                 "type" in step
                 and str(step.get("type") or "")
@@ -599,6 +604,16 @@ def apply_transforms_impl(
             df = bin_stat(df, bin_stat_config(trans), preprocessor.logger)
             preprocessor._debug(
                 "bin_stat:\n\t source \t-> {}\n\t rows \t\t-> {} -> {}".format(
+                    source_label or "<unknown>",
+                    before_rows if before_rows is not None else "NA",
+                    preprocessor._safe_nrows(df),
+                )
+            )
+        elif is_correlation_transform(trans):
+            before_rows = preprocessor._safe_nrows(df)
+            df = correlation(df, correlation_config(trans), preprocessor.logger)
+            preprocessor._debug(
+                "correlation:\n\t source \t-> {}\n\t rows \t\t-> {} -> {}".format(
                     source_label or "<unknown>",
                     before_rows if before_rows is not None else "NA",
                     preprocessor._safe_nrows(df),

@@ -1,19 +1,37 @@
 {
-    "Frame": {
-        "figure": {
-            "figsize": [
-                3.3,
-                3.0
-            ]
+    "Contract": {
+        "figure_type": "correlation_matrix",
+        "axes": "axcorr",
+        "colorbar": "axccorr",
+        "exclusive": true,
+        "geometry": "solved",
+        "note": "Reserved card, own family. Only `type: correlation_matrix` may select it; the matrix owns 'axcorr' and its colorbar 'axccorr'; no other layer may be attached. It carries no figsize and no axes rects on purpose -- a correlation matrix holds n^2 cells and n names, so the figure size is solved from the matrix (see Geometry and Figure/corr_layout.py) rather than authored. Rendering it without that solve is an error, not a fallback."
+    },
+    "Geometry": {
+        "units": "mm",
+        "max_width": 170.0,
+        "cell": 4.2,
+        "cell_min": 1.6,
+        "margin": {
+            "top": 4.0,
+            "right": 11.0,
+            "bottom": 11.0,
+            "left": 11.0
         },
+        "colorbar": {
+            "width": 2.6,
+            "gap": 0.42,
+            "inset": 5.0
+        },
+        "logo": {
+            "width": 5.0,
+            "height": 5.0,
+            "offset": 0.838
+        }
+    },
+    "Frame": {
         "axes": {
             "axlogo": {
-                "rect": [
-                    0.01,
-                    0.011,
-                    0.06,
-                    0.066
-                ],
                 "frameon": false,
                 "yticks": [],
                 "xticks": [],
@@ -26,41 +44,14 @@
                     0
                 ]
             },
-            "ax": {
-                "rect": [
-                    0.202,
-                    0.226,
-                    0.655,
-                    0.722
-                ]
+            "axcorr": {
+                "frameon": false
             },
-            "axl": {
-                "rect": [
-                    0.101,
-                    0.226,
-                    0.095,
-                    0.722
-                ]
-            },
-            "axb": {
-                "rect": [
-                    0.202,
-                    0.114,
-                    0.655,
-                    0.105
-                ]
-            },
-            "axc": {
-                "rect": [
-                    0.863,
-                    0.252,
-                    0.036,
-                    0.669
-                ],
+            "axccorr": {
                 "xticks": []
             }
         },
-        "ax": {
+        "axcorr": {
             "title_params": {
                 "position": "top",
                 "fontsize": "small",
@@ -69,211 +60,102 @@
                 "clip_on": false,
                 "zorder": 1000
             },
-            "frame": {
-                "linewidth": 0.8,
-                "solid_capstyle": "projecting",
-                "solid_joinstyle": "miter",
-                "clip_on": false,
-                "c": "#21171A",
-                "zorder": 100
-            },
             "grid": {
-                "axisbelow": false,
-                "major": {
-                    "visible": true,
-                    "which": "major",
-                    "axis": "both",
-                    "color": "#C2C2C250",
-                    "linewidth": 0.5,
-                    "linestyle": "-"
-                },
-                "minor": {
-                    "visible": true,
-                    "which": "minor",
-                    "axis": "both",
-                    "color": "#C2C2C225",
-                    "linewidth": 0.2,
-                    "linestyle": "-"
-                }
+                "axisbelow": true
             },
             "ticks": {
                 "both": {
                     "labelsize": 6,
-                    "direction": "in",
+                    "direction": "out",
                     "labelfontfamily": "sans",
-                    "top": true,
+                    "top": false,
                     "left": true,
-                    "right": true,
+                    "right": false,
                     "bottom": true,
-                    "which": "both",
-                    "zorder": 1000,
-                    "labelleft": false,
-                    "labelbottom": false,
                     "labeltop": false,
-                    "labelright": false
-                },
-                "major": {
-                    "which": "major",
-                    "length": 5,
-                    "width": 0.6,
-                    "color": "black",
-                    "zorder": 1000
-                },
-                "minor": {
-                    "which": "minor",
-                    "length": 2,
-                    "width": 0.6,
-                    "color": "black",
-                    "zorder": 1000
-                }
-            },
-            "labels": {
-                "zorder": 1000
-            }
-        },
-        "axl": {
-            "title_params": {
-                "position": "top",
-                "fontsize": "small",
-                "fontfamily": "Fira code",
-                "fontweight": "normal",
-                "clip_on": false,
-                "zorder": 1000
-            },
-            "frame": {
-                "linewidth": 0.8,
-                "solid_capstyle": "projecting",
-                "solid_joinstyle": "miter",
-                "clip_on": false,
-                "c": "#21171A",
-                "zorder": 100
-            },
-            "grid": {
-                "axisbelow": false,
-                "major": {
-                    "visible": true,
-                    "which": "major",
-                    "axis": "both",
-                    "color": "#C2C2C250",
-                    "linewidth": 0.5,
-                    "linestyle": "-"
-                },
-                "minor": {
-                    "visible": true,
-                    "which": "minor",
-                    "axis": "both",
-                    "color": "#C2C2C225",
-                    "linewidth": 0.2,
-                    "linestyle": "-"
-                }
-            },
-            "ticks": {
-                "both": {
-                    "pad": 1.5,
-                    "labelsize": 4,
-                    "direction": "in",
-                    "labelfontfamily": "sans",
-                    "top": true,
-                    "left": true,
-                    "right": true,
-                    "bottom": true,
-                    "which": "both",
                     "labelbottom": true,
-                    "labeltop": false
+                    "labelleft": true,
+                    "labelright": false,
+                    "which": "both",
+                    "zorder": 1000
                 },
                 "major": {
                     "which": "major",
-                    "length": 4,
+                    "length": 0.0,
                     "width": 0.4,
-                    "color": "black"
+                    "color": "#21171A",
+                    "pad": 1.6,
+                    "zorder": 1000
                 },
-                "minor": {
-                    "which": "minor",
-                    "length": 2,
-                    "width": 0.4,
-                    "color": "black"
-                }
-            },
-            "labels": {
-                "ylabel": {
-                    "loc": "center",
-                    "fontsize": 10,
-                    "fontfamily": "STIXGeneral"
+                "x": {
+                    "labelrotation": 90.0,
+                    "labelrotation_mode": "anchor",
+                    "labelha": "right",
+                    "labelva": "center",
+                    "labelcolor": "#21171A"
                 },
-                "ylabel_coords": {
-                    "x": -0.46,
-                    "y": 0.5
+                "y": {
+                    "labelrotation": 0.0,
+                    "labelha": "right",
+                    "labelva": "center",
+                    "labelcolor": "#21171A"
                 }
             }
         },
-        "axb": {
-            "title_params": {
-                "position": "top",
-                "fontsize": "small",
-                "fontfamily": "Fira code",
-                "fontweight": "normal",
-                "clip_on": false,
-                "zorder": 1000
+        "axccorr": {
+            "color": {
+                "cmap": "RdBu",
+                "vmin": -1.0,
+                "vmax": 1.0
             },
-            "frame": {
-                "linewidth": 0.8,
-                "solid_capstyle": "projecting",
-                "solid_joinstyle": "miter",
-                "clip_on": false,
-                "c": "#21171A",
-                "zorder": 100
-            },
-            "grid": {
-                "axisbelow": false,
-                "major": {
-                    "visible": true,
-                    "which": "major",
-                    "axis": "both",
-                    "color": "#C2C2C250",
-                    "linewidth": 0.5,
-                    "linestyle": "-"
-                },
-                "minor": {
-                    "visible": true,
-                    "which": "minor",
-                    "axis": "both",
-                    "color": "#C2C2C225",
-                    "linewidth": 0.2,
-                    "linestyle": "-"
-                }
+            "label": {
+                "ylabel": "",
+                "loc": "center",
+                "labelpad": 1.5,
+                "fontsize": 7,
+                "fontfamily": "STIXGeneral"
             },
             "ticks": {
+                "ticks_position": "right",
                 "both": {
-                    "pad": 1.5,
-                    "labelsize": 4,
+                    "labelsize": 6,
                     "direction": "in",
                     "labelfontfamily": "sans",
-                    "top": true,
-                    "left": true,
+                    "top": false,
+                    "left": false,
                     "right": true,
-                    "bottom": true,
-                    "which": "both",
-                    "labelleft": false,
-                    "labelright": true
+                    "bottom": false,
+                    "which": "both"
                 },
                 "major": {
                     "which": "major",
-                    "length": 4,
+                    "length": 2.4,
                     "width": 0.4,
-                    "color": "black"
+                    "color": "black",
+                    "pad": 1.6
                 },
                 "minor": {
                     "which": "minor",
-                    "length": 2,
+                    "length": 1.2,
                     "width": 0.4,
-                    "color": "black"
-                }
-            },
-            "labels": {
-                "xlabel": {
-                    "loc": "center",
-                    "fontsize": 10,
-                    "fontfamily": "STIXGeneral"
+                    "color": "black",
+                    "pad": 1.6
+                },
+                "y": {
+                    "positions": [
+                        -1.0,
+                        -0.5,
+                        0.0,
+                        0.5,
+                        1.0
+                    ],
+                    "labels": [
+                        "-1",
+                        "-0.5",
+                        "0",
+                        "0.5",
+                        "1"
+                    ]
                 }
             }
         },
@@ -305,52 +187,11 @@
                     "fontweight": "normal"
                 }
             ]
-        },
-        "axc": {
-            "color": {
-                "cmap": "jdistri"
-            },
-            "label": {
-                "ylabel": "",
-                "labelpad": 1.5,
-                "loc": "center",
-                "fontsize": 10,
-                "fontfamily": "STIXGeneral"
-            },
-            "ticks": {
-                "ticks_position": "right",
-                "both": {
-                    "pad": 1.0,
-                    "labelsize": 4,
-                    "direction": "in",
-                    "labelfontfamily": "sans",
-                    "top": false,
-                    "left": false,
-                    "right": true,
-                    "bottom": false,
-                    "which": "both"
-                },
-                "major": {
-                    "which": "major",
-                    "length": 4,
-                    "width": 0.4,
-                    "color": "white"
-                },
-                "minor": {
-                    "which": "minor",
-                    "length": 2,
-                    "width": 0.4,
-                    "color": "white"
-                }
-            }
         }
     },
     "Debug": {
         "primary_order": [
-            "ax",
-            "ax0",
-            "ax1",
-            "axtri"
+            "axcorr"
         ],
         "units": {
             "cm_per_inch": 2.54,
@@ -649,13 +490,36 @@
         }
     },
     "Style": {
-        "scatter": {
-            "s": 1.0,
-            "marker": ",",
-            "linewidths": 0.02,
-            "alpha": 1.0,
-            "zorder": 30,
-            "edgecolor": "None"
+        "corrplot": {
+            "method": "circle",
+            "type": "full",
+            "diag": true,
+            "glyph.scale": 0.9,
+            "outline": false,
+            "addgrid.col": "#C2C2C2",
+            "order": "original",
+            "hclust.method": "complete",
+            "addrect": null,
+            "rect.col": "#21171A",
+            "rect.lwd": 0.7,
+            "addCoef.col": null,
+            "number.digits": 2,
+            "number.cex": 1.0,
+            "addCoefasPercent": false,
+            "tl.pos": "lt",
+            "tl.cex": 1.0,
+            "tl.col": "#21171A",
+            "tl.srt": 90,
+            "tl.offset": 0.4,
+            "sig.level": null,
+            "insig": "pch",
+            "pch": "x",
+            "pch.cex": 1.5,
+            "pch.col": "#21171A",
+            "na.label": "?",
+            "na.label.col": "#8A8A8A",
+            "clip": false,
+            "zorder": 30
         }
     }
 }

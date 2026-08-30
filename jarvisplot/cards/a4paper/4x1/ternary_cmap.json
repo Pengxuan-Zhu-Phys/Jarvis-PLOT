@@ -10,7 +10,7 @@
             "axlogo": {
                 "rect": [
                     0.01,
-                    0.01,
+                    0.012,
                     0.06,
                     0.072
                 ],
@@ -48,8 +48,8 @@
             },
             "axc": {
                 "rect": [
-                    0.100,
-                    0.400,
+                    0.1,
+                    0.4,
                     0.036,
                     0.528
                 ],
@@ -176,6 +176,7 @@
             }
         },
         "axlogo": {
+            "clip": false,
             "file": "&JP/jarvisplot/cards/icons/jarvisHEP.png"
         }
     },

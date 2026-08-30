@@ -22,5 +22,8 @@
         "Ternary": "&JP/jarvisplot/cards/gambit/2x1/ternary.json",
         "TernaryCmap": "&JP/jarvisplot/cards/gambit/2x1/ternary_cmap.json",
         "rectcmap": "&JP/jarvisplot/cards/gambit/2x1/rect_cmap.json"
+    },
+    "corrplot": {
+        "matrix": "&JP/jarvisplot/cards/corrplot/matrix.json"
     }
 }

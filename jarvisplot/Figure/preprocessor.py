@@ -337,6 +337,7 @@ class DataPreprocessor:
             if icfg:
                 out.update(self._interp_2d_cfg_input_columns(icfg))
             out.update(self._bin_stat_cfg_columns(step, "input"))
+            out.update(self._correlation_cfg_columns(step, "input"))
         return sorted(out)
 
     def _transform_output_columns(self, transform: Any) -> List[str]:
@@ -381,6 +382,7 @@ class DataPreprocessor:
             if icfg:
                 out.update(self._interp_2d_cfg_output_columns(icfg))
             out.update(self._bin_stat_cfg_columns(step, "output"))
+            out.update(self._correlation_cfg_columns(step, "output"))
             out.update(self._significance_cfg_columns(step))
         return sorted(out)
 
@@ -532,7 +534,40 @@ class DataPreprocessor:
         except Exception:
             return set()
 
+    @staticmethod
+    def _transform_needs_all_columns(transform: Any) -> bool:
+        """Whether a step in this pipeline chooses its inputs at runtime."""
+        from ..column_demand import transform_needs_all_columns
+
+        try:
+            return bool(transform_needs_all_columns(transform))
+        except Exception:
+            return False
+
+    @staticmethod
+    def _correlation_cfg_columns(step: Any, which: str) -> set:
+        """Columns a correlation step reads or writes, for projection."""
+        from .correlation_runtime import (
+            correlation_config,
+            correlation_input_columns,
+            correlation_output_columns,
+            is_correlation_transform,
+        )
+
+        if not is_correlation_transform(step):
+            return set()
+        cfg = correlation_config(step)
+        try:
+            return correlation_input_columns(cfg) if which == "input" else correlation_output_columns(cfg)
+        except Exception:
+            return set()
+
     def _runtime_projection(self, transform: Any, demand_columns: Optional[Sequence[str]]) -> Optional[List[str]]:
+        if self._transform_needs_all_columns(transform):
+            # The step picks its own inputs from the table, so there is no
+            # name set that describes what it needs.  Pruning would cut the
+            # features out from under it.
+            return None
         if self._transform_publishes(transform):
             # The consumer of a published table is a different block with
             # its own demand, so pruning to this block's columns would drop
@@ -546,6 +581,11 @@ class DataPreprocessor:
         return self._projection_list(sorted(out))
 
     def _runtime_cache_columns(self, transform: Any, demand_columns: Optional[Sequence[str]]) -> Optional[List[str]]:
+        if self._transform_needs_all_columns(transform):
+            # The step picks its own inputs from the table, so there is no
+            # name set that describes what it needs.  Pruning would cut the
+            # features out from under it.
+            return None
         if self._transform_publishes(transform):
             # The consumer of a published table is a different block with
             # its own demand, so pruning to this block's columns would drop

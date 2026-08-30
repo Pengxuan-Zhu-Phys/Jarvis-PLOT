@@ -1,0 +1,89 @@
+# Correlation matrix — R's corrplot, on the reserved `corrplot / matrix` card.
+#
+#   Run:    jplot Example/corrplot_matrix.yaml
+#   Layers: jplot config expand Example/corrplot_matrix.yaml --figure corrplot_matrix
+#
+# This is the only example here that carries data, because a correlation matrix
+# has nothing to show without it — and because this card's geometry is *solved
+# from* the data rather than authored. Where every other card fixes `figsize`
+# and writes its axes as fractions of it, this one holds a `Geometry` block in
+# millimetres and lets the figure size fall out of the matrix: the cell size and
+# the font size stay put, the figure grows with the number of variables.
+#
+# So there is nothing here to size by hand. No `figsize`, no axes `rect`, no
+# tick positions, no coordinates. `prebuild_correlations` resolves the ordering,
+# solves the layout from the card's margins and cell size, and writes all of it
+# into the config before the figure is built.
+#
+# Run with `-v` to see what it decided:
+#
+#   Correlation geometry solved -> figure 'corrplot_matrix'
+#        variables  -> 13
+#        order      -> hclust (3 blocks)
+#        cell       -> 4.20 mm
+#        figure     -> 79.62 × 69.60 mm
+#
+# The `corrplot:` block below takes R's own formals, spelled as R spells them.
+# They divide in two: `order` / `addrect` / `hclust.method` / `tl.pos` / `col`
+# decide *which variable sits where* and are resolved before the figure exists
+# (the tick labels are written against those positions); everything else
+# describes one cell and is applied at draw time. `jplot man corrplot` lists
+# both halves.
+
+version: '0.3'
+project:
+  name: corrplot_matrix
+
+Functions: []
+
+DataSet:
+  - name: mssm
+    path: ./correlation_demo.csv
+    type: csv
+
+Figures:
+  - name: corrplot_matrix
+    type: correlation_matrix
+    data: mssm
+    variables:
+      exclude: [weight, label]     # everything else numeric, in file order
+    corrplot:
+      method: circle               # circle | square | ellipse | color | shade | pie | number
+      type: upper                  # the wedge above the diagonal, as printed
+      order: hclust                # clustered, so the blocks come out adjacent
+      addrect: 3                   # boxes around the cut — needs order: hclust
+    colorbar:
+      label: '$\rho$'
+
+  # The same figure with the design overlay on. `debug: true` works on every
+  # card; what it adds *here* is the block under the caption reporting what the
+  # size was solved from — how many variables, the cell that left, and how far
+  # the panel ended up from the corner — plus any clamp note verbatim. On a card
+  # whose figure size is authored there is nothing to report and the block does
+  # not appear.
+  #
+  # The rest is the ordinary overlay: every axes' rect and printed size, the
+  # figure border and total size, the margins, the colorbar gap. Two numbers
+  # worth checking against each other on this card: `axcorr` comes out the same
+  # width as height (the panel is square, so a `circle` glyph is round), and the
+  # left and bottom margins are equal by construction.
+  - name: corrplot_matrix_debug
+    type: correlation_matrix
+    data: mssm
+    debug: true
+    variables:
+      exclude: [weight, label]
+    corrplot:
+      method: circle
+      type: upper
+      order: hclust
+      addrect: 3
+    colorbar:
+      label: '$\rho$'
+
+output:
+  dir: ./plots
+  dpi: 300
+  formats:
+    - png
+    - pdf

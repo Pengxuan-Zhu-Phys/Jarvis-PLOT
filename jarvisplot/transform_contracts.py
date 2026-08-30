@@ -280,6 +280,101 @@ TRANSFORM_CONTRACTS: dict[str, dict[str, Any]] = {
             "block -- filter first if it is not.",
         ],
     ),
+    "correlation": _c(
+        description=(
+            "Compute unweighted Pearson correlations between selected event-level "
+            "columns and emit one long-table row per requested variable pair."
+        ),
+        form="object",
+        form_extra="single-key mapping or {type: correlation, ...}",
+        required={},
+        optional={
+            "columns": {"type": "list[string]", "description": "explicit source columns, in matrix order"},
+            "regex": {"type": "string", "description": "take numeric columns matching this pattern"},
+            "exclude": {"type": "string|list[string]", "description": "names to drop from the selection"},
+            "missing": {"type": "enum", "description": "listwise | pairwise"},
+            "min_periods": {"type": "int", "description": "minimum valid entries per pair"},
+            "triangle": {"type": "enum", "description": "full | upper | lower"},
+            "include_diagonal": {"type": "boolean", "description": "emit self-correlations"},
+        },
+        defaults={
+            "columns": "every numeric column",
+            "missing": "listwise",
+            "min_periods": 2,
+            "triangle": "full",
+            "include_diagonal": True,
+        },
+        enums={
+            "missing": ["listwise", "pairwise"],
+            "triangle": ["full", "upper", "lower"],
+        },
+        output_kind="long table (var_x, var_y, x_index, y_index, rho, abs_rho, n)",
+        owner="Figure/correlation_runtime.py",
+        examples=[
+            {
+                "title": "BDT input correlations, transform to matrix",
+                "yaml": (
+                    "frame:\n"
+                    "  ax:\n"
+                    "    xlim: [-0.5, 2.5]\n"
+                    "    ylim: [-0.5, 2.5]\n"
+                    "    ticks:\n"
+                    "      x: {positions: [0, 1, 2], labels: [m_ttbar, p_star, delta_y]}\n"
+                    "      y: {positions: [0, 1, 2], labels: [m_ttbar, p_star, delta_y]}\n"
+                    "  axc:\n"
+                    "    color: {cmap: coolwarm, vmin: -1.0, vmax: 1.0}\n"
+                    "layers:\n"
+                    "  - name: rho\n"
+                    "    data:\n"
+                    "      - source: events\n"
+                    "        transform:\n"
+                    "          - correlation:\n"
+                    "              exclude: [weight, label, event_id]\n"
+                    "              triangle: upper\n"
+                    "    axes: ax\n"
+                    "    # imshow takes z alone: the cells come from the grid\n"
+                    "    # this step publishes, not from x/y columns.\n"
+                    "    method: imshow\n"
+                    "    colorbar: axc\n"
+                    "    coordinates: {z: {expr: rho}}\n"
+                    "    style: {interpolation: nearest}\n"
+                ),
+            },
+            {
+                "title": "Other ways to pick the features",
+                "yaml": (
+                    "- correlation: {}                              # every numeric column\n"
+                    "- correlation: {exclude: [weight, label]}      # ... minus the bookkeeping ones\n"
+                    "- correlation: {regex: '^bdt_'}                # ... matching a prefix\n"
+                    "- correlation: {columns: [m_ttbar, p_star]}    # ... or named outright\n"
+                ),
+            },
+        ],
+        notes=[
+            "Unweighted by design: this is the standard Pearson redundancy diagnostic, not a yield-weighted observable.",
+            "Naming N features by hand costs N strings, so the default names none of them: "
+            "with no columns and no regex the step takes every numeric column. In a feature "
+            "table the bookkeeping columns are the short list, so `exclude` is usually what "
+            "you want to write.",
+            "Order is what x_index counts: an explicit `columns` keeps the order you wrote, "
+            "while `regex` and the default keep the table's own column order.",
+            "Bool columns, non-numeric columns and the private __* ones are never picked up "
+            "automatically -- a flag is a label by construction, not a feature.",
+            "A step that selects turns off column projection for its source, so the table "
+            "loads whole. That is the cost of not naming the columns: with an explicit "
+            "`columns` list the loader still reads only what it needs.",
+            "listwise reproduces a dataframe after finite-value cleaning of all selected BDT inputs.",
+            "x_index and y_index are positions in `columns`, so `triangle: upper` keeps "
+            "y_index >= x_index -- the half above the diagonal once drawn with y upward.",
+            "The step also publishes the private __grid_* columns that say how big the "
+            "matrix is. Without them a long table does not carry its own shape, and "
+            "pcolormesh would infer one from the row count -- right only when every "
+            "cell is present, so a triangle would silently draw on the wrong mesh.",
+            "The colour range belongs on frame.axc.color.vmin/vmax, not on the layer: a "
+            "bound colorbar owns the norm, and a correlation plot wants a fixed "
+            "symmetric [-1, 1] rather than one that follows the data.",
+        ],
+    ),
     "duplicate": _c(
         description=(
             "Detach from a shared table before editing it. Use it as the first "

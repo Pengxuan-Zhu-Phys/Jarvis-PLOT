@@ -65,6 +65,7 @@ mapping. Every key is optional; anything absent falls back.
 | `dimension` | cap bars, arrowheads and labels -- every measured distance uses these |
 | `margins` | **every** axes' top / bottom insets, each riding that axes' own right border (`marker_step` separates crowded columns, `exclude` names axes to leave alone -- `axlogo` by default); plus the primary axes' left inset |
 | `colorbar_gap` | gap between the primary axes and a colorbar |
+| `solved` | on cards whose size is solved rather than authored, what it was solved *from* — printed under the caption. Its `lines` is the one part of `Debug` written by Python: the solver fills it through the figure's own `debug:` mapping, and a card that solves nothing leaves it empty and draws nothing |
 | `colorbar_preview` | fills a colorbar no layer fed with the card's own colormap, so a `layers: []` reference still shows the bar; only ships on cards that have an `axc` axes |
 | `numbered_axes` | the staggered edge dimensions for `ax0`, `ax1`, … |
 | `panel` | the "axes layout" information card: one type scale on every figure, box measured from its content, free to run past the axes |
@@ -124,6 +125,19 @@ before an element existed keeps drawing it.
 `show` is a veto, not a command: the structural conditions still apply. Setting
 `colorbar_gap.show: true` on a card with no colorbar draws nothing.
 
+### Handing the overlay a value from Python
+
+`Figures[].debug` is both the switch and the per-figure override, which makes it
+the delivery channel for anything only the config stage knows — the correlation
+matrix's solve is the one case today (`core_runtime._attach_corr_debug`). Two
+rules keep it a channel rather than a second way to turn the overlay on:
+
+- carry `show` through explicitly. The mapping form defaults to *on*, so a
+  figure that never asked for the overlay must be written back as
+  `{"show": False, ...}`;
+- put the value in a group the defaults define, or `merge_debug_config` reports
+  it as an unknown key and drops it.
+
 ### Validation
 
 Card JSON has no JSON-schema. Instead the merge checks each `Debug` key against
@@ -134,6 +148,58 @@ never raises, because it must not be able to break a plot.
 
 Owner: `jarvisplot/Figure/debug_config.py` (defaults and merge),
 `jarvisplot/Figure/design_runtime.py` (drawing).
+
+## The `axlogo` Discipline
+
+Every card that carries the Jarvis-HEP badge places it the same way, and the
+numbers are not negotiable per card:
+
+| Quantity | Value |
+|---|---|
+| offset from the **left** figure edge | **0.0838 cm** (0.838 mm, 0.033 in) |
+| offset from the **bottom** figure edge | **0.0838 cm** |
+| badge size | 0.503 cm square (0.198 in) |
+
+`axlogo` is written as a rect in figure fractions, so the two offsets are
+*different* fractions on any figure that is not square, and a card that copies
+one number into both corners is wrong on the page even though it looks
+symmetric in JSON. Compute them from the card's own `figsize`:
+
+```
+rect = [0.0838 / (2.54 * width_in), 0.0838 / (2.54 * height_in),
+        0.503  / (2.54 * width_in), 0.503  / (2.54 * height_in)]
+```
+
+Nothing on `axlogo` is clipped, either — not the icon and not the wordmark.
+Every card carries `Frame.axlogo.clip: false`, which the setter applies to the
+image and to each `text` entry (an entry may still override it with its own
+`clip_on`). The axes is sized to the icon, so a clip can only ever shave a pixel
+row off an edge, and the "Powered by Jarvis-HEP" text is written at `x = 1.0` in
+axes coordinates — outside the axes, so unclipped is the only way it exists at
+all. It is a card key rather than a constant in `Figure.axlogo` so the rule sits
+where the rest of the badge is described; omit it and matplotlib's default
+(clipped) applies.
+
+The rule is about *printed* distance because that is what a reader sees. The
+badge is a mark of provenance, not a plot element: it must sit in the same
+place, at the same size, on a 3.3 x 2.75 in panel and on a 6.7 x 6.5 in
+correlation matrix, or a paper with two Jarvis-PLOT figures in it looks like a
+paper made with two tools. This is also why the badge sits *outside* the page
+pad rather than inside it — the pad insets the content, and the mark is not
+content.
+
+Cards whose size is solved rather than authored cannot write a rect at all, so
+they carry the discipline as millimetres in `Geometry` and divide by the solved
+figure at the end; `corrplot/matrix.json` spells it `Geometry.logo.offset:
+0.838`, consumed by `Figure/corr_layout.py`.
+
+Two deliberate departures, so they are not read as drift:
+
+- `a4paper/4x1/rect_cmap.json` is a 1.7 in card and scales the whole badge
+  block by ~0.5 (0.0432 cm offset, 0.259 cm badge). A full-size badge on it
+  would be a fifth of the figure width.
+- The `gambit/**` family is a different house style with its own header band,
+  and positions the badge inside that band.
 
 ## Current Owner
 

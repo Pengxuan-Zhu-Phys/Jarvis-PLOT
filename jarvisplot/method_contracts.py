@@ -63,6 +63,10 @@ METHOD_COORDINATES: dict[str, dict[str, Any]] = {
     "triplot": {"required": ("x", "y"), "optional": ()},
     "voronoi": {"required": ("x", "y"), "optional": ("z",)},
     "voronoif": {"required": ("x", "y", "z"), "optional": ()},
+    # corrplot reads the `correlation` transform's own output columns
+    # (x_index / y_index / rho), so nothing has to be restated.  The optional
+    # three are overrides for a table whose columns were renamed.
+    "corrplot": {"required": (), "optional": ("x", "y", "c")},
 }
 
 
