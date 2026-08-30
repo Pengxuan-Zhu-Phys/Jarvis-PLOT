@@ -26,9 +26,12 @@ human:
         A Pearson correlation matrix over many columns of one table.
         Unlike every other figure type, you do not choose the figure size:
         the cell size and the font size are fixed and the figure is solved
-        from n variables and the measured width of their names, capped at
-        170 mm. Add a variable and the figure grows; nothing shrinks but the
-        cell, and only past the cap.
+        from n variables, capped at 170 mm. Add a variable and the figure
+        grows; nothing shrinks but the cell, and only past the cap.
+        The margins around the panel are the card's (1.1 cm on the left and
+        bottom), and Geometry.margin.fit lets a band grow when the names
+        measure wider than it -- no trial render involved, the names are
+        measured with the tick font before anything is drawn.
     - kind: yaml
       title: Minimal figure
       lexer: yaml

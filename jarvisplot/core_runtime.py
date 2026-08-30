@@ -371,13 +371,31 @@ def _numeric_predicate(dts):
     return None
 
 
-def _corr_tick_sizes(card: Mapping) -> tuple[float, float, str]:
+def _corr_tick_sizes(card: Mapping) -> tuple[float, float, str, float]:
+    """Tick text size, colorbar text size, family, and the panel's label pad.
+
+    The pad is returned in **millimetres** because it is part of how much room a
+    name needs: the text starts that far from the panel, so under ``margin.fit``
+    a margin of exactly the label width would still clip its last glyph.
+    """
     frame = card.get("Frame", {}) or {}
     style = (card.get("Style", {}) or {}).get("corrplot", {}) or {}
-    panel = ((frame.get("axcorr", {}) or {}).get("ticks", {}) or {}).get("both", {}) or {}
+    ticks = (frame.get("axcorr", {}) or {}).get("ticks", {}) or {}
+    panel = ticks.get("both", {}) or {}
+    major = ticks.get("major", {}) or {}
     bar = ((frame.get("axccorr", {}) or {}).get("ticks", {}) or {}).get("both", {}) or {}
     label_pt = float(panel.get("labelsize", 6.0)) * float(style.get("tl.cex", 1.0) or 1.0)
-    return label_pt, float(bar.get("labelsize", 6.0)), str(panel.get("labelfontfamily", "sans"))
+    # An outward tick pushes the label out by its own length first; this card
+    # draws none (length 0), but a card that did would need the room.
+    pad_pt = float(major.get("pad", 3.5) or 0.0)
+    if str(panel.get("direction", "out")).strip().lower() == "out":
+        pad_pt += float(major.get("length", 0.0) or 0.0)
+    return (
+        label_pt,
+        float(bar.get("labelsize", 6.0)),
+        str(panel.get("labelfontfamily", "sans")),
+        pad_pt / 72.0 * 25.4,
+    )
 
 
 def _colorbar_label_samples(card: Mapping) -> list[str]:
@@ -742,7 +760,7 @@ def _prebuild_one(core, info: dict, card: Mapping) -> None:
         )
 
     show_x, show_y = _corr_tick_visibility(style.get("tl.pos", "lt"))
-    label_pt, bar_pt, family = _corr_tick_sizes(card)
+    label_pt, bar_pt, family, label_pad_mm = _corr_tick_sizes(card)
     cb_title, cb_title_pt = _colorbar_title(card, info)
     geom = solve_corr_geometry(
         len(columns),
@@ -755,6 +773,7 @@ def _prebuild_one(core, info: dict, card: Mapping) -> None:
         colorbar_labels=_colorbar_label_samples(card),
         colorbar_title=cb_title,
         label_size_pt=label_pt,
+        label_pad_mm=label_pad_mm,
         colorbar_label_size_pt=bar_pt,
         colorbar_title_size_pt=cb_title_pt,
         family=family,

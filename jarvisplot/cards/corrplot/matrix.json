@@ -13,6 +13,8 @@
         "cell": 4.2,
         "cell_min": 1.6,
         "margin": {
+            "fit": true,
+            "slack": 1.0,
             "top": 4.0,
             "right": 11.0,
             "bottom": 11.0,
