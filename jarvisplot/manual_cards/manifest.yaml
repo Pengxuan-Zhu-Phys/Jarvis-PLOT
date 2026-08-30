@@ -5,6 +5,9 @@ aliases:
   agent: workflow
   posterior: type-posterior-2d
   profile: type-profile-2d
+  correlation: type-correlation-matrix
+  corr: type-correlation-matrix
+  correlation_matrix: type-correlation-matrix
   viz: dryrun-viz
   columns: data-columns
   yaml: yaml-root
@@ -30,6 +33,7 @@ topics:
   - yaml-root
   - type-posterior-2d
   - type-profile-2d
+  - type-correlation-matrix
   - layer-method
   - methods
   - transforms

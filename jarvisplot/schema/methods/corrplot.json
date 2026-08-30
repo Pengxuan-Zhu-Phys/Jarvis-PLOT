@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/methods/corrplot.json",
+  "title": "method: corrplot",
+  "description": "Coordinate contract for layers[].method='corrplot' (JarvisPLOT adapter-native). Draws the long table emitted by the `correlation` transform: one cell per variable pair, glyph shape from style.method, size from |rho|, colour from rho. Coordinates are optional because x_index / y_index / rho are the transform's own output columns; state them only to point at a renamed column. style takes R corrplot formals -- see `jplot man corrplot`.",
+  "x-jarvis-zone": "closed",
+  "x-jarvis-method": "corrplot",
+  "x-jarvis-mpl": "corrplot",
+  "x-jarvis-axes-types": [
+    "rect",
+    "any"
+  ],
+  "x-jarvis-coordinates": {
+    "required": [],
+    "optional": [
+      "x",
+      "y",
+      "c"
+    ],
+    "alternatives": []
+  },
+  "x-jarvis-example": "method: corrplot\nstyle:\n  method: circle\n  type: upper\n  order: hclust",
+  "type": "object",
+  "properties": {
+    "method": {
+      "const": "corrplot"
+    },
+    "coordinates": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "additionalProperties": true,
+      "description": "Required axes for corrplot: (none). Optional: x, y, c."
+    }
+  },
+  "additionalProperties": true
+}

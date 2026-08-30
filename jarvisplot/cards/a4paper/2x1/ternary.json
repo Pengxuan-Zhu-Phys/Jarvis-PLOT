@@ -132,6 +132,7 @@
             }
         },
         "axlogo": {
+            "clip": false,
             "file": "&JP/jarvisplot/cards/icons/jarvisHEP.png"
         }
     },

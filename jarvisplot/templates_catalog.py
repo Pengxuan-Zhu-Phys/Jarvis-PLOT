@@ -241,6 +241,80 @@ TEMPLATE_KINDS: dict[str, dict[str, Any]] = {
             "output": {"dir": "./plots"},
         },
     },
+    "correlation_matrix": {
+        "title": "Correlation matrix (type: correlation_matrix)",
+        "family": "corrplot",
+        "requires": ["data"],
+        "description": (
+            "R corrplot on the reserved [corrplot, matrix] card. The figure size is "
+            "solved from the matrix, not declared: no figsize, no rects, no ticks."
+        ),
+        "slots": [
+            {"name": "name", "type": "string", "default": "correlation", "description": "Figure name"},
+            {"name": "data", "type": "dataset_ref", "default": "samples"},
+            {"name": "path", "type": "path", "default": "./samples.csv"},
+            {
+                "name": "dtype",
+                "type": "enum",
+                "default": "csv",
+                "enum": ["csv", "hdf5", "parquet"],
+            },
+            {
+                "name": "exclude",
+                "type": "column_list",
+                "default": ["weight"],
+                "description": "Columns to leave out; everything else numeric goes in, in file order",
+            },
+            {
+                "name": "glyph",
+                "type": "enum",
+                "default": "circle",
+                "enum": ["circle", "square", "ellipse", "color", "shade", "pie", "number"],
+                "description": "corrplot.method -- what one cell looks like",
+            },
+            {
+                "name": "triangle",
+                "type": "enum",
+                "default": "full",
+                "enum": ["full", "upper", "lower"],
+                "description": "corrplot.type -- which half is printed",
+            },
+            {
+                "name": "order",
+                "type": "enum",
+                "default": "original",
+                "enum": ["original", "AOE", "FPC", "hclust", "alphabet"],
+                "description": "Resolved before the figure is built; hclust also enables addrect",
+            },
+            {
+                "name": "label",
+                "type": "string",
+                "default": "$\\rho$",
+                "description": "Colorbar label",
+            },
+        ],
+        "skeleton": {
+            "version": "0.3",
+            "DataSet": [
+                {"name": "${data}", "path": "${path}", "type": "${dtype}"}
+            ],
+            "Figures": [
+                {
+                    "name": "${name}",
+                    "type": "correlation_matrix",
+                    "data": "${data}",
+                    "variables": {"exclude": "${exclude}"},
+                    "corrplot": {
+                        "method": "${glyph}",
+                        "type": "${triangle}",
+                        "order": "${order}",
+                    },
+                    "colorbar": {"label": "${label}"},
+                }
+            ],
+            "output": {"dir": "./plots"},
+        },
+    },
     "scatter_2d": {
         "title": "2D scatter with optional colour",
         "family": "rect",

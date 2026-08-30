@@ -19,6 +19,15 @@ from ..utils.expression import eval_scalar_expression
 
 _MISSING_CLIP_PATH = object()
 
+#: Methods whose adapter rebuilds a matrix out of a long table, so they need
+#: the frame itself and not just the evaluated coordinate columns -- the
+#: ``__grid_*`` metadata that says how big the matrix is lives there.
+#: Methods handed the prepared table itself (as ``__df__``) on top of their
+#: coordinates: the grid methods read the ``__grid_*`` metadata off it, and
+#: corrplot reads the whole correlation table -- var names, indices, rho and
+#: the per-pair row count that significance is computed from.
+_GRID_TABLE_METHODS = frozenset({"pcolormesh", "imshow", "corrplot"})
+
 
 def _clip_expr_inside(expr: str, point) -> bool:
     px, py = float(point[0]), float(point[1])
@@ -859,7 +868,7 @@ def render_layer(fig, ax, layer_info):
             raise ValueError("Ternary layer must define coordinates: {left, right, bottom} or {x, y} with exprs.")
         for kk, vv in coor.items():
             style[kk] = fig._eval_series(df, vv)
-        if method_key == "pcolormesh":
+        if method_key in _GRID_TABLE_METHODS:
             style["__df__"] = df
         if method_key in {"jpcontour", "jpcontourf", "jpfield"}:
             jp_kwargs = _prepare_jpcontour_style(
@@ -961,7 +970,7 @@ def render_layer(fig, ax, layer_info):
                     style[kk] = fig._eval_series(df, vv)
                 else:
                     style[kk] = vv
-            if method_key == "pcolormesh":
+            if method_key in _GRID_TABLE_METHODS:
                 style["__df__"] = df
             style.pop("interp", None)
             return _call_with_layer_clip(ax, layer_clip_path, method, **style)

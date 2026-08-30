@@ -72,7 +72,13 @@ METHOD_DISPATCH: Dict[str, str] = {
     
     # jarvisplot inplemented Voronoi method 
     "voronoi":      "voronoi", 
-    "voronoif":     "voronoif"
+    "voronoif":     "voronoif",
+
+    # correlation matrix.  Adapter-native: there is no matplotlib primitive
+    # that draws a cell whose glyph shape, size and colour all come off one
+    # coefficient, which is why corrplot is a method here rather than a macro
+    # over scatter.
+    "corrplot":     "corrplot"
 }
 
 

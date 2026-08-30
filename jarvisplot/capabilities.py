@@ -140,6 +140,19 @@ def _transforms() -> list[dict[str, Any]]:
     return sorted(out, key=lambda e: e["name"])
 
 
+def _man_type_topics() -> frozenset[str]:
+    """Man topics that document a figure type, read off the man manifest."""
+    try:
+        from .man_catalog import load_manifest
+
+        return frozenset(str(topic) for topic in load_manifest().get("topics", []) or ())
+    except Exception:
+        return frozenset()
+
+
+_MAN_TYPE_TOPICS = _man_type_topics()
+
+
 def _types() -> list[dict[str, Any]]:
     """Figure-type shorthands that expand into a layer stack before rendering.
 
@@ -153,7 +166,15 @@ def _types() -> list[dict[str, Any]]:
             "name": name,
             "expands_to": "layers",
             "explain": f"jplot explain {name}",
-            "man": f"jplot man type-{name.replace('_', '-')}" if name.endswith("_2d") else f"jplot explain {name}",
+            # The man card is named after the type; whether one exists is a
+            # packaging fact, not something to infer from the type's spelling.
+            # `_2d` was that inference, and it sent `correlation_matrix` to a
+            # verb with less to say than the card it already ships with.
+            "man": (
+                f"jplot man type-{name.replace('_', '-')}"
+                if f"type-{name.replace('_', '-')}" in _MAN_TYPE_TOPICS
+                else f"jplot explain {name}"
+            ),
         }
         for name in sorted(KNOWN_FIGURE_TYPES)
     ]
@@ -204,6 +225,13 @@ def _styles() -> list[dict[str, Any]]:
             figsize = (frame.get("figure") or {}).get("figsize")
             if figsize:
                 entry["figsize"] = figsize
+            elif isinstance(card.get("Geometry"), dict):
+                # A card may leave the figure size to be solved from the data
+                # rather than fixing it.  Saying nothing here would advertise a
+                # card that cannot be rendered by naming it in `style:` alone.
+                entry["figsize"] = None
+                entry["geometry"] = "solved"
+                entry["requires_type"] = (card.get("Contract") or {}).get("figure_type")
             entry["styled_methods"] = sorted(card.get("Style", {}))
             # Which debug-overlay groups this card configures. `Figures[].debug`
             # turns the overlay on; these are the groups a card (or a `debug:`

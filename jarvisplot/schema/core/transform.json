@@ -110,6 +110,39 @@
       "additionalProperties": false,
       "description": "Collapse the table into one row per bin of `x`. Emits bin_index, x_lo, x_hi, x_center and the binned column."
     },
+    "correlation": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "columns": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString" },
+          "description": "Event-table columns to correlate, in the order they should appear on the matrix. Omit to take every numeric column; mutually exclusive with `regex`."
+        },
+        "regex": {
+          "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString",
+          "description": "Take the numeric columns whose name matches this regular expression (re.search), in table order. Mutually exclusive with `columns`."
+        },
+        "exclude": {
+          "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/stringOrStringList",
+          "description": "Names to drop from whatever the selection picked. The usual way to say 'every feature except the bookkeeping columns'."
+        },
+        "missing": {
+          "enum": ["listwise", "pairwise"],
+          "description": "listwise drops a row if any selected column is non-finite; pairwise uses valid rows for each pair. Default listwise."
+        },
+        "min_periods": { "type": "integer", "minimum": 1, "description": "Minimum valid entries required for a pair. Default 2." },
+        "triangle": {
+          "enum": ["full", "upper", "lower"],
+          "description": "Which matrix entries to emit. Default full."
+        },
+        "include_diagonal": { "type": "boolean", "description": "Whether to emit self-correlations. Default true." }
+      },
+      "additionalProperties": false,
+      "description": "Compute unweighted Pearson correlations from selected event-level columns. Selects with `columns`, `regex`, or (by default) every numeric column, minus `exclude`. Emits var_x, var_y, x_index, y_index, rho, abs_rho and n, plus the grid metadata the drawing methods read."
+    },
     "duplicate": {
       "type": "boolean",
       "description": "Detach from a shared table before editing it. Use it as the first step of a block whose source is a table another block published, so downstream steps cannot mutate what the other block still holds."
@@ -166,7 +199,7 @@
   "$defs": {
     "discriminatedStepName": {
       "description": "Step names that also work in the `{type: ...}` form. Kept in sync with the _*_TYPES sets by tests/test_schema_catalog.py.",
-      "enum": ["make_density_core", "posterior_density", "make_interp_2d"]
+      "enum": ["make_density_core", "posterior_density", "make_interp_2d", "correlation"]
     }
   }
 }

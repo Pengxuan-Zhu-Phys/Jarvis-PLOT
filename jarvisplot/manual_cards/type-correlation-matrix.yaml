@@ -1,0 +1,62 @@
+id: type-correlation-matrix
+title: type correlation_matrix
+summary: R's corrplot on the reserved card whose figure size is solved from the matrix.
+role: how-to
+priority: 36
+see_also: [layer-method, style-axes, type-profile-2d]
+related_cli:
+  - argv: [jplot, template, show, correlation_matrix, "--json"]
+    why: slots + skeleton YAML
+  - argv: [jplot, man, corrplot]
+    why: every R formal, and where each one is applied
+  - argv: [jplot, config, expand, "<yaml>", "--figure", "<name>", "--write"]
+    why: lower to the single corrplot layer for fine-tuning
+live_sources:
+  - verb: cap.types
+    truth: correlation_matrix is a registered figure type
+  - verb: cap.methods
+    truth: corrplot's coordinate contract (all optional)
+  - verb: cap.styles
+    truth: "[corrplot, matrix] reports geometry: solved, figsize: null"
+human:
+  panels:
+    - kind: overview
+      title: When to use
+      body: |
+        A Pearson correlation matrix over many columns of one table.
+        Unlike every other figure type, you do not choose the figure size:
+        the cell size and the font size are fixed and the figure is solved
+        from n variables and the measured width of their names, capped at
+        170 mm. Add a variable and the figure grows; nothing shrinks but the
+        cell, and only past the cap.
+    - kind: yaml
+      title: Minimal figure
+      lexer: yaml
+      body: |
+        - name: correlation
+          type: correlation_matrix
+          data: samples
+          variables: {exclude: [weight, label]}
+          corrplot: {method: circle, type: upper, order: hclust, addrect: 3}
+          colorbar: {label: "$\\rho$"}
+    - kind: notes
+      title: Where each formal is applied
+      items:
+        - "Config time (before the figure exists): order, addrect, hclust.method, tl.pos, col. They decide which variable sits at which index, and the tick labels are written against those indices."
+        - "Draw time (one cell at a time): method, type, diag, glyph.scale, outline, addgrid.col, addCoef.col, number.*, sig.level, insig, pch.*, na.label."
+        - "Card-owned, not R formals: clip (false on this card -- a glyph on the first or last row sits on the axes edge and a clipped one is drawn as a half-moon) and zorder."
+        - "order: original and alphabet read no data at all; AOE / FPC / hclust read the selected columns once, running any transforms that come before the correlation step."
+        - "sig.level switches on the significance test. R needs a separate p.mat for this; the long table carries n per pair, so the level is enough."
+        - "variables takes a list (explicit, in that order), or {regex:} / {exclude:}."
+    - kind: notes
+      title: What the card refuses
+      items:
+        - "One layer, on axcorr. The frame is solved from that one matrix, so a second layer would be drawn into a panel never measured for it."
+        - "method must be corrplot. scatter accepts type / order / diag and silently discards them."
+        - "addrect needs order: hclust -- the boxes are cuts of that tree."
+agent:
+  anti_patterns:
+    - Writing figsize / axes rect / tick positions by hand (all are solved outputs and get overwritten)
+    - Using method scatter with s computed from abs_rho (only reproduces method circle)
+    - Setting both corrplot col and frame.axccorr.color.cmap
+    - Putting the column selection in correlation instead of variables

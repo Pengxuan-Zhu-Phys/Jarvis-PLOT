@@ -11,7 +11,7 @@ from matplotlib.axes import Axes
 from matplotlib.collections import PolyCollection
 #
 from .helper import _auto_clip, _mask_by_extend, voronoi_finite_polygons_2d, _clip_poly_to_rect
-from .profile_runtime import regular_grid_mesh
+from .profile_runtime import grid_from_metadata, regular_grid_mesh
 from .interp_natural_neighbor import resolve_backend
 from .posterior_hpd import prepare_hpd_contour_style
 
@@ -672,9 +672,73 @@ class StdAxesAdapter:
         )
         return _auto_clip(artists, self.ax, self._clip_path)
 
+    def corrplot(self, **kwargs):
+        """R's corrplot, on the reserved correlation panel.
+
+        Adapter-native: matplotlib has no primitive for a cell whose shape,
+        size and colour all come off one coefficient, so there is nothing to
+        forward to.  The drawing lives in :mod:`.corrplot_runtime` for the
+        same reason the dynesty and significance renderers do -- it is a
+        figure's worth of logic, not a wrapper.
+        """
+        from .corrplot_runtime import draw_corrplot
+
+        return draw_corrplot(self.ax, **self._merge("corrplot", kwargs))
+
     def imshow(self, *args, **kwargs):
+        """Draw a matrix, from an array or from the long table behind one.
+
+        An array handed in positionally goes straight to matplotlib.  A layer
+        instead names a ``z`` column, and a column is one-dimensional, so the
+        table is folded back into its matrix using the grid metadata its
+        producer published.  The shape is never inferred from the row count:
+        a table with holes in it -- a correlation `triangle`, an unpopulated
+        profile cell -- would infer the wrong one and draw it without
+        complaint.
+        """
+        if args:
+            kw = self._merge("imshow", kwargs)
+            artists = self.ax.imshow(*args, **kw)
+            return _auto_clip(artists, self.ax, self._clip_path)
+
+        z = kwargs.pop("z", None)
+        df = kwargs.pop("__df__", None)
+        stray = [key for key in ("x", "y") if key in kwargs]
+        if stray:
+            raise ValueError(
+                "imshow takes only the 'z' coordinate, but this layer also "
+                f"defines {', '.join(stray)}; an image gets its cell positions "
+                "from the table's grid metadata, not from coordinate columns. "
+                "Drop them, or use pcolormesh, which does place cells by x and y."
+            )
+        if z is None:
+            raise ValueError("imshow needs a 'z' coordinate")
+
         kw = self._merge("imshow", kwargs)
-        artists = self.ax.imshow(*args, **kw)
+        extent = kw.pop("extent", None)
+        arr = np.asarray(z, dtype=float)
+        if arr.ndim < 2:
+            built = grid_from_metadata(arr, df)
+            if built is None:
+                raise ValueError(
+                    "imshow got a one-dimensional 'z' and the table says "
+                    "nothing about the matrix behind it, so its shape is "
+                    "unknown. Produce z with a transform that publishes the "
+                    "grid (correlation, or profile: {method: grid}), or hand "
+                    "imshow a two-dimensional array."
+                )
+            arr, table_extent = built
+            if extent is None:
+                extent = table_extent
+        if extent is not None:
+            kw["extent"] = tuple(float(v) for v in extent)
+        # The card usually sets these; a card that does not should still get a
+        # matrix drawn the way a matrix is read -- y upward, cells unblurred,
+        # and the axes box left at the size the card fixed it to.
+        kw.setdefault("origin", "lower")
+        kw.setdefault("aspect", "auto")
+        kw.setdefault("interpolation", "nearest")
+        artists = self.ax.imshow(arr, **kw)
         return _auto_clip(artists, self.ax, self._clip_path)
 
     def tricontour(self, **kwargs):

@@ -15,6 +15,7 @@ from .utils.pathing import resolve_project_path
 from .core_runtime import (
     expand_figure_types as runtime_expand_figure_types,
     plan_dataset_required_columns as runtime_plan_dataset_required_columns,
+    prebuild_correlations as runtime_prebuild_correlations,
     prepare_project_layout as runtime_prepare_project_layout,
     prepare_usage_plan as runtime_prepare_usage_plan,
     parse_hdf5_metadata_and_renew_yaml as runtime_parse_hdf5_metadata_and_renew_yaml,
@@ -100,10 +101,11 @@ class JarvisPLOT():
                 logger=self.logger,
                 base_dir=self.workdir or self.yaml.dir,
             )
+            self.style = load_styles(self.load_path, logger=self.logger)
             self.prebuild_profile_pipelines()
+            runtime_prebuild_correlations(self)
             runtime_prepare_usage_plan(self)
 
-            self.style = load_styles(self.load_path, logger=self.logger)
             self.plot()
 
     def _is_flowchart_command(self) -> bool:

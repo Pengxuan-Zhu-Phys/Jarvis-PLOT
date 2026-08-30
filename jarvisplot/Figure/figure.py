@@ -25,6 +25,10 @@ from .layout_runtime import (
     apply_axis_title,
     apply_grid,
     apply_manual_ticks,
+    apply_tick_label_props,
+    CORR_AXES,
+    ensure_corr_axes,
+    is_colorbar_ax,
     SIDE_AXES,
     ensure_rect_axes,
     ensure_numbered_rect_axes,
@@ -413,7 +417,21 @@ class Figure:
         self._render_queue = []
         for layer in infos: 
             info = {}
-            ax  = self.axes[layer['axes']]
+            ax_name = layer.get('axes')
+            try:
+                ax = self.axes[ax_name]
+            except KeyError:
+                # A bare KeyError here surfaces as the axes name and nothing
+                # else, which reads as a corrupt config rather than the one
+                # thing that is actually wrong.
+                available = ", ".join(sorted(self.axes)) or "<none>"
+                raise KeyError(
+                    "layer '{}' asks for axes '{}', which this style card does "
+                    "not provide. This card has: {}. Run `jplot cap styles` to "
+                    "see the axes each card offers.".format(
+                        layer.get("name", ""), ax_name, available
+                    )
+                ) from None
             info['name'] = layer.get("name", "")
             info['data'] = None
             info['data_loaded'] = False
@@ -514,6 +532,13 @@ class Figure:
             self.axes['axlogo'].status = 'finalized'
 
         self.axlogo.layers  = []
+        # Every card writes `clip: false`.  The badge is a mark, not data: its
+        # axes is sized to the icon, so a clip can only ever shave a pixel row
+        # off an edge, and the wordmark is written at x = 1.0 in axes
+        # coordinates -- outside the axes, so unclipped is the only way it
+        # exists at all.  Read from the card rather than fixed here so the
+        # rule stays visible where the rest of the badge is described.
+        logo_clip = bool(self.frame['axlogo'].get("clip", True))
         jhlogo = self.load_path(self.frame['axlogo']['file'])
         from PIL import Image
         with Image.open(jhlogo) as image:
@@ -533,12 +558,16 @@ class Figure:
                 # output DPI; the PDF backend then embeds a blurry 30x30
                 # image instead of the original icon.
                 interpolation="none",
+                clip_on=logo_clip,
             )
             self.axlogo.set_xlim(0.0, float(image_width))
             self.axlogo.set_ylim(float(image_height), 0.0)
             if self.frame['axlogo'].get("text"):
                 for txt in self.frame['axlogo']['text']:
-                    self.axlogo.text(**txt,  transform=self.axlogo.transAxes)
+                    self.axlogo.text(
+                        **{"clip_on": logo_clip, **txt},
+                        transform=self.axlogo.transAxes,
+                    )
             # else: 
                 # self.axlogo.text(1., 0., "Jarvis-HEP", ha="left", va='bottom', color="black", fontfamily="Fira code", fontsize="x-small", fontstyle="normal", fontweight="bold", transform=self.axlogo.transAxes)
                 # self.axlogo.text(1., 0.9, "  Powered by", ha="left", va='top', color="black", fontfamily="Fira code", fontsize="xx-small", fontstyle="normal", fontweight="normal", transform=self.axlogo.transAxes)
@@ -980,6 +1009,14 @@ class Figure:
 
 
     @property
+    def axcorr(self):
+        return self.axes[CORR_AXES]
+
+    @axcorr.setter
+    def axcorr(self, kwgs):
+        ensure_corr_axes(self, kwgs)
+
+    @property
     def ax(self): 
         return self.axes['ax']
 
@@ -1068,6 +1105,11 @@ class Figure:
         self.ax.tick_params(**self.frame['ax']['ticks'].get("both", {}))
         self.ax.tick_params(**self.frame['ax']['ticks'].get("major", {}))
         self.ax.tick_params(**self.frame['ax']['ticks'].get("minor", {}))
+
+        # After the tick_params trio: it rewrites every label from the axis'
+        # stored parameters, so a rotation applied earlier is reset to zero.
+        apply_tick_label_props(self, self.ax, "x", ax_ticks_cfg.get('x', {}))
+        apply_tick_label_props(self, self.ax, "y", ax_ticks_cfg.get('y', {}))
         
         apply_grid(self, self.axes['ax'], 'ax')
 
@@ -1182,6 +1224,10 @@ class Figure:
                 self.axlogo = kws
             elif ax == "axtri":
                 self.axtri  = kws
+            elif ax == CORR_AXES:
+                # Before the axc* branch on purpose: 'axcorr' also starts with
+                # 'axc', and the colorbar branch would swallow the panel.
+                self.axcorr = kws
             elif ax == "axc":
                 self.axc    = kws
             elif ax.startswith("axc") and len(ax) > 3:
@@ -1257,7 +1303,7 @@ class Figure:
 
         # Finalize all colorbar axes (axc and any named axc*)
         for name in list(self.axes.keys()):
-            if name == "axc" or (name.startswith("axc") and len(name) > 3):
+            if is_colorbar_ax(name):
                 try:
                     self._finalize_axc(name)
                 except Exception as e:
@@ -1272,7 +1318,7 @@ class Figure:
                     self._apply_auto_ticks(ax, 'x')
                 if not self._has_manual_ticks(name, 'y'):
                     self._apply_auto_ticks(ax, 'y')
-            elif name == "axc" or (name.startswith("axc") and len(name) > 3):
+            elif is_colorbar_ax(name):
                 axc_tick_axis = 'x' if axc_is_horizontal(self.frame, name) else 'y'
                 if not self._has_manual_ticks(name, axc_tick_axis):
                     self._apply_auto_ticks(self.axes[name], axc_tick_axis)

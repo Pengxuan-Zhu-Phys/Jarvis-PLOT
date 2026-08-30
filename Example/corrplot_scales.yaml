@@ -1,0 +1,220 @@
+# Correlation matrix — what happens as the matrix grows.
+#
+#   Run:    jplot Example/corrplot_scales.yaml
+#
+# `corrplot_matrix.yaml` is the ordinary case, on real column names. This file
+# is the experiment: the *same* table, the *same* card, seven different values
+# of n, so the only thing that changes is the size of the matrix.
+#
+# The variable names here are deliberately short and uniform (`a01` … `h25`).
+# They no longer feed the layout — the margins are authored — but a short name
+# keeps the label band uncluttered while the cells are the thing being read. The letter is a planted correlation block, so
+# `order: hclust` has something to find and you can check it found it: after
+# clustering, the letters come out in runs.
+#
+# Not *quite* in runs, and the exception is worth knowing. Every fifth member
+# of each block is planted anti-correlated with its own factor, and hclust
+# measures distance as `1 - rho` — so an anti-correlated variable is as far
+# from its group as an unrelated one, and those members break off into runs of
+# their own. That is correct clustering, not a bug, and it is the reason the
+# large figures show red stripes crossing the boxes. If you want sign-blind
+# grouping, cluster on |rho| instead — which corrplot does not offer either.
+#
+#   ^a               ->  10 variables
+#   ^(a|b)           ->  16
+#   ^(a|b|c)         ->  24
+#   ^(a|b|c|d)       ->  33
+#   ^(a|b|c|d|e|f)   ->  50
+#   (everything)     -> 100
+#
+# What to watch, in the `-v` log:
+#
+#   n     figure (mm)        cell
+#    6      50.2 x  40.2      4.20   ]
+#   10      67.0 x  57.0      4.20   ]  cell fixed,
+#   16      92.2 x  82.2      4.20   ]  figure grows
+#   24     125.8 x 115.8      4.20   ]
+#   33     163.6 x 153.6      4.20   ]  last size that fits 170 mm
+#   50     170.0 x 160.0      2.90      width pinned, cell shrinks
+#  100     185.0 x 175.0      1.60      past the floor: overruns by 15.0 mm
+#
+# The font never moves anywhere in that table — that is the whole point of the
+# clamp, and it is why any two of these can sit in one paper. Past n ~ 33 the
+# cell is what gives; past n ~ 90 even the 1.60 mm floor does not fit, and the
+# solver says so rather than quietly printing something unreadable.
+#
+# So the honest reading of `corrplot_100_bare` is *this is past the limit*.
+# A 1.60 mm cell is a 4.5 pt mark; it is included because seeing where the
+# design stops being usable is more informative than being told.
+#
+# Two of these are repeated with `debug: true`, which prints the solve on the
+# figure instead of leaving it in the log. Two rather than one because the
+# point of this file is the comparison: `16_pie_debug` is the unclamped
+# regime, where the cell is the 4.20 mm the card asked for, and
+# `100_labelled_debug` is past the floor, where the overlay also carries the
+# clamp note verbatim. Any of the others will do the same with one line added.
+
+version: '0.3'
+project:
+  name: corrplot_scales
+
+Functions: []
+
+DataSet:
+  - name: wide
+    path: ./correlation_demo_wide.csv
+    type: csv
+
+Figures:
+
+  # -- n = 6 -----------------------------------------------------------------
+  # Small enough that the coefficient fits inside the cell. `method: number`
+  # is the coefficient *instead of* a glyph, coloured by its own value.
+  - name: corrplot_06_number
+    type: correlation_matrix
+    data: wide
+    variables: [a01, a02, a03, b01, b02, c01]   # explicit: drawn in this order
+    corrplot:
+      method: number
+      number.digits: 2
+    colorbar: {label: '$\rho$'}
+
+  # -- n = 10 ----------------------------------------------------------------
+  # R's correlation ellipse: round at rho = 0, collapsed onto the diagonal at
+  # |rho| = 1, leaning `/` when positive. `order: AOE` is the cheap angular
+  # ordering — no tree, so no `addrect`.
+  - name: corrplot_10_ellipse
+    type: correlation_matrix
+    data: wide
+    variables: {regex: '^a'}
+    corrplot:
+      method: ellipse
+      order: AOE
+      col: PRGn
+    colorbar: {label: '$\rho$'}
+
+  # -- n = 16 ----------------------------------------------------------------
+  # The pie's radius is fixed and the filled wedge is |rho| — so an empty
+  # circle is a real reading (uncorrelated), not a missing cell.
+  - name: corrplot_16_pie
+    type: correlation_matrix
+    data: wide
+    variables: {regex: '^(a|b)'}
+    corrplot:
+      method: pie
+      type: lower
+      order: hclust
+      addrect: 2
+    colorbar: {label: '$\rho$'}
+
+  # The same matrix with the design overlay. Under the caption: 16 variables,
+  # cell 4.200 mm — the card's own number, untouched, because nothing is
+  # clamped here — and the corner the panel sits at. Compare with the figure
+  # below, which is the same block past the floor.
+  - name: corrplot_16_pie_debug
+    type: correlation_matrix
+    data: wide
+    debug: true
+    variables: {regex: '^(a|b)'}
+    corrplot:
+      method: pie
+      type: lower
+      order: hclust
+      addrect: 2
+    colorbar: {label: '$\rho$'}
+
+  # -- n = 24 ----------------------------------------------------------------
+  # Square: the *side* tracks |rho|, which reads as area — the one thing a
+  # scatter marker cannot do, since `s` is an area.
+  - name: corrplot_24_square
+    type: correlation_matrix
+    data: wide
+    variables: {regex: '^(a|b|c)'}
+    corrplot:
+      method: square
+      order: hclust
+      addrect: 3
+      addgrid.col: '#E4E4E4'
+    colorbar: {label: '$\rho$'}
+
+  # -- n = 33 ----------------------------------------------------------------
+  # The last size that still fits 170 mm at the full 4.20 mm cell. One more
+  # variable and the clamp starts.
+  - name: corrplot_33_circle
+    type: correlation_matrix
+    data: wide
+    variables: {regex: '^(a|b|c|d)'}
+    corrplot:
+      method: circle
+      order: hclust
+      addrect: 4
+      sig.level: 0.01          # x over the pairs the 200 rows cannot resolve
+    colorbar: {label: '$\rho$'}
+
+  # -- n = 50 ----------------------------------------------------------------
+  # Clamped: width pinned to 170 mm, cell down to 2.92 mm. At this size a
+  # glyph whose size carries information is wasted — `color` fills the cell
+  # and puts everything in the hue.
+  - name: corrplot_50_color
+    type: correlation_matrix
+    data: wide
+    variables: {regex: '^(a|b|c|d|e|f)'}
+    corrplot:
+      method: color
+      order: hclust
+      addrect: 6
+      col: RdYlBu
+    colorbar: {label: '$\rho$'}
+
+  # -- n = 100, labelled -----------------------------------------------------
+  # Past the floor. The names are printed and they collide: 100 labels at
+  # 6 pt need more than the 1.60 mm each row can give them. Kept as the
+  # honest picture of the limit.
+  - name: corrplot_100_labelled
+    type: correlation_matrix
+    data: wide
+    corrplot:
+      method: color
+      order: hclust
+      addrect: 8
+    colorbar: {label: '$\rho$'}
+
+  # Past the floor, with the overlay. `cell 1.600 mm` is the floor rather than
+  # the card's 4.20, and the clamp note is printed under it in full — the one
+  # place the reason a figure is this size sits on the figure itself instead of
+  # scrolling past in the log.
+  - name: corrplot_100_labelled_debug
+    type: correlation_matrix
+    data: wide
+    debug: true
+    corrplot:
+      method: color
+      order: hclust
+      addrect: 8
+    colorbar: {label: '$\rho$'}
+
+  # -- n = 100, unlabelled ---------------------------------------------------
+  # The same matrix with `tl.pos: n`. Dropping the names frees no width at
+  # all — the margins are authored (11 mm on the left and bottom), not
+  # measured off the labels — so this figure comes out exactly the size of
+  # the labelled one. That is the trade the fixed margin makes: the card is
+  # the same shape whatever it is given, and a name wider than 11 mm prints
+  # past the edge rather than pushing the panel over.
+  # What it is good for is the block structure: eight planted groups,
+  # recovered by the clustering, boxed by `addrect: 8`.
+  - name: corrplot_100_bare
+    type: correlation_matrix
+    data: wide
+    corrplot:
+      method: color
+      order: hclust
+      addrect: 8
+      tl.pos: n
+      col: RdBu
+    colorbar: {label: '$\rho$'}
+
+output:
+  dir: ./plots
+  dpi: 300
+  formats:
+    - png

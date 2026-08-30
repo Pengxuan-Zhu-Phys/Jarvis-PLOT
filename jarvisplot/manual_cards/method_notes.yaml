@@ -56,6 +56,20 @@ voronoif:
   notes:
     - "Sibling of voronoi with filled faces."
 
+corrplot:
+  summary: "Correlation matrix in R's corrplot style; draws the `correlation` transform's long table."
+  notes:
+    - "Reserved: only the [corrplot, matrix] style card provides its axes (axcorr / axccorr)."
+    - "No coordinates needed — x_index / y_index / rho are the transform's own output columns."
+    - "style takes R's formals: method (circle|square|ellipse|color|shade|pie|number), type, diag, glyph.scale, outline, addgrid.col."
+    - "order (original|AOE|FPC|hclust|alphabet) and addrect are resolved before the figure is built, then written into the transform's `columns`."
+    - "sig.level switches on the significance test; unlike R no p.mat is needed, because the table carries n per pair."
+    - "The glyph is sized from the solved cell and the coefficient text is back-solved from it, so both survive the 170 mm width clamp."
+  traps:
+    - "addrect needs order: hclust — the boxes are cuts of that tree, so there is nothing to cut under any other order."
+    - "R's tl.pos: d is not supported: the diagonal carries cells here, not names."
+    - "type is the printed wedge (row 0 at top); the `correlation` transform's own `triangle` names the halves in array terms. Leave the transform at full and let corrplot mask."
+
 jpfield:
   summary: "Jarvis field helper over a regular/irregular field."
   notes:
@@ -92,9 +106,14 @@ errorbar:
     - "Check optional keys for xerr/yerr in the live contract."
 
 imshow:
-  summary: "Image / 2D array display."
+  summary: "Matrix / image display; the only coordinate is z."
+  notes:
+    - "A z column is folded back into its matrix using the __grid_* metadata the producing transform published — correlation, or profile: {method: grid}."
+    - "Cells the table never emitted stay transparent, so a correlation triangle draws as a triangle."
+    - "Cards set interpolation: bilinear; a matrix wants interpolation: nearest on the layer."
   traps:
-    - "Expects array-like z layout; not raw (x,y) scatter."
+    - "No x/y coordinates: an image places cells by index, not by column. Use pcolormesh when the positions must come from data."
+    - "A z with no grid metadata behind it has no shape, and the layer says so rather than guessing one."
 
 dynesty_runplot:
   summary: "Dynesty nested-sampling run diagnostics panel."

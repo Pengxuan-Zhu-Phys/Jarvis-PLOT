@@ -170,6 +170,12 @@ _CONTOUR_LIKE_METHODS = frozenset({
 #: binning matplotlib will run.
 _BINNED_COLOR_METHODS = frozenset({"hist2d"})
 
+#: Methods whose colour channel is a fixed column of their own input table,
+#: not a `c`/`z` coordinate the layer names.  Without this a corrplot layer
+#: reads as colourless and its colorbar is never drawn -- the axes stays on
+#: the page, empty, which is worse than no colorbar at all.
+_TABLE_COLOR_METHODS = {"corrplot": "rho"}
+
 
 def _hist2d_bin_values(df, coor: dict, style: dict):
     """Reproduce the bin contents ``Axes.hist2d`` will colour.
@@ -235,6 +241,8 @@ def layer_uses_color(style: dict, coor: dict, method_key: str) -> bool:
     # A self-binning method always has a colour channel -- its own bin contents.
     if method_key in _BINNED_COLOR_METHODS:
         return True
+    if method_key in _TABLE_COLOR_METHODS:
+        return True
 
     return False
 
@@ -247,7 +255,14 @@ def collect_layer_color_range(
     Returns (None, None) when no finite data is available.
     """
     arr = None
-    if str(method_key or "").strip().lower() in _BINNED_COLOR_METHODS:
+    key = str(method_key or "").strip().lower()
+    if key in _TABLE_COLOR_METHODS and not isinstance(coor.get("c"), dict):
+        column = _TABLE_COLOR_METHODS[key]
+        try:
+            arr = df[column]
+        except Exception:
+            arr = None
+    elif str(method_key or "").strip().lower() in _BINNED_COLOR_METHODS:
         try:
             arr = _hist2d_bin_values(df, coor, style)
         except Exception:

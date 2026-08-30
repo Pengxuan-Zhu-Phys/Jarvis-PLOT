@@ -607,9 +607,142 @@ def expand_profile_2d(info: Mapping[str, Any]) -> dict[str, Any]:
     return out
 
 
+_CORRELATION_TRANSFORM_KEYS = {"missing", "min_periods", "triangle", "include_diagonal"}
+
+
+def _correlation_selection(info: Mapping[str, Any]) -> dict[str, Any]:
+    """Turn ``variables:`` into the selector the ``correlation`` transform takes.
+
+    Three spellings, because all three are things people actually mean::
+
+        variables: [M1, M2, mu]              # exactly these, in this order
+        variables: {regex: "^m_"}            # everything matching
+        variables: {exclude: [weight]}       # everything else
+
+    A bare list is the explicit form because the order it is written in is the
+    order the matrix is drawn in -- which is worth being able to state without
+    a wrapper key.
+    """
+    spec = info.get("variables", None)
+    if spec is None:
+        return {}
+    if isinstance(spec, str):
+        spec = [spec]
+    if isinstance(spec, (list, tuple)):
+        return {"columns": [str(name).strip() for name in spec]}
+    if not isinstance(spec, Mapping):
+        raise ValueError(
+            "correlation_matrix `variables` must be a list of column names, or a "
+            "mapping with columns / regex / exclude; got {}".format(type(spec).__name__)
+        )
+    unknown = sorted(set(spec) - {"columns", "regex", "exclude"})
+    if unknown:
+        raise ValueError(
+            "correlation_matrix `variables` takes columns, regex or exclude; "
+            "got {}".format(", ".join(unknown))
+        )
+    return {key: deepcopy(value) for key, value in spec.items() if value is not None}
+
+
+def _correlation_frame(info: Mapping[str, Any]) -> dict[str, Any]:
+    """The colorbar half of the frame.  The rest is solved, not authored.
+
+    Only the colour scale and the bar's label are decisions a person makes
+    here: `figsize`, every rect, both limits and both sets of tick labels are
+    outputs of ``core_runtime.prebuild_correlations`` and would be overwritten
+    if they were written down.
+    """
+    colorbar = info.get("colorbar", {})
+    if not isinstance(colorbar, Mapping):
+        colorbar = {}
+    axccorr: dict[str, Any] = {}
+    if "label" in colorbar:
+        axccorr["label"] = {"ylabel": colorbar.get("label")}
+    color: dict[str, Any] = {}
+    for key in ("cmap", "vmin", "vmax"):
+        if key in colorbar:
+            color[key] = deepcopy(colorbar[key])
+    if color:
+        axccorr["color"] = color
+    return {"axccorr": axccorr} if axccorr else {}
+
+
+def expand_correlation_matrix(info: Mapping[str, Any]) -> dict[str, Any]:
+    """Expand a ``type: correlation_matrix`` figure into one corrplot layer.
+
+    Thinner than the other two macros on purpose.  ``posterior_2d`` and
+    ``profile_2d`` lower to a stack of three or four layers because the work
+    is spread across transforms and render methods; a correlation matrix is
+    one transform feeding one primitive.  What this macro actually buys is
+    that the reserved names -- ``axcorr``, ``axccorr``, the ``corrplot``
+    method and the ``[corrplot, matrix]`` card -- stop being four things the
+    author has to get right and become one word.
+    """
+    out = deepcopy(dict(info))
+    out.pop("type", None)
+
+    name = str(info.get("name", "correlation_matrix")).strip() or "correlation_matrix"
+    source = deepcopy(info.get("data"))
+    if source is None:
+        raise ValueError(
+            "correlation_matrix requires a data source: `data: <DataSet name>`."
+        )
+
+    # `_style_tokens` defaults to the rect card, which is the right default for
+    # the other two macros and the wrong one here: this type only renders on the
+    # card that carries axcorr / axccorr and the millimetre Geometry block.
+    raw_style = info.get("style_card", info.get("style", None))
+    style_tokens = ["corrplot", "matrix"] if raw_style is None else _style_tokens(deepcopy(raw_style))
+
+    corr_cfg = _correlation_selection(info)
+    extra = info.get("correlation", {})
+    if isinstance(extra, Mapping):
+        unknown = sorted(set(extra) - _CORRELATION_TRANSFORM_KEYS)
+        if unknown:
+            raise ValueError(
+                "correlation_matrix `correlation` takes {}; got {}. Column "
+                "selection goes in `variables`.".format(
+                    ", ".join(sorted(_CORRELATION_TRANSFORM_KEYS)), ", ".join(unknown)
+                )
+            )
+        corr_cfg.update(deepcopy(dict(extra)))
+
+    formals = info.get("corrplot", {})
+    if formals is None:
+        formals = {}
+    if not isinstance(formals, Mapping):
+        raise ValueError(
+            "correlation_matrix `corrplot` must be a mapping of R corrplot "
+            "formals (method, type, order, ...); got {}".format(type(formals).__name__)
+        )
+
+    frame = _deep_merge(_correlation_frame(info), info.get("frame"))
+
+    layers = [
+        {
+            "name": "correlation",
+            "data": [{"source": source, "transform": [{"correlation": corr_cfg}]}],
+            "axes": "axcorr",
+            "colorbar": "axccorr",
+            "method": "corrplot",
+            "style": deepcopy(dict(formals)),
+        }
+    ]
+
+    for key in ("style_card", "data", "variables", "correlation", "corrplot", "colorbar"):
+        out.pop(key, None)
+
+    out["name"] = name
+    out["style"] = style_tokens
+    if frame:
+        out["frame"] = frame
+    out["layers"] = layers
+    return out
+
+
 # Types that expand_figure_type can lower to layers. Keep in sync with
 # expand_figure_type dispatch and capabilities.figure_types.
-KNOWN_FIGURE_TYPES = frozenset({"posterior_2d", "profile_2d"})
+KNOWN_FIGURE_TYPES = frozenset({"posterior_2d", "profile_2d", "correlation_matrix"})
 
 
 def expand_figure_type(info: Any) -> Any:
@@ -627,7 +760,18 @@ def expand_figure_type(info: Any) -> Any:
         return expand_posterior_2d(info)
     if fig_type == "profile_2d":
         return expand_profile_2d(info)
+    if fig_type == "correlation_matrix":
+        return expand_correlation_matrix(info)
     return deepcopy(dict(info))
+
+
+def _note(logger, message: str) -> None:
+    if logger is None:
+        return
+    try:
+        logger.error(message)
+    except Exception:
+        pass
 
 
 def expand_typed_figures(
@@ -636,6 +780,7 @@ def expand_typed_figures(
     figure_names: list[str] | tuple[str, ...] | None = None,
     raise_on_error: bool = True,
     allow_noop: bool = False,
+    logger=None,
 ) -> list[str]:
     """Expand ``type:`` figures in place to the equivalent layers form.
 
@@ -650,6 +795,11 @@ def expand_typed_figures(
     raise_on_error:
         When false (runtime path), failures leave the original figure and
         continue. When true (CLI convert path), fail loudly on real errors.
+    logger:
+        Where the swallowed reasons go when ``raise_on_error`` is false. A
+        figure that fails to expand is caught later -- ``apply_figure_config``
+        refuses a figure that still carries ``type:`` -- but without this the
+        author is told only that it failed, never why.
     allow_noop:
         When true, "nothing to expand" is not an error — callers get an empty
         list (CLI uses this for idempotent re-runs).
@@ -713,19 +863,23 @@ def expand_typed_figures(
             )
             if raise_on_error:
                 raise ValueError(msg)
+            _note(logger, msg)
             continue
 
         try:
             out = expand_figure_type(fig)
         except Exception as exc:
+            msg = f"Figure {label!r}: type expansion failed: {exc}"
             if raise_on_error:
-                raise ValueError(f"Figure {label!r}: type expansion failed: {exc}") from exc
+                raise ValueError(msg) from exc
+            _note(logger, msg)
             continue
 
         if not isinstance(out, Mapping) or out.get("type"):
             msg = f"Figure {label!r}: type {fig_type!r} did not expand to layers"
             if raise_on_error:
                 raise ValueError(msg)
+            _note(logger, msg)
             continue
 
         figures[index] = out
@@ -752,7 +906,7 @@ def expand_figure_types_in_config(config: Any, logger=None) -> Any:
     if not isinstance(config, dict):
         return config
     try:
-        expand_typed_figures(config, raise_on_error=False)
+        expand_typed_figures(config, raise_on_error=False, logger=logger)
     except Exception as exc:
         if logger is not None:
             try:

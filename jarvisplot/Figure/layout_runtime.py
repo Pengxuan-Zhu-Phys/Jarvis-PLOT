@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any, Mapping
 
-from matplotlib.ticker import AutoMinorLocator, LogLocator, ScalarFormatter
+from matplotlib.ticker import AutoMinorLocator, LogLocator, NullLocator, ScalarFormatter
 
 
 def is_numbered_ax(name: str) -> bool:
@@ -14,6 +14,33 @@ def is_numbered_ax(name: str) -> bool:
 #: and the left / bottom marginal panels of a corner-plot layout.  Each is a
 #: full rectangular axes and reads its own ``Frame`` node.
 SIDE_AXES = ("axr", "axl", "axb")
+
+#: The correlation matrix owns a panel and a colorbar of its own, and both
+#: names are reserved.  A correlation matrix is not a matplotlib primitive --
+#: it is a categorical grid whose two axes carry variable names in an order
+#: the data decides -- so dropping one onto a general panel would not fail,
+#: it would draw a plausible-looking wrong figure.  Giving it names no other
+#: card declares makes that impossible to express rather than merely
+#: discouraged.
+CORR_AXES = "axcorr"
+CORR_COLORBAR = "axccorr"
+
+
+def is_corr_ax(name) -> bool:
+    """True for the reserved correlation-matrix panel."""
+    return name == CORR_AXES
+
+
+def is_colorbar_ax(name) -> bool:
+    """True for ``axc`` and the named secondary colorbars (``axc2``, ``axccorr``).
+
+    ``axcorr`` also starts with ``axc``, so the matrix panel has to be
+    excluded by name: every caller of this rule routes its matches into the
+    colorbar machinery, which would swallow the panel whole.
+    """
+    if not isinstance(name, str) or is_corr_ax(name):
+        return False
+    return name == "axc" or (name.startswith("axc") and len(name) > 3)
 
 
 def is_rect_ax(name: str) -> bool:
@@ -205,6 +232,8 @@ def ensure_rect_axes(fig, ax_name: str, kwgs: dict):
     # locator -- even though has_manual_ticks already reads this same node.
     apply_manual_ticks(fig, ax_obj, "x", ticks_cfg.get("x", {}) or {})
     apply_manual_ticks(fig, ax_obj, "y", ticks_cfg.get("y", {}) or {})
+    apply_tick_label_props(fig, ax_obj, "x", ticks_cfg.get("x", {}) or {})
+    apply_tick_label_props(fig, ax_obj, "y", ticks_cfg.get("y", {}) or {})
 
     apply_grid(fig, ax_obj, ax_name)
 
@@ -233,13 +262,112 @@ def ensure_numbered_rect_axes(fig, ax_name: str, kwgs: dict):
     return ensure_rect_axes(fig, ax_name, kwgs)
 
 
+#: Everything ``axcorr`` reads out of its ``Frame`` node.  A card key outside
+#: this set is a mistake worth reporting rather than a setting that quietly
+#: does nothing -- which is what the general ``ax`` path does with the keys it
+#: happens not to consume.
+CORR_FRAME_KEYS = frozenset(
+    {"rect", "spines", "xlim", "ylim", "ticks", "grid", "title", "title_params"}
+)
+
+
+def ensure_corr_axes(fig, kwgs: dict):
+    """Create and configure the reserved correlation-matrix panel.
+
+    Deliberately narrower than the general ``ax`` path.  A correlation matrix
+    is a categorical grid: both axes are variable names at integer positions,
+    so there is no log scale to switch, no minor locator to place, no axis
+    label to centre and no endpoint tick to trim.  Supporting those here would
+    only create ways to configure a matrix into something that is no longer a
+    matrix.
+    """
+    from .adapters_rect import StdAxesAdapter
+
+    name = CORR_AXES
+    node = fig.frame.get(name, {}) or {}
+
+    unknown = sorted(set(node) - CORR_FRAME_KEYS)
+    if unknown and getattr(fig, "logger", None):
+        fig.logger.warning(
+            "frame.{} ignores {}: the correlation panel reads only {}.".format(
+                name, unknown, ", ".join(sorted(CORR_FRAME_KEYS))
+            )
+        )
+
+    if name not in fig.axes:
+        if not (isinstance(kwgs, Mapping) and kwgs.get("rect")):
+            raise ValueError(
+                "frame.axes.{} has no rect. This card solves its geometry from "
+                "the matrix rather than carrying a fixed one, so the figure has "
+                "to be rendered through `type: correlation_matrix`, which runs "
+                "the solve. Nothing else can supply a sensible rect here."
+                .format(name)
+            )
+        raw_ax = fig.fig.add_axes(**kwgs)
+        if "facecolor" in kwgs:
+            raw_ax.set_facecolor(kwgs["facecolor"])
+        adapter = StdAxesAdapter(raw_ax)
+        adapter._type = "rect"
+        adapter.layers = []
+        adapter._legend = False
+        fig.axes[name] = adapter
+        adapter.status = "configured"
+
+    ax_obj = fig.axes[name]
+    target = ax_obj.ax if hasattr(ax_obj, "ax") else ax_obj
+
+    spines = node.get("spines") or {}
+    for key, setter in (("color", "set_color"), ("linewidth", "set_linewidth")):
+        if spines.get(key) is not None:
+            for spine in target.spines.values():
+                getattr(spine, setter)(spines[key])
+
+    for key, setter in (("xlim", target.set_xlim), ("ylim", target.set_ylim)):
+        lim = node.get(key)
+        if lim:
+            setter([float(v) for v in lim])
+
+    # A categorical axis has nowhere to put a minor tick: AutoMinorLocator
+    # would drop them between the variable names.
+    target.xaxis.set_minor_locator(NullLocator())
+    target.yaxis.set_minor_locator(NullLocator())
+
+    apply_axis_title(fig, ax_obj, name)
+
+    ticks_cfg = node.get("ticks", {}) or {}
+    apply_manual_ticks(fig, ax_obj, "x", ticks_cfg.get("x", {}) or {})
+    apply_manual_ticks(fig, ax_obj, "y", ticks_cfg.get("y", {}) or {})
+    target.tick_params(**ticks_cfg.get("both", {}))
+    target.tick_params(**ticks_cfg.get("major", {}))
+    apply_tick_label_props(fig, ax_obj, "x", ticks_cfg.get("x", {}) or {})
+    apply_tick_label_props(fig, ax_obj, "y", ticks_cfg.get("y", {}) or {})
+
+    apply_grid(fig, ax_obj, name)
+
+    if getattr(ax_obj, "needs_finalize", True) and hasattr(ax_obj, "finalize"):
+        try:
+            ax_obj.finalize()
+        except Exception as e:
+            if getattr(fig, "logger", None):
+                fig.logger.warning(f"Finalize failed on axes '{name}': {e}")
+
+    try:
+        fig.logger.debug(f"Loaded correlation matrix axes -> {name}")
+    except Exception:
+        pass
+
+    return ax_obj
+
+
 def has_manual_ticks(frame: Mapping[str, Any], ax_key: str, which: str) -> bool:
     try:
-        if ax_key == "ax" or ax_key in SIDE_AXES:
+        if ax_key == "ax" or ax_key in SIDE_AXES or is_corr_ax(ax_key):
             # Each side panel reads its own node, so a later auto-tick pass
-            # cannot hand it the main axes' positions.
+            # cannot hand it the main axes' positions.  The correlation panel
+            # is here for the same reason: its ticks are variable names, and
+            # a formatter would replace them with numbers.
             ticks_cfg = frame.get(ax_key, {}).get("ticks", {})
-        elif isinstance(ax_key, str) and ax_key.startswith("axc"):
+        elif is_colorbar_ax(ax_key):
             # Colorbars can be named axc, axc2, etc.  Each must read its
             # own frame node so a later auto-tick pass cannot replace YAML
             # positions/labels with a Matplotlib formatter.
@@ -349,6 +477,54 @@ def apply_auto_ticks(ax_obj, which: str):
                 axis.set_major_formatter(fmt)
     except Exception:
         return
+
+
+#: Tick-label text properties a per-axis ``ticks.x`` / ``ticks.y`` node may
+#: set, mapped to the ``Text`` property each one becomes.  The card's
+#: ``both`` / ``major`` / ``minor`` blocks go through ``tick_params``, which
+#: reaches *both* axes at once, so an axis carrying names rather than numbers
+#: -- rotated on x, horizontal on y -- has nowhere else to say so.  These sit
+#: next to ``positions`` because they describe the same labels.
+TICK_LABEL_PROPS = {
+    "labelrotation": "rotation",
+    "labelrotation_mode": "rotation_mode",
+    "labelha": "ha",
+    "labelva": "va",
+    "labelcolor": "color",
+    "labelsize": "fontsize",
+    "labelfamily": "fontfamily",
+}
+
+
+def tick_label_props(ticks_cfg: Mapping[str, Any]) -> dict:
+    """Text properties declared on one axis' tick node."""
+    if not isinstance(ticks_cfg, Mapping):
+        return {}
+    return {
+        prop: ticks_cfg[key]
+        for key, prop in TICK_LABEL_PROPS.items()
+        if ticks_cfg.get(key) is not None
+    }
+
+
+def apply_tick_label_props(fig, ax_obj, which: str, ticks_cfg: dict) -> None:
+    """Style one axis' tick labels.
+
+    Must run *after* the ``both`` / ``major`` / ``minor`` blocks: ``tick_params``
+    rewrites each label from the axis' stored parameters, so a rotation set
+    before it is silently reset to zero.
+    """
+    props = tick_label_props(ticks_cfg)
+    if not props:
+        return
+    target = ax_obj.ax if hasattr(ax_obj, "ax") else ax_obj
+    try:
+        artists = target.get_xticklabels() if which == "x" else target.get_yticklabels()
+        for artist in artists:
+            artist.set(**props)
+    except Exception as e:
+        if getattr(fig, "logger", None):
+            fig.logger.warning(f"Tick label props failed on {which}-axis: {e}")
 
 
 def apply_manual_ticks(fig, ax_obj, which: str, ticks_cfg: dict):
