@@ -138,6 +138,11 @@ _CELL_LOOP = 0.5 * np.vstack([_CORNERS, _CORNERS[:1]])
 #: patch objects entirely -- see :func:`_glyph_vertices`.
 _POLYGON_GLYPHS = ("square", "color", "shade")
 
+#: Glyphs that cover their whole cell whatever rho is.  Everything else shrinks
+#: with |rho|, which is what makes an edge worth drawing -- see
+#: :func:`_outline_color`.
+_FILLED_GLYPHS = ("color", "shade")
+
 
 def _glyph_vertices(kind: str, cx, cy, rho, scale: float):
     """``(cells, 4, 2)`` corner array for the square-shaped glyphs.
@@ -157,7 +162,8 @@ def _glyph_vertices(kind: str, cx, cy, rho, scale: float):
     return centres[:, None, :] + np.asarray(half).reshape(-1, 1, 1) * _CORNERS[None, :, :]
 
 
-def _glyph_patches(kind: str, cx, cy, rho, scale: float, sign: float):
+def _glyph_patches(kind: str, cx, cy, rho, scale: float, sign: float,
+                   ellipse_scale: float = 1.4):
     """One matplotlib patch per drawn cell, in data coordinates.
 
     Only the round glyphs come through here; the square ones are built as bare
@@ -180,13 +186,21 @@ def _glyph_patches(kind: str, cx, cy, rho, scale: float, sign: float):
             # The pictogram of a scatter plot with this correlation: round at
             # rho = 0, collapsed onto the diagonal at |rho| = 1, leaning `/`
             # when positive.
+            #
+            # `ellipse.scale` is why the family fills its cell.  Rotated 45
+            # degrees, an ellipse of these two axes has a bounding box of
+            # `k / sqrt(2)` on a side whatever rho is -- the shape changes,
+            # the box does not -- so at k = glyph.scale the widest one covers
+            # 0.64 of the cell while a circle covers 0.9.  sqrt(2) is the
+            # factor that makes the two agree, which is where 1.4 comes from.
+            k = scale * ellipse_scale
             r = 0.0 if not np.isfinite(r) else float(np.clip(r, -1.0, 1.0))
-            width = scale * np.sqrt(max(1.0 + r, 0.0)) / np.sqrt(2.0)
+            width = k * np.sqrt(max(1.0 + r, 0.0)) / np.sqrt(2.0)
             # |rho| = 1 collapses the minor axis to zero, which fills no
             # pixels at all -- the diagonal of an `ellipse` matrix would read
             # as missing rather than as perfect. R draws the degenerate case
             # as a line, so the minor axis gets a hairline floor.
-            height = max(scale * np.sqrt(max(1.0 - r, 0.0)) / np.sqrt(2.0), 0.02 * scale)
+            height = max(k * np.sqrt(max(1.0 - r, 0.0)) / np.sqrt(2.0), 0.02 * k)
             patches.append(
                 Ellipse((x, y), width=width, height=height, angle=sign * 45.0)
             )
@@ -282,6 +296,13 @@ def draw_corrplot(ax, **kwargs):
         )
     diag = _as_bool(kwargs.pop("diag", True), True)
     scale = float(_pop(kwargs, "glyph.scale", 0.9))
+    # Card-owned, and only `ellipse` reads it: the ellipse family is drawn from
+    # two axes rather than from one radius, so `glyph.scale` alone leaves it
+    # visibly smaller than the other glyphs at the same setting.  See
+    # `_glyph_patches`.
+    ellipse_scale = float(_pop(kwargs, "ellipse.scale", 1.4))
+    # Also card-owned: R's `outline` is on or off, and this is how thin.
+    outline_lwd = float(_pop(kwargs, "outline.lwd", 0.3))
     outline = kwargs.pop("outline", False)
     grid_color = kwargs.pop("addgrid.col", None)
 
@@ -348,7 +369,10 @@ def draw_corrplot(ax, **kwargs):
             )
         else:
             artists = PatchCollection(
-                _glyph_patches(kind, ix[drawn], iy[drawn], rho[drawn], scale, sign),
+                _glyph_patches(
+                    kind, ix[drawn], iy[drawn], rho[drawn], scale, sign,
+                    ellipse_scale=ellipse_scale,
+                ),
                 match_original=False,
             )
         artists.set_array(rho[drawn])
@@ -361,11 +385,12 @@ def draw_corrplot(ax, **kwargs):
                 -1.0 if vmin is None else float(vmin),
                 1.0 if vmax is None else float(vmax),
             )
-        if outline:
-            artists.set_edgecolor(outline if isinstance(outline, str) else "#21171A")
-            artists.set_linewidth(0.3)
-        else:
+        edge = _outline_color(outline, kind, rho[drawn], cmap, norm, vmin, vmax)
+        if edge is None:
             artists.set_linewidth(0.0)
+        else:
+            artists.set_edgecolor(edge)
+            artists.set_linewidth(outline_lwd)
         if alpha is not None:
             artists.set_alpha(float(alpha))
         artists.set_zorder(zorder)
@@ -473,13 +498,45 @@ def draw_corrplot(ax, **kwargs):
         # discarded.
         raise TypeError(
             "corrplot does not take {}. It takes R's corrplot formals: method, "
-            "type, diag, glyph.scale, outline, addgrid.col, addCoef.col, "
+            "type, diag, glyph.scale, ellipse.scale, outline, outline.lwd, "
+            "addgrid.col, addCoef.col, "
             "number.digits, number.cex, addCoefasPercent, sig.level, insig, "
             "pch, pch.cex, pch.col, na.label, na.label.col, rect.col, rect.lwd "
             "(order / hclust.method / addrect / tl.* are resolved before the "
             "figure is built).".format(", ".join(sorted(map(str, kwargs))))
         )
     return artists
+
+
+def _outline_color(outline, kind, rho, cmap, norm, vmin, vmax):
+    """The glyph edge: ``None`` for no edge, one colour, or one per cell.
+
+    R's ``outline`` is ``TRUE`` or a colour.  ``sign`` is this card's addition
+    and the reason it exists is the small glyphs: ``circle`` and ``square``
+    carry |rho| in their area, so a weak cell is a pale mark shrunk to nothing
+    in the middle of an empty cell.  Drawing its edge in the *end* of the scale
+    its sign points at -- ``rho = 1`` for a positive cell, ``rho = -1`` for a
+    negative one -- keeps that cell readable as positive or negative when its
+    fill has gone almost white.
+
+    ``sign`` is not applied to ``color`` and ``shade``: those cover the whole
+    cell whatever rho is, so their edge is not a mark on a glyph but a second
+    grid line, drawn in two loud colours next to the one ``addgrid.col``
+    already draws.  Nothing shrinks there, so there is nothing to rescue.
+    """
+    if outline is None or outline is False:
+        return None
+    if isinstance(outline, str) and outline.strip().lower() == "sign":
+        if kind in _FILLED_GLYPHS:
+            return None
+        from matplotlib.colors import to_rgba
+
+        ends = np.asarray([
+            to_rgba(_value_color(-1.0 if vmin is None else vmin, cmap, norm, vmin, vmax)),
+            to_rgba(_value_color(1.0 if vmax is None else vmax, cmap, norm, vmin, vmax)),
+        ])
+        return ends[(np.asarray(rho, dtype=float) >= 0.0).astype(int)]
+    return outline if isinstance(outline, str) else "#21171A"
 
 
 def _value_color(value, cmap, norm, vmin, vmax):
