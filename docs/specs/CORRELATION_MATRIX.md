@@ -186,15 +186,46 @@ choice. The optional `x` / `y` / `c` exist only to point at a renamed column.
 | `addCoef.col` | ✅ | Size is back-solved from the cell, then scaled by `number.cex` |
 | `number.digits`, `number.cex`, `addCoefasPercent` | ✅ | |
 | `addgrid.col` | ✅ | The panel is frameless, as in R — `axcorr` carries `frameon: false` and no tick marks — so this grid is the drawn boundary, and it follows the mask: with `type: upper` nothing is drawn around the empty half. `null` leaves the matrix unbounded |
-| `outline` | ✅ | `true`, or a colour |
+| `outline` | ✅ | `true`, a colour, or `sign` — this card's addition, see below. Width is `outline.lwd` |
 | `sig.level`, `insig`, `pch`, `pch.cex`, `pch.col` | ✅ | **Off by default**, as in R. Unlike R no `p.mat` is needed: the long table carries `n` per pair, so the p-value comes from `(rho, n)`. `insig`: `pch` marks, `blank` omits the glyph, `n` does nothing |
 | `na.label`, `na.label.col` | ✅ | |
-| `tl.pos` | ⚠️ `lt`, `t`, `l`, `n` | Config time — a name nobody prints also stops costing margin, so the figure shrinks. The x names print at the **bottom** (see §3), so `b` / `lb` are accepted as aliases of `t` / `lt` and mean the same band; R's spellings are kept so a pasted R call still runs. R's `d` is refused: the diagonal carries cells here |
+| `tl.pos` | ⚠️ `lt`, `t`, `l`, `n` | Config time. It hides names; it does not change the figure size, because the margins are authored (§3). The x names print at the **bottom** (see §3), so `b` / `lb` are accepted as aliases of `t` / `lt` and mean the same band; R's spellings are kept so a pasted R call still runs. R's `d` is refused: the diagonal carries cells here |
 | `tl.cex`, `tl.col`, `tl.srt`, `tl.offset` | ⚠️ card-level | Tick text belongs to `Frame.axcorr.ticks` on the style card, which is what keeps it consistent across figures. `tl.cex` is read by the geometry solver |
 | `cl.*` (`cl.pos`, `cl.ratio`, `cl.length`, …) | ⚠️ card-level | The colorbar is `axccorr`, an axes of the card. Its label is `colorbar: {label: ...}` |
 | `is.corr`, `p.mat` | ❌ | `p.mat` is unnecessary (see `sig.level`); `is.corr = FALSE` would mean drawing a non-correlation matrix, which is a different figure |
 | `plotCI`, `lowCI.mat`, `uppCI.mat` | ❌ | Confidence-interval glyphs. Not ported |
 | `mar`, `title`, `bg`, `win.asp` | ❌ | Owned by the card and the geometry solver, which is the point of the card |
+
+Five keys in `Style.corrplot` are the card's own rather than R's:
+
+| key | default | what it does |
+|---|---|---|
+| `glyph.scale` | 0.9 | the glyph at \|rho\| = 1, as a fraction of the cell |
+| `ellipse.scale` | 1.4 | `ellipse` only, on top of `glyph.scale` — see below |
+| `outline.lwd` | 0.2 | width of the glyph edge R's `outline` switches on |
+| `clip` | `false` | nothing on the panel is clipped — see §3 |
+| `zorder` | 30 | where the matrix sits among the layers |
+
+`ellipse.scale` exists because the ellipse is the one glyph drawn from two axes
+instead of one radius. Rotated 45°, an ellipse of those axes has a bounding box
+of `glyph.scale / √2` on a side *whatever rho is* — the shape changes, the box
+does not — so at `glyph.scale: 0.9` the widest ellipse covers 0.64 of the cell
+while a circle covers 0.9. √2 is the factor that makes the two agree, which is
+where 1.4 comes from: it fills the same box the other glyphs do, and still
+cannot spill into the neighbouring cell at any rho.
+
+`outline: sign` draws each glyph's own edge in the **end of the scale its sign
+points at** — the `rho = 1` colour on a positive cell, `rho = -1` on a negative
+one, read off the card's `vmin`/`vmax`. It is what keeps a weak cell readable.
+A `circle`, `square`, `pie` or `ellipse` carries \|rho\| in its area, so as the
+coefficient falls the glyph shrinks *and* its fill fades toward white at the
+same time: at rho = 0.05 there is nearly nothing left on the cell, and the two
+loud edge colours are then the only thing saying which way it went.
+
+It is not applied to `color` and `shade`. Those cover the whole cell whatever
+rho is, so their edge is not a mark on a glyph but a second grid line, in two
+loud colours, next to the one `addgrid.col` already draws — and nothing shrinks
+there, so there is nothing to rescue.
 
 ## 6. Reading the solve on the figure
 

@@ -44,7 +44,7 @@ human:
       items:
         - "Config time (before the figure exists): order, addrect, hclust.method, tl.pos, col. They decide which variable sits at which index, and the tick labels are written against those indices."
         - "Draw time (one cell at a time): method, type, diag, glyph.scale, outline, addgrid.col, addCoef.col, number.*, sig.level, insig, pch.*, na.label."
-        - "Card-owned, not R formals: clip (false on this card -- a glyph on the first or last row sits on the axes edge and a clipped one is drawn as a half-moon) and zorder."
+        - "Card-owned, not R formals: glyph.scale, outline.lwd (the width of the edge `outline` switches on; `outline: sign` colours it by the sign's end of the scale, which is what keeps a near-zero cell readable once its fill has faded -- not applied to color/shade, which never shrink), ellipse.scale (1.4 -- rotated 45 degrees the ellipse family has a fixed bounding box of glyph.scale/sqrt(2), so without it the widest ellipse covers 0.64 of the cell where a circle covers 0.9), clip (false -- a glyph on the first or last row sits on the axes edge and a clipped one is drawn as a half-moon) and zorder."
         - "order: original and alphabet read no data at all; AOE / FPC / hclust read the selected columns once, running any transforms that come before the correlation step."
         - "sig.level switches on the significance test. R needs a separate p.mat for this; the long table carries n per pair, so the level is enough."
         - "variables takes a list (explicit, in that order), or {regex:} / {exclude:}."

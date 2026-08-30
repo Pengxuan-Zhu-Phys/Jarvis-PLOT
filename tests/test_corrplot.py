@@ -365,6 +365,73 @@ def test_the_square_glyphs_are_built_as_bare_corners():
     assert square[0][:, 0].max() * 2 == pytest.approx(np.sqrt(0.25))
 
 
+def test_the_ellipse_fills_the_box_the_other_glyphs_do():
+    # Rotated 45 degrees, the ellipse family's bounding box is
+    # `glyph.scale * ellipse.scale / sqrt(2)` on a side *whatever rho is* --
+    # the shape changes, the box does not.  So `ellipse.scale: 1.4` is what
+    # makes the widest ellipse reach as far as a circle at |rho| = 1 does, and
+    # the constant box is why it still cannot spill into the next cell.
+    table = _long_table()
+    drawn = draw_corrplot(_axes(3), __df__=table, method="ellipse")
+    boxes = [p.get_extents() for p in drawn.get_paths()]
+    side = 0.9 * 1.4 / np.sqrt(2.0)
+    assert len({round(b.width, 2) for b in boxes}) == 1
+    for box in boxes:
+        assert box.width == pytest.approx(side, abs=2e-3)
+        assert box.height == pytest.approx(side, abs=2e-3)
+        assert box.width < 1.0
+
+    bare = draw_corrplot(_axes(3), __df__=table, method="ellipse",
+                         **{"ellipse.scale": 1.0})
+    assert bare.get_paths()[0].get_extents().width == pytest.approx(
+        0.9 / np.sqrt(2.0), abs=2e-3
+    )
+
+
+def test_the_glyph_edge_is_coloured_by_the_sign_of_the_cell():
+    # A circle or square carries |rho| in its area, so a weak cell both shrinks
+    # and fades to nearly white.  `outline: sign` draws its edge in the end of
+    # the scale its sign points at, which is the only thing left on that cell
+    # saying which way it went.
+    import matplotlib as mpl
+
+    table = _long_table()
+    drawn = draw_corrplot(
+        _axes(3), __df__=table, method="circle",
+        outline="sign", cmap="RdBu", vmin=-1.0, vmax=1.0,
+    )
+    scale = mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(-1.0, 1.0), cmap="RdBu")
+    expected = [scale.to_rgba(1.0 if value >= 0 else -1.0) for value in table["rho"]]
+    assert np.allclose(drawn.get_edgecolor(), expected)
+    assert np.allclose(drawn.get_linewidth(), 0.3)          # outline.lwd default
+    assert np.allclose(
+        draw_corrplot(_axes(3), __df__=table, method="circle", outline="sign",
+                      **{"outline.lwd": 0.2}).get_linewidth(),
+        0.2,
+    )
+
+    # R's own spellings still mean what they meant.
+    plain = draw_corrplot(_axes(3), __df__=table, method="circle", outline=True)
+    assert np.allclose(plain.get_edgecolor(), mpl.colors.to_rgba("#21171A"))
+    named = draw_corrplot(_axes(3), __df__=table, method="circle", outline="#00FF00")
+    assert np.allclose(named.get_edgecolor(), mpl.colors.to_rgba("#00FF00"))
+    assert np.allclose(
+        draw_corrplot(_axes(3), __df__=table, method="circle").get_linewidth(), 0.0
+    )
+
+
+def test_a_glyph_that_never_shrinks_gets_no_sign_edge():
+    # `color` and `shade` cover the cell whatever rho is, so the sign edge
+    # would be a second grid line in two loud colours rather than a mark.
+    table = _long_table()
+    for glyph in ("color", "shade"):
+        filled = draw_corrplot(_axes(3), __df__=table, method=glyph, outline="sign")
+        assert np.allclose(filled.get_linewidth(), 0.0), glyph
+    # A colour asked for by name is still honoured there -- only `sign` opts out.
+    edged = draw_corrplot(_axes(3), __df__=table, method="color", outline="#00FF00")
+    assert np.allclose(edged.get_linewidth(), 0.3)
+
+
 def test_the_grid_is_one_closed_loop_per_cell():
     # Four separate edges per cell is 40,000 paths at n = 100 for the same
     # picture.  Each loop closes, so no edge goes missing in the trade.
