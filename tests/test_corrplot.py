@@ -248,6 +248,42 @@ def test_the_figure_is_the_same_shape_whatever_the_names_are():
     assert any("print past it" in note for note in long_.notes)
 
 
+def test_margin_fit_grows_the_corner_to_hold_the_widest_name():
+    # The opt-in: `margin.fit` turns the overrun note into an action.  It needs
+    # no trial render -- the names are measured exactly, with the tick font at
+    # the tick size, so where the text ends is known before anything is drawn.
+    fit = {**_GEOMETRY, "margin": {**_GEOMETRY["margin"], "fit": True, "slack": 1.0}}
+    labels = ["a_long_variable_name"] * 8
+    geom = solve_corr_geometry(8, geometry=fit, x_labels=labels, y_labels=labels,
+                               label_pad_mm=0.6)
+    # Where the text ends, plus the slack: fitting to the last glyph exactly
+    # puts it on the edge of the paper, which reads as nearly cut off.
+    need = 0.6 + max_label_mm(labels, size_pt=5.5) + 1.0
+    left_mm = geom.panel_rect[0] * geom.width_mm
+    bottom_mm = geom.panel_rect[1] * geom.height_mm
+    assert left_mm == pytest.approx(need, abs=1e-6)
+    assert bottom_mm == pytest.approx(need, abs=1e-6)   # still equal on both
+    assert any("margin.fit" in note for note in geom.notes)
+
+    # One corner for both bands, so hiding the x names cannot shrink it below
+    # what the y names still need.
+    y_only = solve_corr_geometry(8, geometry=fit, y_labels=labels, label_pad_mm=0.6)
+    assert y_only.panel_rect[1] * y_only.height_mm == pytest.approx(need, abs=1e-6)
+
+
+def test_margin_fit_only_ever_grows():
+    # The card's margin is the floor: a short name does not pull the panel in
+    # toward the edge, which would make a small matrix a different shape again.
+    fit = {**_GEOMETRY, "margin": {**_GEOMETRY["margin"], "fit": True, "slack": 1.0}}
+    short = solve_corr_geometry(8, geometry=fit, x_labels=["a1"] * 8,
+                                y_labels=["a1"] * 8, label_pad_mm=0.6)
+    plain = solve_corr_geometry(8, geometry=_GEOMETRY, x_labels=["a1"] * 8,
+                                y_labels=["a1"] * 8, label_pad_mm=0.6)
+    assert short.width_mm == pytest.approx(plain.width_mm, abs=1e-6)
+    assert short.panel_rect[0] * short.width_mm == pytest.approx(11.0, abs=1e-6)
+    assert not short.notes
+
+
 def test_the_margin_never_prints_the_panel_on_top_of_the_badge():
     # The one thing the solver still enforces about the margins.
     narrow = {**_GEOMETRY, "margin": {**_GEOMETRY["margin"], "left": 1.0, "bottom": 1.0}}

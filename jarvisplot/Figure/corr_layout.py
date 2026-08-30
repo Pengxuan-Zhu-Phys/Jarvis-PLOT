@@ -167,6 +167,7 @@ def solve_corr_geometry(
     colorbar_labels: Sequence[Any] = (),
     colorbar_title: Any = "",
     label_size_pt: float = 5.5,
+    label_pad_mm: float = 0.0,
     colorbar_label_size_pt: float = 5.5,
     colorbar_title_size_pt: float = 7.0,
     family: str = "sans",
@@ -176,6 +177,11 @@ def solve_corr_geometry(
     ``x_labels`` are rotated 90 degrees, so what they cost the layout is their
     *width* hanging below the panel -- the same measurement as the y labels,
     not their line height.
+
+    ``label_pad_mm`` is the gap the card's tick settings put between the panel
+    and the first glyph of a name, so ``pad + widest label`` is where the text
+    actually ends.  It only matters under ``margin.fit``; without it the fitted
+    margin would end exactly where the text starts to be drawn.
     """
     n = max(int(n), 1)
 
@@ -186,6 +192,18 @@ def solve_corr_geometry(
     m_right = _geom(geometry, "margin", "right", default=11.0)
     m_top = _geom(geometry, "margin", "top", default=4.0)
     m_bottom = _geom(geometry, "margin", "bottom", default=11.0)
+    # `margin.fit` is what to do when a name does not fit the margin it was
+    # given: off, print past it and say so; on, grow the margin to hold it.
+    # Off by default because the fixed margin is what makes the card come out
+    # the same shape on any dataset -- growing is opting back into a figure
+    # whose proportions depend on how long the variable names happen to be.
+    fit = bool(((geometry.get("margin") or {}) if isinstance(geometry, Mapping) else {})
+               .get("fit", False))
+    # Breathing room on a band that had to grow.  Fitting to where the text
+    # ends puts the last glyph exactly on the paper's edge, which reads as a
+    # name that was nearly cut off rather than as one that fits.  Added only
+    # when the margin grows: the card's own number is the card's business.
+    fit_slack = _geom(geometry, "margin", "slack", default=1.0)
     cb_w = _geom(geometry, "colorbar", "width", default=2.6)
     cb_gap = _geom(geometry, "colorbar", "gap", default=0.42)
     # The bar is deliberately shorter than the panel it explains: it is a key,
@@ -220,30 +238,63 @@ def solve_corr_geometry(
     # only thing enforced here is that the badge still fits underneath, since a
     # margin narrower than the mark would print the two on top of each other.
     corner_floor = logo_off + logo_h
-    left_block = max(m_left, corner_floor)
-    # x names print *below* the panel, as they do on every other figure in
-    # this repository -- corrplot's own default is the top, but a reader who
-    # has to look up to find the column name of a cell is being asked to read
-    # the figure backwards from every other one in the same paper.
-    bottom_block = max(m_bottom, corner_floor)
-    right_block = cb_gap + cb_w + m_right
-    top_block = m_top
-
-    # Labels are measured, reported, and then not acted on.  The margin is the
-    # card's call, so a name too long for it is something the reader is told
-    # about -- in the log and on the debug overlay -- rather than something the
-    # layout silently reshapes the whole figure around.
+    # What each band would have to be to hold its text: where the text ends,
+    # which is the pad before the first glyph plus the widest name.  Measured
+    # with the tick font at the tick size, so this is the real edge of the
+    # printed text and not an estimate of it.
+    name_need = label_pad_mm + max(ylab, xlab) + fit_slack
     bar_need = (cblab + 1.2 if cblab else 0.0) + (cbtitle + 0.8 if cbtitle else 0.0)
-    for band, need, have in (
-        ("y", ylab, left_block),
-        ("x", xlab, bottom_block),
-        ("colorbar", bar_need, m_right),
-    ):
-        if need > have:
+
+    if fit:
+        bar_need += fit_slack
+        # One corner for both bands, as below, and it holds the *widest* name
+        # of either -- so fitting can never trade a clipped y name for a
+        # clipped x one.  It only ever grows: the card's margin is the floor.
+        corner = max(m_left, m_bottom, name_need, corner_floor)
+        left_block = bottom_block = corner
+        if corner > max(m_left, m_bottom, corner_floor):
             notes.append(
-                "the {} labels need {:.1f} mm and the margin is {:.1f} mm, so "
-                "they print past it.".format(band, need, have)
+                "margin.fit: the names need {:.1f} mm plus {:.1f} mm of slack, "
+                "so the corner grew from {:.1f} to {:.1f} mm.".format(
+                    name_need - fit_slack, fit_slack, max(m_left, m_bottom), corner)
             )
+        right_margin = max(m_right, bar_need)
+        if right_margin > m_right:
+            notes.append(
+                "margin.fit: the colorbar labels need {:.1f} mm plus {:.1f} mm "
+                "of slack, so the right margin grew from {:.1f} mm.".format(
+                    bar_need - fit_slack, fit_slack, m_right)
+            )
+    else:
+        # The panel sits the same distance from the left edge as from the
+        # bottom edge, because a correlation matrix is a square whose two label
+        # bands hold the same names: an unequal corner reads as a mistake in
+        # the figure rather than as a consequence of the text.  Both numbers
+        # come from the card; the only thing enforced here is that the badge
+        # still fits underneath, since a margin narrower than the mark would
+        # print the two on top of each other.
+        left_block = max(m_left, corner_floor)
+        # x names print *below* the panel, as they do on every other figure in
+        # this repository -- corrplot's own default is the top, but a reader
+        # who has to look up to find the column name of a cell is being asked
+        # to read the figure backwards from every other one in the same paper.
+        bottom_block = max(m_bottom, corner_floor)
+        right_margin = m_right
+        # Measured, reported, and then not acted on.
+        for band, need, have in (
+            ("y", label_pad_mm + ylab, left_block),
+            ("x", label_pad_mm + xlab, bottom_block),
+            ("colorbar", bar_need, m_right),  # no slack added in this branch
+        ):
+            if need > have:
+                notes.append(
+                    "the {} labels need {:.1f} mm and the margin is {:.1f} mm, "
+                    "so they print past it. margin.fit: true grows it "
+                    "instead.".format(band, need, have)
+                )
+
+    right_block = cb_gap + cb_w + right_margin
+    top_block = m_top
 
     clamped = False
     width = left_block + n * cell + right_block

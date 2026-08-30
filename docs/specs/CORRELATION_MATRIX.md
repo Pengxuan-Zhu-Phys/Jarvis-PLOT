@@ -53,6 +53,8 @@ The card authors those margins, in millimetres:
 
 | key | mm | what sits in it |
 |---|---|---|
+| `margin.fit` | `true` | grow a margin that cannot hold its text — see below |
+| `margin.slack` | 1.0 | breathing room added to a band that grew |
 | `margin.left` | 11.0 | the y variable names, and the badge |
 | `margin.bottom` | 11.0 | the x variable names, rotated |
 | `margin.top` | 4.0 | the title |
@@ -81,11 +83,41 @@ debug overlay —
 correlation geometry: the y labels need 11.4 mm and the margin is 11.0 mm, so they print past it.
 ```
 
-— but nothing moves in response: a long name prints past the edge rather than
-pushing the panel over. The one thing enforced is that `margin.left` and
-`margin.bottom` are never smaller than the badge (`logo.offset + logo.height`),
-since a margin narrower than the mark would print the two on top of each other.
-A consequence worth knowing: `tl.pos: n` now frees no width at all.
+— and with `margin.fit: false` nothing moves in response: a long name prints
+past the edge rather than pushing the panel over.
+
+`margin.fit: true`, which the card sets, turns that measurement into an action:
+a band too small for its text grows to `tick pad + widest name + margin.slack`,
+and the note says so instead.
+
+```
+correlation geometry: margin.fit: the names need 12.0 mm plus 1.0 mm of slack, so the corner grew from 11.0 to 13.0 mm.
+```
+
+The slack is why the fit is not exact: growing to where the text *ends* puts its
+last glyph on the edge of the paper, which reads as a name that was nearly cut
+off rather than as one that fits. It is added only to a band that grew — the
+card's own 11 mm is the card's business, and a name that already fits does not
+get pushed outward.
+
+It only ever **grows** — the card's margin is the floor, so a matrix of short
+names keeps the shape the card asked for — and it grows *one* corner for both
+bands, so fitting can never trade a clipped y name for a clipped x one. The
+right margin grows the same way when the colorbar's numbers and label need more
+than it was given.
+
+No trial render is involved, and none is needed: the names are measured with
+the tick font at the tick size, so where the text ends is known before anything
+is drawn. Drawing a figure to find out would produce the same number, one
+discarded figure later. What the fit does *not* know about is a font the
+renderer substitutes for a missing one — measure and draw both ask for the same
+family, but only the draw would notice a fallback.
+
+The one thing enforced regardless is that `margin.left` and `margin.bottom` are
+never smaller than the badge (`logo.offset + logo.height`), since a margin
+narrower than the mark would print the two on top of each other. And note that
+`tl.pos: n` frees no width unless `margin.fit` is on: without it the margin is
+the card's number whether or not anything is printed in it.
 
 The colorbar is deliberately **shorter than the panel** — `colorbar.inset` off each
 end, so 1 cm shorter in total and centred on it. It is a key, not a second data
@@ -234,8 +266,8 @@ it carries an extra block under the caption:
 
 ```
 solved geometry · 13 vars · cell 4.200 mm
-corner 11.000 mm · panel 54.60 mm sq
-figure 79.62 × 69.60 mm
+corner 12.982 mm · panel 54.60 mm sq
+figure 81.60 × 71.58 mm
 ```
 
 The caption reports the size that came *out*; on a solved card that is the least

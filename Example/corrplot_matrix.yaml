@@ -21,7 +21,7 @@
 #        variables  -> 13
 #        order      -> hclust (3 blocks)
 #        cell       -> 4.20 mm
-#        figure     -> 79.62 × 69.60 mm
+#        figure     -> 81.60 × 71.58 mm
 #
 # The `corrplot:` block below takes R's own formals, spelled as R spells them.
 # They divide in two: `order` / `addrect` / `hclust.method` / `tl.pos` / `col`
