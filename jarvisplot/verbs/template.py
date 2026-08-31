@@ -90,6 +90,7 @@ def run(argv: Sequence[str], *, prog: str = "jplot template") -> int:
             "family": spec["family"],
             "requires": spec["requires"],
             "description": spec["description"],
+            "variants": spec.get("variants", []),
             "slots": spec["slots"],
             "yaml_text": yaml_text,
         }

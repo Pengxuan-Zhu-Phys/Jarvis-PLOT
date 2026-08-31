@@ -69,6 +69,9 @@ def test_correlation_capabilities_expose_type_method_and_cards():
         ("corrplot", "diamond"),
     }
     assert "side" in corr_method["style_keys"]["corrplot.diamond"]["corrplot"]
+    assert corr_method["style_options"]["corrplot.diamond"]["side"]["values"] == [
+        "left", "right"
+    ]
 
     styles = {
         (entry["bundle"], entry["token"]): entry for entry in section("styles")
@@ -76,6 +79,15 @@ def test_correlation_capabilities_expose_type_method_and_cards():
     assert styles[("corrplot", "diamond")]["contract"]["layout"] == "diamond"
     assert styles[("corrplot", "matrix")]["layout"] == "matrix"
     assert "stripe" in styles[("corrplot", "diamond")]["style_keys"]["corrplot"]
+    assert styles[("corrplot", "matrix")]["style_options"]["type"]["values"] == [
+        "full", "upper", "lower"
+    ]
+    assert styles[("corrplot", "diamond")]["style_options"]["side"]["values"] == [
+        "left", "right"
+    ]
+    assert styles[("corrplot", "diamond")]["style_options"]["type"]["forbidden"] == [
+        "full"
+    ]
 
 
 def test_cmaps_include_jarvis_and_reversed():

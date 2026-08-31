@@ -246,9 +246,47 @@ TEMPLATE_KINDS: dict[str, dict[str, Any]] = {
         "family": "corrplot",
         "requires": ["data"],
         "description": (
-            "R corrplot on the reserved [corrplot, matrix] card. The figure size is "
-            "solved from the matrix, not declared: no figsize, no rects, no ticks."
+            "R corrplot on the reserved [corrplot, matrix] card by default, or "
+            "[corrplot, diamond] when a rotated triangle with horizontal labels is "
+            "wanted. Both figure sizes are solved from the matrix: no figsize, "
+            "no axes rects, no hand-written ticks."
         ),
+        "variants": [
+            {
+                "name": "matrix",
+                "style": ["corrplot", "matrix"],
+                "selection": "omit style (this is the type default)",
+                "defaults": {
+                    "method": "circle",
+                    "type": "full",
+                    "diag": True,
+                    "order": "original",
+                    "tl.pos": "lt",
+                },
+                "example": "jplot man corrplot --json",
+            },
+            {
+                "name": "diamond",
+                "style": ["corrplot", "diamond"],
+                "selection": "set style: [corrplot, diamond]",
+                "defaults": {
+                    "method": "circle",
+                    "type": "upper",
+                    "diag": False,
+                    "side": "right",
+                    "stripe": "alternate",
+                    "order": "original",
+                    "tl.pos": "l",
+                    "edge.numbers": True,
+                },
+                "constraints": [
+                    "type: full is forbidden; choose upper or lower",
+                    "side is left or right",
+                    "stripe is alternate or none (false is accepted as none)",
+                ],
+                "example": "jplot man corrplot --json",
+            },
+        ],
         "slots": [
             {"name": "name", "type": "string", "default": "correlation", "description": "Figure name"},
             {"name": "data", "type": "dataset_ref", "default": "samples"},

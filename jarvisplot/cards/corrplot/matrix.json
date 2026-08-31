@@ -491,6 +491,17 @@
             }
         }
     },
+    "Options": {
+        "method": {"type": "enum", "values": ["circle", "square", "ellipse", "color", "shade", "pie", "number"], "default": "circle"},
+        "type": {"type": "enum", "values": ["full", "upper", "lower"], "default": "full"},
+        "diag": {"type": "boolean", "default": true},
+        "order": {"type": "enum", "values": ["original", "AOE", "FPC", "hclust", "alphabet"], "default": "original"},
+        "hclust.method": {"type": "enum", "values": ["single", "complete", "average", "weighted", "mcquitty", "median", "centroid", "ward.D", "ward.D2"], "default": "complete"},
+        "addrect": {"type": "integer_or_null", "default": null, "requires": {"order": "hclust"}},
+        "tl.pos": {"type": "enum", "values": ["lt", "tl", "t", "b", "l", "n"], "default": "lt"},
+        "insig": {"type": "enum", "values": ["pch", "blank"], "default": "pch"},
+        "pch": {"type": "enum", "values": ["cross", "x"], "default": "cross"}
+    },
     "Style": {
         "corrplot": {
             "method": "circle",
@@ -501,6 +512,7 @@
             "outline": "sign",
             "outline.lwd": 0.2,
             "addgrid.col": "#C2C2C2",
+            "col": null,
             "order": "original",
             "hclust.method": "complete",
             "addrect": null,

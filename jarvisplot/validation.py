@@ -24,6 +24,8 @@ this module owns             everything a schema cannot see: the
 from __future__ import annotations
 
 import os
+import json
+from pathlib import Path
 from typing import Any
 
 import yaml
@@ -129,6 +131,7 @@ def validate_config(
     _check_unique_names(config, bag)
     _check_layer_sources(config, set(resolved_paths) | _collect_shared_names(config), bag)
     _check_method_contracts(config, bag)
+    _check_corrplot_contracts(config, bag)
     _check_ignored_keys(config, bag)
     if check_columns:
         _check_columns_exist(config, resolved_paths, bag)
@@ -496,6 +499,176 @@ def _check_method_contracts(config: dict[str, Any], bag: DiagnosticBag) -> None:
                         "optional": list(contract.get("optional") or ()),
                     },
                 )
+
+
+# --------------------------------------------------------------------------- #
+# Type-first correlation cards
+# --------------------------------------------------------------------------- #
+
+
+def _check_corrplot_contracts(config: dict[str, Any], bag: DiagnosticBag) -> None:
+    """Validate the corrplot formals that the open delegated schema cannot see.
+
+    ``Figures[].corrplot`` is intentionally delegated because it is lowered
+    into a layer style.  That used to mean a misspelled option, or an option
+    valid on the square card but not the diamond card, survived ``validate``.
+    The card's small ``Options`` block is the source of truth shared with
+    ``jplot cap styles``.
+    """
+    for figure_index, figure in enumerate(config.get("Figures") or ()):
+        if not isinstance(figure, dict) or figure.get("type") != "correlation_matrix":
+            continue
+
+        variant = _corrplot_variant(figure, figure_index, bag)
+        if variant is None:
+            continue
+        options = _load_corrplot_options(variant)
+        if not options:
+            continue
+
+        formals = figure.get("corrplot")
+        if not isinstance(formals, dict):
+            continue
+        base = join_path("Figures", figure_index, "corrplot")
+        allowed = set(options)
+        for key, value in formals.items():
+            path = join_path(base, key)
+            spec = options.get(key)
+            if spec is None:
+                near = did_you_mean(str(key), allowed)
+                hint = f" Did you mean {near[0]!r}?" if near else ""
+                bag.error(
+                    "JP-COR-001",
+                    path,
+                    f"corrplot option {key!r} is not supported by the "
+                    f"[corrplot, {variant}] card.{hint}",
+                    suggestion=(
+                        "Use a key from `jplot cap styles --json` or "
+                        "`jplot man corrplot --json`."
+                    ),
+                    context={"style": ["corrplot", variant], "allowed": sorted(allowed)},
+                )
+                continue
+
+            _check_corrplot_option_value(value, spec, path, variant, bag)
+
+        for key, spec in options.items():
+            if not isinstance(spec, dict) or "requires" not in spec or key not in formals:
+                continue
+            requirements = spec.get("requires")
+            if not isinstance(requirements, dict) or formals.get(key) in (None, False):
+                continue
+            for required_key, required_value in requirements.items():
+                actual = formals.get(required_key)
+                if actual is None:
+                    required_spec = options.get(required_key)
+                    if isinstance(required_spec, dict):
+                        actual = required_spec.get("default")
+                if (
+                    actual is not None
+                    and str(actual).strip().lower() != str(required_value).strip().lower()
+                ):
+                    bag.error(
+                        "JP-COR-004",
+                        join_path(base, key),
+                        f"corrplot option {key!r} requires {required_key}: "
+                        f"{required_value!r}; got {actual!r}",
+                        suggestion=f"Set {required_key}: {required_value} or remove {key}.",
+                        context={"requires": {required_key: required_value}, "actual": actual},
+                    )
+
+
+def _corrplot_variant(
+    figure: dict[str, Any], figure_index: int, bag: DiagnosticBag
+) -> str | None:
+    """Return the selected corrplot card variant, including the type default."""
+    raw = figure.get("style_card", figure.get("style"))
+    if raw is None:
+        return "matrix"
+    tokens = list(raw) if isinstance(raw, (list, tuple)) else [raw]
+    tokens = [str(token).strip().lower() for token in tokens]
+    expected = {("corrplot", "matrix"), ("corrplot", "diamond")}
+    selected = tuple(tokens)
+    if selected in expected:
+        return selected[1]
+    bag.error(
+        "JP-COR-002",
+        join_path("Figures", figure_index, "style"),
+        "correlation_matrix must use the square default or exactly one "
+        "corrplot card: [corrplot, matrix] or [corrplot, diamond]",
+        suggestion="Omit style for the square card, or set style: [corrplot, diamond].",
+        context={
+            "received": raw,
+            "allowed": [["corrplot", "matrix"], ["corrplot", "diamond"]],
+        },
+    )
+    return None
+
+
+def _load_corrplot_options(variant: str) -> dict[str, Any]:
+    path = Path(__file__).with_name("cards") / "corrplot" / f"{variant}.json"
+    try:
+        with path.open(encoding="utf-8") as handle:
+            card = json.load(handle)
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(card, dict):
+        return {}
+    options = card.get("Options")
+    options = options if isinstance(options, dict) else {}
+    # Options describes constrained values; Style.corrplot remains the
+    # authoritative complete key vocabulary (colours, sizes and typography
+    # are legal too, even when they do not need an enum).
+    style = (card.get("Style") or {}).get("corrplot")
+    merged = {
+        str(key): (options.get(key) if key in options else {})
+        for key in (style or {})
+    }
+    merged.update(options)
+    return merged
+
+
+def _check_corrplot_option_value(
+    value: Any,
+    spec: dict[str, Any],
+    path: str,
+    variant: str,
+    bag: DiagnosticBag,
+) -> None:
+    values = spec.get("values")
+    if isinstance(values, list):
+        if value is False and spec.get("false_alias") in values:
+            return
+        folded = {str(item).lower(): item for item in values}
+        if not isinstance(value, str) or value.lower() not in folded:
+            bag.error(
+                "JP-COR-003",
+                path,
+                f"corrplot option must be one of {values}; got {value!r}",
+                suggestion=f"Choose a value from `jplot cap styles --json` for the {variant} card.",
+                context={"style": ["corrplot", variant], "values": values},
+            )
+        return
+
+    kind = str(spec.get("type", ""))
+    boolean_value = isinstance(value, bool) or (
+        isinstance(value, str)
+        and value.lower() in {"true", "false", "yes", "no", "1", "0"}
+    )
+    integer_or_null = value is None or (
+        isinstance(value, int) and not isinstance(value, bool)
+    )
+    valid = (kind == "boolean" and boolean_value) or (
+        kind == "integer_or_null" and integer_or_null
+    )
+    if kind and not valid:
+        bag.error(
+            "JP-COR-003",
+            path,
+            f"corrplot option expects {kind}; got {type(value).__name__}",
+            suggestion="Use the type and default shown by `jplot cap styles --json`.",
+            context={"style": ["corrplot", variant], "expected": kind, "received": value},
+        )
 
 
 # --------------------------------------------------------------------------- #
