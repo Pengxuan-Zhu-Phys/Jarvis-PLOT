@@ -1298,3 +1298,33 @@ def test_the_rules_between_the_names_start_where_the_cells_meet():
     )
     # and without the diagonal the two are the same number, as they always were
     assert reach((0.0, 4.0), (-0.4, 0.0)) == pytest.approx((-0.4, 0.0))
+
+
+def test_the_tint_is_the_bottom_layer_and_is_one_layer():
+    # The tint is the background the figure is drawn *on*, so it takes the
+    # lowest layer on the axes rather than one derived from the glyph's. A
+    # zorder relative to the glyphs lands above the 2.5 an axis draws its own
+    # tick labels at, which is how the longest name on the figure once lost
+    # half of its first letter to a tint that reached past the panel.
+    from jarvisplot.Figure.corrplot_runtime import _TINT_ZORDER
+
+    ax = _axes(6)
+    draw_corrplot(
+        ax, __df__=_long_table(), __corr_layout__="diamond", type="upper",
+        method="color", diag=True, __corr_label_mm__=12.0,
+        __corr_blocks__=[[0, 2], [3, 5]], **{"addgrid.col": "#C2C2C2"},
+    )
+    tint = [
+        a for a in list(ax.collections) + list(ax.patches)
+        if a.get_zorder() == pytest.approx(_TINT_ZORDER)
+    ]
+    # its three pieces -- the cells, the notch, the band under the label --
+    # are one band and carry one number
+    assert len(tint) >= 3
+    assert _TINT_ZORDER < 2.5, "an axis draws its tick labels at 2.5"
+    # and everything the figure draws over it is above it
+    above = [
+        a.get_zorder() for a in ax.collections
+        if a.get_zorder() != pytest.approx(_TINT_ZORDER)
+    ]
+    assert above and min(above) > _TINT_ZORDER

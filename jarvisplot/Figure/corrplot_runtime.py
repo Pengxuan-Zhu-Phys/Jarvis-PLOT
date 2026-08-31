@@ -161,6 +161,14 @@ _DIAMOND_ROUND = 1.0 / np.sqrt(2.0)
 #: because a divider that is *nearly* the cell divider reads as a mistake.
 _GRID_LWD = 0.3
 
+#: Where the tint sits: under everything.  It is the background the figure is
+#: drawn *on*, so it takes the lowest layer on the axes rather than one derived
+#: from the glyph's -- an axis draws its own tick labels at 2.5, and a tint
+#: placed relative to the glyphs lands above that and prints over the names.
+#: Its three pieces (the cells, the notch, the band under the label) are one
+#: band and share one number, so they cannot drift apart.
+_TINT_ZORDER = 0.4
+
 #: Square glyphs are a polygon per cell and nothing else, so they skip the
 #: patch objects entirely -- see :func:`_glyph_vertices`.
 _POLYGON_GLYPHS = ("square", "color", "shade")
@@ -487,7 +495,7 @@ def _stripe_the_labels(ax, n: int, shaded, span, color, clip: bool) -> None:
         ax.axhspan(
             k - 0.5, k + 0.5, xmin=span[0], xmax=span[1],
             facecolor=color, edgecolor="none", linewidth=0.0,
-            zorder=0.5, clip_on=clip,
+            zorder=_TINT_ZORDER, clip_on=clip,
         )
 
 
@@ -904,7 +912,7 @@ def draw_corrplot(ax, **kwargs):
                 np.stack([ix[band], iy[band]], axis=1)[:, None, :]
                 + 0.5 * _DIAMOND_CORNERS[None, :, :],
                 closed=True, facecolors=stripe_color, edgecolors="none",
-                zorder=zorder - 20,
+                zorder=_TINT_ZORDER,
             )
             cells.set_clip_on(clip)
             ax.add_collection(cells)
@@ -913,7 +921,7 @@ def draw_corrplot(ax, **kwargs):
         # The diagonal moves this, it does not remove it: see `_notch_vertices`.
         notches = PolyCollection(
             _notch_vertices(n, side, diag)[shaded], closed=True,
-            facecolors=stripe_color, edgecolors="none", zorder=zorder - 20,
+            facecolors=stripe_color, edgecolors="none", zorder=_TINT_ZORDER,
         )
         notches.set_clip_on(clip)
         ax.add_collection(notches)
