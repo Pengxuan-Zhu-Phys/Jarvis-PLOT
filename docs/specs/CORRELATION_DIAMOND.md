@@ -59,9 +59,26 @@ Read off what it implies, because every later section is a consequence:
   `n-1` rows tall and `n/2` wide — **height / width = 2(n-1)/n**, which is
   1.85 at n = 13 and approaches 2. Near enough to "twice as tall" to plan
   with, and the exact ratio is what the tests pin.
-- **`diag`.** A self-pair lands at `u = 0`, half of it outside the panel. The
-  reference diagram omits it and so should the default: `diag: false` on this
-  card. With `diag: true` the panel simply starts at `u = -½`.
+- **`diag`.** On by default. A self-pair lands at `u = 0`, so half of an
+  ordinary cell would hang off the matrix and print over the names — and
+  clipping it instead leaves a triangle, half the area of every other cell,
+  which reads as a fainter diagonal rather than as the constant it is. It is
+  neither: the cell keeps its point into the matrix and is **squared off on the
+  outside**, and the rectangle that squares it off is exactly deep enough to
+  pay back what the clip took. The triangle is ¼ and the rectangle is `a × 1`,
+  so `a = ¼` puts the pentagon at ½ — a whole cell's area, at every
+  `glyph.scale`, which is the only way a diagonal of constant `rho` can look
+  constant.
+
+  It fits without moving anything. The wedge beside each name is empty by
+  construction — it is what `_notch_vertices` used to fill, and with the
+  diagonal in, that fill goes: the self cell stands there itself and squares
+  off the same edge. Only the quarter cell outside is new page, so `diag`
+  pushes `v` out by the usual half cell and `u` by a **quarter**.
+
+  Every shape built from the cell takes the pentagon there — the fill and the
+  grid outline. The round glyphs do not: a circle is a circle, and at `rho = 1`
+  it reaches 0.07 cells past the panel, into a gap 1.6 mm wide.
 
 `side` names the side the *labels* go on, and the card's default is
 **`side: right`** — names on the right, colorbar on the left, the triangle

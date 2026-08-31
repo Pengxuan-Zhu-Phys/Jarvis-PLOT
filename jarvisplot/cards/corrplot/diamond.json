@@ -496,7 +496,7 @@
     "Options": {
         "method": {"type": "enum", "values": ["circle", "square", "ellipse", "color", "shade", "pie", "number"], "default": "circle"},
         "type": {"type": "enum", "values": ["upper", "lower"], "default": "upper", "forbidden": ["full"]},
-        "diag": {"type": "boolean", "default": false},
+        "diag": {"type": "boolean", "default": true},
         "side": {"type": "enum", "values": ["left", "right"], "default": "right"},
         "stripe": {"type": "enum", "values": ["alternate", "none"], "default": "alternate", "false_alias": "none"},
         "order": {"type": "enum", "values": ["original", "AOE", "FPC", "hclust", "alphabet"], "default": "original"},
@@ -511,7 +511,7 @@
         "corrplot": {
             "method": "circle",
             "type": "upper",
-            "diag": false,
+            "diag": true,
             "glyph.scale": 0.9,
             "ellipse.scale": 1.4,
             "outline": "sign",
