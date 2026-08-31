@@ -111,6 +111,8 @@ def agent_topic_data(topic: str) -> dict[str, Any]:
         "write_yaml": False,
         "card_version": int(card.get("card_version", 1)),
     }
+    if isinstance(agent.get("verification"), dict) and agent["verification"]:
+        data["verification"] = agent["verification"]
     # Live method / transform pages attach structured contract blobs.
     if "method" in card:
         data["method"] = card["method"]

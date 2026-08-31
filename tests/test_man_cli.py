@@ -174,6 +174,52 @@ def test_man_single_method_json(capsys):
     assert data["examples"]
 
 
+def test_man_corrplot_json_has_both_type_first_forms_and_verification(capsys):
+    assert main(["man", "corrplot", "--json"]) == 0
+    env = json.loads(capsys.readouterr().out)
+    data = env["data"]
+
+    assert data["method"]["name"] == "corrplot"
+    titles = {item["title"] for item in data["examples"]}
+    assert titles == {"square correlation matrix", "diamond correlation matrix"}
+    yaml_by_title = {item["title"]: item["yaml"] for item in data["examples"]}
+    assert "type: correlation_matrix" in yaml_by_title["square correlation matrix"]
+    assert "style: [corrplot, diamond]" in yaml_by_title["diamond correlation matrix"]
+    verification = next(section for section in data["sections"] if section["id"] == "verification")
+    names = {item["name"] for item in verification["items"]}
+    assert names == {"validate", "doctor", "render"}
+    assert any(
+        item["argv"] == ["jplot", "doctor", "<yaml>", "--json"]
+        for item in verification["items"]
+    )
+    assert data["verification"]["doctor"]["argv"] == [
+        "jplot",
+        "doctor",
+        "<yaml>",
+        "--json",
+    ]
+
+
+def test_man_correlation_type_json_has_both_forms(capsys):
+    assert main(["man", "type-correlation-matrix", "--json"]) == 0
+    env = json.loads(capsys.readouterr().out)
+    data = env["data"]
+    assert len(data["examples"]) == 2
+    assert any("style: [corrplot, diamond]" in item["yaml"] for item in data["examples"])
+    assert any(
+        item["argv"] == ["jplot", "validate", "<yaml>", "--json"]
+        for section in data["sections"]
+        if section["id"] == "verification"
+        for item in section["items"]
+    )
+    assert data["verification"]["validate"]["argv"] == [
+        "jplot",
+        "validate",
+        "<yaml>",
+        "--json",
+    ]
+
+
 def test_man_method_dot_form(capsys):
     assert main(["man", "method.pcolormesh", "--json"]) == 0
     env = json.loads(capsys.readouterr().out)
