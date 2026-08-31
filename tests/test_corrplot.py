@@ -1049,3 +1049,47 @@ def test_the_ellipse_turns_with_the_cell_on_the_diamond():
     # left at 45 degrees the same ellipse reaches `A*sqrt2`, which is `k/sqrt2`
     # at |rho| = 1 -- a quarter again wider than the cell it belongs to
     assert k / np.sqrt(2.0) > 0.5
+
+
+def _polygon_area(poly) -> float:
+    x, y = np.asarray(poly)[:, 0], np.asarray(poly)[:, 1]
+    return 0.5 * abs(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1)))
+
+
+def test_a_self_pair_is_a_pentagon_with_a_whole_cells_area():
+    # A variable's pair with itself sits at u = 0, so half an ordinary cell
+    # would hang off the matrix and print over the names.  Clipping it leaves a
+    # triangle -- half the area of every other cell, which reads as a fainter
+    # diagonal rather than as the constant it is.  So the cell keeps its point
+    # into the matrix, is squared off outside, and the rectangle that squares
+    # it off is exactly deep enough to pay back what the clip took.
+    from jarvisplot.Figure.corrplot_runtime import _self_cell_vertices
+
+    for scale in (1.0, 0.9, 0.5):
+        pentagon = _self_cell_vertices([3.0], scale=scale)[0]
+        assert pentagon.shape == (5, 2)
+        # the rhombus with unit diagonals is 1/2; the pentagon matches it at
+        # every scale, which is the whole point of the shape
+        assert _polygon_area(pentagon) == pytest.approx(0.5 * scale ** 2, abs=1e-12)
+        # squared off outside, pointed inside, and never past a quarter cell
+        assert pentagon[:, 0].min() == pytest.approx(-0.25 * scale, abs=1e-12)
+        assert pentagon[:, 0].max() == pytest.approx(0.5 * scale, abs=1e-12)
+        # the flat edge is the two outer corners, at u = 0 on the inner pair
+        assert list(pentagon[:, 1]) == pytest.approx(
+            [3 - 0.5 * scale, 3 - 0.5 * scale, 3.0, 3 + 0.5 * scale, 3 + 0.5 * scale]
+        )
+    # and the mirror negates u, like everything else about `side`
+    assert np.allclose(
+        _self_cell_vertices([3.0], side="right")[0][:, 0],
+        -_self_cell_vertices([3.0])[0][:, 0],
+    )
+
+
+def test_the_panel_buys_only_the_quarter_cell_the_pentagon_needs():
+    # `diag` pushes v out by the usual half cell, but u by a quarter: what
+    # stands at u = 0 is the pentagon, not a diamond, and a quarter is all of it
+    # that lies outside the matrix.
+    from jarvisplot.Figure.corr_layout_diamond import diamond_extent
+
+    assert diamond_extent(10, diag=True) == (-0.25, 5.0, -0.5, 9.5)
+    assert diamond_extent(10, diag=False) == (0.0, 5.0, 0.0, 9.0)

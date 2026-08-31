@@ -171,6 +171,53 @@ _POLYGON_GLYPHS = ("square", "color", "shade")
 _FILLED_GLYPHS = ("color", "shade")
 
 
+#: How far a self cell reaches past the matrix's near edge, in cells.  See
+#: :func:`_self_cell_vertices` -- it is what makes the pentagon's area a cell.
+_SELF_REACH = 0.25
+
+
+def _self_cell_vertices(rows, side: str = "left", scale: float = 1.0):
+    """``(m, 5, 2)`` outlines for the cells on the diagonal.
+
+    A variable's pair with *itself* sits at ``u = 0``, so half of an ordinary
+    cell would hang off the matrix and print over the names.  Clipping it
+    instead leaves a triangle -- half the area of every other cell, which reads
+    as a fainter diagonal rather than as the constant it is.
+
+    So it is neither: the cell keeps its point into the matrix and is squared
+    off on the outside, and the rectangle that squares it off is exactly deep
+    enough to pay back what the clip took.  The triangle is ``1/4``, the
+    rectangle is ``a x 1``, so ``a = 1/4`` puts the pentagon at ``1/2`` -- the
+    area of a whole cell, for every variable, which is the only way a diagonal
+    of constant rho can look constant.
+
+    It fits without moving anything: the wedge beside each name is empty by
+    construction (see :func:`_notch_vertices`, which is what used to fill it)
+    and the quarter cell outside is page the panel takes from the gap.
+
+    ``scale`` shrinks it about ``(0, k)`` exactly as ``glyph.scale`` shrinks
+    every other cell.  Without it these are the only shapes on the figure drawn
+    at full size, and since they also stack without a gap in ``v`` they fuse
+    into one bar down the edge instead of reading as a cell each.
+    """
+    k = np.asarray(rows, dtype=float)
+    flip = -1.0 if side == "right" else 1.0
+    zero = np.zeros_like(k)
+    half = 0.5 * float(scale)
+    back = flip * -2.0 * _SELF_REACH * half + zero
+    point, edge = flip * half + zero, half
+    return np.stack(
+        [
+            np.stack([back, k - edge], axis=1),
+            np.stack([zero, k - edge], axis=1),
+            np.stack([point, k], axis=1),
+            np.stack([zero, k + edge], axis=1),
+            np.stack([back, k + edge], axis=1),
+        ],
+        axis=1,
+    )
+
+
 def _notch_vertices(n: int, side: str = "left"):
     """The half cells that make the matrix's near edge straight.
 
@@ -788,14 +835,34 @@ def draw_corrplot(ax, **kwargs):
             ax.add_collection(cells)
         # The half cells beside the names, so the band reaches the matrix and
         # the edge it makes is straight enough for the rules to close against.
-        notches = PolyCollection(
-            _notch_vertices(n, side)[shaded], closed=True,
-            facecolors=stripe_color, edgecolors="none", zorder=zorder - 20,
-        )
-        notches.set_clip_on(clip)
-        ax.add_collection(notches)
+        # Only when the diagonal is out: with it in, the self cell stands in
+        # that wedge itself and squares off the same edge (see
+        # `_self_cell_vertices`), so filling it again would be the same tint
+        # laid down twice under a cell that is already there.
+        if not diag:
+            notches = PolyCollection(
+                _notch_vertices(n, side)[shaded], closed=True,
+                facecolors=stripe_color, edgecolors="none", zorder=zorder - 20,
+            )
+            notches.set_clip_on(clip)
+            ax.add_collection(notches)
         if label_span is not None:
             _stripe_the_labels(ax, n, shaded, label_span, stripe_color, clip)
+
+    # The diagonal, when it is in.  Every shape built from the cell -- the fill,
+    # the grid outline -- takes the pentagon there instead of the diamond.
+    def _with_self_cells(shapes, mask, closed_loop: bool, shape_scale=1.0):
+        if not diamond or not np.any(mask):
+            return shapes
+        out = [np.asarray(shape) for shape in shapes]
+        pentagons = _self_cell_vertices(iy[mask], side, shape_scale)
+        for slot, pentagon in zip(np.flatnonzero(mask), pentagons):
+            out[slot] = (
+                np.vstack([pentagon, pentagon[:1]]) if closed_loop else pentagon
+            )
+        return out
+
+    self_cells = drawn & (index_x.astype(int) == index_y.astype(int))
 
     artists = None
     if kind == "number":
@@ -805,9 +872,12 @@ def draw_corrplot(ax, **kwargs):
     else:
         if kind in _POLYGON_GLYPHS:
             artists = PolyCollection(
-                _glyph_vertices(
-                    kind, ix[drawn], iy[drawn], rho[drawn], scale,
-                    corners=_DIAMOND_CORNERS if diamond else _CORNERS,
+                _with_self_cells(
+                    _glyph_vertices(
+                        kind, ix[drawn], iy[drawn], rho[drawn], scale,
+                        corners=_DIAMOND_CORNERS if diamond else _CORNERS,
+                    ),
+                    self_cells[drawn], closed_loop=False, shape_scale=scale,
                 ),
                 closed=True,
             )
@@ -884,8 +954,11 @@ def draw_corrplot(ax, **kwargs):
         # of them.  The outline has to be per cell rather than n+1 ruled lines
         # because a `triangle` selection leaves holes for the ruling to cross.
         grid = LineCollection(
-            np.stack([ix, iy], axis=1)[:, None, :]
-            + (_DIAMOND_LOOP if diamond else _CELL_LOOP)[None, :, :],
+            _with_self_cells(
+                np.stack([ix, iy], axis=1)[:, None, :]
+                + (_DIAMOND_LOOP if diamond else _CELL_LOOP)[None, :, :],
+                self_cells, closed_loop=True,
+            ),
             colors=grid_color, linewidths=_GRID_LWD, zorder=zorder - 10,
         )
         grid.set_clip_on(clip)

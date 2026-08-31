@@ -61,12 +61,16 @@ def diamond_extent(n: int, *, diag: bool = False) -> tuple[float, float, float, 
     ``n-1`` sit -- the first and last name line up with the top and bottom of
     the diamond, as they must.
 
-    With ``diag`` the self-pairs come in at ``u = 0`` and push both ranges out
-    by half a cell.
+    With ``diag`` the self-pairs come in at ``u = 0``.  They push ``v`` out by
+    the usual half cell, but ``u`` by only a *quarter*: a self cell is not a
+    diamond, it is the pentagon of :func:`corrplot_runtime._self_cell_vertices`
+    -- squared off on the outside so it does not print over the names, and
+    squared off exactly deep enough to keep a whole cell's area.  That depth is
+    all the panel has to buy.
     """
     n = max(int(n), 2)
     if diag:
-        return -0.5, n / 2.0, -0.5, n - 0.5
+        return -0.25, n / 2.0, -0.5, n - 0.5
     return 0.0, n / 2.0, 0.0, float(n - 1)
 
 

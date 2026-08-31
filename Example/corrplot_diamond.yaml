@@ -26,6 +26,12 @@
 # out along that name's V, so a reader can carry one variable across a lattice
 # of diagonals. `corrplot: {stripe: none}` turns it off.
 #
+# The diagonal is in by default, and it is a pentagon rather than a cell: a
+# self-pair sits at u = 0, so half a cell would hang over the names and a
+# clipped one would be half the area of its neighbours. Squared off outside,
+# with the rectangle deep enough to pay the clip back, it is a whole cell's
+# area for every variable.
+#
 # The default is the triangle on the left of the page: names on the right,
 # colorbar on the left. `side: left` mirrors the whole figure the other way.
 # Either way it is one sign flip in the map, not a second code path.
@@ -99,6 +105,14 @@ Figures:
     corrplot:
       method: ellipse
       order: AOE
+
+  # -- the fill, where the pentagon on the diagonal is plain to see -----------
+  - name: corrplot_diamond_color
+    type: correlation_matrix
+    style: [corrplot, diamond]
+    data: wide
+    variables: {regex: '^a'}
+    corrplot: {method: color, order: hclust}
 
   # -- the solve, printed on the figure ---------------------------------------
   - name: corrplot_diamond_debug
