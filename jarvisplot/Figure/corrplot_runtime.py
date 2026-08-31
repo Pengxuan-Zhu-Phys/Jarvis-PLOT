@@ -395,13 +395,25 @@ def _label_rules(ax, n: int, span, color, lw: float, clip: bool,
     colour and weight rather than a nearby pair, because a divider that only
     nearly matches reads as a second, different thing.
 
+    It starts where the *cells* meet, not where the axes end.  Two cells of one
+    row touch at ``u = 0`` whichever layout is drawn -- without the diagonal
+    that is also the panel's near edge, so the two were the same number and the
+    difference never showed.  With the diagonal the panel reaches half a cell
+    further out, and a rule begun at the edge leaves that half cell unruled:
+    the line between two names starts in mid air instead of at the matrix.
+
     Below the tick labels, like the band: an axis draws its labels at zorder
     2.5, and a rule over one of them is a strike-through.
     """
     from matplotlib.collections import LineCollection
 
     target = ax.ax if hasattr(ax, "ax") else ax
-    x0, x1 = span
+    try:
+        lo, hi = target.get_xlim()
+        meet = (0.0 - float(lo)) / (float(hi) - float(lo))
+    except Exception:
+        meet = span[1] if span[0] < 0.0 else span[0]
+    x0, x1 = min(span[0], meet), max(span[1], meet)
     rules = LineCollection(
         [[(x0, k + 0.5), (x1, k + 0.5)] for k in range(int(n) - 1)],
         colors=color, linewidths=lw, zorder=0.6,

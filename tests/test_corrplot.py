@@ -1267,3 +1267,34 @@ def test_only_a_glyph_that_fills_its_cell_takes_the_pentagon():
     assert "square" in _POLYGON_GLYPHS and "square" not in _FILLED_GLYPHS
     assert 6 in diagonal_shapes("color")        # pentagon, closed by the path
     assert 6 not in diagonal_shapes("square")   # ordinary diamond only
+
+
+def test_the_rules_between_the_names_start_where_the_cells_meet():
+    # Two cells of one row touch at `u = 0` whichever layout is drawn. Without
+    # the diagonal that is also the panel's near edge, so starting the rule at
+    # the edge happened to be right; with it the panel reaches half a cell
+    # further out and the rule began in mid air, half a cell clear of the
+    # matrix it is supposed to run out of.
+    from matplotlib.collections import LineCollection
+
+    from jarvisplot.Figure.corrplot_runtime import _GRID_LWD, _label_rules
+
+    def reach(xlim, span):
+        ax = _axes(7)
+        ax.set_xlim(*xlim)
+        _label_rules(ax, 7, span, "#C2C2C2", _GRID_LWD, False, 1.0)
+        drawn = [c for c in ax.collections if isinstance(c, LineCollection)][0]
+        xs = np.asarray(drawn.get_segments())[:, :, 0]
+        return xs.min(), xs.max()
+
+    # names on the left, diagonal in: the panel runs to u = -1/2 but the cells
+    # stop at 0, which is axes fraction 0.5 / 4.5 along
+    lo, hi = -0.5, 4.0
+    inner = (0.0 - lo) / (hi - lo)
+    assert reach((lo, hi), (-0.4, 0.0)) == pytest.approx((-0.4, inner))
+    # mirrored
+    assert reach((-4.0, 0.5), (1.0, 1.4)) == pytest.approx(
+        ((0.0 + 4.0) / 4.5, 1.4)
+    )
+    # and without the diagonal the two are the same number, as they always were
+    assert reach((0.0, 4.0), (-0.4, 0.0)) == pytest.approx((-0.4, 0.0))
