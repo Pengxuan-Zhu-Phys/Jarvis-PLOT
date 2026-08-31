@@ -1010,3 +1010,42 @@ def test_the_rules_between_the_names_are_the_cell_grid():
     # below the tick labels, which an axis draws at 2.5: a rule over a name is
     # a strike-through
     assert drawn[0].get_zorder() < 2.5
+
+
+def test_the_ellipse_turns_with_the_cell_on_the_diamond():
+    # `ellipse` is the one glyph with a direction, and its direction is a
+    # statement about the two axes of the cell it sits in.  The index map sends
+    # that frame through a +45 degree rotation, so the glyph has to follow: left
+    # behind, every ellipse on the figure reports the wrong pair *and* spills
+    # out of its own cell.
+    from jarvisplot.Figure.corrplot_runtime import _DIAMOND_ROUND, _glyph_patches
+
+    for sign in (1.0, -1.0):
+        square = _glyph_patches("ellipse", [0.0], [0.0], np.array([0.8]), 0.9, sign)
+        turned = _glyph_patches(
+            "ellipse", [0.0], [0.0], np.array([0.8]), 0.9, sign, diamond=True
+        )
+        assert (turned[0].angle - square[0].angle) % 180 == pytest.approx(45.0)
+
+    # ...and the reason it matters, as a measurement.  The rotated cell is
+    # `|du| + |dv| <= 1/2`, and the furthest an ellipse reaches in that norm is
+    # `sqrt(A^2 + B^2)` -- which is `k/2` for every rho, because the two axes
+    # are `k*sqrt(1±r)/(2*sqrt2)` and the squares add back to `k^2/4`.
+    scale = 0.9 * _DIAMOND_ROUND
+    k = scale * 1.4
+    for rho in (-0.9, -0.5, 0.0, 0.5, 0.9):
+        patch = _glyph_patches(
+            "ellipse", [0.0], [0.0], np.array([rho]), scale, -1.0, diamond=True
+        )[0]
+        a, b = patch.width / 2.0, patch.height / 2.0
+        assert np.hypot(a, b) == pytest.approx(k / 2.0, abs=1e-9)
+    # |rho| = 1 collapses the minor axis, which the hairline floor holds just
+    # off zero, so that one reaches a hair further -- and still fits
+    for rho in (-1.0, 1.0):
+        patch = _glyph_patches(
+            "ellipse", [0.0], [0.0], np.array([rho]), scale, -1.0, diamond=True
+        )[0]
+        assert np.hypot(patch.width / 2.0, patch.height / 2.0) <= 0.5
+    # left at 45 degrees the same ellipse reaches `A*sqrt2`, which is `k/sqrt2`
+    # at |rho| = 1 -- a quarter again wider than the cell it belongs to
+    assert k / np.sqrt(2.0) > 0.5

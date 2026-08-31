@@ -895,8 +895,17 @@ def _prebuild_one(core, info: dict, card: Mapping) -> None:
     _enforce_corr_contract(info, contract, name)
 
     source = entry.get("source")
-    dts = (getattr(core, "dataset_registry", {}) or {}).get(
-        source if isinstance(source, str) else None
+    # A correlation layer may intentionally concatenate several root
+    # datasets.  The runtime already supports source lists; the prebuild only
+    # needs one member's cheap column metadata to solve the shared geometry.
+    # Use the first registered member (the input tables are required to carry
+    # the same schema), while leaving the complete source list for the actual
+    # correlation transform below.
+    registry = getattr(core, "dataset_registry", {}) or {}
+    source_names = [source] if isinstance(source, str) else list(source or [])
+    dts = next(
+        (registry.get(item) for item in source_names if isinstance(item, str) and registry.get(item) is not None),
+        None,
     )
     names = list(getattr(dts, "keys", None) or [])
     if not names:

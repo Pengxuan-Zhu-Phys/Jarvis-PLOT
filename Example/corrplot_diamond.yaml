@@ -87,6 +87,19 @@ Figures:
       method: square
       order: hclust
 
+  # -- the one glyph with a direction -----------------------------------------
+  # `ellipse` is the pictogram of a scatter with this correlation, so which way
+  # it leans is a statement about the two axes of the cell it sits in. Turned
+  # 45 degrees with the lattice, as every other glyph is.
+  - name: corrplot_diamond_ellipse
+    type: correlation_matrix
+    style: [corrplot, diamond]
+    data: wide
+    variables: {regex: '^a'}
+    corrplot:
+      method: ellipse
+      order: AOE
+
   # -- the solve, printed on the figure ---------------------------------------
   - name: corrplot_diamond_debug
     type: correlation_matrix

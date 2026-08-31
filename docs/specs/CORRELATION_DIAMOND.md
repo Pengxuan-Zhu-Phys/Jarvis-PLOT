@@ -213,6 +213,7 @@ author does not choose it, the card does.
 | colorbar | a bar beside the panel, in its own band of width | inside the empty triangle above the matrix; ticks and axis label on opposite sides of it |
 | `outline: sign` | unchanged | unchanged |
 | `pch` | the square cell's diagonals — a cross | the rotated cell's diagonals — a plus, the same construction seen from 45° |
+| `ellipse` | leans `/` at `rho > 0` | turned 45° with the lattice: the lean is a statement about the cell's own two axes, and the index map rotates that frame |
 | ellipse angle | 45° in screen space | **unchanged, deliberately** — the pictogram is about the scatter plot, not about the matrix's orientation |
 
 New and specific to this layout:
@@ -295,6 +296,17 @@ New and specific to this layout:
   figure all reach `name_pad_mm`, so the numbering falls outside all three. A
   box drawn round the tag would say it was part of the name. That one number
   travels as `__corr_label_mm__` and is the reach of all three.
+- **`ellipse`** — the only glyph with a direction, and the only one that had to
+  learn the layout. Which way it leans says something about the two axes of the
+  cell it sits in, and the map sends that frame through a +45° rotation (`j+1`
+  goes to `(+½, +½)` and `i+1` to `(−½, +½)`). Left at the square card's angle
+  it reports the wrong pair *and* spills its own cell: the rotated cell is
+  `|du| + |dv| ≤ ½` and an ellipse at 45° reaches `k/√2 = 0.63` in that norm at
+  `|rho| = 1`, where turned it reaches `k/2 = 0.45` for *every* rho — the two
+  semi-axes are `k√(1±r)/(2√2)` and their squares add back to `k²/4`.
+  `side: right` needs no case of its own: it reflects rather than rotates,
+  sending an angle `A` to `135 − A`, which differs from `A + 45` by 180 exactly
+  when it differs at all — and an ellipse's angle is read modulo 180.
 - **`edge.lwd` / `edge.col`** — the outline that closes the figure, at the cell
   grid's own weight (0.3): it bounds the matrix, so it should not read heavier
   than the matrix's own lines. Turned 45°,

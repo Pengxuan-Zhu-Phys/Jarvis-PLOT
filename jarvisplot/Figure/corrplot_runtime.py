@@ -464,7 +464,7 @@ def _glyph_vertices(kind: str, cx, cy, rho, scale: float, corners=None):
 
 
 def _glyph_patches(kind: str, cx, cy, rho, scale: float, sign: float,
-                   ellipse_scale: float = 1.4):
+                   ellipse_scale: float = 1.4, diamond: bool = False):
     """One matplotlib patch per drawn cell, in data coordinates.
 
     Only the round glyphs come through here; the square ones are built as bare
@@ -494,7 +494,22 @@ def _glyph_patches(kind: str, cx, cy, rho, scale: float, sign: float,
             # the box does not -- so at k = glyph.scale the widest one covers
             # 0.64 of the cell while a circle covers 0.9.  sqrt(2) is the
             # factor that makes the two agree, which is where 1.4 comes from.
+            #
+            # And it is the *cell's* diagonal, not the page's.  `ellipse` is
+            # the one glyph with a direction, and its direction means something
+            # about the two axes of the cell it sits in: turn the lattice 45
+            # degrees and leave the ellipse behind and every one of them is
+            # reporting the wrong pair.  The index map sends the cell's own
+            # frame through a +45 degree rotation (`j+1` goes to `(+1/2, +1/2)`
+            # and `i+1` to `(-1/2, +1/2)`), so the glyph turns with it.
+            #
+            # `side: right` negates u, which reflects rather than rotates and
+            # sends an angle A to 135 - A.  It needs no case of its own: the
+            # angle here is a constant +/-45, and 135 - A and A + 45 differ by
+            # 180 exactly when they differ at all -- and an ellipse's angle is
+            # read modulo 180.
             k = scale * ellipse_scale
+            lean = sign * 45.0 + (45.0 if diamond else 0.0)
             r = 0.0 if not np.isfinite(r) else float(np.clip(r, -1.0, 1.0))
             width = k * np.sqrt(max(1.0 + r, 0.0)) / np.sqrt(2.0)
             # |rho| = 1 collapses the minor axis to zero, which fills no
@@ -503,7 +518,7 @@ def _glyph_patches(kind: str, cx, cy, rho, scale: float, sign: float,
             # as a line, so the minor axis gets a hairline floor.
             height = max(k * np.sqrt(max(1.0 - r, 0.0)) / np.sqrt(2.0), 0.02 * k)
             patches.append(
-                Ellipse((x, y), width=width, height=height, angle=sign * 45.0)
+                Ellipse((x, y), width=width, height=height, angle=lean)
             )
         elif kind == "pie":
             # Clockwise from twelve o'clock, as read off the page.
@@ -800,7 +815,7 @@ def draw_corrplot(ax, **kwargs):
             artists = PatchCollection(
                 _glyph_patches(
                     kind, ix[drawn], iy[drawn], rho[drawn], round_scale, sign,
-                    ellipse_scale=ellipse_scale,
+                    ellipse_scale=ellipse_scale, diamond=diamond,
                 ),
                 match_original=False,
             )
