@@ -70,35 +70,40 @@ Read off what it implies, because every later section is a consequence:
   `glyph.scale`, which is the only way a diagonal of constant `rho` can look
   constant.
 
-  It fits without moving anything. The wedge beside each name is empty by
-  construction — it is what `_notch_vertices` used to fill, and with the
-  diagonal in, that fill goes: the self cell stands there itself and squares
-  off the same edge. Only the quarter cell outside is new page, so `diag`
-  pushes `v` out by the usual half cell and `u` by a **quarter**.
+  The wedge beside each name is empty by construction — it is what
+  `_notch_vertices` used to fill, and with the diagonal in, that fill goes: the
+  self cell stands there itself and squares off the same edge.
 
-  Every shape built from the cell takes the pentagon there — the fill, the grid
-  outline **and the tint**. That last one is not tidiness. Only
+  **The pentagon is a fill, and only a fill.** It is how a glyph that covers
+  its cell keeps a whole cell's area against the edge, so it is taken by the
+  fill and by that fill's grid outline — and by nothing else:
+
+  - The **round glyphs** do not take it: a circle is a circle. `pie` and
+    `ellipse` likewise.
+  - The **grid outline under a round glyph** does not either. It would draw a
+    boundary the glyph does not keep — the flat backs line up into a grey rail
+    down the edge of the matrix with the circles straddling it. There the
+    diagonal carries no outline at all; `edge.lwd` already closes the matrix.
+  - The **tint** does not. It is a background and has to reach the panel's
+    edge, or the band it carries from the name into the matrix comes apart on
+    the diagonal rows.
+
+  Which is why `diag` pushes **both** ranges out by the usual half cell, not by
+  the quarter the pentagon reaches: the panel has to hold whatever shape the
+  method draws, and the widest of them is the circle at `rho = 1`, which needs
+  0.32. At the quarter it overhung by 0.07 cells — 0.3 mm, but 0.3 mm off the
+  one gap the eye checks, the channel between the matrix and the names, and
+  narrowed on the diagonal rows alone.
+
+  That half cell is also what keeps the tint off the names. Only
   `_stripe_the_labels` is drawn below the axis' own zorder of 2.5; everything
-  else on this figure sits far above it, so a tint *diamond* on the diagonal
-  hangs a quarter cell past the panel and prints **over** the name beside it —
-  which is how the longest name on the figure lost the left half of its first
-  letter. Each of the three is drawn for a different set of cells (the fill for
-  what is drawn, the tint for the shaded band, the grid for everything), so the
-  substitution takes the selection mask the shapes were built from rather than
-  assuming one.
-
-  The round glyphs do not take it: a circle is a circle, and at `rho = 1` it
-  reaches 0.07 cells past the panel, into a gap 1.6 mm wide. Nor does the
-  **grid outline** under one — the pentagon is a shape for glyphs that *fill*
-  their cell, and outlining it under a circle draws a boundary the glyph does
-  not keep: the flat backs line up into a grey rail down the edge of the matrix
-  with the circles straddling it. There the diagonal simply carries no outline;
-  `edge.lwd` already closes the matrix.
-
-  Two conversions had to learn the quarter cell as well. The closing rule is
+  else sits far above it, so a tint reaching past the panel prints **over** the
+  name beside it, which is how the longest name on the figure once lost the
+  left half of its first letter. The fix is the clearance, not the shape.
+  Two conversions had to learn the extra cell as well. The closing rule is
   drawn in cell units from a column measured in millimetres, and it took the
-  panel to be `n/2` cells wide (it is `n/2 + ¼`) with its near edge at `u = 0`
-  (it is `−¼`). Both are now read off the axes, and the invariant the tests
+  panel to be `n/2` cells wide (it is `n/2 + ½`) with its near edge at `u = 0`
+  (it is `−½`). Both are now read off the axes, and the invariant the tests
   pin is the one that survives either mistake: **the rule ends exactly where
   the label column does.**
 

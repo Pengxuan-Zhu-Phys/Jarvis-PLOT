@@ -864,12 +864,14 @@ def draw_corrplot(ax, **kwargs):
         band = shaded[index_x.astype(int)] | shaded[index_y.astype(int)]
         band &= drawn
         if np.any(band):
+            # The tint is a background and keeps the plain cell, diagonal
+            # included: it has to reach the panel's edge or the band it carries
+            # from the name into the matrix comes apart there.  It can, because
+            # the panel buys the whole half cell -- which is also what stops it
+            # printing over the names, and that is a clearance, not a shape.
             cells = PolyCollection(
-                _with_self_cells(
-                    np.stack([ix[band], iy[band]], axis=1)[:, None, :]
-                    + 0.5 * _DIAMOND_CORNERS[None, :, :],
-                    band, closed_loop=False,
-                ),
+                np.stack([ix[band], iy[band]], axis=1)[:, None, :]
+                + 0.5 * _DIAMOND_CORNERS[None, :, :],
                 closed=True, facecolors=stripe_color, edgecolors="none",
                 zorder=zorder - 20,
             )

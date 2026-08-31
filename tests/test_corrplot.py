@@ -1085,16 +1085,6 @@ def test_a_self_pair_is_a_pentagon_with_a_whole_cells_area():
     )
 
 
-def test_the_panel_buys_only_the_quarter_cell_the_pentagon_needs():
-    # `diag` pushes v out by the usual half cell, but u by a quarter: what
-    # stands at u = 0 is the pentagon, not a diamond, and a quarter is all of it
-    # that lies outside the matrix.
-    from jarvisplot.Figure.corr_layout_diamond import diamond_extent
-
-    assert diamond_extent(10, diag=True) == (-0.25, 5.0, -0.5, 9.5)
-    assert diamond_extent(10, diag=False) == (0.0, 5.0, 0.0, 9.0)
-
-
 def test_a_self_pair_is_a_pentagon_with_a_whole_cells_area():
     # A variable's pair with itself sits at `u = 0`, so half an ordinary cell
     # would hang off the matrix and print over the names.  Clipping it leaves a
@@ -1123,18 +1113,22 @@ def test_a_self_pair_is_a_pentagon_with_a_whole_cells_area():
     assert np.allclose(right[:, 1], left[:, 1])
 
 
-def test_the_diagonal_costs_the_panel_a_quarter_cell_not_a_half():
-    # `u_lo` is the pentagon's reach, which is all the panel has to buy: a
-    # whole half cell would be page paid for a shape that is not drawn.
-    from jarvisplot.Figure.corrplot_runtime import _SELF_REACH
+def test_the_diagonal_costs_the_panel_a_whole_half_cell():
+    # The pentagon only reaches a quarter, but the panel buys the half: that
+    # shape is how a *fill* keeps a whole cell's area against the edge, and the
+    # round glyphs do not take it.  At the quarter a circle overhung the panel
+    # by 0.07 cells -- 0.3 mm, but 0.3 mm off the one gap the eye checks, the
+    # channel between the matrix and the names, and only on the diagonal rows.
+    from jarvisplot.Figure.corrplot_runtime import _DIAMOND_ROUND, _SELF_REACH
 
     off = diamond_extent(9, diag=False)
     on = diamond_extent(9, diag=True)
-    assert off[0] == 0.0 and on[0] == pytest.approx(-_SELF_REACH)
-    # v still gains the usual half cell at each end -- there the self cell is
-    # an ordinary cell's height
+    assert off[0] == 0.0 and on[0] == pytest.approx(-0.5)
     assert (on[2], on[3]) == pytest.approx((-0.5, 8.5))
     assert (off[2], off[3]) == pytest.approx((0.0, 8.0))
+    # the half is what the widest glyph on the diagonal actually needs
+    circle_radius = 0.5 * 0.9 * _DIAMOND_ROUND
+    assert _SELF_REACH < circle_radius <= 0.5
 
 
 def test_the_diagonal_is_only_outlined_where_a_glyph_fills_it():
