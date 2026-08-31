@@ -93,6 +93,59 @@ Figures:
       method: square
       order: hclust
 
+  # -- every method, on the same eight variables ------------------------------
+  # The diagonal is where the layouts differ: a self pair sits at u = 0, half
+  # of an ordinary cell outside the matrix. Each method answers that its own
+  # way, so each one is drawn here rather than described.
+  - name: diag_circle
+    type: correlation_matrix
+    style: [corrplot, diamond]
+    data: wide
+    variables: {regex: '^a0[1-8]$'}
+    corrplot: {method: circle, order: hclust}
+
+  - name: diag_square
+    type: correlation_matrix
+    style: [corrplot, diamond]
+    data: wide
+    variables: {regex: '^a0[1-8]$'}
+    corrplot: {method: square, order: hclust}
+
+  - name: diag_ellipse
+    type: correlation_matrix
+    style: [corrplot, diamond]
+    data: wide
+    variables: {regex: '^a0[1-8]$'}
+    corrplot: {method: ellipse, order: hclust}
+
+  - name: diag_color
+    type: correlation_matrix
+    style: [corrplot, diamond]
+    data: wide
+    variables: {regex: '^a0[1-8]$'}
+    corrplot: {method: color, order: hclust}
+
+  - name: diag_shade
+    type: correlation_matrix
+    style: [corrplot, diamond]
+    data: wide
+    variables: {regex: '^a0[1-8]$'}
+    corrplot: {method: shade, order: hclust}
+
+  - name: diag_pie
+    type: correlation_matrix
+    style: [corrplot, diamond]
+    data: wide
+    variables: {regex: '^a0[1-8]$'}
+    corrplot: {method: pie, order: hclust}
+
+  - name: diag_number
+    type: correlation_matrix
+    style: [corrplot, diamond]
+    data: wide
+    variables: {regex: '^a0[1-8]$'}
+    corrplot: {method: number, order: hclust}
+
   # -- the one glyph with a direction -----------------------------------------
   # `ellipse` is the pictogram of a scatter with this correlation, so which way
   # it leans is a statement about the two axes of the cell it sits in. Turned

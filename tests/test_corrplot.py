@@ -1186,3 +1186,84 @@ def test_the_closing_rule_ends_where_the_names_end():
         for rule in rules:
             outer = np.asarray(rule.get_xdata())[0]
             assert (outer - lo) / (hi - lo) == pytest.approx(want, abs=1e-9)
+
+
+def test_the_notch_moves_with_the_diagonal_rather_than_going_away():
+    # Whatever stands at u = 0 meets the edge beside the names at a *point*, so
+    # the tint carrying a variable's band in from its name pinches to nothing
+    # there unless the notch fills it.  The diagonal moves that gap; it does
+    # not close it -- an earlier version assumed it did and the band broke on
+    # every shaded row.
+    from jarvisplot.Figure.corrplot_runtime import _notch_vertices
+
+    plain = _notch_vertices(5)
+    assert plain.shape == (5, 3, 2)                      # a triangle, inside
+    assert np.allclose(plain[0], [[0.0, -0.5], [0.5, 0.0], [0.0, 0.5]])
+
+    # with the diagonal the near edge is u = -1/2 and the self cell's own
+    # corner is the point, so the gap either side of it is the rectangle
+    boxed = _notch_vertices(5, diag=True)
+    assert boxed.shape == (5, 4, 2)
+    assert np.allclose(boxed[0], [[-0.5, -0.5], [0.0, -0.5], [0.0, 0.5], [-0.5, 0.5]])
+    assert boxed[:, :, 0].min() == pytest.approx(-0.5)   # it reaches the panel
+    assert boxed[:, :, 0].max() == pytest.approx(0.0)    # and stops at the cell
+    # and it mirrors, like everything else about `side`
+    assert np.allclose(_notch_vertices(5, "right", True)[:, :, 0],
+                       -boxed[:, :, 0])
+
+
+def test_the_shade_hatch_is_drawn_for_the_cell_it_is_in():
+    # The hatch runs corner to corner of the cell, and *which* corners is the
+    # layout's business.  Drawn to `(+/-1, +/-1) * half` on the diamond it
+    # reaches `half * sqrt2` where the cell only reaches `half / sqrt2` --
+    # twice too long, over the boundary and into the neighbour, on every cell.
+    from matplotlib.collections import LineCollection
+
+    def strokes(layout):
+        ax = _axes(6)
+        draw_corrplot(
+            ax, __df__=_long_table(), method="shade", diag=True,
+            **({"__corr_layout__": "diamond", "type": "upper"} if layout else {}),
+        )
+        hatch = [
+            c for c in ax.collections
+            if isinstance(c, LineCollection)
+            and all(len(seg) == 2 for seg in c.get_segments())
+            and c.get_colors()[0][:3].tolist() == [1.0, 1.0, 1.0]
+        ]
+        assert len(hatch) == 1
+        return np.asarray(hatch[0].get_segments())
+
+    half = 0.5 * 0.9
+    square = strokes(False)
+    # the square cell's own diagonal: half in x and half in y
+    assert np.abs(square[:, 1] - square[:, 0]).max() == pytest.approx(2 * half)
+
+    diamond = strokes(True)
+    span = diamond[:, 1] - diamond[:, 0]
+    # the rotated cell's corners are straight up and straight across, so one
+    # axis carries the whole stroke and the other carries none
+    assert np.allclose(np.minimum(np.abs(span[:, 0]), np.abs(span[:, 1])), 0.0)
+    assert np.abs(span).max() == pytest.approx(2 * half)
+
+
+def test_only_a_glyph_that_fills_its_cell_takes_the_pentagon():
+    # `square` covers its cell at |rho| = 1 but shrinks below it, so it is a
+    # glyph *in* the cell, not the cell -- on the diagonal it draws the
+    # ordinary diamond.  `color` and `shade` are the cell.
+    from jarvisplot.Figure.corrplot_runtime import _FILLED_GLYPHS, _POLYGON_GLYPHS
+    from matplotlib.collections import PolyCollection
+
+    def diagonal_shapes(method):
+        ax = _axes(6)
+        draw_corrplot(ax, __df__=_long_table(), __corr_layout__="diamond",
+                      type="upper", method=method, diag=True, stripe="none")
+        fills = [c for c in ax.collections if isinstance(c, PolyCollection)]
+        assert len(fills) == 1
+        return {len(p) for p in fills[0].get_paths()[0].vertices[:0]} or {
+            len(np.asarray(p.vertices)) for p in fills[0].get_paths()
+        }
+
+    assert "square" in _POLYGON_GLYPHS and "square" not in _FILLED_GLYPHS
+    assert 6 in diagonal_shapes("color")        # pentagon, closed by the path
+    assert 6 not in diagonal_shapes("square")   # ordinary diamond only
