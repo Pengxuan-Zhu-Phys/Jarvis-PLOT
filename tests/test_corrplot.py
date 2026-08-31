@@ -19,6 +19,7 @@ import pandas as pd
 import pytest
 
 from jarvisplot.Figure.corr_layout import max_label_mm, solve_corr_geometry
+from jarvisplot.Figure.corr_layout_diamond import diamond_extent, solve_diamond_geometry
 from jarvisplot.core_runtime import _attach_corr_debug, _corr_debug_lines
 from jarvisplot.Figure.corr_order import ORDERS, order_columns
 from jarvisplot.Figure.correlation_runtime import (
@@ -594,3 +595,383 @@ def test_a_misspelled_selector_is_refused():
 def test_the_macro_needs_a_source():
     with pytest.raises(ValueError, match="requires a data source"):
         expand_figure_type({"name": "c", "type": "correlation_matrix"})
+
+
+# --------------------------------------------------------------------------- #
+# the diamond card: one triangle, turned 45 degrees
+# --------------------------------------------------------------------------- #
+
+_DIAMOND = {
+    "units": "mm",
+    "pitch": 4.2,
+    "pitch_min": 2.6,
+    "max_height": 247.0,
+    "max_width": 170.0,
+    "labels": {"gap": 1.4, "width": None},
+    "margin": {"fit": True, "slack": 1.0, "top": 4.0, "right": 4.0,
+               "bottom": 4.0, "left": 4.0},
+    "colorbar": {"width": 2.6, "length": 0.22, "offset": 10.0},
+    "logo": {"width": 5.0, "height": 5.0, "offset": 0.838},
+}
+
+
+def test_the_map_gathers_a_variables_pairs_into_one_v():
+    # The property the whole card rests on: every cell variable k appears in
+    # satisfies `v - |u| == k` or `v + |u| == k`, so its pairs are two rays
+    # meeting at (0, k) -- which is exactly where its name is printed.
+    from jarvisplot.Figure.corrplot_runtime import _diamond_uv
+
+    n = 9
+    ix, iy = np.meshgrid(np.arange(n), np.arange(n))
+    ix, iy = ix.ravel(), iy.ravel()
+    keep = ix > iy                                    # the upper triangle
+    u, v = _diamond_uv(ix[keep], iy[keep])
+    for k in range(n):
+        mine = (ix[keep] == k) | (iy[keep] == k)
+        # each of k's cells sits on one of the two rays out of (0, k)
+        on_ray = np.isclose(v[mine] - u[mine], k) | np.isclose(v[mine] + u[mine], k)
+        assert on_ray.all(), k
+    # and nothing else is on those rays
+    assert np.isclose(u, 0.0).sum() == 0              # no self-pairs drawn
+
+
+def test_the_right_hand_figure_is_the_mirror_and_nothing_else():
+    labels = ["v%02d" % i for i in range(12)]
+    left = solve_diamond_geometry(12, geometry=_DIAMOND, labels=labels, side="left")
+    right = solve_diamond_geometry(12, geometry=_DIAMOND, labels=labels, side="right")
+
+    assert left.width_mm == pytest.approx(right.width_mm, abs=1e-9)
+    assert left.height_mm == pytest.approx(right.height_mm, abs=1e-9)
+    assert left.panel_rect[2:] == pytest.approx(right.panel_rect[2:], abs=1e-12)
+    # u negated, and the two bands swap sides: the names are always the band
+    # against the panel's own edge, and the bar is always the other one.
+    assert left.xlim == (0.0, 6.0) and right.xlim == (-6.0, -0.0)
+    assert left.panel_rect[0] * left.width_mm == pytest.approx(
+        left.label_block_mm, abs=1e-9
+    )
+    right_gap = (1.0 - right.panel_rect[0] - right.panel_rect[2]) * right.width_mm
+    assert right_gap == pytest.approx(right.label_block_mm, abs=1e-9)
+    assert left.colorbar_rect[0] > right.colorbar_rect[0]
+
+
+def test_the_panel_is_a_row_per_variable_and_half_as_wide():
+    geom = solve_diamond_geometry(21, geometry=_DIAMOND, labels=["v"] * 21)
+    lo_u, hi_u, lo_v, hi_v = diamond_extent(21)
+    assert geom.panel_h_mm == pytest.approx((hi_v - lo_v) * geom.pitch_mm, abs=1e-9)
+    assert geom.panel_w_mm == pytest.approx((hi_u - lo_u) * geom.pitch_mm, abs=1e-9)
+    # (n-1) tall against n/2 wide: about twice, exactly 2(n-1)/n.
+    assert geom.panel_h_mm / geom.panel_w_mm == pytest.approx(2 * 20 / 21, abs=1e-9)
+
+
+def test_the_diamond_runs_out_of_page_height_not_width():
+    # The opposite bound from the square card, and the clamp says which.
+    tall = solve_diamond_geometry(70, geometry=_DIAMOND, labels=["v%02d" % i for i in range(70)])
+    assert tall.clamped
+    assert tall.height_mm == pytest.approx(247.0, abs=1e-6)
+    assert tall.width_mm < 170.0
+    assert tall.pitch_mm < 4.2
+    assert any("height pinned" in note for note in tall.notes)
+
+
+def test_below_the_pitch_floor_the_names_would_collide():
+    huge = solve_diamond_geometry(140, geometry=_DIAMOND, labels=["v"] * 140)
+    assert huge.pitch_mm == pytest.approx(2.6, abs=1e-9)
+    assert huge.height_mm > 247.0
+    assert any("the names collide" in note for note in huge.notes)
+
+
+def test_the_label_column_is_measured_and_the_stripe_stops_at_the_text():
+    short = solve_diamond_geometry(8, geometry=_DIAMOND, labels=["a1"] * 8)
+    long_ = solve_diamond_geometry(8, geometry=_DIAMOND, labels=["a_long_name"] * 8)
+    # At a 4 mm page margin even a two-character name asks for more, so the
+    # floor is the margin and the column is whatever the names need above it.
+    assert short.label_block_mm >= 4.0
+    assert long_.label_block_mm > short.label_block_mm
+    # The band the stripes use is the text, not the column: the page margin
+    # under a short name stays white instead of bleeding to the paper edge.
+    assert short.label_text_mm < short.label_block_mm
+    assert long_.label_text_mm == pytest.approx(long_.label_block_mm - 1.0, abs=1e-9)
+
+
+def test_a_block_of_variables_is_boxed_as_a_triangle():
+    from jarvisplot.Figure.corrplot_runtime import _diamond_block
+
+    box = _diamond_block(2, 6)
+    assert box == [(0.0, 1.5), (2.5, 4.0), (0.0, 6.5)]
+    # mirrored, and nothing else, on the right-hand figure
+    assert _diamond_block(2, 6, "right") == [(-u, v) for u, v in box]
+
+
+def test_the_diamond_refuses_the_whole_matrix():
+    table = _long_table()
+    with pytest.raises(ValueError, match="type: full on the diamond"):
+        draw_corrplot(_axes(3), __df__=table, __corr_layout__="diamond", type="full")
+
+
+def test_the_colorbar_stands_in_the_empty_triangle():
+    # Turning the matrix leaves a right-angled hole above it as big as the
+    # matrix itself.  The bar goes in the hole rather than beside the panel,
+    # so the figure is the names plus the panel and nothing else -- and three
+    # numbers place it: top aligned with the panel, `colorbar.length` of the
+    # panel's height, and `colorbar.offset` in from the edge of the paper.
+    labels = ["v%02d" % i for i in range(24)]
+    # spelled out: the card's default is the other mirror, and every number
+    # below is written for the names on the left
+    geom = solve_diamond_geometry(24, geometry=_DIAMOND, labels=labels, side="left")
+
+    panel_x0, panel_y0, panel_w, panel_h = geom.panel_rect
+    bar_x0, bar_y0, bar_w, bar_h = geom.colorbar_rect
+    assert bar_y0 + bar_h == pytest.approx(panel_y0 + panel_h, abs=1e-12)
+    assert bar_h * geom.height_mm == pytest.approx(0.22 * geom.panel_h_mm, abs=1e-9)
+    assert geom.width_mm - (bar_x0 + bar_w) * geom.width_mm == pytest.approx(
+        10.0, abs=1e-9
+    )
+    assert not geom.notes
+
+    # Above the matrix's own upper boundary, which is the line v = u - 1/2:
+    # the bar's lowest point has to clear the diagonal under its near edge.
+    near_u = (bar_x0 - panel_x0) * geom.width_mm / geom.pitch_mm
+    diagonal_mm = (near_u - 0.5) * geom.pitch_mm
+    assert bar_h * geom.height_mm < diagonal_mm
+
+    # and the figure pays for the names, the panel and the page margin only
+    assert geom.width_mm == pytest.approx(
+        geom.label_block_mm + geom.panel_w_mm + 4.0, abs=1e-9
+    )
+
+
+def test_the_three_colorbar_numbers_are_never_overridden():
+    # Top, length and offset are the author's three numbers, and the solve
+    # realises them -- on every size of matrix and both mirrors, including the
+    # tight ones.  An earlier version shortened the bar to fit a clearance
+    # allowance of its own and so drew a figure that did not have the length it
+    # was asked for, with nothing on the page saying so.
+    for side in ("left", "right"):
+        for n in (10, 13, 16, 24):
+            geom = solve_diamond_geometry(
+                n, geometry=_DIAMOND, labels=["v%02d" % i for i in range(n)],
+                side=side, edge_numbers=True, colorbar_title=r"$\rho$",
+                colorbar_labels=["-1.0", "-0.5", "0", "0.5", "1.0"],
+            )
+            bar_x0, bar_y0, bar_w, bar_h = geom.colorbar_rect
+            panel_x0, panel_y0, panel_w, panel_h = geom.panel_rect
+            assert bar_y0 + bar_h == pytest.approx(panel_y0 + panel_h, abs=1e-12)
+            assert bar_h * geom.height_mm == pytest.approx(
+                0.22 * geom.panel_h_mm, abs=1e-9
+            )
+            outer = (
+                geom.width_mm - (bar_x0 + bar_w) * geom.width_mm
+                if side == "left" else bar_x0 * geom.width_mm
+            )
+            assert outer == pytest.approx(10.0, abs=1e-9)
+
+
+def test_a_tight_triangle_is_reported_not_resized():
+    # The check is a measurement, not a limit.  At ten variables the text
+    # beside the bar comes within a cell of the diagonal -- worth saying, and
+    # worth naming the key that fixes it, but not worth silently redrawing the
+    # figure the author asked for.
+    geom = solve_diamond_geometry(
+        10, geometry=_DIAMOND, labels=["v%02d" % i for i in range(10)],
+        edge_numbers=True, colorbar_title=r"$\rho$",
+        colorbar_labels=["-1.0", "-0.5", "0", "0.5", "1.0"],
+    )
+    assert geom.colorbar_rect[3] * geom.height_mm == pytest.approx(
+        0.22 * geom.panel_h_mm, abs=1e-9
+    )
+    assert any("colorbar.offset" in note for note in geom.notes)
+
+    # A bar that really would run over the cells says *that* instead, and is
+    # still drawn at the length it was given.
+    crossing = solve_diamond_geometry(
+        10, geometry={**_DIAMOND, "colorbar": {**_DIAMOND["colorbar"],
+                                               "length": 0.9}},
+        labels=["v%02d" % i for i in range(10)],
+    )
+    assert crossing.colorbar_rect[3] * crossing.height_mm == pytest.approx(
+        0.9 * crossing.panel_h_mm, abs=1e-9
+    )
+    assert any("across the cells" in note for note in crossing.notes)
+
+
+def test_the_page_margins_are_symmetric_top_to_bottom():
+    # Nothing prints above the matrix and nothing below it, so an uneven pair
+    # would read as a figure sitting crookedly rather than as a title band.
+    geom = solve_diamond_geometry(10, geometry=_DIAMOND, labels=["v"] * 10)
+    top = (1.0 - geom.panel_rect[1] - geom.panel_rect[3]) * geom.height_mm
+    bottom = geom.panel_rect[1] * geom.height_mm
+    assert top == pytest.approx(bottom, abs=1e-9)
+    assert top == pytest.approx(4.0, abs=1e-9)
+
+
+def test_the_shading_follows_the_clusters_when_there_are_any():
+    # The reference diagram tints groups of rows, not every other one, and the
+    # clusters are the groups: with `addrect` the tint is what says where one
+    # ends and the next begins, which is what the boxes were for.
+    from jarvisplot.Figure.corrplot_runtime import _shaded_variables
+
+    blocks = [[0, 2], [3, 5], [6, 9]]
+    shaded = _shaded_variables(10, blocks)
+    assert list(np.flatnonzero(shaded)) == [0, 1, 2, 6, 7, 8, 9]
+    # and without clusters it falls back to every other name
+    assert list(np.flatnonzero(_shaded_variables(6))) == [1, 3, 5]
+
+
+def test_the_badge_takes_the_corner_the_names_are_not_in():
+    # 4 mm margins leave no room under the last name for a 5.8 mm mark, and on
+    # this layout the opposite corner is empty by construction -- the last
+    # variable's only cell sits at u = 1/2.  The house offset is unchanged.
+    left = solve_diamond_geometry(9, geometry=_DIAMOND, labels=["v"] * 9, side="left")
+    right = solve_diamond_geometry(9, geometry=_DIAMOND, labels=["v"] * 9, side="right")
+    assert left.logo_rect[0] * left.width_mm == pytest.approx(
+        left.width_mm - 0.838 - 5.0, abs=1e-9
+    )
+    assert right.logo_rect[0] * right.width_mm == pytest.approx(0.838, abs=1e-9)
+    for geom in (left, right):
+        assert geom.logo_rect[1] * geom.height_mm == pytest.approx(0.838, abs=1e-9)
+
+    # and a card that wants it back on the left says so
+    pinned = solve_diamond_geometry(
+        9, geometry={**_DIAMOND, "logo": {**_DIAMOND["logo"], "corner": "bottom-left"}},
+        labels=["v"] * 9, side="left",
+    )
+    assert pinned.logo_rect[0] * pinned.width_mm == pytest.approx(0.838, abs=1e-9)
+
+
+def test_the_notch_makes_the_edge_beside_the_names_straight():
+    # A variable's two edge cells meet at a point, so the boundary is a
+    # sawtooth; the notch fills it, and its two outer corners are exactly where
+    # the closing rules run -- half a row above the first name and below the
+    # last.
+    from jarvisplot.Figure.corrplot_runtime import _notch_vertices
+
+    notches = _notch_vertices(5)
+    assert notches.shape == (5, 3, 2)
+    assert np.allclose(notches[0], [[0.0, -0.5], [0.5, 0.0], [0.0, 0.5]])
+    assert np.allclose(notches[4], [[0.0, 3.5], [0.5, 4.0], [0.0, 4.5]])
+    # every notch touches u = 0 twice, which is what makes the edge straight
+    assert np.allclose(notches[:, ::2, 0], 0.0)
+    # and the mirror points the other way, like everything else about `side`
+    assert np.allclose(_notch_vertices(5, "right")[:, 1, 0], -0.5)
+
+
+def test_the_numbers_beside_the_names_are_a_column_of_their_own():
+    # `edge.numbers` prints a variable's position three times: at the end of
+    # each arm of its V, and once beside its name.  The third copy is not part
+    # of the tick label -- it is set smaller and lighter, and a tick label is
+    # one string in one colour -- so the band becomes two columns and the solve
+    # has to pay for both.
+    from jarvisplot.Figure.corr_layout import max_label_mm
+
+    labels = ["mu", "m_gluino", "Omega_h2"] * 4
+    plain = solve_diamond_geometry(12, geometry=_DIAMOND, labels=labels)
+    numbered = solve_diamond_geometry(
+        12, geometry=_DIAMOND, labels=labels, edge_numbers=True, number_size_pt=4.2,
+    )
+    # the names cost the same either way; the numbers are the difference
+    assert numbered.name_pad_mm == pytest.approx(plain.name_pad_mm, abs=1e-9)
+    digits = max_label_mm(["%02d" % k for k in range(1, 13)], size_pt=4.2)
+    assert numbered.number_pad_mm - numbered.name_pad_mm == pytest.approx(
+        digits + 1.0, abs=1e-9                      # labels.number_gap
+    )
+    assert numbered.label_block_mm - plain.label_block_mm == pytest.approx(
+        digits + 1.0, abs=1e-9
+    )
+    # unnumbered there is no second column, so the two anchors are one anchor
+    assert plain.number_pad_mm == pytest.approx(plain.name_pad_mm, abs=1e-9)
+
+
+def test_the_tightness_is_measured_against_whichever_text_ends_up_inward():
+    # The numbers print on the bar's left and the label on its right on both
+    # mirrors, so *which* of them stands between the bar and the diagonal is
+    # the mirror's doing -- and the two are obstructions of different shapes:
+    # the numbers are a column as tall as the bar, the label one turned line at
+    # its mid height.  Neither resizes anything; they decide what is reported.
+    labels = ["v%02d" % i for i in range(9)]
+    plain = dict(geometry=_DIAMOND, labels=labels)
+
+    # On a right-hand diamond the label is inward and the numbers are outward,
+    # where they have the page margin: only the label can make it tight.
+    assert not solve_diamond_geometry(
+        9, side="right", colorbar_labels=["-1.0", "1.0"], **plain
+    ).notes
+    assert solve_diamond_geometry(
+        9, side="right", colorbar_title=r"$\rho$", **plain
+    ).notes
+
+    # On a left-hand diamond they swap.
+    assert solve_diamond_geometry(
+        9, side="left", colorbar_labels=["-1.0", "1.0"], **plain
+    ).notes
+    assert not solve_diamond_geometry(
+        9, side="left", colorbar_title=r"$\rho$", **plain
+    ).notes
+
+    # A matrix with room to spare says nothing about either of them.
+    wide = ["v%02d" % i for i in range(30)]
+    for side in ("left", "right"):
+        assert not solve_diamond_geometry(
+            30, geometry=_DIAMOND, labels=wide, side=side,
+            colorbar_title=r"$\rho$", colorbar_labels=["-1.0", "1.0"],
+        ).notes
+
+
+def test_the_edge_numbers_are_set_across_the_edge_a_settable_gap_off_it():
+    # They name the arms of the V they stand at the end of, so they have to
+    # read as part of the matrix rather than as a scale printed beside it --
+    # set *across* the edge, like the leader on a dimension, because text lying
+    # along a diagonal is text the reader has to tilt their head to take in.
+    from jarvisplot.Figure.corr_layout import max_label_mm
+    from jarvisplot.Figure.corrplot_runtime import _edge_numbers
+
+    root = 1.0 / np.sqrt(2.0)
+    pitch_pt = 12.0
+    # `gap` is the clearance to the *near end of the text*, so the rest is
+    # measured: the cell face at 0.5 / sqrt(2), half the text's width (which
+    # lies along the normal now that it is turned), and one more sqrt(2) for
+    # striking the whole offset along the diagonal.
+    half = (max_label_mm("0", size_pt=4.2) / 25.4 * 72.0 / 2.0) / pitch_pt
+    for gap in (0.06, 0.4):
+        want = (0.5 * root + gap + half) * root
+        ax = _axes(6)
+        _edge_numbers(ax, 6, "left", 4.2, "#6E6E6E", False, 10.0,
+                      gap=gap, pitch_pt=pitch_pt)
+        first = ax.texts[0]
+        assert first.get_position() == pytest.approx((want, -want), abs=1e-12)
+        assert first.get_text() == "1"
+        # across the edge, not along it: the upper edge runs at -45 degrees
+        assert first.get_rotation() == pytest.approx(45.0)
+        assert ax.texts[1].get_rotation() == pytest.approx(315.0)
+
+
+def test_everything_that_follows_the_names_stops_at_the_names():
+    # A position is a tag *on* the row, not part of it.  So the tint, the rules
+    # between the names and the outline that closes the figure all reach the
+    # names' own outer edge and no further, and the numbering falls outside all
+    # three -- a box drawn round the tag would say it was part of the name.
+    labels = ["mu", "m_gluino", "Omega_h2"] * 4
+    geom = solve_diamond_geometry(
+        12, geometry=_DIAMOND, labels=labels, edge_numbers=True, number_size_pt=4.2,
+    )
+    assert geom.name_pad_mm < geom.number_pad_mm <= geom.label_text_mm
+
+
+def test_the_rules_between_the_names_are_the_cell_grid():
+    # A row of the label column *is* a row of the matrix, so the line dividing
+    # two names is the line dividing two cells -- the same colour and the same
+    # weight, not a nearby pair, and one fewer than there are names.
+    from matplotlib.collections import LineCollection
+
+    from jarvisplot.Figure.corrplot_runtime import _GRID_LWD, _label_rules
+
+    ax = _axes(7)
+    _label_rules(ax, 7, (-0.4, 0.0), "#C2C2C2", False, 1.0)
+    drawn = [c for c in ax.collections if isinstance(c, LineCollection)]
+    assert len(drawn) == 1
+    segments = drawn[0].get_segments()
+    assert len(segments) == 6                       # between, not through
+    assert [seg[0][1] for seg in segments] == [0.5, 1.5, 2.5, 3.5, 4.5, 5.5]
+    assert drawn[0].get_linewidths()[0] == pytest.approx(_GRID_LWD)
+    # below the tick labels, which an axis draws at 2.5: a rule over a name is
+    # a strike-through
+    assert drawn[0].get_zorder() < 2.5

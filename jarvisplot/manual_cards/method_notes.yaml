@@ -59,9 +59,10 @@ voronoif:
 corrplot:
   summary: "Correlation matrix in R's corrplot style; draws the `correlation` transform's long table."
   notes:
-    - "Reserved: only the [corrplot, matrix] style card provides its axes (axcorr / axccorr)."
+    - "Reserved: only the [corrplot, matrix] or [corrplot, diamond] style card provides its axes (axcorr / axccorr)."
     - "No coordinates needed — x_index / y_index / rho are the transform's own output columns."
     - "style takes R's formals: method (circle|square|ellipse|color|shade|pie|number), type, diag, glyph.scale, outline, addgrid.col, plus the card's own ellipse.scale."
+    - "Use [corrplot, matrix] for the square matrix; [corrplot, diamond] keeps one triangle, rotates it 45 degrees, and adds side: left|right (default right, which puts the triangle on the left of the page) plus stripe: alternate|none."
     - "order (original|AOE|FPC|hclust|alphabet) and addrect are resolved before the figure is built, then written into the transform's `columns`."
     - "sig.level switches on the significance test; unlike R no p.mat is needed, because the table carries n per pair."
     - "The glyph is sized from the solved cell and the coefficient text is back-solved from it, so both survive the 170 mm width clamp."
@@ -69,6 +70,7 @@ corrplot:
     - "addrect needs order: hclust — the boxes are cuts of that tree, so there is nothing to cut under any other order."
     - "R's tl.pos: d is not supported: the diagonal carries cells here, not names."
     - "type is the printed wedge (row 0 at top); the `correlation` transform's own `triangle` names the halves in array terms. Leave the transform at full and let corrplot mask."
+    - "The diamond card refuses type: full; it is already one triangle by construction."
 
 jpfield:
   summary: "Jarvis field helper over a regular/irregular field."

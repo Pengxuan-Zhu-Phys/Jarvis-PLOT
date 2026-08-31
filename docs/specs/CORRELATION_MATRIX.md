@@ -296,6 +296,15 @@ is solved *from* the matrix:
   and no rects, and `jplot cap styles` reports it as `geometry: solved`,
   `requires_type: correlation_matrix`.
 
+## 8. The other card
+
+`[corrplot, diamond]` draws the same matrix as one triangle turned 45 degrees,
+with the names as a plain column of horizontal text and each variable's pairs
+as a V rooted at its own name. Same transform, same ordering, same formals;
+its own solver, because it is anchored on the row pitch and bounded by the page
+height where this one is anchored on the cell and bounded by the width. See
+`CORRELATION_DIAMOND.md` and `Example/corrplot_diamond.yaml`.
+
 ## 8. Files
 
 | File | Role |
@@ -308,3 +317,4 @@ is solved *from* the matrix:
 | `jarvisplot/Figure/figure_types.py` | `expand_correlation_matrix` |
 | `jarvisplot/core_runtime.py` | `prebuild_correlations` — order, geometry, frame, contract |
 | `Example/corrplot_matrix.yaml` | Worked example over `Example/correlation_demo.csv` |
+| `jarvisplot/cards/corrplot/diamond.json`, `Figure/corr_layout_diamond.py` | The rotated card and its solver (`CORRELATION_DIAMOND.md`) |

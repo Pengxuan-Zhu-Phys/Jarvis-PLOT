@@ -1,0 +1,101 @@
+# Correlation diamond — the same matrix, turned 45 degrees.
+#
+#   Run:    jplot Example/corrplot_diamond.yaml
+#
+# `corrplot_matrix.yaml` is the square card. This is the other arrangement:
+# keep one triangle, turn it on its point, and print the names as an ordinary
+# column of horizontal text. Same data, same transform, same corrplot formals
+# — only the card is different, which is the whole of what `style:` selects.
+#
+# What the rotation buys, and it is not decoration:
+#
+#   * A name is one line of horizontal text, so a long one costs width in a
+#     column that had to exist anyway. On the square card it is a rotated tick
+#     label crammed under a 4.2 mm cell.
+#   * Every pair a variable takes part in is a single connected **V** rooted at
+#     its own name — the cell for (i, j) sits at their midpoint, as far out as
+#     they are far apart. On the square card those same pairs are a row and a
+#     column that meet at a corner.
+#
+# What it costs is aspect. The panel is (n-1) rows tall and half that wide, so
+# this card runs out of page *height* where the square one runs out of width:
+# it is solved from the row pitch (the label line height, 4.2 mm) and clamped
+# against 247 mm, and past n ~ 90 the names would collide.
+#
+# The alternating band is what makes it readable: it runs under the name and
+# out along that name's V, so a reader can carry one variable across a lattice
+# of diagonals. `corrplot: {stripe: none}` turns it off.
+#
+# The default is the triangle on the left of the page: names on the right,
+# colorbar on the left. `side: left` mirrors the whole figure the other way.
+# Either way it is one sign flip in the map, not a second code path.
+
+version: '0.3'
+project:
+  name: corrplot_diamond
+
+Functions: []
+
+DataSet:
+  - name: wide
+    path: ./correlation_demo_wide.csv
+    type: csv
+  - name: mssm
+    path: ./correlation_demo.csv
+    type: csv
+
+Figures:
+
+  # -- the mirror: names on the left, triangle opening right ------------------
+  # 16 variables, clustered, with the two planted groups boxed. `addrect` draws
+  # a triangle here rather than a rectangle: a run of adjacent variables is the
+  # set of cells whose midpoint and half-distance both fall inside the run,
+  # which is a triangle with the panel's own edge as its third side.
+  - name: corrplot_diamond_left
+    type: correlation_matrix
+    style: [corrplot, diamond]
+    data: wide
+    variables: {regex: '^(a|b)'}
+    corrplot:
+      method: circle
+      order: hclust
+      addrect: 4
+      side: left
+    colorbar: {label: '$\rho$'}
+
+  # -- the card's own default -------------------------------------------------
+  - name: corrplot_diamond_right
+    type: correlation_matrix
+    style: [corrplot, diamond]
+    data: wide
+    variables: {regex: '^(a|b)'}
+    corrplot:
+      method: circle
+      order: hclust
+      addrect: 4
+    colorbar: {label: '$\rho$'}
+
+  # -- long names, which is the case this layout is for -----------------------
+  # `margin.fit` grows the label column to hold them; on the square card the
+  # same names are rotated under the cells and the figure grows in both
+  # directions to make room.
+  - name: corrplot_diamond_named
+    type: correlation_matrix
+    style: [corrplot, diamond]
+    data: mssm
+    variables:
+      exclude: [weight, label]
+    corrplot:
+      method: square
+      order: hclust
+    colorbar: {label: '$\rho$'}
+
+  # -- the solve, printed on the figure ---------------------------------------
+  - name: corrplot_diamond_debug
+    type: correlation_matrix
+    style: [corrplot, diamond]
+    data: wide
+    debug: true
+    variables: {regex: '^a'}
+    corrplot: {method: circle}
+    colorbar: {label: '$\rho$'}

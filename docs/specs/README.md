@@ -16,6 +16,7 @@ Use these docs when you need to know what a valid scene, style, profile, or laye
 - `INTERP_2D.md`: implemented 2D support-to-grid interpolation transform
 - `LAYER_TYPE_REGISTRY.md`: spec-only layer/method registry contract
 - `CORRELATION_MATRIX.md`: implemented correlation-matrix figure type, corrplot drawing method, and the R corrplot crosswalk
+- `CORRELATION_DIAMOND.md`: the same matrix as one triangle turned 45 degrees, on its own card
 - `POSTERIOR_DENSITY.md`: implemented posterior-density reconstruction transforms and HPD contour contract
 - `AGENT_DATA_API.md`: spec-only Jarvis-Agent bridge — JSON verbs, headless analysis channel (`likelihood_report` cell/region digests), template slot schemas, figure numeric twins
 
