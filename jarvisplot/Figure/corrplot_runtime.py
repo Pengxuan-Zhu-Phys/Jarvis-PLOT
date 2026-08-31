@@ -814,10 +814,22 @@ def draw_corrplot(ax, **kwargs):
 
     if diamond and edge_lwd > 0.0 and label_span is not None:
         # The column is a width in axes fractions; the outline is drawn in cell
-        # units, and the panel is `u_span` cells wide.
-        column_u = -label_span[0] * (n / 2.0) if side == "left" else (
-            (label_span[1] - 1.0) * (n / 2.0)
-        )
+        # units, so it is scaled by how many cells wide the panel is.  Read off
+        # the axes rather than worked out as `n / 2`: with the diagonal in, the
+        # panel is a quarter cell wider than that (see `diamond_extent`), and a
+        # rule scaled by the wrong span stops short of the names it is meant to
+        # close over -- by 4% of the column, which at thirteen variables is the
+        # last two letters of the longest name left hanging outside it.
+        lo, hi = float(min(ax.get_xlim())), float(max(ax.get_xlim()))
+        u_span = hi - lo
+        # ... and measured from the panel's own near edge, which the diagonal
+        # moves out to `u = -1/4`.  `_edge_rules` strikes the horizontal run
+        # from `-column_u` to `0`, so the near edge has to be added back in:
+        # left out, the rule stops a quarter cell short and the last letters of
+        # the longest name hang outside the box it is meant to close.
+        near_u = lo if side == "left" else -hi
+        column_u = (-label_span[0] if side == "left" else label_span[1] - 1.0)
+        column_u = column_u * u_span - near_u
         _edge_rules(ax, n, column_u, side, edge_color, edge_lwd, zorder + 40, clip)
     if diamond and grid_color and label_span is not None:
         _label_rules(ax, n, label_span, grid_color, _GRID_LWD, clip, zorder)
@@ -968,11 +980,22 @@ def draw_corrplot(ax, **kwargs):
         # picture, a quarter of the paths, and at 100 variables that is 40,000
         # of them.  The outline has to be per cell rather than n+1 ruled lines
         # because a `triangle` selection leaves holes for the ruling to cross.
+        # The pentagon is a shape for glyphs that *fill* their cell.  Outlining
+        # it under a round one would be drawing a boundary the glyph does not
+        # keep: at `rho = 1` the circle on the diagonal overhangs it, and the
+        # flat backs line up into a grey rail down the edge of the matrix with
+        # the circles straddling it.  So there the diagonal simply carries no
+        # outline -- the matrix's own edge is already closed by `edge.lwd`.
+        ruled = (
+            np.ones(ix.shape, dtype=bool)
+            if not diamond or kind in _POLYGON_GLYPHS
+            else ~self_cells
+        )
         grid = LineCollection(
             _with_self_cells(
-                np.stack([ix, iy], axis=1)[:, None, :]
+                np.stack([ix[ruled], iy[ruled]], axis=1)[:, None, :]
                 + (_DIAMOND_LOOP if diamond else _CELL_LOOP)[None, :, :],
-                np.ones(ix.shape, dtype=bool), closed_loop=True,
+                ruled, closed_loop=True,
             ),
             colors=grid_color, linewidths=_GRID_LWD, zorder=zorder - 10,
         )

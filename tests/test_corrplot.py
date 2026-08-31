@@ -1135,3 +1135,60 @@ def test_the_diagonal_costs_the_panel_a_quarter_cell_not_a_half():
     # an ordinary cell's height
     assert (on[2], on[3]) == pytest.approx((-0.5, 8.5))
     assert (off[2], off[3]) == pytest.approx((0.0, 8.0))
+
+
+def test_the_diagonal_is_only_outlined_where_a_glyph_fills_it():
+    # The pentagon is a shape for glyphs that *fill* their cell.  Outlining it
+    # under a round one draws a boundary the glyph does not keep: the circle at
+    # `rho = 1` overhangs it, and the flat backs line up into a grey rail down
+    # the edge of the matrix with the circles straddling it.
+    from matplotlib.collections import LineCollection
+
+    def rails(method):
+        ax = _axes(6)
+        draw_corrplot(
+            ax, __df__=_long_table(), __corr_layout__="diamond", type="upper",
+            method=method, diag=True, **{"addgrid.col": "#C2C2C2"},
+        )
+        # the cell grid is the one whose segments are closed loops; the rules
+        # between the names are two-point lines
+        grids = [
+            c for c in ax.collections
+            if isinstance(c, LineCollection)
+            and all(len(seg) >= 5 for seg in c.get_segments())
+        ]
+        assert len(grids) == 1
+        return [len(seg) for seg in grids[0].get_segments()]
+
+    # a fill gets the pentagon's outline: six points, closed
+    assert 6 in rails("color")
+    # a round glyph gets no outline on the diagonal at all -- every loop left
+    # is an ordinary five-point closed diamond
+    assert set(rails("circle")) == {5}
+
+
+def test_the_closing_rule_ends_where_the_names_end():
+    # The rule is drawn in cell units and the column is a width in millimetres,
+    # so the conversion has two chances to be wrong -- and with the diagonal in,
+    # both of them were.  The panel is a quarter cell wider than `n/2`, and its
+    # near edge is no longer `u = 0`.  The invariant that survives either: the
+    # rule ends exactly where the label column does.
+    from jarvisplot.Figure.corrplot_runtime import _label_span
+
+    for side in ("left", "right"):
+        ax = _axes(6)
+        ax.set_xlim(-0.25, 3.0) if side == "left" else ax.set_xlim(-3.0, 0.25)
+        ax.set_ylim(5.5, -0.5)
+        draw_corrplot(
+            ax, __df__=_long_table(), __corr_layout__="diamond", type="upper",
+            method="color", diag=True, side=side,
+            __corr_label_mm__=12.0, **{"edge.lwd": 0.4},
+        )
+        span = _label_span(ax, side, 12.0)
+        want = span[0] if side == "left" else span[1]
+        lo, hi = ax.get_xlim()
+        rules = [ln for ln in ax.lines if len(ln.get_xdata()) == 3]
+        assert len(rules) == 2, "one rule above the names and one below"
+        for rule in rules:
+            outer = np.asarray(rule.get_xdata())[0]
+            assert (outer - lo) / (hi - lo) == pytest.approx(want, abs=1e-9)
