@@ -79,6 +79,23 @@ def _methods() -> list[dict[str, Any]]:
                 "required": list(contract.get("required") or ()),
                 "optional": list(contract.get("optional") or ()),
             }
+        if key == "corrplot":
+            cards = [
+                item
+                for item in _styles()
+                if item.get("usable")
+                and item.get("requires_type") == "correlation_matrix"
+                and item.get("bundle") == "corrplot"
+            ]
+            entry.update(
+                figure_type="correlation_matrix",
+                compatible_styles=[list(item["style"]) for item in cards],
+                style_keys={
+                    f"{item['bundle']}.{item['token']}": item.get("style_keys", {})
+                    for item in cards
+                },
+                man="jplot man corrplot",
+            )
         out.append(entry)
     return out
 
@@ -161,8 +178,10 @@ def _types() -> list[dict[str, Any]]:
     """
     from .Figure.figure_types import KNOWN_FIGURE_TYPES
 
-    return [
-        {
+    styles = _styles()
+    out = []
+    for name in sorted(KNOWN_FIGURE_TYPES):
+        entry = {
             "name": name,
             "expands_to": "layers",
             "explain": f"jplot explain {name}",
@@ -176,8 +195,20 @@ def _types() -> list[dict[str, Any]]:
                 else f"jplot explain {name}"
             ),
         }
-        for name in sorted(KNOWN_FIGURE_TYPES)
-    ]
+        if name == "correlation_matrix":
+            matching = [
+                item
+                for item in styles
+                if item.get("usable")
+                and item.get("requires_type") == name
+            ]
+            entry.update(
+                method="corrplot",
+                styles=[list(item["style"]) for item in matching],
+                axes=sorted({axis for item in matching for axis in item.get("axes", [])}),
+            )
+        out.append(entry)
+    return out
 
 
 def _styles() -> list[dict[str, Any]]:
@@ -222,6 +253,35 @@ def _styles() -> list[dict[str, Any]]:
             axes = frame.get("axes", {})
             entry["usable"] = True
             entry["axes"] = sorted(axes) if isinstance(axes, dict) else []
+            contract = card.get("Contract")
+            if isinstance(contract, dict):
+                entry["contract"] = {
+                    key: contract[key]
+                    for key in (
+                        "figure_type",
+                        "axes",
+                        "colorbar",
+                        "exclusive",
+                        "geometry",
+                        "layout",
+                        "note",
+                    )
+                    if key in contract
+                }
+                if bundle == "corrplot" and token in {"matrix", "diamond"}:
+                    # matrix predates Contract.layout; expose the established
+                    # card token as the layout without mutating the card file.
+                    entry["layout"] = contract.get("layout") or token
+            entry["man"] = (
+                f"jplot man type-{contract['figure_type'].replace('_', '-')}"
+                if isinstance(contract, dict) and contract.get("figure_type")
+                else None
+            )
+            entry["style_keys"] = {
+                str(name): sorted(value)
+                for name, value in (card.get("Style") or {}).items()
+                if isinstance(value, dict)
+            }
             figsize = (frame.get("figure") or {}).get("figsize")
             if figsize:
                 entry["figsize"] = figsize

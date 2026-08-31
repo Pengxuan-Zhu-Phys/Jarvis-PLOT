@@ -51,6 +51,33 @@ def test_style_cards_expose_axes_and_usable():
         assert "Frame" in (entry.get("error") or "")
 
 
+def test_correlation_capabilities_expose_type_method_and_cards():
+    types = {entry["name"]: entry for entry in section("types")}
+    corr_type = types["correlation_matrix"]
+    assert corr_type["method"] == "corrplot"
+    assert {tuple(style) for style in corr_type["styles"]} == {
+        ("corrplot", "matrix"),
+        ("corrplot", "diamond"),
+    }
+    assert {"axcorr", "axccorr"} <= set(corr_type["axes"])
+
+    methods = {entry["name"]: entry for entry in section("methods")}
+    corr_method = methods["corrplot"]
+    assert corr_method["figure_type"] == "correlation_matrix"
+    assert {tuple(style) for style in corr_method["compatible_styles"]} == {
+        ("corrplot", "matrix"),
+        ("corrplot", "diamond"),
+    }
+    assert "side" in corr_method["style_keys"]["corrplot.diamond"]["corrplot"]
+
+    styles = {
+        (entry["bundle"], entry["token"]): entry for entry in section("styles")
+    }
+    assert styles[("corrplot", "diamond")]["contract"]["layout"] == "diamond"
+    assert styles[("corrplot", "matrix")]["layout"] == "matrix"
+    assert "stripe" in styles[("corrplot", "diamond")]["style_keys"]["corrplot"]
+
+
 def test_cmaps_include_jarvis_and_reversed():
     cmaps = section("cmaps")
     jarvis = cmaps["jarvis"]

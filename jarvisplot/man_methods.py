@@ -234,6 +234,84 @@ def load_method_card(name: str) -> dict[str, Any]:
         "Inventing method aliases (e.g. 'scatterplot') will fail — use the exact name.",
     ]
 
+    agent_examples = [{"title": "minimal layer", "yaml": yaml_body}]
+    agent_sections = [
+        {
+            "id": "contract",
+            "title": "Contract",
+            "kind": "mapping",
+            "body": {
+                "name": name,
+                "mpl_method": mpl,
+                "axes_types": axes_types,
+                "coordinates": {"required": required, "optional": optional},
+            },
+        },
+        {
+            "id": "notes",
+            "title": "Notes",
+            "kind": "notes",
+            "items": human_notes,
+        },
+    ]
+    verification: dict[str, Any] = {}
+    if name == "corrplot":
+        agent_examples = _corrplot_examples()
+        verification = {
+            "validate": {
+                "argv": ["jplot", "validate", "<yaml>", "--json"],
+                "purpose": "schema, references, data paths, columns and method contract",
+            },
+            "doctor": {
+                "argv": ["jplot", "doctor", "<yaml>", "--json"],
+                "purpose": "validate plus data loading and type expansion without rendering",
+            },
+            "render": {
+                "argv": ["jplot", "<yaml>", "--report"],
+                "purpose": "actual matplotlib render and render-health report",
+            },
+        }
+        agent_sections.append(
+            {
+                "id": "verification",
+                "title": "Verification",
+                "kind": "commands",
+                "items": [
+                    {
+                        "name": "validate",
+                        "argv": ["jplot", "validate", "<yaml>", "--json"],
+                        "purpose": "schema, references, data paths, columns, and method contract",
+                    },
+                    {
+                        "name": "doctor",
+                        "argv": ["jplot", "doctor", "<yaml>", "--json"],
+                        "purpose": "validate plus data loading and type expansion without rendering",
+                    },
+                    {
+                        "name": "render",
+                        "argv": ["jplot", "<yaml>", "--report"],
+                        "purpose": "actual matplotlib render and render-health report",
+                    },
+                ],
+            }
+        )
+
+    related_cli = [
+        {"argv": ["jplot", "cap", "methods", "--json"], "why": "full method table"},
+        {"argv": ["jplot", "man", "methods", "--json"], "why": "all methods catalog"},
+        {"argv": ["jplot", "data", "describe", "<file>", "--json"], "why": "column names for expr"},
+    ]
+    if name == "corrplot":
+        related_cli.extend(
+            [
+                {"argv": ["jplot", "cap", "types", "--json"], "why": "correlation_matrix type and its compatible cards"},
+                {"argv": ["jplot", "cap", "styles", "--json"], "why": "matrix/diamond axes and card options"},
+                {"argv": ["jplot", "man", "type-correlation-matrix", "--json"], "why": "type-first YAML examples and card rules"},
+                {"argv": ["jplot", "validate", "<yaml>", "--json"], "why": "cheap schema/reference/column gate"},
+                {"argv": ["jplot", "doctor", "<yaml>", "--json"], "why": "validate plus data/type expansion without rendering"},
+            ]
+        )
+
     topic = method_topic_id(name)
     return {
         "id": topic,
@@ -242,11 +320,7 @@ def load_method_card(name: str) -> dict[str, Any]:
         "role": "reference",
         "priority": 39,
         "see_also": ["methods", "layer-method", "style-axes"],
-        "related_cli": [
-            {"argv": ["jplot", "cap", "methods", "--json"], "why": "full method table"},
-            {"argv": ["jplot", "man", "methods", "--json"], "why": "all methods catalog"},
-            {"argv": ["jplot", "data", "describe", "<file>", "--json"], "why": "column names for expr"},
-        ],
+        "related_cli": related_cli,
         "live_sources": [
             {"verb": "cap.methods", "truth": f"contract for {name}"},
         ],
@@ -289,22 +363,17 @@ def load_method_card(name: str) -> dict[str, Any]:
                 f"- required coordinates: {required}\n"
                 f"- optional coordinates: {optional}\n\n"
                 "Live source: `jplot cap methods --json`.\n"
+                + (
+                    "For correlation figures, use `jplot man type-correlation-matrix --json` "
+                    "for the type contract and choose a matrix or diamond YAML example below.\n"
+                    if name == "corrplot"
+                    else ""
+                )
             ),
-            "sections": [
-                {
-                    "id": "contract",
-                    "title": "Contract",
-                    "kind": "mapping",
-                    "body": {
-                        "name": name,
-                        "mpl_method": mpl,
-                        "axes_types": axes_types,
-                        "coordinates": {"required": required, "optional": optional},
-                    },
-                }
-            ],
-            "examples": [{"title": "minimal layer", "yaml": yaml_body}],
+            "sections": agent_sections,
+            "examples": agent_examples,
             "anti_patterns": human_traps,
+            "verification": verification,
         },
         "method": {
             "name": name,
@@ -319,6 +388,8 @@ def load_method_card(name: str) -> dict[str, Any]:
 
 def _example_yaml(name: str, *, required: list[str], optional: list[str]) -> str:
     """Synthesize a minimal layer sketch from the coordinate contract."""
+    if name == "corrplot":
+        return _corrplot_examples()[0]["yaml"]
     # Prefer common HEP-ish placeholders by axis key.
     defaults = {
         "x": "m_A",
@@ -356,3 +427,46 @@ def _example_yaml(name: str, *, required: list[str], optional: list[str]) -> str
             lines.append(f"      # {key}: {{expr: {sample}}}   # optional")
     lines.append("    style: {}")
     return "\n".join(lines) + "\n"
+
+
+def _corrplot_examples() -> list[dict[str, str]]:
+    """Canonical type-first YAML few-shots for both corrplot cards."""
+    return [
+        {
+            "title": "square correlation matrix",
+            "yaml": r'''version: '0.3'
+DataSet:
+  - {name: samples, path: ./samples.csv, type: csv}
+Figures:
+  - name: correlation
+    type: correlation_matrix
+    data: samples
+    variables: {exclude: [weight, label]}
+    corrplot:
+      method: circle
+      type: upper
+      order: hclust
+      addrect: 3
+    colorbar: {label: '$\rho$'}
+''',
+        },
+        {
+            "title": "diamond correlation matrix",
+            "yaml": r'''version: '0.3'
+DataSet:
+  - {name: samples, path: ./samples.csv, type: csv}
+Figures:
+  - name: correlation
+    type: correlation_matrix
+    style: [corrplot, diamond]
+    data: samples
+    variables: {exclude: [weight, label]}
+    corrplot:
+      method: circle
+      side: right
+      stripe: alternate
+      order: hclust
+    colorbar: {label: '$\rho$'}
+''',
+        },
+    ]
