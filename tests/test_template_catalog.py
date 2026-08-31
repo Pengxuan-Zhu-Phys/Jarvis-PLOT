@@ -33,6 +33,35 @@ def test_show_correlation_matrix_yaml_validates_shape(tmp_path):
     assert "style" not in figure
 
 
+def test_correlation_template_describes_matrix_and_diamond_variants():
+    from jarvisplot.templates_catalog import get_template
+
+    variants = {item["name"]: item for item in get_template("correlation_matrix")["variants"]}
+    assert variants["matrix"]["style"] == ["corrplot", "matrix"]
+    assert variants["diamond"]["style"] == ["corrplot", "diamond"]
+    assert variants["diamond"]["defaults"]["side"] == "right"
+    assert any("type: full is forbidden" in item for item in variants["diamond"]["constraints"])
+
+
+def test_corrplot_validation_catches_card_specific_formals():
+    from jarvisplot.validation import validate_config
+
+    base = {"DataSet": [{"name": "s", "path": "/dev/null", "type": "csv"}]}
+
+    def check(corrplot, style=None):
+        figure = {"name": "c", "type": "correlation_matrix", "data": "s", "corrplot": corrplot}
+        if style is not None:
+            figure["style"] = style
+        return validate_config({**base, "Figures": [figure]}, check_columns=False)
+
+    assert check({"side": "right"}, ["corrplot", "diamond"]).ok
+    assert check({"stripe": False}, ["corrplot", "diamond"]).ok
+    assert any(d.code == "JP-COR-003" for d in check({"side": "diagonal"}, ["corrplot", "diamond"]).errors)
+    assert any(d.code == "JP-COR-003" for d in check({"type": "full"}, ["corrplot", "diamond"]).errors)
+    assert any(d.code == "JP-COR-001" for d in check({"methd": "circle"}).errors)
+    assert any(d.code == "JP-COR-004" for d in check({"addrect": 3}).errors)
+
+
 def test_show_posterior_yaml_validates_shape(tmp_path):
     text = render_template_yaml(
         "posterior_2d",

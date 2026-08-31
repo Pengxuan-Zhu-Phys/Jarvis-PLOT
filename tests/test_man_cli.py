@@ -180,6 +180,9 @@ def test_man_corrplot_json_has_both_type_first_forms_and_verification(capsys):
     data = env["data"]
 
     assert data["method"]["name"] == "corrplot"
+    assert data["method"]["style_options"]["corrplot.diamond"]["side"]["values"] == [
+        "left", "right"
+    ]
     titles = {item["title"] for item in data["examples"]}
     assert titles == {"square correlation matrix", "diamond correlation matrix"}
     yaml_by_title = {item["title"]: item["yaml"] for item in data["examples"]}

@@ -94,6 +94,10 @@ def _methods() -> list[dict[str, Any]]:
                     f"{item['bundle']}.{item['token']}": item.get("style_keys", {})
                     for item in cards
                 },
+                style_options={
+                    f"{item['bundle']}.{item['token']}": item.get("style_options", {})
+                    for item in cards
+                },
                 man="jplot man corrplot",
             )
         out.append(entry)
@@ -282,6 +286,13 @@ def _styles() -> list[dict[str, Any]]:
                 for name, value in (card.get("Style") or {}).items()
                 if isinstance(value, dict)
             }
+            options = card.get("Options")
+            if isinstance(options, dict):
+                # Keep the option contract next to the card that implements
+                # it.  This is deliberately separate from style_keys: the
+                # latter answers "may I spell this key?", while this answers
+                # "what values can I safely put there?".
+                entry["style_options"] = options
             figsize = (frame.get("figure") or {}).get("figsize")
             if figsize:
                 entry["figsize"] = figsize

@@ -245,6 +245,16 @@ def load_method_card(name: str) -> dict[str, Any]:
                 "mpl_method": mpl,
                 "axes_types": axes_types,
                 "coordinates": {"required": required, "optional": optional},
+                **(
+                    {
+                        "figure_type": entry.get("figure_type"),
+                        "compatible_styles": entry.get("compatible_styles", []),
+                        "style_keys": entry.get("style_keys", {}),
+                        "style_options": entry.get("style_options", {}),
+                    }
+                    if name == "corrplot"
+                    else {}
+                ),
             },
         },
         {
@@ -380,6 +390,16 @@ def load_method_card(name: str) -> dict[str, Any]:
             "mpl_method": mpl,
             "axes_types": axes_types,
             "coordinates": {"required": required, "optional": optional},
+            **(
+                {
+                    "figure_type": entry.get("figure_type"),
+                    "compatible_styles": entry.get("compatible_styles", []),
+                    "style_keys": entry.get("style_keys", {}),
+                    "style_options": entry.get("style_options", {}),
+                }
+                if name == "corrplot"
+                else {}
+            ),
         },
         "card_version": 1,
         "_live": True,

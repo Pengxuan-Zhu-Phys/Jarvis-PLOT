@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://jarvis-plot.org/schema/v2/methods/corrplot.json",
   "title": "method: corrplot",
-  "description": "Coordinate contract for layers[].method='corrplot' (JarvisPLOT adapter-native). Draws the long table emitted by the `correlation` transform: one cell per variable pair, glyph shape from style.method, size from |rho|, colour from rho. Coordinates are optional because x_index / y_index / rho are the transform's own output columns; state them only to point at a renamed column. style takes R corrplot formals -- see `jplot man corrplot`.",
+  "description": "Coordinate contract for layers[].method='corrplot' (JarvisPLOT adapter-native). Draws the long table emitted by the `correlation` transform: one cell per variable pair, glyph shape from style.method, size from |rho|, colour from rho. Coordinates are optional because x_index / y_index / rho are the transform's own output columns; state them only to point at a renamed column. In type-first YAML, use type: correlation_matrix: omit style for [corrplot, matrix], or set style: [corrplot, diamond]; the latter is one triangle and forbids type: full. Discover keys and values with `jplot cap styles`, then use `jplot man corrplot`.",
   "x-jarvis-zone": "closed",
   "x-jarvis-method": "corrplot",
   "x-jarvis-mpl": "corrplot",
@@ -19,7 +19,7 @@
     ],
     "alternatives": []
   },
-  "x-jarvis-example": "method: corrplot\nstyle:\n  method: circle\n  type: upper\n  order: hclust",
+  "x-jarvis-example": "type: correlation_matrix\ndata: samples\nstyle: [corrplot, diamond]\ncorrplot:\n  method: circle\n  type: upper\n  side: right\n  stripe: alternate",
   "type": "object",
   "properties": {
     "method": {

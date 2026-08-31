@@ -148,7 +148,7 @@
     },
     "corrplot": {
       "type": "object",
-      "description": "type: correlation_matrix -- R corrplot formals (method, type, diag, order, addrect, addCoef.col, sig.level, col, ...). Becomes the layer's style. Run `jplot man corrplot`. Expanded away before render.",
+      "description": "type: correlation_matrix -- R corrplot formals (method, type, diag, order, addrect, addCoef.col, sig.level, col, ...). Omit style for the solved square [corrplot, matrix] card; set style: [corrplot, diamond] for the solved rotated triangle. Diamond takes type: upper|lower (not full), side: left|right, and stripe: alternate|none. Becomes the layer's style. Run `jplot man corrplot` and `jplot cap styles`. Expanded away before render.",
       "x-jarvis-zone": "delegated"
     },
     "correlation": {
