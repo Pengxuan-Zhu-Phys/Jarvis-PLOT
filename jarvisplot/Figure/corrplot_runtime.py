@@ -783,6 +783,33 @@ def draw_corrplot(ax, **kwargs):
     if sig_level is not None and insig == "blank":
         drawn &= ~insignificant
 
+    # The diagonal, when it is in.  A self pair sits at `u = 0`, so anything
+    # built from an ordinary cell there hangs a quarter of a cell past the
+    # panel and prints over the names -- and everything on this figure except
+    # `_stripe_the_labels` is drawn well above the axis' own zorder of 2.5, so
+    # it prints *over* them, not under.  Every shape cut from a cell therefore
+    # takes the pentagon on the diagonal: the fill, the grid outline, and the
+    # tint.  See `_self_cell_vertices`.
+    self_cells = drawn & (index_x.astype(int) == index_y.astype(int))
+
+    def _with_self_cells(shapes, selection, closed_loop: bool, shape_scale=1.0):
+        """Swap the pentagon in wherever `shapes` covers a self pair.
+
+        `selection` is the mask over *all* cells that `shapes` was built from,
+        which is not the same mask each time -- the fill is drawn for `drawn`,
+        the tint for the shaded band, the grid for everything.
+        """
+        picked = self_cells[selection]
+        if not diamond or not np.any(picked):
+            return shapes
+        out = [np.asarray(shape) for shape in shapes]
+        pentagons = _self_cell_vertices(iy[selection & self_cells], side, shape_scale)
+        for slot, pentagon in zip(np.flatnonzero(picked), pentagons):
+            out[slot] = (
+                np.vstack([pentagon, pentagon[:1]]) if closed_loop else pentagon
+            )
+        return out
+
     label_span = _label_span(ax, side, label_column_mm) if diamond else None
 
     if diamond and edge_lwd > 0.0 and label_span is not None:
@@ -826,8 +853,11 @@ def draw_corrplot(ax, **kwargs):
         band &= drawn
         if np.any(band):
             cells = PolyCollection(
-                np.stack([ix[band], iy[band]], axis=1)[:, None, :]
-                + 0.5 * _DIAMOND_CORNERS[None, :, :],
+                _with_self_cells(
+                    np.stack([ix[band], iy[band]], axis=1)[:, None, :]
+                    + 0.5 * _DIAMOND_CORNERS[None, :, :],
+                    band, closed_loop=False,
+                ),
                 closed=True, facecolors=stripe_color, edgecolors="none",
                 zorder=zorder - 20,
             )
@@ -849,21 +879,6 @@ def draw_corrplot(ax, **kwargs):
         if label_span is not None:
             _stripe_the_labels(ax, n, shaded, label_span, stripe_color, clip)
 
-    # The diagonal, when it is in.  Every shape built from the cell -- the fill,
-    # the grid outline -- takes the pentagon there instead of the diamond.
-    def _with_self_cells(shapes, mask, closed_loop: bool, shape_scale=1.0):
-        if not diamond or not np.any(mask):
-            return shapes
-        out = [np.asarray(shape) for shape in shapes]
-        pentagons = _self_cell_vertices(iy[mask], side, shape_scale)
-        for slot, pentagon in zip(np.flatnonzero(mask), pentagons):
-            out[slot] = (
-                np.vstack([pentagon, pentagon[:1]]) if closed_loop else pentagon
-            )
-        return out
-
-    self_cells = drawn & (index_x.astype(int) == index_y.astype(int))
-
     artists = None
     if kind == "number":
         # R's method="number" is the coefficient *instead of* a glyph, so the
@@ -877,7 +892,7 @@ def draw_corrplot(ax, **kwargs):
                         kind, ix[drawn], iy[drawn], rho[drawn], scale,
                         corners=_DIAMOND_CORNERS if diamond else _CORNERS,
                     ),
-                    self_cells[drawn], closed_loop=False, shape_scale=scale,
+                    drawn, closed_loop=False, shape_scale=scale,
                 ),
                 closed=True,
             )
@@ -957,7 +972,7 @@ def draw_corrplot(ax, **kwargs):
             _with_self_cells(
                 np.stack([ix, iy], axis=1)[:, None, :]
                 + (_DIAMOND_LOOP if diamond else _CELL_LOOP)[None, :, :],
-                self_cells, closed_loop=True,
+                np.ones(ix.shape, dtype=bool), closed_loop=True,
             ),
             colors=grid_color, linewidths=_GRID_LWD, zorder=zorder - 10,
         )

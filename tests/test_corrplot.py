@@ -1093,3 +1093,45 @@ def test_the_panel_buys_only_the_quarter_cell_the_pentagon_needs():
 
     assert diamond_extent(10, diag=True) == (-0.25, 5.0, -0.5, 9.5)
     assert diamond_extent(10, diag=False) == (0.0, 5.0, 0.0, 9.0)
+
+
+def test_a_self_pair_is_a_pentagon_with_a_whole_cells_area():
+    # A variable's pair with itself sits at `u = 0`, so half an ordinary cell
+    # would hang off the matrix and print over the names.  Clipping it leaves a
+    # triangle -- half the area of every other cell, which reads as a fainter
+    # diagonal rather than as the constant it is.  So it is neither: the point
+    # into the matrix is kept, the outside is squared off, and the rectangle
+    # that squares it off pays back exactly what the clip took.
+    from jarvisplot.Figure.corrplot_runtime import _SELF_REACH, _self_cell_vertices
+
+    def area(poly):
+        x, y = poly[:, 0], poly[:, 1]
+        return 0.5 * abs(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1)))
+
+    for scale in (1.0, 0.9, 0.5):
+        pentagon = _self_cell_vertices([3.0], scale=scale)[0]
+        assert pentagon.shape == (5, 2)
+        # the rotated cell is a rhombus with diagonals `scale`, so `scale^2 / 2`
+        assert area(pentagon) == pytest.approx(0.5 * scale ** 2, abs=1e-12)
+        # and it never reaches further out than the panel does
+        assert pentagon[:, 0].min() >= -_SELF_REACH - 1e-12
+
+    # the mirror is the mirror, and nothing else
+    left = _self_cell_vertices([3.0], side="left")[0]
+    right = _self_cell_vertices([3.0], side="right")[0]
+    assert np.allclose(right[:, 0], -left[:, 0])
+    assert np.allclose(right[:, 1], left[:, 1])
+
+
+def test_the_diagonal_costs_the_panel_a_quarter_cell_not_a_half():
+    # `u_lo` is the pentagon's reach, which is all the panel has to buy: a
+    # whole half cell would be page paid for a shape that is not drawn.
+    from jarvisplot.Figure.corrplot_runtime import _SELF_REACH
+
+    off = diamond_extent(9, diag=False)
+    on = diamond_extent(9, diag=True)
+    assert off[0] == 0.0 and on[0] == pytest.approx(-_SELF_REACH)
+    # v still gains the usual half cell at each end -- there the self cell is
+    # an ordinary cell's height
+    assert (on[2], on[3]) == pytest.approx((-0.5, 8.5))
+    assert (off[2], off[3]) == pytest.approx((0.0, 8.0))
