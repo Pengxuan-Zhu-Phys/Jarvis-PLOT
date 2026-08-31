@@ -76,9 +76,19 @@ Read off what it implies, because every later section is a consequence:
   off the same edge. Only the quarter cell outside is new page, so `diag`
   pushes `v` out by the usual half cell and `u` by a **quarter**.
 
-  Every shape built from the cell takes the pentagon there — the fill and the
-  grid outline. The round glyphs do not: a circle is a circle, and at `rho = 1`
-  it reaches 0.07 cells past the panel, into a gap 1.6 mm wide.
+  Every shape built from the cell takes the pentagon there — the fill, the grid
+  outline **and the tint**. That last one is not tidiness. Only
+  `_stripe_the_labels` is drawn below the axis' own zorder of 2.5; everything
+  else on this figure sits far above it, so a tint *diamond* on the diagonal
+  hangs a quarter cell past the panel and prints **over** the name beside it —
+  which is how the longest name on the figure lost the left half of its first
+  letter. Each of the three is drawn for a different set of cells (the fill for
+  what is drawn, the tint for the shaded band, the grid for everything), so the
+  substitution takes the selection mask the shapes were built from rather than
+  assuming one.
+
+  The round glyphs do not take it: a circle is a circle, and at `rho = 1` it
+  reaches 0.07 cells past the panel, into a gap 1.6 mm wide.
 
 `side` names the side the *labels* go on, and the card's default is
 **`side: right`** — names on the right, colorbar on the left, the triangle
