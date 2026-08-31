@@ -24,6 +24,7 @@
         "rectcmap": "&JP/jarvisplot/cards/gambit/2x1/rect_cmap.json"
     },
     "corrplot": {
-        "matrix": "&JP/jarvisplot/cards/corrplot/matrix.json"
+        "matrix": "&JP/jarvisplot/cards/corrplot/matrix.json",
+        "diamond": "&JP/jarvisplot/cards/corrplot/diamond.json"
     }
 }

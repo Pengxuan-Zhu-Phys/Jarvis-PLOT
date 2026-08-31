@@ -398,6 +398,22 @@ def _corr_tick_sizes(card: Mapping) -> tuple[float, float, str, float]:
     )
 
 
+def _corr_bar_tick_pad_mm(card: Mapping) -> float:
+    """How far the colorbar sets its numbers off the bar, in millimetres.
+
+    Needed by the diamond solve and only by it: on that card the numbers can
+    end up between the bar and the matrix's diagonal, where their pad is part
+    of how much room the bar has left.
+    """
+    ticks = ((card.get("Frame", {}) or {}).get("axccorr", {}) or {}).get("ticks", {}) or {}
+    major = ticks.get("major", {}) or {}
+    both = ticks.get("both", {}) or {}
+    pad_pt = float(major.get("pad", 3.5) or 0.0)
+    if str(both.get("direction", "out")).strip().lower() == "out":
+        pad_pt += float(major.get("length", 0.0) or 0.0)
+    return pad_pt / 72.0 * 25.4
+
+
 def _colorbar_label_samples(card: Mapping) -> list[str]:
     """The strings the colorbar will print, for the overrun check.
 
@@ -417,6 +433,169 @@ def _colorbar_label_samples(card: Mapping) -> list[str]:
         lo, hi = -1.0, 1.0
     span = hi - lo
     return ["{:.2f}".format(lo + span * k / 8.0) for k in range(9)]
+
+
+def _solve_corr_square(card, info, style, columns, axes_name):
+    """The square card: an n x n panel with a label band on two sides."""
+    from .Figure.corr_layout import solve_corr_geometry
+
+    n = len(columns)
+    show_x, show_y = _corr_tick_visibility(style.get("tl.pos", "lt"))
+    label_pt, bar_pt, family, label_pad_mm = _corr_tick_sizes(card)
+    cb_title, cb_title_pt = _colorbar_title(card, info)
+    geom = solve_corr_geometry(
+        n,
+        geometry=card.get("Geometry", {}) or {},
+        # A label nobody prints costs the layout nothing.  Budgeting for it
+        # anyway is how a `tl.pos: n` matrix ends up with a blank margin
+        # the width of its longest variable name.
+        x_labels=columns if show_x else (),
+        y_labels=columns if show_y else (),
+        colorbar_labels=_colorbar_label_samples(card),
+        colorbar_title=cb_title,
+        label_size_pt=label_pt,
+        label_pad_mm=label_pad_mm,
+        colorbar_label_size_pt=bar_pt,
+        colorbar_title_size_pt=cb_title_pt,
+        family=family,
+    )
+    solved = geom.as_frame()
+    solved[axes_name] = {
+        "xlim": [-0.5, n - 0.5],
+        # Row 0 on top: a matrix is read from its top-left corner, and the
+        # labels have to agree with the cells they name.
+        "ylim": [n - 0.5, -0.5],
+        "ticks": {
+            "both": {"labelbottom": show_x, "labelleft": show_y,
+                     "bottom": show_x, "left": show_y},
+            "x": {"positions": list(range(n)), "labels": list(columns)},
+            "y": {"positions": list(range(n)), "labels": list(columns)},
+        },
+    }
+    return geom, solved
+
+
+def _solve_corr_diamond(card, info, style, columns, axes_name):
+    """The rotated card: one triangle at 45 degrees, names in a column.
+
+    The names stay y tick labels -- item k sits at ``v = k``, which is the
+    whole convenience of the map -- so what changes here against the square
+    branch is the limits, the side the ticks are on, and that there is no x
+    axis at all.
+    """
+    from .Figure.corr_layout_diamond import solve_diamond_geometry
+
+    n = len(columns)
+    # `t` and `lt` name a band this layout does not have: there is one column
+    # of names, on the side `side` picks.  Saying so beats printing the names
+    # somewhere they cannot line up with anything.
+    tl_pos = str(style.get("tl.pos", "l") or "l").strip().lower()
+    if tl_pos not in ("l", "n"):
+        raise ValueError(
+            "figure '{}' asks for corrplot tl.pos: {}. The diamond card has "
+            "one band of names, printed horizontally beside the panel, so it "
+            "takes l (print them) or n (do not). Which side they are on is "
+            "corrplot side: left | right.".format(info.get("name", "?"), tl_pos)
+        )
+    show_names = tl_pos == "l"
+    side = str(style.get("side", "left") or "left").strip().lower()
+    diag = _as_corr_bool(style.get("diag", False))
+
+    # `edge.numbers` repeats each variable's position at the far end of both
+    # arms of its V, and prints it once more beside the name.  That second copy
+    # is *not* glued onto the name here: it is set in the smaller, lighter face
+    # the numbers wear on the diagonal, and a tick label is one string in one
+    # colour.  The renderer draws it; the solve owns how much room it costs.
+    edge_numbers = _as_corr_bool(style.get("edge.numbers", False))
+
+    label_pt, bar_pt, family, label_pad_mm = _corr_tick_sizes(card)
+    number_pt = max(label_pt * float(style.get("edge.numbers.cex", 0.7) or 0.7), 3.2)
+    cb_title, cb_title_pt = _colorbar_title(card, info)
+    geom = solve_diamond_geometry(
+        n,
+        geometry=card.get("Geometry", {}) or {},
+        labels=columns if show_names else (),
+        colorbar_labels=_colorbar_label_samples(card),
+        colorbar_title=cb_title,
+        side=side,
+        diag=diag,
+        edge_numbers=edge_numbers,
+        label_size_pt=label_pt,
+        label_pad_mm=label_pad_mm,
+        number_size_pt=number_pt,
+        colorbar_label_size_pt=bar_pt,
+        colorbar_tick_pad_mm=_corr_bar_tick_pad_mm(card),
+        colorbar_title_size_pt=cb_title_pt,
+        family=family,
+    )
+    on_left = show_names and geom.side == "left"
+    on_right = show_names and geom.side == "right"
+    solved = geom.as_frame()
+    solved[axes_name] = {
+        "xlim": list(geom.xlim),
+        "ylim": list(geom.ylim),
+        "ticks": {
+            "both": {
+                "left": on_left, "labelleft": on_left,
+                "right": on_right, "labelright": on_right,
+                "bottom": False, "labelbottom": False,
+                "top": False, "labeltop": False,
+            },
+            # A name ends at the panel on the left and starts at it on the
+            # right.  Anchoring both the same way is how a right-hand column
+            # ends up printed back over its own cells.
+            "y": {
+                "positions": list(range(n)),
+                "labels": list(columns),
+                "labelha": "left" if on_right else "right",
+            },
+        },
+    }
+    if edge_numbers and show_names:
+        # Numbered, the band is a table of two columns and the names turn
+        # around: they are set flush with the *outer* edge of their column, so
+        # the numbers beside them line up instead of stepping in and out with
+        # the length of each name.  The cost is a ragged edge against the
+        # panel, which is the right side to spend it on -- a column of numbers
+        # only reads as one if every number starts in the same place.
+        #
+        # The turn is a pad, not just an alignment: matplotlib anchors a tick
+        # label a pad in from the spine, so `ha: left` alone would set every
+        # name running back over its own cells.  The pad is the full width the
+        # solve gave the names.
+        ticks = solved[axes_name]["ticks"]
+        ticks["y"]["labelha"] = "right" if on_right else "left"
+        ticks["major"] = {"pad": geom.name_pad_mm / 25.4 * 72.0}
+    # The bar stands inside the empty triangle, not beside the panel, so its
+    # two pieces of text go on opposite sides of it: numbers left, label right,
+    # the same way round on both mirrors.  The card says so (`ticks_position`,
+    # and `va` on the label); the solve only has to place the label, because
+    # where it goes is `colorbar.label_gap` expressed against a bar the solve
+    # sized, and `ticks_position` would otherwise drag it back to the tick
+    # side.
+    #
+    # The offset anchors the edge of the text *away* from the bar, and which
+    # edge that is comes from `va`, not `ha`: the label is turned on its side,
+    # and under `rotation_mode: anchor` -- which `set_label_position` turns on
+    # -- the alignment is applied before the rotation, so `va: top` puts the
+    # anchor on the text's left edge.  Matplotlib would take `va` from the tick
+    # side, which is the far side from this label; left alone it anchors the
+    # near edge and the label grows into the bar and prints on the scale.
+    gap = geom.colorbar_label_gap_mm / geom.colorbar_w_mm
+    solved["axccorr"] = {"ylabel_coords": {"x": 1.0 + gap, "y": 0.5}}
+    # The badge went to whichever bottom corner the names are not in, so the
+    # wordmark beside it has to run back toward the middle of the page.
+    logo_left = geom.logo_rect[0] < 0.5
+    solved["axlogo"] = {"anchor": "left" if logo_left else "right"}
+    return geom, solved
+
+
+def _as_corr_bool(value, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "t"}
+    return bool(value)
 
 
 def _enforce_corr_contract(info: Mapping, contract: Mapping, name: str) -> None:
@@ -593,12 +772,24 @@ def _corr_debug_lines(geom, n_columns: int) -> list[str]:
 
     # Short lines on purpose: the block is centred on a figure that can be
     # 49 mm wide, and one long line runs off both edges of the smallest case.
-    corner_mm = geom.panel_rect[0] * geom.width_mm
-    lines = [
-        "solved geometry · {} vars · cell {:.3f} mm".format(n_columns, geom.cell_mm),
-        "corner {:.3f} mm · panel {:.2f} mm sq".format(corner_mm, geom.panel_mm),
-        "figure {:.2f} × {:.2f} mm".format(geom.width_mm, geom.height_mm),
-    ]
+    if hasattr(geom, "pitch_mm"):
+        # The diamond reports its own anchor.  The pitch is the number to read
+        # here -- it is the row spacing *and* the cell's diagonal -- and the
+        # label column is the band that actually moved.
+        lines = [
+            "solved diamond · {} vars · pitch {:.3f} mm".format(n_columns, geom.pitch_mm),
+            "labels {:.3f} mm · panel {:.2f} × {:.2f} mm".format(
+                geom.label_block_mm, geom.panel_w_mm, geom.panel_h_mm
+            ),
+            "figure {:.2f} × {:.2f} mm".format(geom.width_mm, geom.height_mm),
+        ]
+    else:
+        corner_mm = geom.panel_rect[0] * geom.width_mm
+        lines = [
+            "solved geometry · {} vars · cell {:.3f} mm".format(n_columns, geom.cell_mm),
+            "corner {:.3f} mm · panel {:.2f} mm sq".format(corner_mm, geom.panel_mm),
+            "figure {:.2f} × {:.2f} mm".format(geom.width_mm, geom.height_mm),
+        ]
     for note in geom.notes:
         lines.extend(textwrap.wrap(note, width=44))
     return lines
@@ -691,7 +882,6 @@ def _prebuild_one(core, info: dict, card: Mapping) -> None:
     """Solve one correlation figure. See :func:`prebuild_correlations`."""
     from deepmerge import always_merger
 
-    from .Figure.corr_layout import solve_corr_geometry
     from .Figure.corr_order import order_columns
     from .Figure.correlation_runtime import pearson_matrix, resolve_correlation_columns
 
@@ -759,43 +949,19 @@ def _prebuild_one(core, info: dict, card: Mapping) -> None:
             addrect=addrect,
         )
 
-    show_x, show_y = _corr_tick_visibility(style.get("tl.pos", "lt"))
-    label_pt, bar_pt, family, label_pad_mm = _corr_tick_sizes(card)
-    cb_title, cb_title_pt = _colorbar_title(card, info)
-    geom = solve_corr_geometry(
-        len(columns),
-        geometry=card.get("Geometry", {}) or {},
-        # A label nobody prints costs the layout nothing.  Budgeting for it
-        # anyway is how a `tl.pos: n` matrix ends up with a blank margin
-        # the width of its longest variable name.
-        x_labels=columns if show_x else (),
-        y_labels=columns if show_y else (),
-        colorbar_labels=_colorbar_label_samples(card),
-        colorbar_title=cb_title,
-        label_size_pt=label_pt,
-        label_pad_mm=label_pad_mm,
-        colorbar_label_size_pt=bar_pt,
-        colorbar_title_size_pt=cb_title_pt,
-        family=family,
-    )
+    # Which layout the card is, stated once by the card and nowhere else.  The
+    # two are not variants of one solve: the square is anchored on the cell and
+    # bounded by the page width, the diamond on the row pitch and bounded by
+    # its height.  See Figure/corr_layout_diamond.py.
+    layout = str(contract.get("layout", "square")).strip().lower()
+    solve = _solve_corr_diamond if layout == "diamond" else _solve_corr_square
+    geom, solved = solve(card, info, style, columns, axes_name)
+
     for note in geom.notes:
         if core.logger:
             core.logger.warning("correlation geometry: {}".format(note))
 
     n = len(columns)
-    solved = geom.as_frame()
-    solved[axes_name] = {
-        "xlim": [-0.5, n - 0.5],
-        # Row 0 on top: a matrix is read from its top-left corner, and the
-        # labels have to agree with the cells they name.
-        "ylim": [n - 0.5, -0.5],
-        "ticks": {
-            "both": {"labelbottom": show_x, "labelleft": show_y,
-                     "bottom": show_x, "left": show_y},
-            "x": {"positions": list(range(n)), "labels": list(columns)},
-            "y": {"positions": list(range(n)), "labels": list(columns)},
-        },
-    }
     info["frame"] = always_merger.merge(info.get("frame") or {}, solved)
     _attach_corr_debug(info, _corr_debug_lines(geom, n))
 
@@ -808,6 +974,24 @@ def _prebuild_one(core, info: dict, card: Mapping) -> None:
     target["columns"] = list(columns)
     target.pop("regex", None)
 
+    # The renderer maps (x_index, y_index) through the same u/v the solver used,
+    # so it has to know which layout it is drawing.  Written into the layer for
+    # the same reason `__corr_blocks__` is: the card said it once, at config
+    # time, and nothing downstream should have to resolve the card again.
+    if layout == "diamond":
+        layer.setdefault("style", {})["__corr_layout__"] = layout
+        # How far out the names go: the one thing about the solve the renderer
+        # cannot measure for itself, and the reach of all three things that
+        # follow the names -- the tint, the rules between them, and the outline
+        # that closes the figure.  It stops at the *names*, so the numbering
+        # beside them falls outside all three: a position is a tag on the row,
+        # not part of it, and a box drawn round the tag says otherwise.
+        layer["style"]["__corr_label_mm__"] = geom.name_pad_mm
+        # Same channel, same reason: the number column is drawn by the renderer
+        # but placed and sized by the solve.
+        layer["style"]["__corr_number_mm__"] = geom.number_pad_mm
+        layer["style"]["__corr_number_pt__"] = geom.number_size_pt
+
     if blocks:
         # The boxes are cuts of the tree the order came from, so they are
         # computed once, here, and drawn from index ranges.  Recomputing
@@ -815,12 +999,17 @@ def _prebuild_one(core, info: dict, card: Mapping) -> None:
         layer.setdefault("style", {})["__corr_blocks__"] = blocks
 
     if core.logger:
+        # Each layout reports the number it is anchored on, because that is the
+        # one a reader checking the figure would go looking for.
+        anchor, anchor_mm = (
+            ("pitch", geom.pitch_mm) if layout == "diamond" else ("cell", geom.cell_mm)
+        )
         core.logger.warning(
             "Correlation geometry solved -> figure '{}'\n\t variables \t-> {}"
-            "\n\t order \t\t-> {}{}"
-            "\n\t cell \t\t-> {:.2f} mm\n\t figure \t-> {:.2f} × {:.2f} mm".format(
-                name, n, order,
+            "\n\t layout \t-> {}\n\t order \t\t-> {}{}"
+            "\n\t {} \t\t-> {:.2f} mm\n\t figure \t-> {:.2f} × {:.2f} mm".format(
+                name, n, layout, order,
                 " ({} blocks)".format(len(blocks)) if blocks else "",
-                geom.cell_mm, geom.width_mm, geom.height_mm,
+                anchor, anchor_mm, geom.width_mm, geom.height_mm,
             )
         )

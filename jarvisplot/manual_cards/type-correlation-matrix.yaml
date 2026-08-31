@@ -7,17 +7,27 @@ see_also: [layer-method, style-axes, type-profile-2d]
 related_cli:
   - argv: [jplot, template, show, correlation_matrix, "--json"]
     why: slots + skeleton YAML
-  - argv: [jplot, man, corrplot]
-    why: every R formal, and where each one is applied
-  - argv: [jplot, config, expand, "<yaml>", "--figure", "<name>", "--write"]
-    why: lower to the single corrplot layer for fine-tuning
+  - argv: [jplot, cap, types, "--json"]
+    why: live type contract and compatible style cards
+  - argv: [jplot, cap, styles, "--json"]
+    why: axes, layout, geometry and accepted corrplot style keys
+  - argv: [jplot, cap, methods, "--json"]
+    why: live corrplot drawing-method contract
+  - argv: [jplot, man, corrplot, "--json"]
+    why: every R formal, and where each one is applied (use --json for agent data)
+  - argv: [jplot, validate, "<yaml>", "--json"]
+    why: schema, references, data paths, columns and method gate
+  - argv: [jplot, doctor, "<yaml>", "--json"]
+    why: validate plus data loading and type expansion without rendering
+  - argv: [jplot, config, expand, "<yaml>", "--figure", "<name>", "--json"]
+    why: inspect the type lowered to its single corrplot layer
 live_sources:
   - verb: cap.types
     truth: correlation_matrix is a registered figure type
   - verb: cap.methods
     truth: corrplot's coordinate contract (all optional)
   - verb: cap.styles
-    truth: "[corrplot, matrix] reports geometry: solved, figsize: null"
+    truth: "[corrplot, matrix] and [corrplot, diamond] report solved geometry and axes"
 human:
   panels:
     - kind: overview
@@ -32,6 +42,10 @@ human:
         bottom), and Geometry.margin.fit lets a band grow when the names
         measure wider than it -- no trial render involved, the names are
         measured with the tick font before anything is drawn.
+        `style: [corrplot, diamond]` picks the other card: the same matrix as
+        one triangle turned 45 degrees, names in a plain column of horizontal
+        text, each variable's pairs a V rooted at its own name. Same formals,
+        plus `side: left | right` (default `right`, the triangle on the left of the page) and `stripe: alternate | none`.
     - kind: yaml
       title: Minimal figure
       lexer: yaml
@@ -58,6 +72,71 @@ human:
         - "method must be corrplot. scatter accepts type / order / diag and silently discards them."
         - "addrect needs order: hclust -- the boxes are cuts of that tree."
 agent:
+  body_markdown: |
+    The live discovery path is `jplot cap types --json`, then
+    `jplot cap styles --json` and `jplot cap methods --json`. The two canonical
+    type-first forms are in `examples`: omit `style` for the square matrix, or
+    set `style: [corrplot, diamond]` for the rotated triangle. After editing a
+    YAML, run `jplot validate <yaml> --json`, then `jplot doctor <yaml> --json`;
+    render only with the bare YAML path.
+  sections:
+    - id: verification
+      title: Verification
+      kind: commands
+      items:
+        - name: validate
+          argv: [jplot, validate, "<yaml>", "--json"]
+          purpose: schema, references, data paths, columns and method contract
+        - name: doctor
+          argv: [jplot, doctor, "<yaml>", "--json"]
+          purpose: validate plus data loading and type expansion without rendering
+        - name: render
+          argv: [jplot, "<yaml>", "--report"]
+          purpose: actual matplotlib render and render-health report
+  verification:
+    validate:
+      argv: [jplot, validate, "<yaml>", "--json"]
+      purpose: schema, references, data paths, columns and method contract
+    doctor:
+      argv: [jplot, doctor, "<yaml>", "--json"]
+      purpose: validate plus data loading and type expansion without rendering
+    render:
+      argv: [jplot, "<yaml>", "--report"]
+      purpose: actual matplotlib render and render-health report
+  examples:
+    - title: square correlation matrix
+      yaml: |
+        version: '0.3'
+        DataSet:
+          - {name: samples, path: ./samples.csv, type: csv}
+        Figures:
+          - name: correlation
+            type: correlation_matrix
+            data: samples
+            variables: {exclude: [weight, label]}
+            corrplot:
+              method: circle
+              type: upper
+              order: hclust
+              addrect: 3
+            colorbar: {label: '$\\rho$'}
+    - title: diamond correlation matrix
+      yaml: |
+        version: '0.3'
+        DataSet:
+          - {name: samples, path: ./samples.csv, type: csv}
+        Figures:
+          - name: correlation
+            type: correlation_matrix
+            style: [corrplot, diamond]
+            data: samples
+            variables: {exclude: [weight, label]}
+            corrplot:
+              method: circle
+              side: right
+              stripe: alternate
+              order: hclust
+            colorbar: {label: '$\\rho$'}
   anti_patterns:
     - Writing figsize / axes rect / tick positions by hand (all are solved outputs and get overwritten)
     - Using method scatter with s computed from abs_rho (only reproduces method circle)

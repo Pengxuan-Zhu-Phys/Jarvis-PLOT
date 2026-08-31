@@ -1,0 +1,539 @@
+{
+    "Contract": {
+        "figure_type": "correlation_matrix",
+        "axes": "axcorr",
+        "colorbar": "axccorr",
+        "exclusive": true,
+        "geometry": "solved",
+        "layout": "diamond",
+        "note": "Reserved card, own family. The upper triangle turned 45 degrees: u = (j - i) / 2 across, v = (i + j) / 2 down, so one variable's pairs are a single V rooted at its own name and the names are an ordinary column of horizontal text. Solved by Figure/corr_layout_diamond.py from the row pitch and bounded by the page height -- the square card is anchored on the cell and bounded by the width, which is why the two do not share a solver."
+    },
+    "Geometry": {
+        "units": "mm",
+        "pitch": 4.2,
+        "pitch_min": 2.6,
+        "max_height": 247.0,
+        "max_width": 170.0,
+        "labels": {
+            "gap": 1.4,
+            "number_gap": 0.6,
+            "width": null
+        },
+        "margin": {
+            "fit": true,
+            "slack": 1.0,
+            "top": 4.0,
+            "right": 4.0,
+            "bottom": 4.0,
+            "left": 4.0
+        },
+        "colorbar": {
+            "width": 2.6,
+            "length": 0.22,
+            "offset": 10.0,
+            "label_gap": 1.5
+        },
+        "logo": {
+            "width": 5.0,
+            "height": 5.0,
+            "offset": 0.838
+        }
+    },
+    "Frame": {
+        "axes": {
+            "axlogo": {
+                "frameon": false,
+                "yticks": [],
+                "xticks": [],
+                "xlim": [
+                    0,
+                    1024
+                ],
+                "ylim": [
+                    1024,
+                    0
+                ]
+            },
+            "axcorr": {
+                "frameon": false
+            },
+            "axccorr": {
+                "xticks": []
+            }
+        },
+        "axcorr": {
+            "title_params": {
+                "position": "top",
+                "fontsize": "small",
+                "fontfamily": "Fira code",
+                "fontweight": "normal",
+                "clip_on": false,
+                "zorder": 1000
+            },
+            "grid": {
+                "axisbelow": true
+            },
+            "ticks": {
+                "both": {
+                    "labelsize": 6,
+                    "direction": "out",
+                    "labelfontfamily": "sans",
+                    "top": false,
+                    "left": true,
+                    "right": false,
+                    "bottom": false,
+                    "labeltop": false,
+                    "labelbottom": false,
+                    "labelleft": true,
+                    "labelright": false,
+                    "which": "both",
+                    "zorder": 1000
+                },
+                "major": {
+                    "which": "major",
+                    "length": 0.0,
+                    "width": 0.4,
+                    "color": "#21171A",
+                    "pad": 1.6,
+                    "zorder": 1000
+                },
+                "y": {
+                    "labelrotation": 0.0,
+                    "labelha": "right",
+                    "labelva": "center",
+                    "labelcolor": "#21171A"
+                }
+            }
+        },
+        "axccorr": {
+            "color": {
+                "cmap": "RdBu",
+                "vmin": -1.0,
+                "vmax": 1.0
+            },
+            "label": {
+                "ylabel": "",
+                "loc": "center",
+                "va": "top",
+                "labelpad": 1.5,
+                "fontsize": 7,
+                "fontfamily": "STIXGeneral"
+            },
+            "ticks": {
+                "ticks_position": "left",
+                "both": {
+                    "labelsize": 6,
+                    "direction": "in",
+                    "labelfontfamily": "sans",
+                    "top": false,
+                    "left": true,
+                    "right": false,
+                    "bottom": false,
+                    "which": "both"
+                },
+                "major": {
+                    "which": "major",
+                    "length": 2.4,
+                    "width": 0.4,
+                    "color": "black",
+                    "pad": 1.6
+                },
+                "minor": {
+                    "which": "minor",
+                    "length": 1.2,
+                    "width": 0.4,
+                    "color": "black",
+                    "pad": 1.6
+                },
+                "y": {
+                    "positions": [
+                        -1.0,
+                        -0.5,
+                        0.0,
+                        0.5,
+                        1.0
+                    ],
+                    "labels": [
+                        "-1.0",
+                        "-0.5",
+                        "0",
+                        "0.5",
+                        "1.0"
+                    ]
+                }
+            }
+        },
+        "axlogo": {
+            "clip": false,
+            "file": "&JP/jarvisplot/cards/icons/JarvisHEP.png",
+            "text": [
+                {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "s": "Jarvis-HEP",
+                    "ha": "left",
+                    "va": "bottom",
+                    "fontfamily": "Fira code",
+                    "fontsize": "x-small",
+                    "fontstyle": "normal",
+                    "fontweight": "bold"
+                },
+                {
+                    "x": 1.0,
+                    "y": 0.9,
+                    "s": "       Powered by",
+                    "ha": "left",
+                    "va": "top",
+                    "color": "black",
+                    "fontfamily": "Fira code",
+                    "fontsize": 4,
+                    "fontstyle": "normal",
+                    "fontweight": "normal"
+                }
+            ]
+        }
+    },
+    "Debug": {
+        "primary_order": [
+            "axcorr"
+        ],
+        "units": {
+            "cm_per_inch": 2.54,
+            "pt_per_inch": 72.0
+        },
+        "overlay": {
+            "add_axes": {
+                "zorder": 10000
+            }
+        },
+        "figure": {
+            "border": {
+                "show": true,
+                "Rectangle": {
+                    "fill": false,
+                    "ec": "#FF3FA4",
+                    "lw": 0.9,
+                    "zorder": 10001
+                }
+            },
+            "caption": {
+                "show": true,
+                "x": 0.5,
+                "y": 0.995,
+                "template": "design reference  ·  figure %.2f cm × %.2f cm",
+                "text": {
+                    "color": "#FF3FA4",
+                    "fontsize": 6.0,
+                    "ha": "center",
+                    "va": "top",
+                    "rotation": 0,
+                    "fontweight": "bold",
+                    "family": "DejaVu Sans",
+                    "clip_on": false,
+                    "zorder": 10002,
+                    "bbox": {
+                        "boxstyle": "square,pad=0.12",
+                        "fc": "white",
+                        "ec": "none",
+                        "alpha": 0.82
+                    }
+                }
+            },
+            "height_marker": {
+                "show": true,
+                "x": 0.035,
+                "template": "%.2f cm"
+            }
+        },
+        "axes": {
+            "frameless_extension_max": 0.018,
+            "frameless_extension_min": 0.006,
+            "frameless_extension_factor": 0.09,
+            "outline": {
+                "show": true,
+                "framed": {
+                    "Rectangle": {
+                        "fill": false,
+                        "ec": "#111111",
+                        "lw": 0.45,
+                        "zorder": 10001
+                    }
+                },
+                "frameless": {
+                    "Rectangle": {
+                        "fill": false,
+                        "ec": "#FF3FA4",
+                        "lw": 0.45,
+                        "zorder": 10001
+                    }
+                }
+            },
+            "corner_ticks": {
+                "show": true,
+                "plot": {
+                    "color": "#FF3FA4",
+                    "lw": 0.45,
+                    "solid_capstyle": "projecting",
+                    "clip_on": false,
+                    "zorder": 10001
+                }
+            }
+        },
+        "dimension": {
+            "cap_half_pt": 5.0,
+            "narrow_threshold_pt": 24.0,
+            "narrow_length_pt": 8.0,
+            "narrow_scale_factor": 0.45,
+            "narrow_scale_min": 3.0,
+            "narrow_scale_max": 6.0,
+            "label_gap": 0.008,
+            "corner_gap": 0.018,
+            "colorbar_line_offset": 0.024,
+            "cap": {
+                "plot": {
+                    "color": "#1F21E9",
+                    "lw": 0.7,
+                    "solid_capstyle": "projecting",
+                    "clip_on": false,
+                    "zorder": 10001
+                }
+            },
+            "narrow_arrow": {
+                "annotate": {
+                    "zorder": 10001,
+                    "arrowprops": {
+                        "arrowstyle": "-|>",
+                        "shrinkA": 0,
+                        "shrinkB": 0,
+                        "color": "#1F21E9",
+                        "lw": 0.7
+                    }
+                }
+            },
+            "wide_arrow": {
+                "annotate": {
+                    "zorder": 10001,
+                    "arrowprops": {
+                        "arrowstyle": "<|-|>",
+                        "shrinkA": 0,
+                        "shrinkB": 0,
+                        "color": "#1F21E9",
+                        "lw": 0.7,
+                        "mutation_scale": 6.0
+                    }
+                }
+            },
+            "hlabel": {
+                "text": {
+                    "fontsize": 5.0,
+                    "fontweight": "normal",
+                    "family": "monospace",
+                    "clip_on": false,
+                    "zorder": 10002,
+                    "color": "#1F21E9",
+                    "ha": "center",
+                    "va": "top",
+                    "rotation": 0,
+                    "bbox": {
+                        "boxstyle": "square,pad=0.12",
+                        "fc": "white",
+                        "ec": "none",
+                        "alpha": 0.5
+                    }
+                }
+            },
+            "vlabel_left": {
+                "text": {
+                    "fontsize": 5.0,
+                    "fontweight": "normal",
+                    "family": "monospace",
+                    "clip_on": false,
+                    "zorder": 10002,
+                    "color": "#1F21E9",
+                    "ha": "right",
+                    "va": "center",
+                    "rotation": 90,
+                    "bbox": {
+                        "boxstyle": "square,pad=0.12",
+                        "fc": "white",
+                        "ec": "none",
+                        "alpha": 0.5
+                    }
+                }
+            },
+            "vlabel_right": {
+                "text": {
+                    "fontsize": 5.0,
+                    "fontweight": "normal",
+                    "family": "monospace",
+                    "clip_on": false,
+                    "zorder": 10002,
+                    "color": "#1F21E9",
+                    "ha": "left",
+                    "va": "center",
+                    "rotation": 90,
+                    "bbox": {
+                        "boxstyle": "square,pad=0.12",
+                        "fc": "white",
+                        "ec": "none",
+                        "alpha": 0.5
+                    }
+                }
+            }
+        },
+        "numbered_axes": {
+            "show": true,
+            "right_edge": 1.0,
+            "marker_step": 0.04,
+            "label_side": "left",
+            "template": "%.3f cm",
+            "top": {
+                "show": true
+            },
+            "bottom": {
+                "show": true
+            }
+        },
+        "margins": {
+            "template": "%.3f cm",
+            "label_side": "right",
+            "exclude": [
+                "axlogo"
+            ],
+            "marker_step": 0.04,
+            "left": {
+                "show": true
+            },
+            "top": {
+                "show": true
+            },
+            "bottom": {
+                "show": true
+            }
+        },
+        "colorbar_gap": {
+            "show": true,
+            "template": "%.3f cm"
+        },
+        "colorbar_preview": {
+            "show": true,
+            "samples": 256,
+            "fallback_cmap": "viridis",
+            "imshow": {
+                "aspect": "auto",
+                "interpolation": "bilinear",
+                "origin": "lower",
+                "zorder": 1
+            }
+        },
+        "panel": {
+            "show": true,
+            "pad_x_max": 0.018,
+            "pad_x_min": 0.004,
+            "pad_x_factor": 0.025,
+            "pad_y_max": 0.018,
+            "pad_y_min": 0.004,
+            "pad_y_factor": 0.035,
+            "entry_gap": 5.0,
+            "char_width_factor": 0.62,
+            "detail_lines_per_entry": 2.0,
+            "text_inset_x": 0.008,
+            "text_inset_y": 0.006,
+            "box": {
+                "FancyBboxPatch": {
+                    "boxstyle": "round,pad=0.004",
+                    "facecolor": "#FFEC73",
+                    "alpha": 0.5,
+                    "edgecolor": "none",
+                    "linewidth": 0.0,
+                    "zorder": 10001
+                }
+            },
+            "header": {
+                "label": "axes layout",
+                "size": 6.0,
+                "leading": 1.2,
+                "text": {
+                    "color": "#1A237E",
+                    "fontweight": "bold",
+                    "ha": "left",
+                    "va": "top",
+                    "family": "monospace",
+                    "clip_on": true,
+                    "zorder": 10002
+                }
+            },
+            "name": {
+                "size": 7.0,
+                "leading": 1.15,
+                "text": {
+                    "color": "#1A237E",
+                    "fontweight": "bold",
+                    "ha": "left",
+                    "va": "top",
+                    "family": "monospace",
+                    "clip_on": true,
+                    "zorder": 10002
+                }
+            },
+            "detail": {
+                "size": 4.6,
+                "leading": 1.08,
+                "rect_template": "  rect=[%.3f, %.3f, %.3f, %.3f]",
+                "size_template": "  width: %.3f cm  height: %.3f cm",
+                "text": {
+                    "color": "#1A237E",
+                    "fontweight": "normal",
+                    "ha": "left",
+                    "va": "top",
+                    "family": "monospace",
+                    "clip_on": true,
+                    "zorder": 10002
+                }
+            }
+        }
+    },
+    "Style": {
+        "corrplot": {
+            "method": "circle",
+            "type": "upper",
+            "diag": false,
+            "glyph.scale": 0.9,
+            "ellipse.scale": 1.4,
+            "outline": "sign",
+            "outline.lwd": 0.2,
+            "addgrid.col": "#C2C2C2",
+            "stripe": "alternate",
+            "stripe.col": "#F6E0C8",
+            "edge.lwd": 0.4,
+            "edge.col": "#6E6E6E",
+            "edge.numbers": true,
+            "edge.numbers.cex": 0.7,
+            "edge.numbers.gap": 0.06,
+            "order": "original",
+            "hclust.method": "complete",
+            "addrect": null,
+            "rect.col": "#21171A",
+            "rect.lwd": 0.7,
+            "addCoef.col": null,
+            "number.digits": 2,
+            "number.cex": 1.0,
+            "addCoefasPercent": false,
+            "tl.pos": "l",
+            "tl.cex": 1.0,
+            "tl.col": "#21171A",
+            "tl.srt": 90,
+            "tl.offset": 0.4,
+            "sig.level": null,
+            "insig": "pch",
+            "pch": "x",
+            "pch.cex": 1.5,
+            "pch.col": "#21171A",
+            "na.label": "?",
+            "na.label.col": "#8A8A8A",
+            "clip": false,
+            "zorder": 30,
+            "side": "right"
+        }
+    }
+}

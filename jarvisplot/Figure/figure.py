@@ -563,7 +563,25 @@ class Figure:
             self.axlogo.set_xlim(0.0, float(image_width))
             self.axlogo.set_ylim(float(image_height), 0.0)
             if self.frame['axlogo'].get("text"):
+                # Cards write the wordmark to the *right* of the icon, which is
+                # where it belongs while the badge sits in the bottom-left
+                # corner.  A card that puts the badge in the other corner (the
+                # diamond one does: the corner beside its names is occupied)
+                # sets `anchor: right`, and the same entries are mirrored about
+                # the icon rather than restated.
+                mirror = str(self.frame['axlogo'].get("anchor", "left")).lower() == "right"
                 for txt in self.frame['axlogo']['text']:
+                    if mirror:
+                        txt = dict(txt)
+                        txt["x"] = 1.0 - float(txt.get("x", 1.0))
+                        txt["ha"] = {"left": "right", "right": "left"}.get(
+                            str(txt.get("ha", "left")), txt.get("ha", "left")
+                        )
+                        # The padding that lines the two lines up is on the
+                        # side the text runs from, so it changes sides too.
+                        text = str(txt.get("s", ""))
+                        if text != text.lstrip(" "):
+                            txt["s"] = text.strip(" ") + " " * (len(text) - len(text.lstrip(" ")))
                     self.axlogo.text(
                         **{"clip_on": logo_clip, **txt},
                         transform=self.axlogo.transAxes,
