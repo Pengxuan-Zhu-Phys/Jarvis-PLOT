@@ -77,7 +77,6 @@ Figures:
     corrplot:
       method: number
       number.digits: 2
-    colorbar: {label: '$\rho$'}
 
   # -- n = 10 ----------------------------------------------------------------
   # R's correlation ellipse: round at rho = 0, collapsed onto the diagonal at
@@ -91,7 +90,6 @@ Figures:
       method: ellipse
       order: AOE
       col: PRGn
-    colorbar: {label: '$\rho$'}
 
   # -- n = 16 ----------------------------------------------------------------
   # The pie's radius is fixed and the filled wedge is |rho| — so an empty
@@ -105,7 +103,6 @@ Figures:
       type: lower
       order: hclust
       addrect: 2
-    colorbar: {label: '$\rho$'}
 
   # The same matrix with the design overlay. Under the caption: 16 variables,
   # cell 4.200 mm — the card's own number, untouched, because nothing is
@@ -121,7 +118,6 @@ Figures:
       type: lower
       order: hclust
       addrect: 2
-    colorbar: {label: '$\rho$'}
 
   # -- n = 24 ----------------------------------------------------------------
   # Square: the *side* tracks |rho|, which reads as area — the one thing a
@@ -135,7 +131,6 @@ Figures:
       order: hclust
       addrect: 3
       addgrid.col: '#E4E4E4'
-    colorbar: {label: '$\rho$'}
 
   # -- n = 33 ----------------------------------------------------------------
   # The last size that still fits 170 mm at the full 4.20 mm cell. One more
@@ -149,7 +144,6 @@ Figures:
       order: hclust
       addrect: 4
       sig.level: 0.01          # x over the pairs the 200 rows cannot resolve
-    colorbar: {label: '$\rho$'}
 
   # -- n = 50 ----------------------------------------------------------------
   # Clamped: width pinned to 170 mm, cell down to 2.92 mm. At this size a
@@ -164,7 +158,6 @@ Figures:
       order: hclust
       addrect: 6
       col: RdYlBu
-    colorbar: {label: '$\rho$'}
 
   # -- n = 100, labelled -----------------------------------------------------
   # Past the floor. The names are printed and they collide: 100 labels at
@@ -177,7 +170,6 @@ Figures:
       method: color
       order: hclust
       addrect: 8
-    colorbar: {label: '$\rho$'}
 
   # Past the floor, with the overlay. `cell 1.600 mm` is the floor rather than
   # the card's 4.20, and the clamp note is printed under it in full — the one
@@ -191,7 +183,6 @@ Figures:
       method: color
       order: hclust
       addrect: 8
-    colorbar: {label: '$\rho$'}
 
   # -- n = 100, unlabelled ---------------------------------------------------
   # The same matrix with `tl.pos: n`. Dropping the names frees no width at
@@ -211,7 +202,6 @@ Figures:
       addrect: 8
       tl.pos: n
       col: RdBu
-    colorbar: {label: '$\rho$'}
 
 output:
   dir: ./plots

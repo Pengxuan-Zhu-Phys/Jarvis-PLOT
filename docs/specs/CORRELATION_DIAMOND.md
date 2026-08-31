@@ -212,6 +212,7 @@ author does not choose it, the card does.
 | `type` | `full`/`upper`/`lower` | one half exists by construction — `full` is refused, not ignored |
 | colorbar | a bar beside the panel, in its own band of width | inside the empty triangle above the matrix; ticks and axis label on opposite sides of it |
 | `outline: sign` | unchanged | unchanged |
+| `pch` | the square cell's diagonals — a cross | the rotated cell's diagonals — a plus, the same construction seen from 45° |
 | ellipse angle | 45° in screen space | **unchanged, deliberately** — the pictogram is about the scatter plot, not about the matrix's orientation |
 
 New and specific to this layout:
@@ -294,7 +295,9 @@ New and specific to this layout:
   figure all reach `name_pad_mm`, so the numbering falls outside all three. A
   box drawn round the tag would say it was part of the name. That one number
   travels as `__corr_label_mm__` and is the reach of all three.
-- **`edge.lwd` / `edge.col`** — the outline that closes the figure. Turned 45°,
+- **`edge.lwd` / `edge.col`** — the outline that closes the figure, at the cell
+  grid's own weight (0.3): it bounds the matrix, so it should not read heavier
+  than the matrix's own lines. Turned 45°,
   the matrix has no top or bottom edge of its own: its boundary is two
   diagonals meeting the label column at a point, so the first and last names
   sit against nothing. Each rule is that nothing — out across the names, then

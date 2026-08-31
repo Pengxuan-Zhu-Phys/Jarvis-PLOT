@@ -52,8 +52,6 @@ Figures:
       type: upper                  # the wedge above the diagonal, as printed
       order: hclust                # clustered, so the blocks come out adjacent
       addrect: 3                   # boxes around the cut — needs order: hclust
-    colorbar:
-      label: '$\rho$'
 
   # The same figure with the design overlay on. `debug: true` works on every
   # card; what it adds *here* is the block under the caption reporting what the
@@ -78,8 +76,6 @@ Figures:
       type: upper
       order: hclust
       addrect: 3
-    colorbar:
-      label: '$\rho$'
 
 output:
   dir: ./plots

@@ -297,7 +297,30 @@ def _label_numbers(ax, n: int, side: str, offset_mm: float, size: float,
         )
 
 
-def _label_rules(ax, n: int, span, color, clip: bool, zorder: float) -> None:
+def _insignificant_marks(ix, iy, corners, scale: float) -> np.ndarray:
+    """The cell's own two diagonals, as ``(2m, 2, 2)`` segments.
+
+    R marks a pair its data cannot resolve with ``pch``, a plotted symbol.
+    Drawn as a *character* it is a glyph sized in points, so it neither fills
+    the cell it belongs to nor shrinks with it -- at fifty variables an ``x``
+    set at half the cell rides over its neighbours, and at ten it sits in the
+    middle of an empty square.  Two lines between opposite corners are the same
+    mark made out of the cell itself: always exactly as big as what it marks.
+
+    It reads as a cross on the square cell and as a plus on the diamond, which
+    is the same construction seen from 45 degrees -- the corners are the
+    corners either way.
+    """
+    corners = 0.5 * float(scale) * corners
+    centres = np.stack([ix, iy], axis=1)[:, None, :]
+    return np.concatenate([
+        centres + corners[None, (0, 2), :],
+        centres + corners[None, (1, 3), :],
+    ])
+
+
+def _label_rules(ax, n: int, span, color, lw: float, clip: bool,
+                 zorder: float) -> None:
     """The cell grid, carried on between the names.
 
     A row of the label column *is* a row of the matrix -- the name at ``v = k``
@@ -315,7 +338,7 @@ def _label_rules(ax, n: int, span, color, clip: bool, zorder: float) -> None:
     x0, x1 = span
     rules = LineCollection(
         [[(x0, k + 0.5), (x1, k + 0.5)] for k in range(int(n) - 1)],
-        colors=color, linewidths=_GRID_LWD, zorder=0.6,
+        colors=color, linewidths=lw, zorder=0.6,
         transform=blended_transform_factory(target.transAxes, target.transData),
     )
     rules.set_clip_on(clip)
@@ -627,8 +650,20 @@ def draw_corrplot(ax, **kwargs):
 
     sig_level = kwargs.pop("sig.level", None)
     insig = str(_pop(kwargs, "insig", "pch")).strip().lower()
-    pch = str(_pop(kwargs, "pch", "x"))
-    pch_cex = float(_pop(kwargs, "pch.cex", 1.5))
+    # `pch` is R's symbol number and this draws exactly one symbol, the cross
+    # through the cell's corners.  Named rather than numbered, and refused
+    # rather than quietly substituted: a figure that marked its unresolved
+    # pairs with something other than what the card asked for would be read as
+    # if it had.
+    pch = str(_pop(kwargs, "pch", "cross")).strip().lower()
+    if pch not in ("cross", "x"):
+        raise ValueError(
+            "corrplot pch draws the cell's own diagonals and takes cross (or "
+            "x, the same mark); got {!r}. insig: blank leaves the cell "
+            "empty instead.".format(pch)
+        )
+    pch_cex = float(_pop(kwargs, "pch.cex", 1.0))
+    pch_lwd = float(_pop(kwargs, "pch.lwd", 0.6))
     pch_color = _pop(kwargs, "pch.col", "#21171A")
 
     na_label = kwargs.pop("na.label", None)
@@ -696,7 +731,7 @@ def draw_corrplot(ax, **kwargs):
         )
         _edge_rules(ax, n, column_u, side, edge_color, edge_lwd, zorder + 40, clip)
     if diamond and grid_color and label_span is not None:
-        _label_rules(ax, n, label_span, grid_color, clip, zorder)
+        _label_rules(ax, n, label_span, grid_color, _GRID_LWD, clip, zorder)
     if diamond and edge_numbers:
         _edge_numbers(
             ax, n, side, number_pt, edge_color, clip, zorder + 40,
@@ -857,13 +892,15 @@ def draw_corrplot(ax, **kwargs):
             )
 
     if sig_level is not None and insig == "pch" and np.any(insignificant):
-        for x, y in zip(ix[insignificant], iy[insignificant]):
-            ax.text(
-                x, y, pch,
-                ha="center", va="center",
-                fontsize=cell_pt * 0.5 * pch_cex / 1.5,
-                color=pch_color, fontfamily="sans", clip_on=clip, zorder=zorder + 25,
-            )
+        marks = LineCollection(
+            _insignificant_marks(
+                ix[insignificant], iy[insignificant],
+                _DIAMOND_CORNERS if diamond else _CORNERS, pch_cex,
+            ),
+            colors=pch_color, linewidths=pch_lwd, zorder=zorder + 25,
+        )
+        marks.set_clip_on(clip)
+        ax.add_collection(marks)
 
     if na_label:
         for x, y in zip(ix[~finite], iy[~finite]):
