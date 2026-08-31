@@ -511,14 +511,49 @@ def test_no_table_says_which_transform_is_missing():
 
 
 def test_significance_marks_only_when_a_level_is_given():
+    from matplotlib.collections import LineCollection
+
+    def marks(ax):
+        return [
+            c for c in ax.collections
+            if isinstance(c, LineCollection) and len(c.get_segments()) % 2 == 0
+            and c.get_zorder() > 20
+        ]
+
     table = _long_table(n_rows=8)
     plain = _axes(3)
     draw_corrplot(plain, __df__=table, method="circle")
-    assert not plain.texts
+    assert not marks(plain)
 
     marked = _axes(3)
     draw_corrplot(marked, __df__=table, method="circle", **{"sig.level": 0.05})
-    assert marked.texts, "sig.level should mark the insignificant cells"
+    assert marks(marked), "sig.level should mark the insignificant cells"
+    # drawn, not typed: nothing about the mark is text
+    assert not marked.texts
+
+
+def test_the_insignificance_mark_is_made_out_of_the_cell():
+    # R's `pch` is a plotted symbol; set as a *character* it is sized in points,
+    # so it neither fills the cell nor shrinks with it.  Two lines between
+    # opposite corners are always exactly as big as what they mark -- a cross
+    # on the square cell, a plus on the diamond, which is the same construction
+    # seen from 45 degrees.
+    from jarvisplot.Figure.corrplot_runtime import (
+        _CORNERS, _DIAMOND_CORNERS, _insignificant_marks,
+    )
+
+    ix, iy = np.array([2.0]), np.array([5.0])
+    square = _insignificant_marks(ix, iy, _CORNERS, 1.0)
+    assert square.shape == (2, 2, 2)
+    assert np.allclose(square[0], [[1.5, 4.5], [2.5, 5.5]])     # corner to corner
+    assert np.allclose(square[1], [[2.5, 4.5], [1.5, 5.5]])
+    # the rotated cell's corners are its own, so the mark turns with it
+    plus = _insignificant_marks(ix, iy, _DIAMOND_CORNERS, 1.0)
+    assert np.allclose(plus[0], [[2.0, 4.5], [2.0, 5.5]])
+    assert np.allclose(plus[1], [[2.5, 5.0], [1.5, 5.0]])
+    # and `pch.cex` scales it about the cell's centre
+    assert np.allclose(_insignificant_marks(ix, iy, _CORNERS, 0.5)[0],
+                       [[1.75, 4.75], [2.25, 5.25]])
 
 
 # --------------------------------------------------------------------------- #
@@ -965,7 +1000,7 @@ def test_the_rules_between_the_names_are_the_cell_grid():
     from jarvisplot.Figure.corrplot_runtime import _GRID_LWD, _label_rules
 
     ax = _axes(7)
-    _label_rules(ax, 7, (-0.4, 0.0), "#C2C2C2", False, 1.0)
+    _label_rules(ax, 7, (-0.4, 0.0), "#C2C2C2", _GRID_LWD, False, 1.0)
     drawn = [c for c in ax.collections if isinstance(c, LineCollection)]
     assert len(drawn) == 1
     segments = drawn[0].get_segments()

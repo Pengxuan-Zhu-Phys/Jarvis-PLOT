@@ -55,7 +55,6 @@ human:
           data: samples
           variables: {exclude: [weight, label]}
           corrplot: {method: circle, type: upper, order: hclust, addrect: 3}
-          colorbar: {label: "$\\rho$"}
     - kind: notes
       title: Where each formal is applied
       items:
@@ -119,7 +118,6 @@ agent:
               type: upper
               order: hclust
               addrect: 3
-            colorbar: {label: '$\\rho$'}
     - title: diamond correlation matrix
       yaml: |
         version: '0.3'
@@ -136,7 +134,6 @@ agent:
               side: right
               stripe: alternate
               order: hclust
-            colorbar: {label: '$\\rho$'}
   anti_patterns:
     - Writing figsize / axes rect / tick positions by hand (all are solved outputs and get overwritten)
     - Using method scatter with s computed from abs_rho (only reproduces method circle)

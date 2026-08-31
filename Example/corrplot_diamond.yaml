@@ -61,7 +61,6 @@ Figures:
       order: hclust
       addrect: 4
       side: left
-    colorbar: {label: '$\rho$'}
 
   # -- the card's own default -------------------------------------------------
   - name: corrplot_diamond_right
@@ -73,7 +72,6 @@ Figures:
       method: circle
       order: hclust
       addrect: 4
-    colorbar: {label: '$\rho$'}
 
   # -- long names, which is the case this layout is for -----------------------
   # `margin.fit` grows the label column to hold them; on the square card the
@@ -88,7 +86,6 @@ Figures:
     corrplot:
       method: square
       order: hclust
-    colorbar: {label: '$\rho$'}
 
   # -- the solve, printed on the figure ---------------------------------------
   - name: corrplot_diamond_debug
@@ -98,4 +95,3 @@ Figures:
     debug: true
     variables: {regex: '^a'}
     corrplot: {method: circle}
-    colorbar: {label: '$\rho$'}
