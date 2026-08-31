@@ -88,7 +88,19 @@ Read off what it implies, because every later section is a consequence:
   assuming one.
 
   The round glyphs do not take it: a circle is a circle, and at `rho = 1` it
-  reaches 0.07 cells past the panel, into a gap 1.6 mm wide.
+  reaches 0.07 cells past the panel, into a gap 1.6 mm wide. Nor does the
+  **grid outline** under one — the pentagon is a shape for glyphs that *fill*
+  their cell, and outlining it under a circle draws a boundary the glyph does
+  not keep: the flat backs line up into a grey rail down the edge of the matrix
+  with the circles straddling it. There the diagonal simply carries no outline;
+  `edge.lwd` already closes the matrix.
+
+  Two conversions had to learn the quarter cell as well. The closing rule is
+  drawn in cell units from a column measured in millimetres, and it took the
+  panel to be `n/2` cells wide (it is `n/2 + ¼`) with its near edge at `u = 0`
+  (it is `−¼`). Both are now read off the axes, and the invariant the tests
+  pin is the one that survives either mistake: **the rule ends exactly where
+  the label column does.**
 
 `side` names the side the *labels* go on, and the card's default is
 **`side: right`** — names on the right, colorbar on the left, the triangle
