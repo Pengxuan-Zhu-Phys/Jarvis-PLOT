@@ -70,9 +70,21 @@ Read off what it implies, because every later section is a consequence:
   `glyph.scale`, which is the only way a diagonal of constant `rho` can look
   constant.
 
-  The wedge beside each name is empty by construction — it is what
-  `_notch_vertices` used to fill, and with the diagonal in, that fill goes: the
-  self cell stands there itself and squares off the same edge.
+  The **notch moves, it does not go.** Whatever stands at `u = 0` meets the
+  edge beside the names at a *point*, so the tint carrying a variable's band in
+  from its name pinches to nothing there unless something fills the gap — which
+  is all `_notch_vertices` has ever been for. Without the diagonal the near
+  edge is `u = 0` and the gap is the triangle `(0, k−½) (½, k) (0, k+½)`
+  *inside* the matrix. With it the near edge is `u = −½` and the self cell's
+  own corner is the point, so the gap is the pair of triangles either side of
+  it — together with that corner, the rectangle `[−½, 0] × [k−½, k+½]`. An
+  earlier version of this card assumed the self cell closed the edge by itself
+  and the band broke on every shaded row: a diamond's corner does not fill a
+  straight edge.
+
+  The rules *between* the names start there too, at `u = 0` rather than at the
+  panel's edge. Without the diagonal the two are the same number, which is why
+  the difference never showed.
 
   **The pentagon is a fill, and only a fill.** It is how a glyph that covers
   its cell keeps a whole cell's area against the edge, so it is taken by the
@@ -86,7 +98,12 @@ Read off what it implies, because every later section is a consequence:
     diagonal carries no outline at all; `edge.lwd` already closes the matrix.
   - The **tint** does not. It is a background and has to reach the panel's
     edge, or the band it carries from the name into the matrix comes apart on
-    the diagonal rows.
+    the diagonal rows. It also sits at `_TINT_ZORDER`, the bottom layer of the
+    axes, rather than at a zorder derived from the glyph's: everything else
+    here is drawn far above the 2.5 an axis uses for its own tick labels, so a
+    tint placed relative to the glyphs prints *over* a name rather than under
+    it. Its three pieces — the cells, the notch, and the band under the label —
+    are one band and carry one number, so they cannot drift apart.
 
   Which is why `diag` pushes **both** ranges out by the usual half cell, not by
   the quarter the pentagon reaches: the panel has to hold whatever shape the
