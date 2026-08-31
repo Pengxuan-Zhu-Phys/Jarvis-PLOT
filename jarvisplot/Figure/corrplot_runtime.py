@@ -218,21 +218,40 @@ def _self_cell_vertices(rows, side: str = "left", scale: float = 1.0):
     )
 
 
-def _notch_vertices(n: int, side: str = "left"):
+def _notch_vertices(n: int, side: str = "left", diag: bool = False):
     """The half cells that make the matrix's near edge straight.
 
-    A variable's V has its vertex at ``(0, k)``, and the two cells meeting
-    there touch the edge at a point, not along it -- so the boundary beside the
-    names comes out as a row of notches.  The notch at ``k`` is the triangle
-    ``(0, k-1/2) (1/2, k) (0, k+1/2)``: filling it with that variable's own
-    tint carries the band from the name into the matrix without a gap, and
-    turns the sawtooth into the straight edge the rules can close against.
+    Whatever stands at ``u = 0`` meets the edge beside the names at a *point*,
+    so that boundary comes out as a row of notches and the tint carrying a
+    variable's band in from its name pinches to nothing there.  Filling the
+    notch is what turns the sawtooth into the straight edge the rules close
+    against, and the band into one band.
+
+    The diagonal moves the notch, it does not remove it -- which is what an
+    earlier version of this card assumed, and the band broke on every shaded
+    row.  Without the diagonal the near edge is ``u = 0`` and the first cells
+    are the pairs at ``u = 1/2``, so the gap is the triangle
+    ``(0, k-1/2) (1/2, k) (0, k+1/2)`` *inside* the matrix.  With it the near
+    edge is ``u = -1/2`` and the self cell's own left corner is the point, so
+    the gap is the pair of triangles either side of it -- together with that
+    corner, the rectangle ``[-1/2, 0] x [k-1/2, k+1/2]``.
 
     Returned for every variable; the caller picks the tinted ones.
     """
     k = np.arange(int(n), dtype=float)
     flip = -1.0 if side == "right" else 1.0
     zero = np.zeros_like(k)
+    if diag:
+        back = flip * -0.5 + zero
+        return np.stack(
+            [
+                np.stack([back, k - 0.5], axis=1),
+                np.stack([zero, k - 0.5], axis=1),
+                np.stack([zero, k + 0.5], axis=1),
+                np.stack([back, k + 0.5], axis=1),
+            ],
+            axis=1,
+        )
     return np.stack(
         [
             np.stack([zero, k - 0.5], axis=1),
@@ -879,17 +898,13 @@ def draw_corrplot(ax, **kwargs):
             ax.add_collection(cells)
         # The half cells beside the names, so the band reaches the matrix and
         # the edge it makes is straight enough for the rules to close against.
-        # Only when the diagonal is out: with it in, the self cell stands in
-        # that wedge itself and squares off the same edge (see
-        # `_self_cell_vertices`), so filling it again would be the same tint
-        # laid down twice under a cell that is already there.
-        if not diag:
-            notches = PolyCollection(
-                _notch_vertices(n, side)[shaded], closed=True,
-                facecolors=stripe_color, edgecolors="none", zorder=zorder - 20,
-            )
-            notches.set_clip_on(clip)
-            ax.add_collection(notches)
+        # The diagonal moves this, it does not remove it: see `_notch_vertices`.
+        notches = PolyCollection(
+            _notch_vertices(n, side, diag)[shaded], closed=True,
+            facecolors=stripe_color, edgecolors="none", zorder=zorder - 20,
+        )
+        notches.set_clip_on(clip)
+        ax.add_collection(notches)
         if label_span is not None:
             _stripe_the_labels(ax, n, shaded, label_span, stripe_color, clip)
 
@@ -906,7 +921,8 @@ def draw_corrplot(ax, **kwargs):
                         kind, ix[drawn], iy[drawn], rho[drawn], scale,
                         corners=_DIAMOND_CORNERS if diamond else _CORNERS,
                     ),
-                    drawn, closed_loop=False, shape_scale=scale,
+                    drawn if kind in _FILLED_GLYPHS else np.zeros(ix.shape, dtype=bool),
+                    closed_loop=False, shape_scale=scale,
                 ),
                 closed=True,
             )
@@ -961,14 +977,27 @@ def draw_corrplot(ax, **kwargs):
     if kind == "shade":
         # The sign is already in the colour; the hatch is what survives a
         # greyscale print, which is the whole point of shade.
+        #
+        # It runs corner to corner of the cell, and *which* corners is the
+        # layout's business.  On the square card those are the diagonal ones,
+        # `(+/-1, +/-1) * half`.  On the diamond the same cell is turned 45
+        # degrees, so its corners are the ones straight up and straight across
+        # -- and a stroke still drawn to `(+/-1, +/-1)` reaches `half * sqrt2`
+        # where the cell only reaches `half / sqrt2`: twice too long, over the
+        # boundary and into the neighbour, on every cell of the figure.
+        step = 0.5 * scale
+        arm = (
+            [(0.0, step), (step, 0.0)] if diamond else [(step, step), (step, -step)]
+        )
         hatch = LineCollection(
             [
                 [
-                    (x - 0.5 * scale, y - sign * 0.5 * scale * np.sign(r)),
-                    (x + 0.5 * scale, y + sign * 0.5 * scale * np.sign(r)),
+                    (x - dx, y - sign * dy * np.sign(r)),
+                    (x + dx, y + sign * dy * np.sign(r)),
                 ]
                 for x, y, r in zip(ix[drawn], iy[drawn], rho[drawn])
                 if r != 0.0
+                for dx, dy in [arm[0] if r > 0 else arm[1]]
             ],
             colors="#FFFFFF",
             linewidths=0.4,
@@ -990,7 +1019,7 @@ def draw_corrplot(ax, **kwargs):
         # outline -- the matrix's own edge is already closed by `edge.lwd`.
         ruled = (
             np.ones(ix.shape, dtype=bool)
-            if not diamond or kind in _POLYGON_GLYPHS
+            if not diamond or kind in _FILLED_GLYPHS
             else ~self_cells
         )
         grid = LineCollection(
