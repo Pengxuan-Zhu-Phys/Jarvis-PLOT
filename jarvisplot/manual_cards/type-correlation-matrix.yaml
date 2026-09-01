@@ -45,7 +45,9 @@ human:
         `style: [corrplot, diamond]` picks the other card: the same matrix as
         one triangle turned 45 degrees, names in a plain column of horizontal
         text, each variable's pairs a V rooted at its own name. Same formals,
-        plus `side: left | right` (default `right`, the triangle on the left of the page) and `stripe: alternate | none`.
+        plus `side: left | right` (default `right`, the triangle on the left of the page) and `stripe: alternate | selected | none`
+        (`selected` names the variables in `stripe.variables`), plus
+        `diag: true | false` for the self-correlation on the diagonal.
     - kind: yaml
       title: Minimal figure
       lexer: yaml

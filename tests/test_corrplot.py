@@ -1328,3 +1328,76 @@ def test_the_tint_is_the_bottom_layer_and_is_one_layer():
         if a.get_zorder() != pytest.approx(_TINT_ZORDER)
     ]
     assert above and min(above) > _TINT_ZORDER
+
+
+def test_stripe_selected_tints_the_variables_the_author_named():
+    from jarvisplot.Figure.corrplot_runtime import _shaded_variables
+
+    # positions, not names: the renderer never sees a name
+    picked = _shaded_variables(6, blocks=[[0, 2], [3, 5]], selected=[1, 4])
+    assert list(np.flatnonzero(picked)) == [1, 4]
+    # and it wins over the clustering, which is the point -- the tint stops
+    # being the figure's own grouping and becomes the author's
+    assert list(np.flatnonzero(_shaded_variables(6, blocks=[[0, 2], [3, 5]]))) == [0, 1, 2]
+
+
+def test_stripe_variables_are_resolved_against_the_solved_order():
+    # `order` has already moved the names by the time this runs, and only the
+    # order knows where each one ended up.  Resolved against the *unordered*
+    # columns the tint would land on a different variable every time the
+    # clustering changed, and never say so.
+    from jarvisplot.core_runtime import _corr_shaded_positions
+
+    ordered = ["c", "a", "d", "b"]
+    style = {"stripe": "selected", "stripe.variables": ["a", "b"]}
+    assert _corr_shaded_positions(style, ordered, "fig") == [1, 3]
+    # sorted, so the renderer gets positions in the order it draws them
+    assert _corr_shaded_positions(
+        {"stripe": "selected", "stripe.variables": ["b", "a"]}, ordered, "fig"
+    ) == [1, 3]
+    # nothing asked for, nothing resolved
+    assert _corr_shaded_positions({"stripe": "alternate"}, ordered, "fig") is None
+
+
+def test_a_tint_that_would_quietly_do_nothing_is_refused():
+    # A name not in the matrix, a list given to the wrong mode, and a mode
+    # given no list all have the same failure: a band that says nothing, and
+    # nothing on the page to show it was asked for.
+    from jarvisplot.core_runtime import _corr_shaded_positions
+
+    ordered = ["a", "b", "c"]
+    with pytest.raises(ValueError, match="not in the matrix"):
+        _corr_shaded_positions(
+            {"stripe": "selected", "stripe.variables": ["a", "zz"]}, ordered, "fig"
+        )
+    with pytest.raises(ValueError, match="only read by stripe: selected"):
+        _corr_shaded_positions(
+            {"stripe": "alternate", "stripe.variables": ["a"]}, ordered, "fig"
+        )
+    with pytest.raises(ValueError, match="takes a list"):
+        _corr_shaded_positions(
+            {"stripe": "selected", "stripe.variables": "a"}, ordered, "fig"
+        )
+    # and the renderer refuses the mode without the positions
+    with pytest.raises(ValueError, match="needs stripe.variables"):
+        draw_corrplot(_axes(3), __df__=_long_table(), __corr_layout__="diamond",
+                      type="upper", stripe="selected")
+
+
+def test_addrect_draws_its_boxes_again_once_the_tint_is_spoken_for():
+    # The boxes are dropped only because the shading is saying the same thing.
+    # With `selected` it is saying something else, so the clusters need them
+    # back or nothing on the figure says where they are.
+    from matplotlib.patches import Polygon
+
+    def boxes(**corrplot):
+        ax = _axes(6)
+        draw_corrplot(
+            ax, __df__=_long_table(), __corr_layout__="diamond", type="upper",
+            __corr_blocks__=[[0, 1], [2, 2]], __corr_label_mm__=8.0, **corrplot,
+        )
+        return [p for p in ax.patches if isinstance(p, Polygon)]
+
+    assert not boxes(stripe="alternate")
+    assert boxes(stripe="none")
+    assert boxes(stripe="selected", __corr_shaded__=[0])

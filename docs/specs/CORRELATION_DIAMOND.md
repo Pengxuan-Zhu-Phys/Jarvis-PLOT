@@ -300,6 +300,26 @@ New and specific to this layout:
   coarser grain.
   `stripe: none` turns it off, `stripe.col` recolours it.
 
+  **`stripe: selected`** hands the choice over. The variables named in
+  `stripe.variables` carry the tint and nothing else does, so the band says
+  what the *author* meant by it rather than what the figure inferred. Three
+  things follow, and all three are refusals rather than silences, because a
+  tint that quietly did nothing is indistinguishable from one that was never
+  asked for: a name not in the matrix is an error; `stripe.variables` given to
+  any other mode is an error; and `selected` with no names is an error.
+
+  The names are resolved **at config time**, in
+  `core_runtime._corr_shaded_positions`, against the order `order` just
+  settled — the renderer is handed positions in `__corr_shaded__`, the way it
+  is handed `__corr_blocks__`, and for the same reason. Resolved at draw time
+  against the unordered columns the tint would land on a different variable
+  every time the clustering changed and never say so.
+
+  And with the tint spoken for, `addrect` draws its boxes again. They are
+  dropped only while the shading is saying the same thing; under `selected` it
+  is saying something else, so without them nothing on the figure says where
+  the clusters are.
+
   The names are also ruled apart, at `addgrid.col` and the grid's own weight
   (`_GRID_LWD`, shared rather than repeated). A row of the label column *is* a
   row of the matrix — the name at `v = k` and the V rooted under it are one

@@ -93,6 +93,40 @@ Figures:
       method: square
       order: hclust
 
+  # -- the tint as the author's own grouping ----------------------------------
+  # `stripe: alternate` lets the figure choose (alternate clusters, or every
+  # other name). `stripe: selected` hands that over: the named variables carry
+  # the tint and nothing else does, so the band says what the author meant by
+  # it. The names are resolved against the *solved* order, so `hclust` may move
+  # them and the right rows are still tinted -- and a name that is not in the
+  # matrix is an error, because a tint that quietly did nothing is
+  # indistinguishable from one that was never asked for.
+  #
+  # With the tint spoken for, `addrect` draws its boxes again: the clusters
+  # need something to say them, and here the shading no longer does.
+  - name: corrplot_diamond_selected
+    type: correlation_matrix
+    style: [corrplot, diamond]
+    data: wide
+    variables: {regex: '^(a|b)'}
+    corrplot:
+      method: circle
+      order: hclust
+      addrect: 4
+      stripe: selected
+      stripe.variables: [a01, a03, a07, b02, b05]
+
+  # -- the self-correlation, off ----------------------------------------------
+  # `diag` is on by default: a variable's pair with itself sits at u = 0, and
+  # the panel buys the half cell that holds it. `diag: false` drops it and the
+  # panel gives that half cell back.
+  - name: corrplot_diamond_nodiag
+    type: correlation_matrix
+    style: [corrplot, diamond]
+    data: wide
+    variables: {regex: '^a0[1-8]$'}
+    corrplot: {method: circle, order: hclust, diag: false}
+
   # -- every method, on the same eight variables ------------------------------
   # The diagonal is where the layouts differ: a self pair sits at u = 0, half
   # of an ordinary cell outside the matrix. Each method answers that its own
