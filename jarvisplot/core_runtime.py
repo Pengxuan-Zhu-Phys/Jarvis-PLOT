@@ -590,6 +590,47 @@ def _solve_corr_diamond(card, info, style, columns, axes_name):
     return geom, solved
 
 
+def _corr_shaded_positions(style: Mapping, columns, name: str):
+    """`stripe.variables` resolved against the order the figure ended up in.
+
+    It has to happen here and not at draw time.  The renderer sees positions,
+    and which position a variable holds is `order`'s answer, settled a moment
+    ago -- a name resolved against the *unordered* columns would tint a
+    different variable on every reordering and never say so.
+
+    A name that is not in the matrix is an error rather than a silent miss, for
+    the same reason: a tint that quietly did nothing is indistinguishable from
+    a tint that was not asked for.
+    """
+    stripe = style.get("stripe", "alternate")
+    stripe = "none" if stripe is False else str(stripe or "").strip().lower()
+    wanted = style.get("stripe.variables")
+    if wanted is None:
+        return None
+    if stripe != "selected":
+        raise ValueError(
+            "figure '{}' gives corrplot stripe.variables with stripe: {}. The "
+            "names are only read by stripe: selected; leaving them here would "
+            "draw the other tint and say nothing about them.".format(name, stripe)
+        )
+    if isinstance(wanted, str) or not isinstance(wanted, (list, tuple, set)):
+        raise ValueError(
+            "figure '{}' gives corrplot stripe.variables: {!r}. It takes a "
+            "list of variable names.".format(name, wanted)
+        )
+    at = {str(column): position for position, column in enumerate(columns)}
+    missing = [str(v) for v in wanted if str(v) not in at]
+    if missing:
+        raise ValueError(
+            "figure '{}' asks corrplot to tint {}, which {} not in the matrix. "
+            "The variables drawn are: {}.".format(
+                name, ", ".join(missing), "is" if len(missing) == 1 else "are",
+                ", ".join(str(c) for c in columns),
+            )
+        )
+    return sorted(at[str(v)] for v in wanted)
+
+
 def _as_corr_bool(value, default: bool = False) -> bool:
     if value is None:
         return default
@@ -1000,6 +1041,11 @@ def _prebuild_one(core, info: dict, card: Mapping) -> None:
         # but placed and sized by the solve.
         layer["style"]["__corr_number_mm__"] = geom.number_pad_mm
         layer["style"]["__corr_number_pt__"] = geom.number_size_pt
+        # `stripe.variables` names variables; the renderer draws positions, and
+        # only the order settled above knows which is which.
+        shaded = _corr_shaded_positions(style, columns, info.get("name", "?"))
+        if shaded is not None:
+            layer["style"]["__corr_shaded__"] = shaded
 
     if blocks:
         # The boxes are cuts of the tree the order came from, so they are

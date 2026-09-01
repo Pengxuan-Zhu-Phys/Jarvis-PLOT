@@ -45,10 +45,15 @@ GLYPHS = ("circle", "square", "ellipse", "color", "shade", "pie", "number")
 
 _TRIANGLES = ("full", "upper", "lower")
 
+#: What the tint may be told to mean.  `selected` is the author's own grouping,
+#: `alternate` the figure's own, `none` nothing.
+_STRIPES = ("alternate", "selected", "none")
+
 #: Formals resolved at config time.  They arrive because the user wrote them
 #: in the layer, and are dropped here rather than forwarded to matplotlib.
 _CONFIG_TIME = ("order", "hclust.method", "addrect", "col", "tl.pos", "tl.cex",
-                "tl.col", "tl.srt", "tl.offset", "cl.cex", "edge.numbers.cex")
+                "tl.col", "tl.srt", "tl.offset", "cl.cex", "edge.numbers.cex",
+                "stripe.variables")
 
 
 def _pop(kwargs: dict, name: str, default=None):
@@ -270,14 +275,25 @@ def _notch_vertices(n: int, side: str = "left", diag: bool = False):
     )
 
 
-def _shaded_variables(n: int, blocks=None) -> np.ndarray:
-    """Which variables carry the tint: alternate blocks, or alternate names.
+def _shaded_variables(n: int, blocks=None, selected=None) -> np.ndarray:
+    """Which variables carry the tint.
 
-    A block is a run of adjacent positions cut from the clustering tree, so
-    tinting every other one makes the shading say where one group ends and the
-    next begins -- which is what the boxes were for.
+    Three answers, and they say different things.  ``selected`` is an explicit
+    set of positions -- the author naming the variables that matter, so the
+    tint is *their* grouping and nothing is inferred.  Otherwise it is read off
+    the figure: alternate **blocks** when the clustering cut some, so the
+    shading says where one group ends and the next begins (which is what the
+    boxes were for), and alternate **names** when it did not.
+
+    ``selected`` arrives as positions, not names: the order is settled at
+    config time and only the order knows which position a name ended up at.
     """
     shaded = np.zeros(int(n), dtype=bool)
+    if selected is not None:
+        for position in selected:
+            if 0 <= int(position) < int(n):
+                shaded[int(position)] = True
+        return shaded
     if blocks:
         for position, (start, end) in enumerate(blocks):
             if position % 2 == 0:
@@ -728,9 +744,21 @@ def draw_corrplot(ax, **kwargs):
     # Diamond only.  See the stripe block below for why it is not decoration.
     stripe = _pop(kwargs, "stripe", "alternate")
     stripe = "none" if stripe is False else str(stripe).strip().lower()
-    if stripe not in ("alternate", "none"):
+    if stripe not in _STRIPES:
         raise ValueError(
-            "corrplot stripe must be alternate or none; got {!r}.".format(stripe)
+            "corrplot stripe must be one of {}; got {!r}. `selected` takes the "
+            "variables to tint in `stripe.variables`.".format(
+                ", ".join(_STRIPES), stripe
+            )
+        )
+    # Positions, resolved from `stripe.variables` at config time -- see
+    # `core_runtime._corr_shaded_positions`.  The names cannot be resolved here
+    # because `order` has already moved them.
+    shaded_positions = kwargs.pop("__corr_shaded__", None)
+    if stripe == "selected" and shaded_positions is None:
+        raise ValueError(
+            "corrplot stripe: selected needs stripe.variables -- the names to "
+            "tint. Without them the tint would say nothing."
         )
     stripe_color = _pop(kwargs, "stripe.col", "#EFEFEF")
     # Diamond only.  See `_edge_rules`: the rotated matrix has no top or bottom
@@ -883,7 +911,7 @@ def draw_corrplot(ax, **kwargs):
                 edge_color, clip, zorder + 40,
             )
 
-    if diamond and stripe == "alternate" and np.any(drawn):
+    if diamond and stripe != "none" and np.any(drawn):
         # Every other variable's cells, tinted.  Not decoration: a variable's
         # pairs run away from its name as a V, and at 40 names a reader
         # following one of those arms has nothing to hold on to.  The band is
@@ -899,7 +927,7 @@ def draw_corrplot(ax, **kwargs):
         #
         # The union of those variables' cells rather than one band each, so a
         # cell where two bands cross is filled once and the tint stays even.
-        shaded = _shaded_variables(n, blocks)
+        shaded = _shaded_variables(n, blocks, shaded_positions)
         band = shaded[index_x.astype(int)] | shaded[index_y.astype(int)]
         band &= drawn
         if np.any(band):
@@ -1091,7 +1119,7 @@ def draw_corrplot(ax, **kwargs):
     # block above), so a box around each of them would be the same fact drawn
     # twice, in the heaviest ink on the figure.  `addrect` still decides *what*
     # the blocks are; it just stops drawing them.
-    if blocks and not (diamond and stripe != "none"):
+    if blocks and not (diamond and stripe == "alternate"):
         for start, end in blocks:
             if diamond:
                 ax.add_patch(
