@@ -170,6 +170,7 @@ _CMAP_DESCRIPTIONS = {
     "gambit_cmap": "Continuous black → blue → cyan → yellow map.",
     "jarvis_rainbow": "Continuous purple → blue → cyan → green → orange → red map.",
     "jarvis_rainbow2": "Continuous red → yellow → green → blue map.",
+    "Jpurples": "Matplotlib Purples-style continuous map with a pure-white zero endpoint.",
     "SpectralB": "Spectral-style continuous map from red through green to blue.",
     "RdBuB": "Diverging red → white → blue map.",
     "chrisB": "Diverging black → red → white → blue → navy map.",

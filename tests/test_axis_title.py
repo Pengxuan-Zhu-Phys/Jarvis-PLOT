@@ -257,3 +257,29 @@ def test_side_axes_honour_manual_tick_positions():
         assert [t.get_text() for t in ax.ax.get_yticklabels()] == list("abcde")
     finally:
         plt.close(raw_fig)
+
+
+def test_manual_ticks_do_not_expand_explicit_axis_limits():
+    """Out-of-range manual ticks must not override an explicit frame limit."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    from jarvisplot.Figure.layout_runtime import apply_manual_ticks
+
+    raw_fig, ax = plt.subplots(figsize=(3.3, 3.0))
+    ax.set_ylim(200, 400)
+    apply_manual_ticks(
+        SimpleNamespace(logger=_logger()),
+        ax,
+        "y",
+        {
+            "positions": [200, 300, 400, 500, 600],
+            "labels": ["200", "300", "400", "500", "600"],
+        },
+    )
+
+    assert ax.get_ylim() == pytest.approx((200.0, 400.0))
+    assert list(ax.get_yticks()) == [200, 300, 400, 500, 600]
+    plt.close(raw_fig)

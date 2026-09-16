@@ -40,7 +40,9 @@ def _register(name: str, cmap: Colormap, force: bool) -> bool:
                         cmap.name = name
                     except Exception:
                         pass
-                if "override" in sig.parameters:
+                if "force" in sig.parameters:
+                    kwargs["force"] = bool(force)
+                elif "override" in sig.parameters:
                     kwargs["override"] = bool(force)
             except Exception:
                 # If signature introspection fails, try safest call (cmap only).
