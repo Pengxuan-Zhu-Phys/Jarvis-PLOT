@@ -851,7 +851,7 @@ class DataPreprocessor:
         eff_transform = self._effective_transform(source, transform)
         payload = {
             "kind": "pipeline",
-            "algo": "pregrid-v6",
+            "algo": "pregrid-v7-objective-finite-voronoi",
             "source": self._source_token(source, combine=combine),
             "transform": eff_transform,
             "combine": str(combine),
@@ -900,12 +900,11 @@ class DataPreprocessor:
             if isinstance(item, Mapping):
                 src = item.get("source")
                 tf = self._effective_transform(src, item.get("transform"))
-                tokens.append(
-                    {
-                        "source": self._source_token(src),
-                        "transform": tf,
-                    }
-                )
+                token = {"source": self._source_token(src), "transform": tf}
+                profile_sig = self._runtime_profile_signature(tf)
+                if profile_sig is not None:
+                    token["profile_signature"] = profile_sig
+                tokens.append(token)
         payload = {
             "name": layer.get("name"),
             "axes": layer.get("axes"),
@@ -928,7 +927,7 @@ class DataPreprocessor:
                     cfg = deepcopy(cfg)
                 else:
                     cfg = {"value": cfg}
-                tokens.append({"kind": "profile", "cfg": cfg})
+                tokens.append({"kind": "profile", "algo": "objective-finite-voronoi-v2", "cfg": cfg})
         return tokens
 
     def _runtime_profile_signature(self, transform: Any) -> Optional[str]:
@@ -1332,13 +1331,17 @@ class DataPreprocessor:
 
     @staticmethod
     def _preprofile_profile_cfg(profile_cfg: Any) -> Any:
-        # Preprofile cache identity is intentionally coordinates-only:
-        # runtime profile method/bin/objective changes must reuse same preprofile.
+        # Runtime method/bin can share a preprofile, but objective and pregrid
+        # controls change which source rows survive and must enter its identity.
         if not isinstance(profile_cfg, Mapping):
             return {}
         slim: Dict[str, Any] = {}
         if "coordinates" in profile_cfg:
             slim["coordinates"] = deepcopy(profile_cfg["coordinates"])
+        slim["objective"] = str(profile_cfg.get("objective", "max")).lower()
+        for key in ("pregrid", "pregrid_bin"):
+            if key in profile_cfg:
+                slim[key] = deepcopy(profile_cfg[key])
         return slim
 
     def _split_prebuild_transform(self, transform: Any):

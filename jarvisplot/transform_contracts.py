@@ -499,7 +499,8 @@ TRANSFORM_CONTRACTS: dict[str, dict[str, Any]] = {
                 "description": (
                     "Optional coarse pre-binning before Bridson/grid profile "
                     "(large tables). Mapping: {bin, enable}; false disables; "
-                    "omit for auto-prebin from row count."
+                    "omit for auto-prebin from row count. Keeps one finite "
+                    "extremum per cell according to objective (max/min)."
                 ),
                 "properties": {
                     "bin": {
