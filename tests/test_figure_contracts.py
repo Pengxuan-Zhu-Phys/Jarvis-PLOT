@@ -1094,10 +1094,12 @@ def test_preprofile_identity_ignores_runtime_bin():
         "coordinates": {"x": {"expr": "x"}, "y": {"expr": "y"}},
         "method": "bridson",
         "bin": 32,
-        "objective": "min",
+        "objective": "max",
     }
 
     assert dp._preprofile_profile_cfg(cfg1) == dp._preprofile_profile_cfg(cfg2)
+    cfg2["objective"] = "min"
+    assert dp._preprofile_profile_cfg(cfg1) != dp._preprofile_profile_cfg(cfg2)
 
 
 def test_runtime_projection_includes_row_identity_and_demand():
@@ -1159,7 +1161,7 @@ def test_runtime_transform_to_csv_exports_and_bypasses_cache(tmp_path):
     assert list(out.columns) == ["y", "z"]
 
 
-def test_prebuild_split_keeps_profile_identity_coordinates_only():
+def test_prebuild_split_keeps_profile_reduction_controls():
     dp = DataPreprocessor(context=None)
     transform = [
         {"add_column": {"name": "c", "expr": "a + b"}},
@@ -1169,6 +1171,7 @@ def test_prebuild_split_keeps_profile_identity_coordinates_only():
                 "method": "bridson",
                 "bin": 16,
                 "objective": "max",
+                "pregrid": {"bin": 25, "enable": True},
             }
         },
         {"sortby": "c"},
@@ -1178,7 +1181,11 @@ def test_prebuild_split_keeps_profile_identity_coordinates_only():
 
     assert pre_transform is not None
     assert runtime_transform is not None
-    assert pre_transform[-1]["profile"] == {"coordinates": {"x": {"expr": "x"}, "y": {"expr": "y"}}}
+    assert pre_transform[-1]["profile"] == {
+        "coordinates": {"x": {"expr": "x"}, "y": {"expr": "y"}},
+        "objective": "max",
+        "pregrid": {"bin": 25, "enable": True},
+    }
     assert runtime_transform[0]["profile"]["method"] == "bridson"
     assert runtime_transform[0]["profile"]["bin"] == 16
     assert runtime_transform[1]["sortby"] == "c"

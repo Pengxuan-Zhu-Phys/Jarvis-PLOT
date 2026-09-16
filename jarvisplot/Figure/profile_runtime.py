@@ -451,11 +451,26 @@ def profiling(df, prof, logger):
     else:
         z = df["z"]
 
-    logger.debug("After loading profiling x, y, z. ")
+    if logger:
+        logger.debug("After loading profiling x, y, z. ")
 
-    x = np.asarray(x)
-    y = np.asarray(y)
-    z = np.asarray(z)
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    z = np.asarray(z, dtype=float)
+    # A single invalid objective used to poison min/max(z), making every
+    # normalized dz NaN and silently disabling the z-aware exclusion rule.
+    valid = np.isfinite(x) & np.isfinite(y) & np.isfinite(z)
+    for cfg, values in ((xcfg, x), (ycfg, y), (zcfg, z)):
+        if str(cfg.get("scale", "linear")).lower() == "log":
+            valid &= values > 0
+    if not np.all(valid):
+        df = df.iloc[np.flatnonzero(valid)]
+        x, y, z = x[valid], y[valid], z[valid]
+    if not len(z):
+        out = df.copy()
+        for cfg, values, default in ((xcfg, x, "x"), (ycfg, y, "y"), (zcfg, z, "z")):
+            out[cfg.get("name", default)] = values
+        return out
 
     if grid == "ternary":
         xlim = xcfg.get("lim", [0, 1])
@@ -535,20 +550,12 @@ def profiling(df, prof, logger):
         },
     )
 
-    if xscale == "log":
-        xx = (np.log(xx) - np.log(xlim[0])) / (np.log(xlim[1]) - np.log(xlim[0]))
-    else:
-        xx = (xx - xlim[0]) / (xlim[1] - xlim[0])
-
-    if yscale == "log":
-        yy = (np.log(yy) - np.log(ylim[0])) / (np.log(ylim[1]) - np.log(ylim[0]))
-    else:
-        yy = (yy - ylim[0]) / (ylim[1] - ylim[0])
-
-    if zscale == "log":
-        zz = (np.log(zz) - np.log(zlim[0])) / (np.log(zlim[1]) - np.log(zlim[0]))
-    else:
-        zz = (zz - zlim[0]) / (zlim[1] - zlim[0])
+    xx = _normalize_profile_axis(xx, xlim, xscale)
+    yy = _normalize_profile_axis(yy, ylim, yscale)
+    zz = _normalize_profile_axis(zz, zlim, zscale)
+    # Empty-grid seeds are processed last and carry NaN in the output. Give
+    # them a finite exclusion coordinate, including for logarithmic z.
+    zz[len(order):] = 2.0 if obj == "min" else -1.0
 
     msk = profile_bridson_sorted(xx, yy, zz, radius)
     keep_pos = np.flatnonzero(msk).astype(np.int64, copy=False)
@@ -556,6 +563,22 @@ def profiling(df, prof, logger):
     source_count = int(order.shape[0])
     keep_source = keep_pos[keep_pos < source_count]
     keep_grid = keep_pos[keep_pos >= source_count] - source_count
+
+    # Greedy thinning only chooses the spatial partition: a high-valued point
+    # can be suppressed by an earlier seed, then a worse seed can survive on
+    # the other side of it. Re-profile *all* input rows within the nearest-seed
+    # (Voronoi) cells so those suppressed candidates still contribute. Select
+    # the entire winning source row, not just its z at another row's x/y.
+    if keep_source.size:
+        from scipy.spatial import cKDTree
+
+        source_xy = np.column_stack([xx[:source_count], yy[:source_count]])
+        tree = cKDTree(source_xy[keep_source])
+        _, cell = tree.query(source_xy)
+        winners = np.full(keep_source.size, source_count, dtype=np.int64)
+        # Input is already ordered best first for either max or min.
+        np.minimum.at(winners, cell, np.arange(source_count, dtype=np.int64))
+        keep_source = np.sort(winners[winners < source_count])
 
     source_rows = order[keep_source]
     source_x = x[source_rows]
@@ -594,7 +617,7 @@ def profiling(df, prof, logger):
 
 
 def _preprofiling(df, prof, logger):
-    """Lightweight pre-profiling for cache prebuild."""
+    """Keep the requested finite extremum per pre-bin for cache prebuild."""
 
     def _norm(arr, lim, scale):
         arr = np.asarray(arr, dtype=float)
@@ -765,14 +788,14 @@ def _preprofiling(df, prof, logger):
 
     xnorm = _norm(xvals, xlim, xscale)
     ynorm = _norm(yvals, ylim, yscale)
-    valid = np.isfinite(xnorm) & np.isfinite(ynorm)
+    valid = np.isfinite(xnorm) & np.isfinite(ynorm) & np.isfinite(zvals)
     if not np.any(valid):
         if logger:
-            logger.warning("Preprofiling got no finite points; returning original dataframe.")
-        out = df.copy(deep=False)
-        out[xind] = xvals
-        out[yind] = yvals
-        out[zind] = zvals
+            logger.warning("Preprofiling got no finite points; returning an empty dataframe.")
+        out = df.iloc[:0].copy()
+        out[xind] = xvals[:0]
+        out[yind] = yvals[:0]
+        out[zind] = zvals[:0]
         return out
 
     xv = np.clip(xnorm[valid], 0.0, 1.0 - 1e-12)
@@ -783,20 +806,19 @@ def _preprofiling(df, prof, logger):
 
     idx_src = np.flatnonzero(valid).astype(np.int64)
     zraw = np.asarray(zvals, dtype=float)[valid]
-    zmax = np.where(np.isfinite(zraw), zraw, -np.inf)
-    zmin = np.where(np.isfinite(zraw), zraw, np.inf)
     tmp = pd.DataFrame(
         {
             "__cell__": cell,
-            "__zmax__": zmax,
-            "__zmin__": zmin,
+            "__z__": zraw,
             "__pos__": idx_src,
         }
     )
 
-    loc_max = tmp.groupby("__cell__", sort=False)["__zmax__"].idxmax().to_numpy(dtype=np.int64, copy=False)
-    loc_min = tmp.groupby("__cell__", sort=False)["__zmin__"].idxmin().to_numpy(dtype=np.int64, copy=False)
-    loc_all = np.unique(np.concatenate([loc_max, loc_min], axis=0))
+    if str(prof.get("objective", "max")).lower() == "min":
+        loc = tmp.groupby("__cell__", sort=False)["__z__"].idxmin()
+    else:
+        loc = tmp.groupby("__cell__", sort=False)["__z__"].idxmax()
+    loc_all = np.sort(loc.to_numpy(dtype=np.int64, copy=False))
     keep_pos = tmp.iloc[loc_all]["__pos__"].to_numpy(dtype=np.int64, copy=False)
     reduced = df.iloc[keep_pos].copy()
     reduced[xind] = xvals[keep_pos]
