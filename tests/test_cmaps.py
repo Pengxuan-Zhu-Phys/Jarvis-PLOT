@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import matplotlib as mpl
+import numpy as np
 
 from jarvisplot.utils import cmaps
 
@@ -40,3 +41,17 @@ def test_official_tab5_is_registered_as_five_discrete_tab10_colors():
     )
     assert spec["type"] == "listed"
     assert len(spec["colors"]) == 5
+
+
+def test_jpurples_matches_purples_style_with_a_pure_white_zero_endpoint():
+    summary = cmaps.register_from_json(COLORMAPS_JSON, force=True)
+
+    assert "Jpurples" in summary["registered"]
+    assert "Jpurples_r" in summary["registered"]
+
+    jpurples = mpl.colormaps["Jpurples"]
+    purples = mpl.colormaps["Purples"]
+
+    assert mpl.colors.to_hex(jpurples(0.0), keep_alpha=False) == "#ffffff"
+    for value in (0.125, 0.25, 0.5, 0.75, 1.0):
+        assert np.allclose(jpurples(value), purples(value), atol=1 / 255)

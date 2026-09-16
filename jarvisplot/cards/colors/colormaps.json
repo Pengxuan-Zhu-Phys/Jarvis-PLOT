@@ -96,6 +96,21 @@
       ]
     },
     {
+      "name": "Jpurples",
+      "type": "linear",
+      "colors": [
+        [0.000, "#FFFFFF"],
+        [0.125, "#EFEDF5"],
+        [0.250, "#DADAEB"],
+        [0.375, "#BCBDDC"],
+        [0.500, "#9E9AC8"],
+        [0.625, "#807CBA"],
+        [0.750, "#6950A3"],
+        [0.875, "#53268F"],
+        [1.000, "#3F007D"]
+      ]
+    },
+    {
       "name": "SpectralB",
       "type": "linear",
       "colors": [

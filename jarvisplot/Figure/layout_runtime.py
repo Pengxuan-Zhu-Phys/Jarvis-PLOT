@@ -533,15 +533,35 @@ def apply_manual_ticks(fig, ax_obj, which: str, ticks_cfg: dict):
     if pos is None:
         return
     target = ax_obj.ax if hasattr(ax_obj, "ax") else ax_obj
+
+    # Matplotlib's set_xticks/set_yticks expands the view limits when a
+    # requested tick lies outside the current range.  That is surprising for
+    # Jarvis-PLOT cards, where an explicit frame.xlim/ylim is authoritative
+    # (e.g. ylim: [200, 400] with a stale tick at 600).  Preserve the range
+    # only when autoscaling was already disabled; otherwise leave the normal
+    # autoscaling behaviour untouched for axes whose limits are data-driven.
+    axis = str(which).lower()
+    if axis not in {"x", "y"}:
+        return
+    get_lim = target.get_xlim if axis == "x" else target.get_ylim
+    set_lim = target.set_xlim if axis == "x" else target.set_ylim
+    get_autoscale = (
+        target.get_autoscalex_on if axis == "x" else target.get_autoscaley_on
+    )
+    original_lim = get_lim()
+    autoscale_was_on = get_autoscale()
     try:
-        if which == "x":
+        if axis == "x":
             target.set_xticks(pos)
             if labs is not None:
                 target.set_xticklabels(labs)
-        elif which == "y":
+        elif axis == "y":
             target.set_yticks(pos)
             if labs is not None:
                 target.set_yticklabels(labs)
     except Exception as e:
         if fig.logger:
             fig.logger.warning(f"Manual ticks apply failed on {which}-axis: {e}")
+    finally:
+        if not autoscale_was_on:
+            set_lim(original_lim)
