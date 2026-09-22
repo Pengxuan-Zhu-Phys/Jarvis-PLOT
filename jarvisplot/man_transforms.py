@@ -173,9 +173,20 @@ def load_transform_card(name: str) -> dict[str, Any]:
     if c.get("owner"):
         notes = notes + [f"owner: {c['owner']}"]
 
-    yaml_example = ""
-    if examples:
-        yaml_example = str(examples[0].get("yaml") or "")
+    example_panels = []
+    for index, example in enumerate(examples):
+        body = str((example or {}).get("yaml") or "").rstrip()
+        if not body:
+            continue
+        title = str((example or {}).get("title") or "").strip()
+        example_panels.append(
+            {
+                "kind": "yaml",
+                "title": f"Example — {title}" if title else f"Example {index + 1}",
+                "lexer": "yaml",
+                "body": body,
+            }
+        )
 
     contract_body = (
         f"transform: {name}\n"
@@ -195,7 +206,7 @@ def load_transform_card(name: str) -> dict[str, Any]:
         "summary": c.get("description") or f"Pipeline step {name!r}.",
         "role": "reference",
         "priority": 37,
-        "see_also": ["transforms", "layer-method", "methods"],
+        "see_also": ["transforms", "layer-method", "methods", *(c.get("see_also") or [])],
         "related_cli": [
             {"argv": ["jplot", "cap", "transforms", "--json"], "why": "full transform table"},
             {"argv": ["jplot", "man", "transforms", "--json"], "why": "catalog"},
@@ -207,18 +218,7 @@ def load_transform_card(name: str) -> dict[str, Any]:
         "human": {
             "panels": [
                 {"kind": "overview", "title": "Contract", "body": contract_body},
-                *(
-                    [
-                        {
-                            "kind": "yaml",
-                            "title": "Example",
-                            "lexer": "yaml",
-                            "body": yaml_example,
-                        }
-                    ]
-                    if yaml_example
-                    else []
-                ),
+                *example_panels,
                 {
                     "kind": "notes",
                     "title": "Notes",

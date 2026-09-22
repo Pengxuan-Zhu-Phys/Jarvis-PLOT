@@ -65,6 +65,12 @@ def probe_dataset_columns(entry: Mapping[str, Any], resolved_path: str) -> Colum
     from .dataset_types import IN_MEMORY_DATASET_TYPES
 
     kind = str(entry.get("type", "")).strip().lower()
+    if kind == "generated":
+        generated = entry.get("generate")
+        columns = generated.get("columns") if isinstance(generated, Mapping) else None
+        if isinstance(columns, Mapping):
+            return ColumnProbe(names={str(name) for name in columns if str(name).strip()})
+        return ColumnProbe.unsupported("generated table has no declared columns")
     if kind in IN_MEMORY_DATASET_TYPES:
         # Declared empty; its columns only exist once transforms have run, so
         # there is no header to check an expression against.

@@ -109,6 +109,18 @@ def test_funcs_are_nonempty():
     assert "np" in funcs["namespaces"] or "np" in funcs["names"]
 
 
+def test_datasets_publish_generated_and_separate_contracts():
+    data = section("datasets")
+    assert "generated" in data["root_dataset_types"]
+    assert data["generated_type"] == "generated"
+    assert data["generate"]["operations"] == [
+        "linspace", "logspace", "arange", "full", "values", "expr"
+    ]
+    assert data["layer_data"]["canonical_separate"] == "separate"
+    assert data["layer_data"]["legacy_separate"] == "seperate"
+    assert {"plot", "scatter", "step"} <= set(data["layer_data"]["separate_methods"])
+
+
 def test_cap_cli_matches_spec():
     from pathlib import Path
     import jarvisplot
@@ -149,6 +161,7 @@ def test_jplot_cap_bare_is_index_not_full_dump(capsys):
     sections = env["data"].get("sections") or []
     assert "all" in sections
     assert "methods" in sections
+    assert "datasets" in sections
     # Must not dump the full catalogue (no digest / method list payload)
     assert "digest" not in env["data"]
     assert not isinstance(env["data"].get("methods"), list)
@@ -163,6 +176,8 @@ def test_jplot_cap_bare_human_is_a_rich_section_card(monkeypatch, capsys):
     assert "Sections · jplot cap" in captured.err
     assert "Open next" in captured.err
     assert "methods" in captured.err
+    assert "datasets" in captured.err
+    assert f"{len(CAPABILITY_SECTIONS)} sections" in captured.err
     assert "cap.all" not in captured.err
 
 
@@ -186,6 +201,7 @@ def test_jplot_cap_all_human_is_summary_card(monkeypatch, capsys):
     assert "Capabilities · jplot cap all" in captured.err
     assert "Digest:" in captured.err
     assert "methods" in captured.err
+    assert "datasets" in captured.err
     assert "jplot cap all --json" in captured.err
 
 
@@ -225,6 +241,13 @@ def test_jplot_cap_styles_json_marks_broken_cards(capsys):
     assert broken
     axc_cards = [s for s in styles if "axc" in (s.get("axes") or [])]
     assert axc_cards
+
+
+def test_jplot_cap_datasets_json(capsys):
+    assert main(["cap", "datasets", "--json"]) == 0
+    env = json.loads(capsys.readouterr().out)
+    assert env["kind"] == "cap.datasets"
+    assert env["data"]["datasets"]["generated_type"] == "generated"
 
 
 def test_jplot_cap_cmaps_json_includes_matplotlib_registry(capsys):

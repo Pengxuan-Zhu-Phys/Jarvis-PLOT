@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 from pathlib import Path
-from typing import Optional, Any, Dict, List
+from typing import Optional, Any, List
 import gc
 import os
 import pandas as pd 
 import numpy as np
 from .memtrace import memtrace_checkpoint, memtrace_enabled, memtrace_object_inventory
 from .dataset_types import IN_MEMORY_DATASET_TYPES
+from .generated_data import generate_dataframe
 from .utils.dataframes import polars_to_pandas
 from .utils.pathing import resolve_project_path
 from . import data_loader_hdf5 as hdf5
@@ -37,6 +38,7 @@ class DataSet():
         self.isvalid_policy         = "clean"
         self.full_load              = False
         self.transform              = None
+        self.generate               = None
         self.required_columns: Optional[set[str]] = None
         self.retained_columns: Optional[set[str]] = None
         self._whitelist_base_paths  = None
@@ -62,6 +64,7 @@ class DataSet():
         self.name = dtinfo['name']
         self.type = declared_type
         self.transform = dtinfo.get("transform", None)
+        self.generate = dtinfo.get("generate", None)
         self.required_columns = None
         self.retained_columns = None
         self._full_lazy_frame = None
@@ -78,7 +81,6 @@ class DataSet():
                     )
                 )
             self.isvalid_policy = policy_raw
-
         if eager:
             self.load(force=True)
         else:
@@ -124,6 +126,13 @@ class DataSet():
                 except Exception as e:
                     if self.logger:
                         self.logger.warning(f"Dataset '{self.name}' lazy metadata failed: {e}")
+        elif self.type == "generated":
+            raw_columns = self.generate.get("columns") if isinstance(self.generate, dict) else None
+            self.keys = [str(name) for name in raw_columns] if isinstance(raw_columns, dict) else []
+            if self.logger:
+                self.logger.debug(
+                    f"Dataset '{self.name}' registered as a generated table (columns={len(self.keys)})."
+                )
         elif self.type in IN_MEMORY_DATASET_TYPES:
             self.keys = []
             if self.logger:
@@ -140,6 +149,7 @@ class DataSet():
             "name": self.name,
             "type": self.type,
             "group": self.group,
+            "generate": self.generate,
             "transform": self.transform,
             "columns": self.columns,
             "full_load": bool(getattr(self, "full_load", False)),
@@ -171,7 +181,10 @@ class DataSet():
         elif self.type == "hdf5":
             self.load_hdf5()
         elif self.type in IN_MEMORY_DATASET_TYPES:
-            self.load_in_memory()
+            if self.type == "generated":
+                self.load_generated()
+            else:
+                self.load_in_memory()
         else:
             raise ValueError(f"Unsupported dataset type: {self.type}")
         self._loaded = True
@@ -187,6 +200,18 @@ class DataSet():
         if self.logger:
             self.logger.debug(
                 "Dataset '{}' materialised as an empty {}.".format(self.name, self.type)
+            )
+
+    def load_generated(self):
+        """Materialise a named virtual table from its declarative generator."""
+        self.data = generate_dataframe(self.generate)
+        self.keys = list(self.data.columns)
+        runtime.apply_dataset_transform(self, stage="generated")
+        if self.logger:
+            self.logger.debug(
+                "Dataset '{}' generated in memory (rows={}, columns={}).".format(
+                    self.name, len(self.data), len(self.data.columns)
+                )
             )
 
     def get_data(self):
@@ -362,7 +387,11 @@ class DataSet():
             if self.logger:
                 self.logger.debug("Loading CSV from {}".format(self.path))
 
-            self.data = pd.read_csv(self.path)
+            # Avoid chunk-to-chunk dtype conflicts. Missing values remain part
+            # of the table: dropping them here would silently apply a policy
+            # across every column before an explicit transform can decide how
+            # required and optional fields should be handled.
+            self.data = pd.read_csv(self.path, low_memory=False)
             self.keys = list(self.data.columns)
             runtime.apply_dataset_transform(self, stage="csv")
 

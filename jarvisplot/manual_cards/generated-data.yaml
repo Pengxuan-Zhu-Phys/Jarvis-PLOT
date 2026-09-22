@@ -1,0 +1,94 @@
+id: generated-data
+title: Generated and temporary data
+summary: Generate small NumPy-backed tables in YAML, either as a named DataSet or a layer-private series.
+role: reference
+priority: 28
+see_also: [yaml-root, transforms, layer-method, dryrun-viz]
+related_cli:
+  - argv: [jplot, cap, datasets, --json]
+    why: live generated-data vocabulary and separate-compatible methods
+  - argv: [jplot, validate, "<yaml>", --json]
+    why: schema, generator shape, and source/generate exclusivity
+  - argv: [jplot, dryrun, "<yaml>", --json]
+    why: materialise generated data and inspect its row ledger without rendering
+live_sources:
+  - verb: cap.datasets
+    truth: accepted root types, generator operations, combine spellings, and separate methods
+human:
+  panels:
+    - kind: overview
+      title: Choose a scope
+      body: |
+        Use `DataSet.type: generated` when more than one layer needs the table.
+        Use `layers[].data[].generate` for a one-off curve or guide. Both forms
+        materialise a pandas table, then run the ordinary transform list.
+    - kind: yaml
+      title: Named reusable curve
+      lexer: yaml
+      body: |
+        DataSet:
+          - name: theory
+            type: generated
+            generate:
+              columns:
+                x: {linspace: [0.0, 10.0, 400]}
+                y: {expr: "sin(x) * exp(-0.12 * x)"}
+            transform:
+              - add_column: {name: y_upper, expr: "y + 0.1"}
+        Figures:
+          - name: figure
+            layers:
+              - name: theory_line
+                axes: ax
+                method: plot
+                data: [{source: theory}]
+                coordinates: {x: {expr: x}, y: {expr: y}}
+    - kind: yaml
+      title: Multiple private curves
+      lexer: yaml
+      body: |
+        - name: curves
+          axes: ax
+          method: plot
+          combine: separate
+          data:
+            - label: exact
+              generate:
+                columns:
+                  x: {linspace: [0.0, 10.0, 400]}
+                  y: {expr: "sin(x)"}
+              style: {color: '#4477aa'}
+            - label: approximation
+              generate:
+                columns:
+                  x: {linspace: [0.0, 10.0, 100]}
+                  y: {expr: "x - x**3 / 6"}
+              transform:
+                - filter: "x <= 1.4"
+              style: {color: '#cc6677', linestyle: '--'}
+          coordinates: {x: {expr: x}, y: {expr: y}}
+    - kind: notes
+      title: Generator contract
+      items:
+        - "One generated column uses exactly one of linspace, logspace, arange, full, values, or expr."
+        - "Columns evaluate in YAML order; expr can use only earlier generated columns."
+        - "Scalars broadcast; all non-scalar columns must have the same length."
+        - "source and generate are mutually exclusive in one data[] block."
+        - "Use canonical combine: separate. Legacy seperate still validates for old YAML."
+        - "separate draws plot/scatter/step/fill/errorbar/bar-like series individually; use concat for joint grid or contour calculations."
+agent:
+  body_markdown: |
+    `generate.columns` is an ordered declarative NumPy table builder. Use
+    `DataSet.type: generated` for named reuse. Use `data[].generate` for a
+    private layer input. Both apply `transform` after generation.
+  anti_patterns:
+    - Writing raw Python or an arbitrary np function call in a generator field; use the supported generator operation or expr.
+    - Using concat for independent plot curves, which joins their endpoints.
+    - Giving source and generate in the same data[] block.
+  examples:
+    - title: complete runnable example
+      yaml: Example/generated_data.yaml
+  schema_ids:
+    - https://jarvis-plot.org/schema/v2/core/generated-data.json
+    - https://jarvis-plot.org/schema/v2/core/dataset.json
+    - https://jarvis-plot.org/schema/v2/core/layer.json

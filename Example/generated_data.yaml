@@ -1,0 +1,57 @@
+# Generated data can be named at the top level and reused, or created as a
+# private per-layer table.  Run: jplot Example/generated_data.yaml
+version: '0.3'
+
+DataSet:
+  - name: theory
+    type: generated
+    generate:
+      columns:
+        x: {linspace: [0.0, 10.0, 400]}
+        y: {expr: "sin(x) * exp(-0.12 * x)"}
+    transform:
+      - add_column: {name: y_upper, expr: "y + 0.12"}
+      - add_column: {name: y_lower, expr: "y - 0.12"}
+
+Figures:
+  - name: generated_data
+    style: [a4paper_2x1, rect]
+    frame:
+      ax:
+        labels: {x: '$x$', y: '$f(x)$'}
+    layers:
+      - name: uncertainty_band
+        method: fill_between
+        axes: ax
+        data:
+          - source: theory
+        coordinates:
+          x: {expr: x}
+          y1: {expr: y_lower}
+          y2: {expr: y_upper}
+        style: {color: '#4477aa', alpha: 0.18, linewidth: 0}
+
+      - name: curves
+        method: plot
+        axes: ax
+        combine: separate
+        data:
+          - label: exact
+            source: theory
+            style: {color: '#4477aa', linewidth: 1.8}
+          - label: approximation
+            generate:
+              columns:
+                x: {linspace: [0.0, 10.0, 160]}
+                y: {expr: "x - x**3 / 6"}
+            transform:
+              - filter: "x <= 1.4"
+            style: {color: '#cc6677', linestyle: '--', linewidth: 1.4}
+        coordinates:
+          x: {expr: x}
+          y: {expr: y}
+
+output:
+  dir: ./plots
+  formats: [png]
+  dpi: 150

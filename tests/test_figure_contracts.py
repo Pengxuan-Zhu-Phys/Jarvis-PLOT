@@ -413,6 +413,49 @@ def test_prescan_colorbar_frame_cmap_overrides_layer_cmap():
     assert fig.axes["axc"]._cb["cmap"] == "viridis"
 
 
+def test_prescan_colorbar_aggregates_separate_data_blocks():
+    class DummyColorbarAxis:
+        def __init__(self):
+            self._cb = {
+                "cmap": None,
+                "vmin": None,
+                "vmax": None,
+                "norm": None,
+                "levels": None,
+                "used": False,
+            }
+
+    fig = Figure()
+    fig.logger = _logger()
+    fig.frame = {"axc": {"color": {"scale": "linear"}}}
+    fig.axes = {"axc": DummyColorbarAxis()}
+    layer = {
+        "name": "separate_scatter",
+        "method": "scatter",
+        "combine": "separate",
+        "style": {"cmap": "viridis"},
+        "coor": {"c": {"expr": "color"}},
+        "colorbar": "axc",
+        "data": {
+            "low": pd.DataFrame({"color": [1.0, 2.0]}),
+            "high": pd.DataFrame({"color": [10.0, 20.0]}),
+        },
+        "data_loaded": True,
+        "layer_spec": {
+            "combine": "separate",
+            "data": [{"label": "low"}, {"label": "high"}],
+        },
+        "source_refs": [],
+        "share_name": None,
+    }
+    fig._render_queue = [(None, layer)]
+
+    fig._prescan_colorbar_ranges()
+
+    assert fig.axes["axc"]._cb["vmin"] == 1.0
+    assert fig.axes["axc"]._cb["vmax"] == 20.0
+
+
 def test_colorbar_attachment_skips_plain_scatter_without_color_channel():
     class DummyColorbarAxis:
         def __init__(self):

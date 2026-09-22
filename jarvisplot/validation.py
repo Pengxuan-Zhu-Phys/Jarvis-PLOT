@@ -386,7 +386,8 @@ def _check_columns_exist(
     for name, entry in entries.items():
         wanted = demand.get(name)
         path = resolved_paths.get(name) or ""
-        if wanted is None or not path:
+        generated = str(entry.get("type", "")).strip().lower() == "generated"
+        if wanted is None or (not path and not generated):
             continue
         candidates = wanted.missing_candidates
         if not candidates:

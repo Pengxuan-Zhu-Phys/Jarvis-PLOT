@@ -8,7 +8,9 @@ import pytest
 
 from jarvisplot.Figure.preprocessor import DataPreprocessor
 from jarvisplot.Figure.data_pipelines import DataContext, SharedContent
-from jarvisplot.Figure.profile_runtime import _preprofiling, profiling
+from jarvisplot.Figure.profile_runtime import (
+    _grid_edges, _normalize_profile_axis, _preprofiling, profiling,
+)
 from jarvisplot.cache_store import ProjectCache
 
 
@@ -139,3 +141,51 @@ def test_prebuild_cached_max_and_min_do_not_reuse_each_others_rows(tmp_path):
         assert entries[0]["source"] != entries[1]["source"]
         assert ctx.get(entries[0]["source"]).z.tolist() == [1.0]
         assert ctx.get(entries[1]["source"]).z.tolist() == [0.0]
+
+
+@pytest.mark.parametrize("ylim", [[0.1, 1.8], [0.01, 60.0], [1.0, 2.0]])
+@pytest.mark.parametrize("xscale", ["linear", "log"])
+def test_bridson_background_candidates_follow_axis_scales(ylim, xscale):
+    cfg = config() | {"bin": 20, "grid_points": "rect"}
+    cfg["coordinates"]["x"].update(lim=[200, 5000], scale=xscale)
+    cfg["coordinates"]["y"].update(lim=ylim, scale="log")
+    df = pd.DataFrame({"x": [2500.0], "y": [np.sqrt(np.prod(ylim))], "z": [1.0]})
+    out = profiling(df, cfg, None)
+    bg = out[out.z.isna()]
+    assert len(bg) > 20
+    for axis, lim, scale in (("x", [200, 5000], xscale), ("y", ylim, "log")):
+        # Surviving candidates may be thinned, but must remain on the correct
+        # uniform lattice in interpolation space, including sub-decade axes.
+        u = _normalize_profile_axis(bg[axis], lim, scale) * cfg["bin"]
+        np.testing.assert_allclose(u, np.round(u), atol=1e-12)
+        assert bg[axis].min() >= lim[0]
+        assert bg[axis].max() <= lim[1]
+    assert bg.loc[bg.y >= max(ylim[0], 0.1), "y"].nunique() > 3
+
+
+def test_subdecade_log_grid_and_profile_normalization_agree():
+    edges = _grid_edges(1.0, 2.0, 8, "log")
+    np.testing.assert_allclose(edges, np.geomspace(1, 2, 9))
+    np.testing.assert_allclose(_normalize_profile_axis(edges, [1, 2], "log"), np.linspace(0, 1, 9))
+
+
+@pytest.mark.parametrize("prebuild", [False, True])
+def test_filter_precedes_profile_and_does_not_filter_background(tmp_path, prebuild):
+    cfg = config() | {"bin": 8, "grid_points": "rect", "pregrid": False}
+    raw = pd.DataFrame({"x": [.2, .6, .8], "y": [.2, .6, .8], "z": [10., 1., .5]})
+    for warm in (False, True):
+        ctx = DataContext(SharedContent())
+        ctx.register("scan", lambda _: raw)
+        dp = DataPreprocessor(ctx, cache=ProjectCache(str(tmp_path)))
+        entry = {"source": "scan", "transform": [{"filter": "x > 0.5"}, {"profile": cfg}]}
+        project = {"Figures": [{"name": "ordered", "layers": [{"name": "support", "data": [entry]}]}]}
+        if prebuild:
+            dp.prebuild_profiles(project)
+        out, _, hit = dp.run_pipeline(entry["source"], entry["transform"])
+        finite = out[out.z.notna()]
+        assert sorted(finite.z) == [.5, 1.]
+        assert (finite.x > .5).all()
+        # These new points would be lost if filter were executed after profile.
+        assert ((out.x <= .5) & out.z.isna()).any()
+        if warm:
+            assert hit

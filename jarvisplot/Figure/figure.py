@@ -18,6 +18,7 @@ from .layer_runtime import (
     load_layer_runtime_data as runtime_load_layer_runtime_data,
     release_layer_runtime_data as runtime_release_layer_runtime_data,
     render_layer as runtime_render_layer,
+    separate_block_options,
 )
 from .layout_runtime import (
     apply_axis_endpoints,
@@ -987,14 +988,28 @@ class Figure:
             coor = ly.get("coor", {})
             style = dict(ly.get("style") or {})
             method_key = str(ly.get("method", "scatter")).lower()
+            is_separate = str(ly.get("combine", "concat")).strip().lower() in {
+                "separate",
+                "seperate",
+            }
+            block_options = (
+                separate_block_options(ly.get("layer_spec") or {}) if is_separate else {}
+            )
+            candidate_styles = [style]
+            candidate_styles.extend(
+                {**style, **dict(option.get("style") or {})}
+                for option in block_options.values()
+            )
 
-            if not layer_uses_color(style, coor, method_key):
+            if not any(layer_uses_color(item, coor, method_key) for item in candidate_styles):
                 continue
 
-            if style.get("cmap") is not None and layer_cmap_wins(
-                self, cb_name, axc_color_config(self.frame, cb_name)
-            ):
-                cb_style_cmaps.setdefault(cb_name, style.get("cmap"))
+            for candidate_style in candidate_styles:
+                if candidate_style.get("cmap") is not None and layer_cmap_wins(
+                    self, cb_name, axc_color_config(self.frame, cb_name)
+                ):
+                    cb_style_cmaps.setdefault(cb_name, candidate_style.get("cmap"))
+                    break
 
             # Load data for color range only — do not append health observations
             # (render loop will load again and observe once).
@@ -1003,11 +1018,24 @@ class Figure:
             if df is not None:
                 df = self._ensure_pandas_data(df, reason="prescan:colorbar")
                 color_cfg = axc_color_config(self.frame, cb_name)
-                lo, hi = collect_layer_color_range(
-                    df, coor, style, scale=color_cfg.get("scale"), method_key=method_key
-                )
-                if lo is not None or hi is not None:
-                    cb_ranges.setdefault(cb_name, []).append((lo, hi))
+                blocks = df.items() if isinstance(df, dict) else ((None, df),)
+                for block_key, block_df in blocks:
+                    block_style = dict(style)
+                    if block_key is not None:
+                        block_style.update(
+                            (block_options.get(block_key) or {}).get("style") or {}
+                        )
+                    if not layer_uses_color(block_style, coor, method_key):
+                        continue
+                    lo, hi = collect_layer_color_range(
+                        block_df,
+                        coor,
+                        block_style,
+                        scale=color_cfg.get("scale"),
+                        method_key=method_key,
+                    )
+                    if lo is not None or hi is not None:
+                        cb_ranges.setdefault(cb_name, []).append((lo, hi))
             # Release immediately to preserve memory profile
             runtime_release_layer_runtime_data(self, ly, consume_sources=False)
 

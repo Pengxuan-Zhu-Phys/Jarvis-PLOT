@@ -11,6 +11,17 @@ from .man_catalog import index_payload, load_card
 __all__ = ["agent_index_data", "agent_topic_data"]
 
 
+def _slug(text: str) -> str:
+    """Lowercase, hyphenated id from a panel title."""
+    out = []
+    for ch in str(text).strip().lower():
+        if ch.isalnum():
+            out.append(ch)
+        elif out and out[-1] != "-":
+            out.append("-")
+    return "".join(out).strip("-")
+
+
 def agent_index_data() -> dict[str, Any]:
     idx = index_payload()
     return {
@@ -54,14 +65,22 @@ def agent_index_data() -> dict[str, Any]:
                 "why": "string whitelist",
             },
             {
+                "argv": ["jplot", "cap", "datasets", "--json"],
+                "why": "dataset and generated-data contracts",
+            },
+            {
                 "argv": ["jplot", "doctor", "<yaml>", "--json"],
                 "why": "validate + dryrun gate",
             },
         ],
         "live_sources": [
-            {"verb": "cap.all", "truth": "methods/styles/cmaps/funcs/transforms/types"},
+            {
+                "verb": "cap.all",
+                "truth": "methods/styles/cmaps/funcs/transforms/types/datasets/cli",
+            },
             {"verb": "cap.methods", "truth": "drawing method contracts"},
             {"verb": "cap.transforms", "truth": "pipeline transform contracts"},
+            {"verb": "cap.datasets", "truth": "dataset and generated-data contracts"},
             {"verb": "data.describe", "truth": "real file columns only"},
         ],
         "write_yaml": False,
@@ -77,13 +96,19 @@ def agent_topic_data(topic: str) -> dict[str, Any]:
     sections = list(agent.get("sections") or [])
     if not sections and isinstance(human.get("panels"), list):
         # Project short human panels into structured sections.
+        seen_ids: dict[str, int] = {}
         for block in human["panels"]:
             if not isinstance(block, dict):
                 continue
             kind = str(block.get("kind") or "text")
+            title = str(block.get("title") or kind)
+            # A card with three `notes` panels needs three addressable ids,
+            # so the title carries the id when there is one.
+            base = _slug(title) or kind
+            seen_ids[base] = seen_ids.get(base, 0) + 1
             sec: dict[str, Any] = {
-                "id": kind,
-                "title": str(block.get("title") or kind),
+                "id": base if seen_ids[base] == 1 else f"{base}-{seen_ids[base]}",
+                "title": title,
                 "kind": kind,
             }
             if "body" in block:

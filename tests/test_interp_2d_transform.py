@@ -8,6 +8,7 @@ import pytest
 
 from jarvisplot.Figure.interp_2d_runtime import make_interp_2d
 from jarvisplot.Figure.preprocessor import DataPreprocessor
+from jarvisplot.Figure.profile_runtime import regular_grid_mesh
 from jarvisplot.data_loader import JP_ROW_IDX
 
 
@@ -40,15 +41,60 @@ def _base_cfg(method: str):
     }
 
 
-def test_make_interp_2d_natural_neighbor_outputs_only_grid_columns():
+def test_make_interp_2d_natural_neighbor_outputs_grid_columns_and_geometry():
     out = make_interp_2d(_support_df(), _base_cfg("natural_neighbor"), _logger())
 
-    assert list(out.columns) == ["x", "y", "posterior_pdf"]
+    assert {"x", "y", "posterior_pdf"} <= set(out.columns)
+    assert {"__grid_ix__", "__grid_iy__", "__grid_nx__", "__grid_ny__"} <= set(out.columns)
     assert len(out) == 81
     assert "weight" not in out.columns
     assert np.nanmax(out["posterior_pdf"].to_numpy()) > np.nanmin(out["posterior_pdf"].to_numpy())
     assert out["x"].min() == pytest.approx(0.0)
     assert out["x"].max() == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("method", ["natural_neighbor", "triangulation", "griddata"])
+@pytest.mark.parametrize("policy,expected", [("strict", np.nan), ("ignore", 1.0), ("fill", 0.0)])
+@pytest.mark.parametrize("missing", [np.nan, np.inf])
+def test_missing_background_obeys_policy(method, policy, expected, missing):
+    df = pd.DataFrame({
+        "x": [0., 1., 0., 1., .5], "y": [0., 0., 1., 1., .5],
+        "weight": [1., 1., 1., 1., missing],
+    })
+    before = df.copy(deep=True)
+    cfg = _base_cfg(method) | {"nan_policy": policy, "backend_options": {"fill_value": 0.0}}
+    cfg["griddata"] = {"kind": "nearest"}
+    out = make_interp_2d(df, cfg)
+    center = out.loc[(out.x == .5) & (out.y == .5), "posterior_pdf"].iloc[0]
+    if np.isnan(expected):
+        assert np.isnan(center)
+    else:
+        assert center == pytest.approx(expected)
+    pd.testing.assert_frame_equal(df, before)
+
+
+@pytest.mark.parametrize("policy,expected", [("strict", np.nan), ("ignore", 2.0), ("fill", 1.0)])
+def test_nan_policy_precedes_duplicate_merging(policy, expected):
+    df = pd.DataFrame({
+        "x": [0., 1., 0., 1., .5, .5], "y": [0., 0., 1., 1., .5, .5],
+        "weight": [1., 1., 1., 1., 2., np.nan],
+    })
+    cfg = _base_cfg("natural_neighbor") | {"nan_policy": policy, "backend_options": {"fill_value": 0.}}
+    out = make_interp_2d(df, cfg)
+    center = out.loc[(out.x == .5) & (out.y == .5), "posterior_pdf"].iloc[0]
+    if np.isnan(expected):
+        assert np.isnan(center)
+    else:
+        assert center == pytest.approx(expected)
+
+
+def test_named_interp_cache_signature_includes_algorithm_revision(monkeypatch):
+    dp = DataPreprocessor(context=None)
+    tf = [{"make_interp_2d": _base_cfg("natural_neighbor")}]
+    layer = {"name": "grid", "data": [{"source": "scan", "transform": tf}]}
+    current = dp._layer_signature(layer)
+    monkeypatch.setattr(dp, "_runtime_profile_signature", lambda _: None)
+    assert dp._layer_signature(layer) != current
 
 
 def test_make_interp_2d_triangulation_linear():
@@ -57,7 +103,7 @@ def test_make_interp_2d_triangulation_linear():
 
     out = make_interp_2d(_support_df(), cfg, _logger())
 
-    assert list(out.columns) == ["x", "y", "posterior_pdf"]
+    assert {"x", "y", "posterior_pdf"} <= set(out.columns)
     assert len(out) == 81
     center = out.iloc[len(out) // 2]["posterior_pdf"]
     assert float(center) == pytest.approx(2.5, rel=0.25)
@@ -70,7 +116,7 @@ def test_make_interp_2d_griddata_nearest_and_custom_grid_shape():
 
     out = make_interp_2d(_support_df(), cfg, _logger())
 
-    assert list(out.columns) == ["x", "y", "posterior_pdf"]
+    assert {"x", "y", "posterior_pdf"} <= set(out.columns)
     assert len(out) == 35
     assert np.all(np.isfinite(out["posterior_pdf"].to_numpy()))
 
@@ -82,7 +128,7 @@ def test_make_interp_2d_accepts_compact_scalar_grid():
 
     out = make_interp_2d(_support_df(), cfg, _logger())
 
-    assert list(out.columns) == ["x", "y", "posterior_pdf"]
+    assert {"x", "y", "posterior_pdf"} <= set(out.columns)
     assert len(out) == 36
 
 
@@ -93,7 +139,7 @@ def test_make_interp_2d_accepts_compact_rectangular_grid():
 
     out = make_interp_2d(_support_df(), cfg, _logger())
 
-    assert list(out.columns) == ["x", "y", "posterior_pdf"]
+    assert {"x", "y", "posterior_pdf"} <= set(out.columns)
     assert len(out) == 35
     assert out["x"].nunique() == 7
     assert out["y"].nunique() == 5
@@ -132,7 +178,7 @@ def test_make_interp_2d_as_density_converts_grid_mass_to_density():
 
     out = make_interp_2d(df, cfg, _logger())
 
-    assert list(out.columns) == ["x", "y", "posterior_pdf"]
+    assert {"x", "y", "posterior_pdf"} <= set(out.columns)
     assert np.nanmin(out["posterior_pdf"]) == pytest.approx(1.0)
     assert np.nanmax(out["posterior_pdf"]) == pytest.approx(1.0)
 
@@ -175,11 +221,55 @@ def test_make_interp_2d_respects_log_scale_and_output_names():
 
     out = make_interp_2d(df, cfg, _logger())
 
-    assert list(out.columns) == ["x_phys", "y_phys", "field"]
+    assert {"x_phys", "y_phys", "field"} <= set(out.columns)
     assert out["x_phys"].min() == pytest.approx(0.1)
     assert out["x_phys"].max() == pytest.approx(10.0)
     assert out["y_phys"].min() == pytest.approx(0.1)
     assert out["y_phys"].max() == pytest.approx(10.0)
+
+
+def test_interp_grid_geometry_survives_a_narrower_log_plot_viewport():
+    """Cell edges follow interpolation limits, while axes only clip the view."""
+    df = pd.DataFrame(
+        {
+            "x": [0.01, 60.0, 0.01, 60.0, 1.0],
+            "y": [1e-9, 1e-9, 0.85, 0.85, 1e-4],
+            "z": [1.0, 2.0, 3.0, 4.0, 2.5],
+        }
+    )
+    cfg = {
+        "method": "griddata",
+        "coordinates": {
+            "x": {"expr": "x", "name": "x", "lim": [0.01, 60.0], "scale": "log"},
+            "y": {"expr": "y", "name": "y", "lim": [1e-9, 0.85], "scale": "log"},
+            "z": {"expr": "z", "name": "z"},
+        },
+        "grid": [7, 5],
+        "griddata": {"kind": "nearest"},
+        "diagnostics": False,
+    }
+    out = make_interp_2d(df, cfg, _logger())
+
+    mesh = regular_grid_mesh(
+        out["x"],
+        out["y"],
+        out["z"],
+        df=out,
+        # These are the actual plotting limits in fig-profile-update.yaml,
+        # deliberately narrower than the interpolation range.
+        xlim=[0.1, 60.0],
+        ylim=[1e-8, 0.85],
+        xscale="log",
+        yscale="log",
+    )
+
+    assert mesh is not None
+    x_edges, y_edges, grid = mesh
+    assert x_edges[[0, -1]] == pytest.approx([0.01, 60.0])
+    assert y_edges[[0, -1]] == pytest.approx([1e-9, 0.85])
+    assert grid.shape == (5, 7)
+    assert np.allclose(np.diff(np.log(x_edges)), np.diff(np.log(x_edges))[0])
+    assert np.allclose(np.diff(np.log(y_edges)), np.diff(np.log(y_edges))[0])
 
 
 def test_make_interp_2d_runtime_transform_and_projection():
@@ -194,7 +284,7 @@ def test_make_interp_2d_runtime_transform_and_projection():
     assert "y" in projection
     assert "weight" in projection
     assert "posterior_pdf" in projection
-    assert list(out.columns) == ["x", "y", "posterior_pdf"]
+    assert {"x", "y", "posterior_pdf"} <= set(out.columns)
 
 
 def test_make_interp_2d_raises_on_too_few_points():

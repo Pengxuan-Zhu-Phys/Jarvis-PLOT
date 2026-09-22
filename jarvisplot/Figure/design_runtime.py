@@ -129,8 +129,12 @@ def _preview_colorbar(fig, name, cfg):
 
     from .colorbar_runtime import axc_color_config, axc_is_horizontal
 
-    cmap = axc_color_config(fig.frame, name).get("cmap") or cfg["fallback_cmap"]
-    is_h = axc_is_horizontal(fig.frame, name)
+    # Lightweight wrappers used by design tooling may expose only ``fig`` and
+    # ``axes``. An absent frame means there is no colorbar override, not that
+    # the rest of the debug overlay should be abandoned halfway through.
+    frame = getattr(fig, "frame", {})
+    cmap = axc_color_config(frame, name).get("cmap") or cfg["fallback_cmap"]
+    is_h = axc_is_horizontal(frame, name)
     ramp = np.linspace(0.0, 1.0, int(cfg["samples"])).reshape(-1, 1)
     if is_h:
         ramp = ramp.reshape(1, -1)

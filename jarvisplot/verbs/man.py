@@ -22,7 +22,7 @@ def build_parser(prog: str = "jplot man") -> argparse.ArgumentParser:
     parser = RichArgumentParser(
         prog=prog,
         description=(
-            "Show the Jarvis-PLOT manual (index, topic, method, or transform). "
+            "Show the Jarvis-PLOT manual (index, topic, method, transform, or generated data). "
             "Methods: man methods | man scatter. "
             "Transforms: man transforms | man transform.profile | man filter."
         ),
@@ -34,6 +34,7 @@ def build_parser(prog: str = "jplot man") -> argparse.ArgumentParser:
             f"{prog} <method>                 # e.g. scatter\n"
             f"{prog} transform.<name>         # e.g. transform.profile\n"
             f"{prog} filter | profile | …     # bare transform names\n"
+            f"{prog} generated-data            # generated DataSet / layer data blocks\n"
             f"{prog} <topic> --json\n"
             f"{prog} --json"
         ),

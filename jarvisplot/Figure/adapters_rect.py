@@ -12,7 +12,11 @@ from matplotlib.collections import PolyCollection
 #
 from .helper import _auto_clip, _mask_by_extend, voronoi_finite_polygons_2d, _clip_poly_to_rect
 from .profile_runtime import grid_from_metadata, regular_grid_mesh
-from .interp_natural_neighbor import resolve_backend
+from .interp_natural_neighbor import (
+    drawing_backend_options,
+    log_backend_diagnostics,
+    resolve_backend,
+)
 from .posterior_hpd import prepare_hpd_contour_style
 
 DEFAULT_JP_SAMPLE_GRID = 500
@@ -242,8 +246,9 @@ class StdAxesAdapter:
         ny: Optional[int] = None,
         xlim=None,
         ylim=None,
-        nan_policy: str = "strict",
+        nan_policy: str = "ignore",
         backend_options: Optional[dict[str, Any]] = None,
+        logger=None,
     ):
         x = np.asarray(x, dtype=float).reshape(-1)
         y = np.asarray(y, dtype=float).reshape(-1)
@@ -273,8 +278,9 @@ class StdAxesAdapter:
             X,
             Y,
             nan_policy=nan_policy,
-            backend_options=backend_options,
+            backend_options=drawing_backend_options(backend_options),
         )
+        log_backend_diagnostics(logger, getattr(backend, "last_diagnostics", None))
         return X, Y, np.asarray(Z, dtype=float)
 
     def _build_jpcontour_grid(
@@ -322,9 +328,10 @@ class StdAxesAdapter:
         ny: Optional[int] = None,
         xlim=None,
         ylim=None,
-        nan_policy: str = "strict",
+        nan_policy: str = "ignore",
         diagnostics: bool = False,
         backend_options: Optional[dict[str, Any]] = None,
+        logger=None,
     ):
         """Interpolate scattered data on an axes-fraction grid for contour rendering.
 
@@ -361,8 +368,9 @@ class StdAxesAdapter:
             Y,
             nan_policy=nan_policy,
             diagnostics=diagnostics,
-            backend_options=backend_options,
+            backend_options=drawing_backend_options(backend_options),
         )
+        log_backend_diagnostics(logger, getattr(backend, "last_diagnostics", None))
         return X, Y, np.asarray(Z, dtype=float)
 
     # —— Common method forwarding (add as needed) ——
@@ -518,12 +526,18 @@ class StdAxesAdapter:
         ny: Optional[int] = None,
         xlim=None,
         ylim=None,
-        nan_policy: str = "strict",
+        nan_policy: str = "ignore",
         diagnostics: bool = False,
         backend_options: Optional[dict[str, Any]] = None,
         **kwargs,
     ):
-        """Scattered-data contour plot rendered in axes-fraction coordinates."""
+        """Scattered-data contour plot rendered in axes-fraction coordinates.
+
+        ``nan_policy`` defaults to ``ignore`` here: a sample whose z is NaN --
+        an empty profile-likelihood cell, say -- is not a measurement, and
+        letting it propagate would blank the cells around it as well. Pass
+        ``nan_policy="strict"`` to keep those neighbourhoods masked instead.
+        """
         kw = self._merge("contour", kwargs)
         kw.pop("transform", None)
         logger = kw.pop("_logger", None)
@@ -540,6 +554,7 @@ class StdAxesAdapter:
             nan_policy=nan_policy,
             diagnostics=diagnostics,
             backend_options=backend_options,
+            logger=logger,
         )
         kw = prepare_hpd_contour_style(Z, X, Y, kw, logger=logger)
         label_map = kw.pop("_hpd_label_map", None)
@@ -570,7 +585,7 @@ class StdAxesAdapter:
         ny: Optional[int] = None,
         xlim=None,
         ylim=None,
-        nan_policy: str = "strict",
+        nan_policy: str = "ignore",
         diagnostics: bool = False,
         backend_options: Optional[dict[str, Any]] = None,
         **kwargs,
@@ -578,6 +593,7 @@ class StdAxesAdapter:
         """Filled scattered-data contour plot rendered in axes-fraction coordinates."""
         kw = self._merge("contourf", kwargs)
         kw.pop("transform", None)
+        logger = kw.pop("_logger", None)
         X, Y, Z = self._interpolate_jpcontour_grid(
             x,
             y,
@@ -591,6 +607,7 @@ class StdAxesAdapter:
             nan_policy=nan_policy,
             diagnostics=diagnostics,
             backend_options=backend_options,
+            logger=logger,
         )
         artists = self.ax.contourf(
             X,
@@ -614,7 +631,7 @@ class StdAxesAdapter:
         ny: Optional[int] = None,
         xlim=None,
         ylim=None,
-        nan_policy: str = "strict",
+        nan_policy: str = "ignore",
         backend_options: Optional[dict[str, Any]] = None,
         shading: str = "auto",
         **kwargs,
@@ -633,6 +650,7 @@ class StdAxesAdapter:
             kw.pop(k, None)
         kw.pop("shading", None)
         kw.pop("transform", None)
+        logger = kw.pop("_logger", None)
         X, Y, Z = self._interpolate_jpfield_grid(
             x,
             y,
@@ -645,6 +663,7 @@ class StdAxesAdapter:
             ylim=ylim,
             nan_policy=nan_policy,
             backend_options=backend_options,
+            logger=logger,
         )
         X = np.asarray(X, dtype=float)
         Y = np.asarray(Y, dtype=float)

@@ -11,6 +11,9 @@ aliases:
   viz: dryrun-viz
   columns: data-columns
   yaml: yaml-root
+  generated: generated-data
+  generate: generated-data
+  generated-data: generated-data
   cli: cli-map
   codes: diagnostics
   # methods catalog
@@ -24,6 +27,14 @@ aliases:
   agent: agent-output
   agent_output: agent-output
   digest: agent-output
+  # field interpolation / gaps
+  interp: field-interp
+  interpolation: field-interp
+  gaps: field-interp
+  holes: field-interp
+  nan-policy: field-interp
+  nan_policy: field-interp
+  boundary: field-interp
   # design-reference overlay
   debug: debug-overlay
   overlay: debug-overlay
@@ -31,9 +42,11 @@ aliases:
 topics:
   - workflow
   - yaml-root
+  - generated-data
   - type-posterior-2d
   - type-profile-2d
   - type-correlation-matrix
+  - field-interp
   - layer-method
   - methods
   - transforms

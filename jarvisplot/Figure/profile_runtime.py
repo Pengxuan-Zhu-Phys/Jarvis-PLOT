@@ -61,7 +61,8 @@ def _normalize_profile_axis(arr, lim, scale):
     if str(scale).lower() == "log":
         tiny = np.finfo(float).tiny
         lo = max(lo, tiny)
-        hi = max(hi, lo * 10.0)
+        if hi <= lo:
+            hi = lo * 10.0
         den = np.log(hi) - np.log(lo)
         if den == 0:
             den = 1.0
@@ -80,8 +81,7 @@ def _grid_edges(lo, hi, nbin, scale):
     if str(scale).lower() == "log":
         tiny = np.finfo(float).tiny
         lo = max(lo, tiny)
-        hi = max(hi, lo * 10.0)
-        if hi == lo:
+        if hi <= lo:
             hi = lo * 10.0
         return np.geomspace(lo, hi, int(nbin) + 1)
     if hi == lo:
@@ -126,12 +126,17 @@ def regular_grid_mesh(
                 nx = int(np.asarray(df["__grid_nx__"])[0])
             if "__grid_ny__" in cols:
                 ny = int(np.asarray(df["__grid_ny__"])[0])
-            if "__grid_xmin__" in cols and "__grid_xmax__" in cols and xlim is None:
+            # A grid producer owns its cell boundaries.  The current axis
+            # limits are only the viewport and can be narrower than the grid
+            # (for example, a log plot can hide an interpolation decade).
+            # Using that viewport to rebuild edges shifts node-to-cell
+            # assignment and creates blank seams in pcolormesh.
+            if "__grid_xmin__" in cols and "__grid_xmax__" in cols:
                 xlim = [
                     float(np.asarray(df["__grid_xmin__"])[0]),
                     float(np.asarray(df["__grid_xmax__"])[0]),
                 ]
-            if "__grid_ymin__" in cols and "__grid_ymax__" in cols and ylim is None:
+            if "__grid_ymin__" in cols and "__grid_ymax__" in cols:
                 ylim = [
                     float(np.asarray(df["__grid_ymin__"])[0]),
                     float(np.asarray(df["__grid_ymax__"])[0]),
@@ -526,8 +531,10 @@ def profiling(df, prof, logger):
         x_grid = (b + 0.5 * r)[mask]
         y_grid = r[mask]
     elif grid == "rect":
-        xx = np.linspace(xlim[0], xlim[1], bin + 1)
-        yy = np.linspace(ylim[0], ylim[1], bin + 1)
+        # Background candidates use the same geometry as the distance metric.
+        # Logging a linspace later does not turn it into an evenly spaced grid.
+        xx = _grid_edges(xlim[0], xlim[1], bin, xscale)
+        yy = _grid_edges(ylim[0], ylim[1], bin, yscale)
         xg, yg = np.meshgrid(xx, yy)
         x_grid = xg.ravel()
         y_grid = yg.ravel()
@@ -618,23 +625,6 @@ def profiling(df, prof, logger):
 
 def _preprofiling(df, prof, logger):
     """Keep the requested finite extremum per pre-bin for cache prebuild."""
-
-    def _norm(arr, lim, scale):
-        arr = np.asarray(arr, dtype=float)
-        lo, hi = float(lim[0]), float(lim[1])
-        if str(scale).lower() == "log":
-            tiny = np.finfo(float).tiny
-            lo = max(lo, tiny)
-            hi = max(hi, lo * 10.0)
-            den = np.log(hi) - np.log(lo)
-            if den == 0:
-                den = 1.0
-            arr = np.where(arr > 0, arr, np.nan)
-            return (np.log(arr) - np.log(lo)) / den
-        den = hi - lo
-        if den == 0:
-            den = 1.0
-        return (arr - lo) / den
 
     def _auto_prebin(nrows: int):
         nrows = int(max(nrows, 0))
@@ -786,8 +776,8 @@ def _preprofiling(df, prof, logger):
     yvals = np.asarray(y)
     zvals = np.asarray(z)
 
-    xnorm = _norm(xvals, xlim, xscale)
-    ynorm = _norm(yvals, ylim, yscale)
+    xnorm = _normalize_profile_axis(xvals, xlim, xscale)
+    ynorm = _normalize_profile_axis(yvals, ylim, yscale)
     valid = np.isfinite(xnorm) & np.isfinite(ynorm) & np.isfinite(zvals)
     if not np.any(valid):
         if logger:

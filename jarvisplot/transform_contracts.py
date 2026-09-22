@@ -58,6 +58,71 @@ _COORD_BLOCK = {
 }
 
 
+_BACKEND_OPTIONS = {
+    "type": "object",
+    "description": (
+        "Interpolation backend knobs. The three that decide where the picture "
+        "is blank are boundary, max_fill_spacing and (with nan_policy) "
+        "fill_value; see `jplot man field-interp`."
+    ),
+    "properties": {
+        "boundary": {
+            "type": "enum",
+            "enum": ["nan", "clamp", "nearest"],
+            "description": (
+                "How far past the convex hull of the cores the surface is drawn. "
+                "Cores sit at the centre of the bin they summarise, so the hull "
+                "stops half a cell short of the domain and leaves a blank frame. "
+                "nan: draw only the hull (default here; keeps a normalized "
+                "density honest). clamp: read the surface at the closest hull "
+                "point and carry it out, continuous with the interior. nearest: "
+                "carry the closest core's value out."
+            ),
+            "default": "nan",
+        },
+        "max_boundary_spacing": {
+            "type": "number",
+            "description": (
+                "Reach of the boundary extension, in multiples of the median "
+                "core spacing. Inherits max_fill_spacing when unset."
+            ),
+            "default": 2.0,
+        },
+        "max_boundary_distance": {
+            "type": "number",
+            "description": "Same bound as an absolute distance in interpolation coordinates.",
+        },
+        "max_fill_spacing": {
+            "type": "number",
+            "description": (
+                "Blank any query point more than this many core spacings from a "
+                "real core, so nan_policy: ignore closes one-cell gaps without "
+                "closing a region the scan never visited. Off by default."
+            ),
+        },
+        "max_fill_distance": {
+            "type": "number",
+            "description": "Same coverage bound as an absolute distance.",
+        },
+        "fill_value": {
+            "type": "number",
+            "description": (
+                "Value given to valueless cores under nan_policy: fill. "
+                "Defaults to the smallest finite core value."
+            ),
+        },
+        "vertex_tol": {
+            "type": "number",
+            "description": "Distance below which two cores are one core (merged by mean).",
+        },
+        "nominal_point_spacing": {
+            "type": "number",
+            "description": "Override the measured core spacing the reaches are scaled by.",
+        },
+    },
+}
+
+
 def _c(
     *,
     description: str,
@@ -72,6 +137,7 @@ def _c(
     owner: str = "",
     examples: list[dict[str, Any]] | None = None,
     notes: list[str] | None = None,
+    see_also: list[str] | None = None,
     form_extra: str = "",
 ) -> dict[str, Any]:
     return {
@@ -88,6 +154,7 @@ def _c(
         "owner": owner,
         "examples": examples or [],
         "notes": notes or [],
+        "see_also": see_also or [],
     }
 
 
@@ -490,7 +557,14 @@ TRANSFORM_CONTRACTS: dict[str, dict[str, Any]] = {
             },
             "fill_empty": {
                 "type": "bool",
-                "description": "fill empty cells (grid method)",
+                "description": (
+                    "grid method: floor cells that caught no sample instead of "
+                    "leaving them NaN. The floor is min(finite z) - 0.1 unless "
+                    "empty_value says otherwise. Affects the stored grid, so a "
+                    "raw pcolormesh sees it too; to smooth over the gaps at "
+                    "draw time instead, leave this off and let the "
+                    "interpolation drop them (nan_policy: ignore)."
+                ),
                 "default": False,
             },
             "empty_value": {"type": "number", "description": "value for empty cells when fill_empty"},
@@ -567,7 +641,13 @@ TRANSFORM_CONTRACTS: dict[str, dict[str, Any]] = {
             "Prefer type: profile_2d unless you need custom layer stacks.",
             "pregrid / pregrid_bin are user-writable (profile_runtime); no bins/seed on profile "
             "(those belong to make_density_core / posterior_density).",
+            "method: grid emits one row per cell, the core placed at the cell "
+            "CENTRE, and z = NaN for every cell that caught no sample. Raising "
+            "bin empties more of them. What the picture then does with those "
+            "NaN cells is the interpolation's nan_policy -- see "
+            "`jplot man field-interp`.",
         ],
+        see_also=["field-interp", "type-profile-2d"],
     ),
     "make_density_core": _c(
         description="Build posterior mass support cells (core of density reconstruction).",
@@ -657,7 +737,12 @@ TRANSFORM_CONTRACTS: dict[str, dict[str, Any]] = {
                 "description": "density output name (string) or {x,y,z}",
                 "default": "density",
             },
-            "nan_policy": {"type": "enum", "default": "strict"},
+            "nan_policy": {
+                "type": "enum",
+                "description": "cores with no value: strict keeps them (and blanks their neighbourhood), ignore drops them, fill replaces them",
+                "default": "strict",
+            },
+            "backend_options": _BACKEND_OPTIONS,
             "voronoi": {"type": "object"},
             "adaptive": {"type": "object"},
             "kde": {"type": "object"},
@@ -676,8 +761,10 @@ TRANSFORM_CONTRACTS: dict[str, dict[str, Any]] = {
         enums={
             "method": ["voronoi", "adaptive", "kde", "grid"],
             "nan_policy": ["strict", "ignore", "fill"],
+            "backend_options.boundary": ["nan", "clamp", "nearest"],
         },
         owner="Figure/posterior_density_runtime.py",
+        see_also=["field-interp", "type-posterior-2d"],
         examples=[
             {
                 "title": "voronoi posterior",
@@ -697,6 +784,9 @@ TRANSFORM_CONTRACTS: dict[str, dict[str, Any]] = {
         notes=[
             "Heavy step: dryrun skips it.",
             "type: posterior_2d expands to this + pcolormesh/contour layers.",
+            "Keep backend_options.boundary at nan while normalize is true: the "
+            "integral is taken over the drawn grid, so extrapolating past the "
+            "support of the cores moves it.",
         ],
     ),
     "make_interp_2d": _c(
@@ -724,7 +814,11 @@ TRANSFORM_CONTRACTS: dict[str, dict[str, Any]] = {
             "bin": {"type": "int"},
             "nx": {"type": "int"},
             "ny": {"type": "int"},
-            "nan_policy": {"type": "enum", "default": "strict"},
+            "nan_policy": {
+                "type": "enum",
+                "description": "cores with no value: strict keeps them (and blanks their neighbourhood), ignore drops them, fill replaces them",
+                "default": "strict",
+            },
             "as_density": {
                 "type": "bool",
                 "description": "treat z as density and re-normalize on the grid",
@@ -734,7 +828,7 @@ TRANSFORM_CONTRACTS: dict[str, dict[str, Any]] = {
             "diagnostics": {"type": "bool", "default": True},
             "output": {"type": "object", "description": "{x,y,z} output column names"},
             "output_z": {"type": "string", "description": "shortcut for output z name"},
-            "backend_options": {"type": "object"},
+            "backend_options": _BACKEND_OPTIONS,
             "triangulation": {"type": "object", "description": "for triangulation backends"},
             "griddata": {
                 "type": "object",
@@ -766,9 +860,11 @@ TRANSFORM_CONTRACTS: dict[str, dict[str, Any]] = {
                 "rbf",
             ],
             "nan_policy": ["strict", "ignore", "fill"],
+            "backend_options.boundary": ["nan", "clamp", "nearest"],
             "griddata.kind": ["nearest", "linear", "cubic"],
         },
         owner="Figure/interp_2d_runtime.py",
+        see_also=["field-interp", "type-profile-2d"],
         examples=[
             {
                 "title": "natural neighbor grid",
@@ -783,11 +879,36 @@ TRANSFORM_CONTRACTS: dict[str, dict[str, Any]] = {
                     "        y: {expr: y, scale: linear}\n"
                     "        z: {expr: z}\n"
                 ),
-            }
+            },
+            {
+                "title": "profile grid with empty bins (the usual gap recipe)",
+                "yaml": (
+                    "transform:\n"
+                    "  - profile: {method: grid, bin: 60, objective: max, coordinates: {...}}\n"
+                    "  - make_interp_2d:\n"
+                    "      method: natural_neighbor\n"
+                    "      grid: 400\n"
+                    "      nan_policy: ignore      # empty bins are not cores\n"
+                    "      backend_options:\n"
+                    "        boundary: clamp       # close the half-cell frame\n"
+                    "        max_fill_spacing: 2.5 # but keep real voids blank\n"
+                    "      coordinates:\n"
+                    "        x: {expr: xx}\n"
+                    "        y: {expr: yy}\n"
+                    "        z: {expr: zz}\n"
+                ),
+            },
         ],
         notes=[
             "Heavy step: dryrun skips it.",
             "Common after profile or make_density_core before pcolormesh/contour.",
+            "Non-finite z rows are dropped while the input is validated, so on "
+            "this transform nan_policy strict and ignore behave the same; the "
+            "policy separates them on a drawing layer's style.interp.",
+            "Defaults here are the plain ones (nan_policy: strict, boundary: "
+            "nan). Drawing paths -- style.interp, jpfield/jpcontour/jpcontourf, "
+            "and the type: profile_2d macro -- default to ignore + clamp "
+            "instead. See `jplot man field-interp`.",
         ],
     ),
 }
@@ -849,6 +970,7 @@ RUNTIME_TOP_LEVEL_KEYS: dict[str, frozenset[str]] = {
             "seed",
             "output",
             "nan_policy",
+            "backend_options",
             "voronoi",
             "adaptive",
             "kde",

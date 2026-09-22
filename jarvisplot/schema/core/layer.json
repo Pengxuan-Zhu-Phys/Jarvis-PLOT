@@ -19,8 +19,8 @@
       "description": "Publish this layer's prepared table under a name later layers can use as data[].source."
     },
     "combine": {
-      "enum": ["concat", "seperate"],
-      "description": "How multiple data blocks are joined. Note: 'seperate' is spelled that way in the runtime (Figure/layer_runtime.py); G3/R4 renames it with an alias."
+      "enum": ["concat", "separate", "seperate"],
+      "description": "How multiple data blocks are joined. `separate` renders each block independently; legacy misspelling `seperate` remains accepted for compatibility."
     },
     "axes": {
       "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString",
@@ -91,6 +91,10 @@
           "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/stringOrStringList",
           "description": "A root DataSet name, or a name published by another layer's share_data."
         },
+        "generate": {
+          "$ref": "https://jarvis-plot.org/schema/v2/core/generated-data.json",
+          "description": "Layer-private table generated immediately before this block's transform. It is released after rendering unless the layer explicitly uses share_data."
+        },
         "transform": {
           "type": ["array", "null"],
           "description": "Ordered pre-steps applied to this block only.",
@@ -99,8 +103,17 @@
         "label": {
           "type": "string",
           "description": "Legend label for this block."
+        },
+        "style": {
+          "type": "object",
+          "x-jarvis-zone": "delegated",
+          "description": "Style overrides when combine: separate renders this block as its own series."
         }
       },
+      "oneOf": [
+        { "required": ["source"], "not": { "required": ["generate"] } },
+        { "required": ["generate"], "not": { "required": ["source"] } }
+      ],
       "additionalProperties": false
     },
     "layerCoordinate": {

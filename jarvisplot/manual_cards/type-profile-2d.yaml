@@ -3,7 +3,7 @@ title: type profile_2d
 summary: Short macro for 2D profile likelihood / chi2 maps on a grid.
 role: how-to
 priority: 35
-see_also: [type-posterior-2d, layer-method, workflow]
+see_also: [type-posterior-2d, field-interp, layer-method, workflow]
 related_cli:
   - argv: [jplot, template, show, profile_2d, "--json"]
     why: slots + skeleton YAML
@@ -35,8 +35,14 @@ human:
       items:
         - Required slots: data, x, y, z.
         - Default mesh path is Bridson + natural neighbor + pcolormesh.
+        - "method: grid bins the scan instead; bins: <n> sets the cell count, and any cell that caught no sample becomes a gap in the map."
+        - "The macro interpolates over those gaps and closes the half-cell frame at the domain edge for you (nan_policy: ignore, boundary: clamp). jplot man field-interp explains the knobs, and jplot config expand shows what was written."
+        - "interp: false skips interpolation entirely — method: grid then draws its own bins, method: bridson draws Voronoi cells. interp: {grid: ..., nan_policy: ..., backend_options: {...}} overrides one knob without hand-writing the layers."
+        - "Blank regions after that are either real voids (bound them on purpose with backend_options.max_fill_spacing) or outside the hull of the cores."
         - "Hand-written layer profile steps may set pregrid: {bin, enable} or pregrid_bin for large tables (see jplot man transform.profile --json)."
 agent:
   anti_patterns:
     - Passing weight instead of z for profile_2d
     - "Using bins/seed on profile (density/posterior keys; profile uses bin + pregrid)"
+    - "Raising bins to fix holes in the map — more bins means more empty cells, not fewer"
+    - "Raising interp.bin to fix holes — that refines the query grid, not the cores"

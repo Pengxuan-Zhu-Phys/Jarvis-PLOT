@@ -227,6 +227,7 @@ def _load_datasets(
     import pandas as pd
 
     from .data_access import detect_type, load_dataframe
+    from .generated_data import generate_dataframe
 
     meta: dict[str, Any] = {}
     frames: dict[str, Any] = {}
@@ -237,6 +238,27 @@ def _load_datasets(
         if not isinstance(name, str) or not name.strip():
             continue
         name = name.strip()
+        if str(entry.get("type") or "").strip().lower() == "generated":
+            try:
+                df = generate_dataframe(entry.get("generate"))
+                ds_transform = entry.get("transform")
+                if isinstance(ds_transform, list) and ds_transform:
+                    df, _steps, _heavy = _apply_simple_transforms(df, ds_transform)
+                frames[name] = df
+                meta[name] = {
+                    "path": None,
+                    "type": "generated",
+                    "rows": int(len(df)),
+                    "columns": [str(c) for c in df.columns],
+                }
+            except Exception as exc:
+                bag.error(
+                    "JP-DAT-006",
+                    f"$.DataSet[{index}].generate",
+                    f"could not generate dataset {name!r}: {exc}",
+                )
+                meta[name] = {"path": None, "type": "generated", "rows": None, "error": str(exc)}
+            continue
         if is_in_memory_type(entry.get("type")):
             # Declared empty on purpose; there is no file to open and no rows
             # to count until a transform fills it.
@@ -269,7 +291,7 @@ def _load_datasets(
             # dataset-level transform (simple steps only)
             ds_transform = entry.get("transform")
             if isinstance(ds_transform, list) and ds_transform:
-                df, _steps = _apply_simple_transforms(df, ds_transform)
+                df, _steps, _heavy = _apply_simple_transforms(df, ds_transform)
             rows = int(len(df))
             frames[name] = df
             meta[name] = {
@@ -494,40 +516,100 @@ def _observe_layer(
             [],
         )
 
-    # Use the first data block (primary series); multi-source layers get a note.
-    block = data_blocks[0] if isinstance(data_blocks[0], dict) else {}
-    source = block.get("source")
-    if isinstance(source, list):
-        source = source[0] if source else None
-    if not isinstance(source, str) or source not in frames:
-        # Missing share_data after a skipped heavy producer → incomplete, not failed.
-        incomplete = isinstance(source, str) and source in incomplete_sources
-        note = f"source {source!r} not loaded"
-        if incomplete:
-            note += " (upstream heavy transform skipped in dryrun)"
+    import pandas as pd
+
+    from .generated_data import generate_dataframe
+
+    block_frames: list[Any] = []
+    source_labels: list[str] = []
+    steps: list[TransformStepObs] = []
+    heavy_skipped: list[str] = []
+    notes: list[str] = []
+    incomplete_source_seen = False
+
+    for block_index, block in enumerate(data_blocks):
+        if not isinstance(block, dict):
+            continue
+        source = block.get("source")
+        block_df = None
+        block_source = ""
+
+        if "generate" in block:
+            try:
+                block_df = generate_dataframe(block.get("generate"))
+                block_source = "<generated>"
+            except Exception as exc:
+                bag.error(
+                    "JP-DAT-006",
+                    f"$.Figures[{figure_name}].layers[{layer_index}].data[{block_index}].generate",
+                    f"could not generate layer data block {block_index}: {exc}",
+                )
+                continue
+        else:
+            source_names = source if isinstance(source, list) else [source]
+            source_names = [name for name in source_names if isinstance(name, str) and name]
+            available = [frames[name] for name in source_names if name in frames]
+            missing = [name for name in source_names if name not in frames]
+            if missing:
+                upstream_incomplete = any(name in incomplete_sources for name in missing)
+                incomplete_source_seen = incomplete_source_seen or upstream_incomplete
+                note = f"data[{block_index}] source(s) not loaded: {', '.join(missing)}"
+                if upstream_incomplete:
+                    note += " (upstream heavy transform skipped in dryrun)"
+                notes.append(note)
+            if not available:
+                continue
+            block_df = (
+                available[0]
+                if len(available) == 1
+                else pd.concat(available, ignore_index=False, sort=False)
+            )
+            block_source = ",".join(source_names)
+
+        transform = block.get("transform")
+        if isinstance(transform, list) and transform:
+            try:
+                block_df, block_steps, block_heavy = _apply_simple_transforms(
+                    block_df, transform
+                )
+            except Exception as exc:
+                bag.error(
+                    "JP-DAT-006",
+                    f"$.Figures[{figure_name}].layers[{layer_index}].data[{block_index}].transform",
+                    f"could not apply layer data transform: {exc}",
+                )
+                continue
+            steps.extend(block_steps)
+            heavy_skipped.extend(block_heavy)
+
+        block_frames.append(block_df)
+        source_labels.append(block_source)
+
+    if not block_frames:
         return (
             LayerObservation(
                 figure=figure_name,
                 layer=layer_name,
                 method=method,
-                source=str(source or ""),
+                source=", ".join(source_labels),
                 n_points=0,
-                notes=[note],
-                incomplete=incomplete,
+                notes=notes or ["no loadable data blocks"],
+                incomplete=incomplete_source_seen,
             ),
             None,
-            [],
+            heavy_skipped,
         )
 
-    df = frames[source]
-    steps: list[TransformStepObs] = []
-    heavy_skipped: list[str] = []
-    notes: list[str] = []
-    transform = block.get("transform")
-    if isinstance(transform, list) and transform:
-        df, steps, heavy_skipped = _apply_simple_transforms(df, transform)
-        if heavy_skipped:
-            notes.append("heavy transform skipped in dryrun")
+    df = (
+        block_frames[0]
+        if len(block_frames) == 1
+        else pd.concat(block_frames, ignore_index=False, sort=False)
+    )
+    source = ", ".join(source_labels)
+    if len(block_frames) > 1:
+        notes.append(f"dryrun checked {len(block_frames)} data blocks")
+    if heavy_skipped:
+        notes.append("heavy transform skipped in dryrun")
 
     # After light-only steps, share_data may still be useful for multi-source
     # layers that do not depend on heavy producers.
@@ -554,9 +636,7 @@ def _observe_layer(
                 twin_root, figure_name, layer_name, twin_cols, n_points=n_est
             )
 
-    incomplete = bool(heavy_skipped) or (
-        isinstance(source, str) and source in incomplete_sources
-    )
+    incomplete = bool(heavy_skipped) or incomplete_source_seen
     obs = observe_layer_dataframe(
         figure=figure_name,
         layer=layer,

@@ -274,7 +274,10 @@ def test_jpcontour_strips_interp_kwargs_and_preserves_masked_nan_grid(monkeypatc
     assert out.tag == method_name
     assert backend_calls["nan_policy"] == "strict"
     assert backend_calls["diagnostics"] is True
-    assert backend_calls["backend_options"] == {"vertex_tol": 1.0e-6}
+    assert backend_calls["backend_options"] == {
+        "vertex_tol": 1.0e-6,
+        "boundary": "clamp",
+    }
     assert backend_calls["grid_shape"] == (5, 4)
     assert backend_calls["x_range"] == (0.0, 1.0)
     assert backend_calls["y_range"] == (0.0, 1.0)
@@ -432,7 +435,10 @@ def test_jpfield_strips_interp_kwargs_and_preserves_masked_nan_grid(monkeypatch)
     assert out.tag == "field"
     assert backend_calls["method"] == "natural_neighbor_approx"
     assert backend_calls["nan_policy"] == "strict"
-    assert backend_calls["backend_options"] == {"vertex_tol": 1.0e-6}
+    assert backend_calls["backend_options"] == {
+        "vertex_tol": 1.0e-6,
+        "boundary": "clamp",
+    }
     assert backend_calls["grid_shape"] == (5, 4)
     np.testing.assert_allclose(backend_calls["x"], np.array([0.5, 1.0, 0.5, 1.0]))
     np.testing.assert_allclose(backend_calls["y"], np.array([0.5, 0.5, 0.75, 0.75]))
@@ -755,7 +761,10 @@ def test_jpcontour_strips_interpolation_kwargs_from_mpl_call(monkeypatch):
 
     assert out.tag == "contour"
     assert backend_seen["nan_policy"] == "strict"
-    assert backend_seen["backend_options"] == {"geometry_tol": 1.0e-12}
+    assert backend_seen["backend_options"] == {
+        "geometry_tol": 1.0e-12,
+        "boundary": "clamp",
+    }
     assert "interp_method" not in mpl_calls["kwargs"]
     assert "bin" not in mpl_calls["kwargs"]
     assert "nx" not in mpl_calls["kwargs"]
