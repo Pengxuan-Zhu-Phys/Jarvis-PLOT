@@ -215,6 +215,7 @@ def load_method_card(name: str) -> dict[str, Any]:
     tip_summary = str(tip.get("summary") or "").strip()
     tip_notes = [str(x) for x in (tip.get("notes") or []) if str(x).strip()]
     tip_traps = [str(x) for x in (tip.get("traps") or []) if str(x).strip()]
+    tip_see_also = [str(x) for x in (tip.get("see_also") or []) if str(x).strip()]
 
     summary = tip_summary or (
         f"Layer method {name!r} → matplotlib {mpl!r}. "
@@ -329,7 +330,7 @@ def load_method_card(name: str) -> dict[str, Any]:
         "summary": summary,
         "role": "reference",
         "priority": 39,
-        "see_also": ["methods", "layer-method", "style-axes"],
+        "see_also": list(dict.fromkeys(["methods", "layer-method", "style-axes", *tip_see_also])),
         "related_cli": related_cli,
         "live_sources": [
             {"verb": "cap.methods", "truth": f"contract for {name}"},

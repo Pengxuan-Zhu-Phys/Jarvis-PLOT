@@ -7,6 +7,7 @@ import pandas as pd
 
 from ..utils.expression import eval_dataframe_expression
 from .interp_natural_neighbor import resolve_backend
+from .interp_natural_neighbor_exact import _apply_nan_core_policy, _normalize_nan_policy
 from .posterior_mesh import (
     clipped_voronoi_cells,
     regular_support_areas,
@@ -363,17 +364,27 @@ def make_interp_2d(df: pd.DataFrame, cfg: Mapping[str, Any], logger=None) -> pd.
 
     x = _project_axis(x_raw, xlim, xscale, "x")
     y = _project_axis(y_raw, ylim, yscale, "y")
-    valid = np.isfinite(x) & np.isfinite(y) & np.isfinite(z_raw)
+    valid = np.isfinite(x) & np.isfinite(y)
     valid &= (x >= 0.0) & (x <= 1.0) & (y >= 0.0) & (y <= 1.0)
     valid_count = int(np.count_nonzero(valid))
     if valid_count < 3:
-        raise ValueError("make_interp_2d requires at least three finite support points inside the interpolation limits.")
+        raise ValueError("make_interp_2d requires at least three finite support coordinates inside the interpolation limits.")
     if valid_count != n:
         _logger_emit(logger, "warning", f"make_interp_2d dropped {n - valid_count} invalid or outside-domain support points.")
 
     as_density = bool(cfg.get("as_density", False))
     reducer = "sum" if as_density else "mean"
-    x, y, z = _dedupe_points(x[valid], y[valid], z_raw[valid], reducer=reducer)
+    # Missing values are background cores, not invalid coordinates. Resolve
+    # their policy before merging duplicates (ignore must not poison a finite
+    # sample at the same site; strict must retain the missing contribution).
+    nan_policy = _normalize_nan_policy(str(cfg.get("nan_policy", "strict")).strip() or "strict")
+    cfg = dict(cfg, nan_policy=nan_policy)
+    options = cfg.get("backend_options", {})
+    options = options if isinstance(options, Mapping) else {}
+    coords, z, nan_info = _apply_nan_core_policy(
+        np.column_stack([x[valid], y[valid]]), z_raw[valid], nan_policy, options
+    )
+    x, y, z = _dedupe_points(coords[:, 0], coords[:, 1], z, reducer=reducer)
     if len(x) < 3:
         raise ValueError("make_interp_2d requires at least three unique support points after duplicate merging.")
     x_phys = _unproject_axis(x, xlim, xscale)
@@ -432,6 +443,10 @@ def make_interp_2d(df: pd.DataFrame, cfg: Mapping[str, Any], logger=None) -> pd.
             f"\t method \t-> {method_name}\n"
             f"\t input_points \t-> {n}\n"
             f"\t valid_points \t-> {valid_count}\n"
+            f"\t nan_policy \t-> {nan_policy}\n"
+            f"\t missing_cores -> {nan_info['nan_cores']}\n"
+            f"\t dropped_cores -> {nan_info['dropped']}\n"
+            f"\t filled_cores \t-> {nan_info['filled']}\n"
             f"\t unique_points \t-> {len(x)}\n"
             f"\t xlim \t\t-> [{xlim[0]}, {xlim[1]}]\n"
             f"\t ylim \t\t-> [{ylim[0]}, {ylim[1]}]\n"
@@ -447,10 +462,30 @@ def make_interp_2d(df: pd.DataFrame, cfg: Mapping[str, Any], logger=None) -> pd.
             f"\t z_minmax \t-> {z_range}",
         )
 
-    return pd.DataFrame(
+    # The samples in this table are grid *nodes*, not arbitrary scattered
+    # points.  Preserve that geometry for pcolormesh: the axes may later use a
+    # narrower view than this interpolation domain.  Re-binning the nodes
+    # against that view changes their cell ownership (especially on a log
+    # axis), which leaves unpainted slivers between cells.
+    ix_grid, iy_grid = np.meshgrid(
+        np.arange(nx, dtype=np.int32),
+        np.arange(ny, dtype=np.int32),
+    )
+    out = pd.DataFrame(
         {
             x_out: Xp.ravel(),
             y_out: Yp.ravel(),
             z_out: np.asarray(Z, dtype=float).ravel(),
+            "__grid_ix__": ix_grid.ravel(),
+            "__grid_iy__": iy_grid.ravel(),
         }
     )
+    out["__grid_nx__"] = np.int32(nx)
+    out["__grid_ny__"] = np.int32(ny)
+    out["__grid_xmin__"] = float(xlim[0])
+    out["__grid_xmax__"] = float(xlim[1])
+    out["__grid_ymin__"] = float(ylim[0])
+    out["__grid_ymax__"] = float(ylim[1])
+    out["__grid_xscale__"] = xscale
+    out["__grid_yscale__"] = yscale
+    return out

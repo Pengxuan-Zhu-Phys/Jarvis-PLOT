@@ -59,6 +59,14 @@ def test_man_index_json(capsys):
     assert env["ok"] is True
     assert env["data"]["audience"] == "agent"
     assert env["data"]["write_yaml"] is False
+    assert any(
+        item["argv"] == ["jplot", "cap", "datasets", "--json"]
+        for item in env["data"]["related_cli"]
+    )
+    assert any(
+        source["verb"] == "cap.datasets"
+        for source in env["data"]["live_sources"]
+    )
     ids = {t["id"] for t in env["data"]["topics"]}
     assert "workflow" in ids
     assert "validate" in ids
@@ -85,6 +93,16 @@ def test_man_topic_json_keys(capsys):
     assert data["write_yaml"] is False
     assert data["related_cli"]
     assert any("describe" in " ".join(map(str, c.get("argv", []))) for c in data["related_cli"])
+
+
+def test_man_generated_data_is_discoverable_and_links_to_live_capability(capsys):
+    assert main(["man", "generated", "--json"]) == 0
+    env = json.loads(capsys.readouterr().out)
+    assert env["kind"] == "man.generated-data"
+    data = env["data"]
+    assert data["topic"] == "generated-data"
+    assert any(item["argv"] == ["jplot", "cap", "datasets", "--json"] for item in data["related_cli"])
+    assert any(source["verb"] == "cap.datasets" for source in data["live_sources"])
 
 
 def test_man_unknown_topic_json(capsys):

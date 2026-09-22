@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from jarvisplot.Figure.density_cell_runtime import density_cell
+from jarvisplot.Figure import posterior_density_runtime
 from jarvisplot.Figure.posterior_density_runtime import posterior_density
 from jarvisplot.Figure.posterior_mesh import (
     _anisotropic_ownership,
@@ -494,6 +495,41 @@ def test_posterior_density_grid_compact_transform_outputs_density_grid():
     assert list(out.columns) == ["x", "y", "density"]
     assert len(out) == 25
     assert integral == pytest.approx(1.0, abs=1e-12)
+
+
+def test_posterior_density_forwards_backend_options_to_interpolation(monkeypatch):
+    seen = {}
+
+    monkeypatch.setattr(
+        posterior_density_runtime,
+        "density_cell",
+        lambda *_args, **_kwargs: pd.DataFrame(
+            {"x": [0.0, 1.0], "y": [0.0, 1.0], "weight": [0.5, 0.5]}
+        ),
+    )
+
+    def fake_interp(core, cfg, logger):
+        seen.update(cfg)
+        return core
+
+    monkeypatch.setattr(posterior_density_runtime, "make_interp_2d", fake_interp)
+
+    posterior_density(
+        _sample_df(),
+        {
+            "method": "voronoi",
+            "x": {"expr": "xx", "lim": [0, 1]},
+            "y": {"expr": "yy", "lim": [0, 1]},
+            "weight": {"expr": "exp(LogL)"},
+            "backend_options": {"boundary": "clamp", "max_fill_spacing": 2.5},
+        },
+        _logger(),
+    )
+
+    assert seen["backend_options"] == {
+        "boundary": "clamp",
+        "max_fill_spacing": 2.5,
+    }
 
 
 def test_posterior_density_runtime_projection_and_output_name():

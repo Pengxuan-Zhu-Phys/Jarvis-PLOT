@@ -308,7 +308,23 @@ class DataPreprocessor:
             text = str(value).strip()
             return text or default
 
-        return sorted({_name("x", "x"), _name("y", "y"), _name("z", "z")})
+        return sorted(
+            {
+                _name("x", "x"),
+                _name("y", "y"),
+                _name("z", "z"),
+                "__grid_ix__",
+                "__grid_iy__",
+                "__grid_nx__",
+                "__grid_ny__",
+                "__grid_xmin__",
+                "__grid_xmax__",
+                "__grid_ymin__",
+                "__grid_ymax__",
+                "__grid_xscale__",
+                "__grid_yscale__",
+            }
+        )
 
     def _transform_input_columns(self, transform: Any) -> List[str]:
         out: set[str] = set()
@@ -851,7 +867,7 @@ class DataPreprocessor:
         eff_transform = self._effective_transform(source, transform)
         payload = {
             "kind": "pipeline",
-            "algo": "pregrid-v7-objective-finite-voronoi",
+            "algo": "pregrid-v8-log-background-nan-sibson",
             "source": self._source_token(source, combine=combine),
             "transform": eff_transform,
             "combine": str(combine),
@@ -901,6 +917,12 @@ class DataPreprocessor:
                 src = item.get("source")
                 tf = self._effective_transform(src, item.get("transform"))
                 token = {"source": self._source_token(src), "transform": tf}
+                if "generate" in item:
+                    # Layer-private generated tables have no source
+                    # fingerprint. Their declaration is their identity; omit
+                    # it and share_data can serve a stale curve after YAML
+                    # changes while keeping the same layer name.
+                    token["generate"] = item.get("generate")
                 profile_sig = self._runtime_profile_signature(tf)
                 if profile_sig is not None:
                     token["profile_signature"] = profile_sig
@@ -927,7 +949,12 @@ class DataPreprocessor:
                     cfg = deepcopy(cfg)
                 else:
                     cfg = {"value": cfg}
-                tokens.append({"kind": "profile", "algo": "objective-finite-voronoi-v2", "cfg": cfg})
+                tokens.append({"kind": "profile", "algo": "objective-finite-voronoi-v3-log-background", "cfg": cfg})
+            # Interpolation changes must also invalidate named share_data
+            # caches, including interpolation directly from a raw dataset.
+            for kind in ("make_interp_2d", "posterior_density"):
+                if kind in step or str(step.get("type", "")).lower() == kind:
+                    tokens.append({"kind": kind, "algo": "nan-policy-sibson-fan-v2", "cfg": deepcopy(step)})
         return tokens
 
     def _runtime_profile_signature(self, transform: Any) -> Optional[str]:

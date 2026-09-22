@@ -2,9 +2,9 @@
 
 """``jplot cap …`` -- the closed string vocabulary, as data.
 
-Agents must not invent method names, style tokens, cmaps, or expression
-functions. Every list here is derived from the same registries the runtime
-consults (see :mod:`jarvisplot.capabilities`).
+Agents must not invent method names, style tokens, cmaps, expression functions,
+or dataset/generator forms. Every list here is derived from the same registries
+the runtime consults (see :mod:`jarvisplot.capabilities`).
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ def build_parser(prog: str = "jplot cap") -> argparse.ArgumentParser:
         prog=prog,
         description=(
             "List every string Jarvis-PLOT will accept "
-            "(methods, transforms, types, styles, cmaps, funcs, cli)."
+            "(methods, transforms, types, styles, cmaps, funcs, datasets, cli)."
         ),
         rich_title="cap",
         rich_usage=(
@@ -161,6 +161,7 @@ _SECTION_DESCRIPTIONS = {
     "styles": "Style bundle/token cards and renderer compatibility.",
     "cmaps": "Jarvis colormaps plus the matplotlib fallback.",
     "funcs": "Expression callables and namespaces.",
+    "datasets": "Root dataset types plus generated and per-layer temporary data contracts.",
     "cli": "Top-level commands, arguments, and options.",
 }
 
@@ -284,7 +285,15 @@ def _root_prog(prog: str) -> str:
 
 
 def _index_rows(data: dict[str, Any]) -> list[tuple[bool, str, str, str, str]]:
-    rows = [(True, "all", "object", "7 sections", "Full catalogue; use --json for every entry.")]
+    rows = [
+        (
+            True,
+            "all",
+            "object",
+            f"{len(SECTIONS)} sections",
+            "Full catalogue; use --json for every entry.",
+        )
+    ]
     for key in SECTIONS:
         payload = data.get(key)
         rows.append(
@@ -397,6 +406,7 @@ def _render_section(console: Console, key: str, payload: Any, *, prog: str) -> N
         "styles": _render_styles,
         "cmaps": _render_cmaps,
         "funcs": _render_funcs,
+        "datasets": _render_datasets,
         "cli": _render_cli,
     }.get(key)
     if renderer is None:
@@ -557,6 +567,43 @@ def _render_funcs(console: Console, payload: dict[str, Any], *, prog: str) -> No
     table.add_row("Namespaces", str(len(namespaces)), _join(namespaces))
     table.add_row("Raw callable count", str(payload.get("names_full_count") or "—"), _short(payload.get("note"), 160))
     console.print(table)
+
+
+def _render_datasets(console: Console, payload: dict[str, Any], *, prog: str) -> None:
+    generated = payload.get("generate") or {}
+    layer = payload.get("layer_data") or {}
+    table = _man_table(f"Datasets · {prog} datasets")
+    table.add_column("Surface")
+    table.add_column("Accepted values", overflow="fold")
+    table.add_column("Meaning", overflow="fold")
+    table.add_row(
+        "DataSet[].type",
+        _join(payload.get("root_dataset_types")),
+        "File-backed, empty in-memory, or named generated table.",
+    )
+    table.add_row(
+        "generate.columns.*",
+        _join(generated.get("operations")),
+        _short(generated.get("columns")),
+    )
+    table.add_row(
+        "layers[].data[]",
+        "source | generate",
+        _short(layer.get("source_or_generate")),
+    )
+    table.add_row(
+        "combine",
+        _join(layer.get("combine")),
+        "Use separate for independent curves; seperate remains a legacy alias.",
+    )
+    table.add_row(
+        "separate methods",
+        _join(layer.get("separate_methods")),
+        _short(layer.get("block_style")),
+    )
+    console.print(table)
+    root = _root_prog(prog)
+    _panel(console, f"{_NAV_EXPAND} Open next", [f"{root} man generated-data"])
 
 
 def _render_cli(console: Console, payload: dict[str, Any], *, prog: str) -> None:

@@ -26,13 +26,26 @@ pcolormesh:
 
 contour:
   summary: "Contour lines on a field; requires x, y, z."
+  see_also: [field-interp, layer-method, style-axes]
   notes:
+    - "style.interp turns scattered x/y/z into a field at draw time, so the layer needs no make_interp_2d upstream: {method: natural_neighbor, bin: <query grid>, nan_policy: ..., backend_options: {...}, diagnostics: true}."
+    - "interp.bin is the QUERY grid (how smooth the picture is), not the number of cores. Raising it will not fill a hole."
+    - "Defaults here are the drawing ones: nan_policy: ignore (a NaN z is not a sample) and backend_options.boundary: clamp (close the half-cell frame the hull of bin centres leaves). `jplot man field-interp` explains all three gap causes."
+    - "Bound the filling with backend_options.max_fill_spacing: <n core spacings> so a region the scan never visited stays blank."
     - "Often used for HPD / iso-likelihood after density transforms."
   traps:
-    - "Needs a gridded or interpolable z field, not raw scatter-only samples."
+    - "Needs a gridded or interpolable z field: either already-gridded X/Y/Z, a flat regular mesh, or scattered samples plus style.interp."
+    - "Without style.interp a profile grid is drawn as its own cells, and empty bins stay blank."
 
 contourf:
   summary: "Filled contours; requires x, y, z."
+  see_also: [field-interp, layer-method, style-axes]
+  notes:
+    - "style.interp turns scattered x/y/z into a field at draw time, so the layer needs no make_interp_2d upstream: {method: natural_neighbor, bin: <query grid>, nan_policy: ..., backend_options: {...}, diagnostics: true}."
+    - "interp.bin is the QUERY grid (how smooth the picture is), not the number of cores. Raising it will not fill a hole."
+    - "Defaults here are the drawing ones: nan_policy: ignore (a NaN z is not a sample) and backend_options.boundary: clamp (close the half-cell frame the hull of bin centres leaves). `jplot man field-interp` explains all three gap causes."
+    - "Bound the filling with backend_options.max_fill_spacing: <n core spacings> so a region the scan never visited stays blank."
+    - "Same field requirements as contour."
   traps:
     - "Same field requirements as contour."
 
@@ -73,17 +86,36 @@ corrplot:
     - "The diamond card refuses type: full; it is already one triangle by construction."
 
 jpfield:
-  summary: "Jarvis field helper over a regular/irregular field."
+  summary: "Jarvis field helper: interpolates scattered x/y/z and draws it as a mesh."
+  see_also: [field-interp, layer-method, style-axes]
   notes:
-    - "Prefer when working with pre-gridded z fields."
+    - "style.interp turns scattered x/y/z into a field at draw time, so the layer needs no make_interp_2d upstream: {method: natural_neighbor, bin: <query grid>, nan_policy: ..., backend_options: {...}, diagnostics: true}."
+    - "interp.bin is the QUERY grid (how smooth the picture is), not the number of cores. Raising it will not fill a hole."
+    - "Defaults here are the drawing ones: nan_policy: ignore (a NaN z is not a sample) and backend_options.boundary: clamp (close the half-cell frame the hull of bin centres leaves). `jplot man field-interp` explains all three gap causes."
+    - "Bound the filling with backend_options.max_fill_spacing: <n core spacings> so a region the scan never visited stays blank."
+    - "The usual profile-likelihood colour layer: profile (method: grid) upstream, jpfield here, no make_interp_2d in between."
+  traps:
+    - "Contour-only style keys (levels / colors / extend) are ignored — use jpcontourf for those."
 
 jpcontour:
-  summary: "Jarvis contour helper."
+  summary: "Jarvis contour helper: interpolates scattered x/y/z and draws lines."
+  see_also: [field-interp, layer-method, style-axes]
   notes:
+    - "style.interp turns scattered x/y/z into a field at draw time, so the layer needs no make_interp_2d upstream: {method: natural_neighbor, bin: <query grid>, nan_policy: ..., backend_options: {...}, diagnostics: true}."
+    - "interp.bin is the QUERY grid (how smooth the picture is), not the number of cores. Raising it will not fill a hole."
+    - "Defaults here are the drawing ones: nan_policy: ignore (a NaN z is not a sample) and backend_options.boundary: clamp (close the half-cell frame the hull of bin centres leaves). `jplot man field-interp` explains all three gap causes."
+    - "Bound the filling with backend_options.max_fill_spacing: <n core spacings> so a region the scan never visited stays blank."
     - "Prefer for density isocontours with JP conventions."
 
 jpcontourf:
-  summary: "Jarvis filled contour helper."
+  summary: "Jarvis filled contour helper: interpolates scattered x/y/z and fills between levels."
+  see_also: [field-interp, layer-method, style-axes]
+  notes:
+    - "style.interp turns scattered x/y/z into a field at draw time, so the layer needs no make_interp_2d upstream: {method: natural_neighbor, bin: <query grid>, nan_policy: ..., backend_options: {...}, diagnostics: true}."
+    - "interp.bin is the QUERY grid (how smooth the picture is), not the number of cores. Raising it will not fill a hole."
+    - "Defaults here are the drawing ones: nan_policy: ignore (a NaN z is not a sample) and backend_options.boundary: clamp (close the half-cell frame the hull of bin centres leaves). `jplot man field-interp` explains all three gap causes."
+    - "Bound the filling with backend_options.max_fill_spacing: <n core spacings> so a region the scan never visited stays blank."
+
 
 hist:
   summary: "Histogram; coordinate contract is method-specific (often x or values)."

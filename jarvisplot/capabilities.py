@@ -46,6 +46,7 @@ CAPABILITY_SECTIONS = (
     "styles",
     "cmaps",
     "funcs",
+    "datasets",
     "cli",
 )
 
@@ -453,6 +454,37 @@ def _funcs() -> dict[str, Any]:
     }
 
 
+def _datasets() -> dict[str, Any]:
+    """Dataset and layer-private generation vocabulary from the live schemas."""
+    from .data_generation_contracts import SEPARATE_DATA_METHODS
+    from .generated_data import GENERATED_OPERATIONS
+    from .schema_catalog import subschema
+
+    dataset_schema = subschema("https://jarvis-plot.org/schema/v2/core/dataset.json")
+    layer_schema = subschema("https://jarvis-plot.org/schema/v2/core/layer.json")
+    dataset_types = list(dataset_schema.get("properties", {}).get("type", {}).get("enum", []))
+    combine = list(layer_schema.get("properties", {}).get("combine", {}).get("enum", []))
+    return {
+        "root_dataset_types": dataset_types,
+        "generated_type": "generated",
+        "generate": {
+            "operations": list(GENERATED_OPERATIONS),
+            "columns": "ordered mapping; expr may reference only earlier generated columns",
+            "lifetime": "DataSet.type: generated is named/reusable; layer data[].generate is private to that layer unless share_data is explicit",
+            "transforms": "generate first, then the ordinary transform list",
+        },
+        "layer_data": {
+            "source_or_generate": "exactly one is required in every data[] block",
+            "combine": combine,
+            "canonical_separate": "separate",
+            "legacy_separate": "seperate",
+            "separate_methods": sorted(SEPARATE_DATA_METHODS),
+            "block_style": "data[].style overrides layer.style for one separately rendered series",
+        },
+        "man": "jplot man generated-data",
+    }
+
+
 def _cli() -> dict[str, Any]:
     """The CLI, straight from its own spec file -- so it cannot drift."""
     return _load_json(_ARGS)
@@ -465,6 +497,7 @@ _COLLECTORS = {
     "styles": _styles,
     "cmaps": _cmaps,
     "funcs": _funcs,
+    "datasets": _datasets,
     "cli": _cli,
 }
 

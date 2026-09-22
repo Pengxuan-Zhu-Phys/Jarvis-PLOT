@@ -255,10 +255,11 @@ def test_layer_coordinates_accept_every_form_the_runtime_supports(coordinates):
     assert list(bag) == []
 
 
-def test_combine_accepts_the_runtime_spelling():
-    """`seperate` is spelled that way in Figure/layer_runtime.py; the schema follows."""
+def test_combine_accepts_canonical_and_legacy_separate_spellings():
+    """`separate` is canonical; legacy `seperate` remains valid YAML."""
     assert set(subschema(LAYER_SCHEMA, "properties", "combine")["enum"]) == {
         "concat",
+        "separate",
         "seperate",
     }
 

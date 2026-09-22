@@ -8,8 +8,12 @@ weight construction used by Tinfour:
   (wXY - wThiessen),
 - coincident and near-coincident cores are merged with a MeanValue rule
   and a Tinfour-style vertex tolerance,
-- query points outside the convex hull return NaN,
-- NaN-valued natural neighbors propagate strictly.
+- query points outside the convex hull return NaN, unless ``boundary`` asks
+  for a bounded extension of the surface past the hull,
+- cores whose value is not finite are resolved by ``nan_policy`` before the
+  triangulation is built: ``strict`` lets them propagate to every query that
+  leans on them, ``ignore`` removes them so the surrounding cores close over
+  the gap, ``fill`` substitutes a floor value.
 """
 
 from __future__ import annotations
@@ -60,6 +64,15 @@ class NaturalNeighborExactDiagnostics:
     outside_hull: int = 0
     exact_hits: int = 0
     masked_by_nan: int = 0
+    masked_by_coverage: int = 0
+    boundary_policy: str = "nan"
+    max_boundary_distance: float = 0.0
+    extended_past_hull: int = 0
+    nan_cores: int = 0
+    nan_cores_dropped: int = 0
+    nan_cores_filled: int = 0
+    nan_fill_value: float = float("nan")
+    max_fill_distance: float = float("inf")
     all_nan_cores: bool = False
     degenerate_input: bool = False
     degenerate_queries: int = 0
@@ -99,7 +112,183 @@ def _normalize_nan_policy(nan_policy: str) -> str:
     key = str(nan_policy).strip().lower()
     if key in {"strict", "propagate", "mask"}:
         return "strict"
-    raise ValueError("nan_policy must be one of {'strict', 'propagate', 'mask'}")
+    if key in {"ignore", "omit", "drop"}:
+        return "ignore"
+    if key == "fill":
+        return "fill"
+    raise ValueError(
+        "nan_policy must be one of {'strict', 'propagate', 'mask', "
+        "'ignore', 'omit', 'drop', 'fill'}"
+    )
+
+
+def _apply_nan_core_policy(
+    coords: np.ndarray,
+    values: np.ndarray,
+    policy: str,
+    backend_options: Optional[dict[str, Any]] = None,
+) -> tuple[np.ndarray, np.ndarray, dict[str, float]]:
+    """Resolve cores with a non-finite value before anything is triangulated.
+
+    An empty profile-likelihood cell arrives here as a NaN core, and under
+    ``strict`` that one missing value blanks every query point whose Sibson
+    stencil touches it -- a hole several cells wide around a single gap.
+    ``ignore`` deletes the core instead: no sample landed there, so there is
+    nothing to interpolate from, and the neighbouring cores simply grow to
+    cover the gap. ``fill`` keeps the core and gives it a floor value.
+    """
+    info = {"nan_cores": 0, "dropped": 0, "filled": 0, "fill_value": float("nan")}
+    values = np.asarray(values, dtype=float)
+    if values.size == 0:
+        return coords, values, info
+
+    bad = ~np.isfinite(values)
+    info["nan_cores"] = int(np.count_nonzero(bad))
+    if info["nan_cores"] == 0:
+        return coords, values, info
+
+    if policy == "strict":
+        return coords, np.where(bad, np.nan, values), info
+
+    if policy == "ignore":
+        keep = ~bad
+        info["dropped"] = info["nan_cores"]
+        return coords[keep], values[keep], info
+
+    options = dict(backend_options or {})
+    fill_value = options.get("fill_value", None)
+    if fill_value is None:
+        finite = values[~bad]
+        fill_value = float(np.min(finite)) if finite.size else float("nan")
+    try:
+        fill_value = float(fill_value)
+    except Exception:
+        fill_value = float("nan")
+    values = values.copy()
+    values[bad] = fill_value
+    info["filled"] = info["nan_cores"]
+    info["fill_value"] = fill_value
+    return coords, values, info
+
+
+def _resolve_max_fill_distance(
+    backend_options: Optional[dict[str, Any]], nominal_spacing: float
+) -> float:
+    """Farthest a query point may sit from a core and still be interpolated.
+
+    Closing over a one-cell gap is honest; closing over a region the scan never
+    visited is not. ``max_fill_spacing`` states the limit in multiples of the
+    core spacing so it survives a change of grid resolution; the absolute
+    ``max_fill_distance`` is there when the caller knows the coordinate.
+    """
+    options = dict(backend_options or {})
+    absolute = options.get("max_fill_distance", None)
+    if absolute is not None:
+        try:
+            absolute = float(absolute)
+        except Exception:
+            return float("inf")
+        return absolute if (np.isfinite(absolute) and absolute > 0) else float("inf")
+
+    spacings = options.get("max_fill_spacing", None)
+    if spacings is None:
+        return float("inf")
+    try:
+        spacings = float(spacings)
+    except Exception:
+        return float("inf")
+    if not np.isfinite(spacings) or spacings <= 0:
+        return float("inf")
+    if not np.isfinite(nominal_spacing) or nominal_spacing <= 0:
+        return float("inf")
+    return float(spacings * nominal_spacing)
+
+
+def _normalize_boundary_policy(policy: Any) -> str:
+    """How far past the convex hull of the cores the surface is drawn."""
+    key = str(policy if policy is not None else "nan").strip().lower()
+    if key in {"nan", "none", "off", "strict", "false"}:
+        return "nan"
+    if key in {"clamp", "hull", "extend"}:
+        return "clamp"
+    if key in {"nearest", "nn"}:
+        return "nearest"
+    raise ValueError("boundary must be one of {'nan', 'clamp', 'nearest'}")
+
+
+def _resolve_max_boundary_distance(
+    backend_options: Optional[dict[str, Any]],
+    nominal_spacing: float,
+    max_fill_distance: float,
+    policy: str,
+) -> float:
+    """How far past the hull the extension may reach.
+
+    Cores sit at the centre of the cell they stand for, so the outermost ones
+    are half a cell inside the domain and the hull leaves a blank frame that is
+    pure discretization artifact. Reaching a little past the hull closes it.
+    Reaching far past it invents a scan that never happened, so this is bounded
+    by default rather than open-ended.
+    """
+    if policy == "nan":
+        return 0.0
+    options = dict(backend_options or {})
+
+    absolute = options.get("max_boundary_distance", None)
+    if absolute is not None:
+        try:
+            absolute = float(absolute)
+        except Exception:
+            absolute = None
+        if absolute is not None:
+            return absolute if (np.isfinite(absolute) and absolute > 0) else 0.0
+
+    spacings = options.get("max_boundary_spacing", None)
+    if spacings is None and np.isfinite(max_fill_distance):
+        # An explicit coverage radius already says how far a drawn pixel may
+        # sit from real data; there is no reason for the rim to disagree.
+        return float(max_fill_distance)
+    if spacings is None:
+        # Half a spacing is the centre-vs-cell artifact; the rest absorbs a
+        # cell or so of empty rim, which is where a corner gets chopped
+        # diagonally. Past that the scan really has nothing to say.
+        spacings = 2.0
+    try:
+        spacings = float(spacings)
+    except Exception:
+        spacings = 2.0
+    if not np.isfinite(spacings) or spacings <= 0:
+        return 0.0
+    if not np.isfinite(nominal_spacing) or nominal_spacing <= 0:
+        return 0.0
+    return float(spacings * nominal_spacing)
+
+
+def _project_onto_polygon(pts: np.ndarray, poly: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Closest point on a polygon's boundary, and the distance to it."""
+    pts = np.asarray(pts, dtype=float).reshape(-1, 2)
+    poly = np.asarray(poly, dtype=float).reshape(-1, 2)
+    a = poly
+    b = np.roll(poly, -1, axis=0)
+    ab = b - a
+    denom = np.sum(ab * ab, axis=1)
+    denom = np.where(denom > 0.0, denom, 1.0)
+
+    best = np.empty_like(pts)
+    best_dist = np.empty(pts.shape[0], dtype=float)
+    # Chunked so a fine query grid against a many-sided hull stays bounded.
+    for lo in range(0, pts.shape[0], 4096):
+        block = pts[lo : lo + 4096]
+        ap = block[:, None, :] - a[None, :, :]
+        t = np.sum(ap * ab[None, :, :], axis=2) / denom[None, :]
+        np.clip(t, 0.0, 1.0, out=t)
+        proj = a[None, :, :] + t[:, :, None] * ab[None, :, :]
+        d2 = np.sum((block[:, None, :] - proj) ** 2, axis=2)
+        pick = np.argmin(d2, axis=1)
+        rows = np.arange(block.shape[0])
+        best[lo : lo + 4096] = proj[rows, pick]
+        best_dist[lo : lo + 4096] = np.sqrt(d2[rows, pick])
+    return best, best_dist
 
 
 def _dedupe_coordinates(
@@ -386,14 +575,19 @@ class NaturalNeighborExactInterpolator:
     ):
         self.nan_policy = _normalize_nan_policy(nan_policy)
         self.backend_options = dict(backend_options or {})
+        self.boundary_policy = _normalize_boundary_policy(
+            self.backend_options.get("boundary", "nan")
+        )
         self.diagnostics = NaturalNeighborExactDiagnostics(
             nan_policy=self.nan_policy,
             diagnostics_requested=bool(diagnostics),
+            boundary_policy=self.boundary_policy,
         )
 
         self._coords: Optional[np.ndarray] = None
         self._values: Optional[np.ndarray] = None
         self._tree: Any = None
+        self._last_query_distance: Optional[np.ndarray] = None
         self._tri: Any = None
         self._hull_polygon: Optional[np.ndarray] = None
         self._neighbor_indptr: Optional[np.ndarray] = None
@@ -402,9 +596,10 @@ class NaturalNeighborExactInterpolator:
         self._circumcenters: Optional[np.ndarray] = None
         self._circumradius2: Optional[np.ndarray] = None
         self._vertex_to_simplices: list[np.ndarray] = []
-        self._ordered_vertex_simplices: list[np.ndarray] = []
 
         self._vertex_tol: float = 0.0
+        self._max_fill_distance: float = float("inf")
+        self._max_boundary_distance: float = 0.0
         self._boundary_tol: float = 0.0
         self._exact_tol: float = 0.0
         self._area_tol: float = 0.0
@@ -448,6 +643,21 @@ class NaturalNeighborExactInterpolator:
 
         coords = np.column_stack([x[finite_xy], y[finite_xy]])
         values = z[finite_xy]
+
+        # Resolve empty cores first: under ``ignore`` they must be gone before
+        # dedupe, or a merged group would inherit their NaN all the same.
+        coords, values, nan_info = _apply_nan_core_policy(
+            coords, values, self.nan_policy, self.backend_options
+        )
+        self.diagnostics.nan_cores = int(nan_info["nan_cores"])
+        self.diagnostics.nan_cores_dropped = int(nan_info["dropped"])
+        self.diagnostics.nan_cores_filled = int(nan_info["filled"])
+        self.diagnostics.nan_fill_value = float(nan_info["fill_value"])
+        if coords.shape[0] == 0:
+            self.diagnostics.degenerate_input = True
+            _warn("natural_neighbor: every core value is non-finite; nothing to interpolate")
+            return
+
         coords, values, exact_duplicate_groups, exact_duplicate_points = _dedupe_coordinates(coords, values)
         self.diagnostics.exact_duplicate_groups = int(exact_duplicate_groups)
         self.diagnostics.merged_points = int(exact_duplicate_points)
@@ -464,6 +674,17 @@ class NaturalNeighborExactInterpolator:
         if not np.isfinite(nominal_spacing) or nominal_spacing <= 0:
             nominal_spacing = scale
         self.diagnostics.nominal_point_spacing = float(nominal_spacing)
+        self._max_fill_distance = _resolve_max_fill_distance(
+            self.backend_options, nominal_spacing
+        )
+        self.diagnostics.max_fill_distance = float(self._max_fill_distance)
+        self._max_boundary_distance = _resolve_max_boundary_distance(
+            self.backend_options,
+            nominal_spacing,
+            self._max_fill_distance,
+            self.boundary_policy,
+        )
+        self.diagnostics.max_boundary_distance = float(self._max_boundary_distance)
 
         self._vertex_tol = float(
             self.backend_options.get(
@@ -562,21 +783,6 @@ class NaturalNeighborExactInterpolator:
                     np.asarray(indices, dtype=int) if indices else np.empty((0,), dtype=int)
                     for indices in self._vertex_to_simplices
                 ]
-                self._ordered_vertex_simplices = []
-                for vertex_idx, simplex_ids in enumerate(self._vertex_to_simplices):
-                    if simplex_ids.size == 0:
-                        self._ordered_vertex_simplices.append(np.empty((0,), dtype=int))
-                        continue
-                    centers = self._circumcenters[simplex_ids]
-                    if not np.isfinite(centers).all():
-                        self._ordered_vertex_simplices.append(np.empty((0,), dtype=int))
-                        self.diagnostics.degenerate_input = True
-                        _warn("natural_neighbor: degenerate triangles produced invalid circumcenters")
-                        continue
-                    origin = coords[int(vertex_idx)]
-                    angles = np.arctan2(centers[:, 1] - origin[1], centers[:, 0] - origin[0])
-                    order = np.argsort(angles, kind="mergesort")
-                    self._ordered_vertex_simplices.append(np.asarray(simplex_ids[order], dtype=int))
             else:
                 self._tri = None
         except QhullError as exc:
@@ -587,7 +793,6 @@ class NaturalNeighborExactInterpolator:
             self._circumcenters = None
             self._circumradius2 = None
             self._vertex_to_simplices = []
-            self._ordered_vertex_simplices = []
             self.diagnostics.degenerate_input = True
             _warn(f"natural_neighbor: Delaunay triangulation failed: {exc}")
 
@@ -789,10 +994,7 @@ class NaturalNeighborExactInterpolator:
         cavity_set: set[int],
         q: np.ndarray,
     ) -> Optional[list[int]]:
-        if not self._ordered_vertex_simplices:
-            return None
-        ordered = self._ordered_vertex_simplices[int(vertex_idx)]
-        if ordered.size == 0:
+        if self._tri is None or self._simplex_neighbors is None:
             return None
 
         start = self._incident_simplex_with_edge(vertex_idx, left_idx, cavity_set, q)
@@ -800,41 +1002,28 @@ class NaturalNeighborExactInterpolator:
         if start is None or end is None:
             return None
 
-        start_pos_arr = np.flatnonzero(ordered == int(start))
-        end_pos_arr = np.flatnonzero(ordered == int(end))
-        if start_pos_arr.size == 0 or end_pos_arr.size == 0:
-            return None
-        start_pos = int(start_pos_arr[0])
-        end_pos = int(end_pos_arr[0])
-
-        def _walk(step: int) -> Optional[list[int]]:
-            chain: list[int] = []
-            pos = start_pos
-            limit = ordered.size + 1
-            while True:
-                simplex_id = int(ordered[pos])
-                if simplex_id not in cavity_set:
-                    return None
-                if not self._circumcircle_contains(simplex_id, q):
-                    return None
-                chain.append(simplex_id)
-                if pos == end_pos:
-                    return chain if chain else None
-                pos = (pos + step) % ordered.size
-                limit -= 1
-                if limit <= 0:
-                    return None
-
-        # The cavity block can wrap around the angle discontinuity in the
-        # per-vertex circular ordering. Try both traversal directions and keep
-        # whichever one stays fully inside the cavity.
-        chain = _walk(+1)
-        if chain is not None:
-            return chain
-        chain = _walk(-1)
-        if chain is not None:
-            return chain
-        return None
+        # Follow the triangle fan topologically. Circumcenters sorted by
+        # angle around the site do NOT preserve this order at hull vertices
+        # or obtuse configurations; that can skip a triangle and corrupt the
+        # stolen Voronoi area even while producing finite-looking weights.
+        chain = [start]
+        visited = {start}
+        current = start
+        while current != end:
+            candidates = []
+            for local_vertex, nb in enumerate(self._simplex_neighbors[current]):
+                nb = int(nb)
+                # The edge opposite this vertex must contain vertex_idx.
+                if int(self._tri.simplices[current, local_vertex]) == vertex_idx:
+                    continue
+                if nb in cavity_set and nb not in visited:
+                    candidates.append(nb)
+            if len(candidates) != 1:
+                return None
+            current = candidates[0]
+            visited.add(current)
+            chain.append(current)
+        return chain
 
     def _query_point(
         self,
@@ -963,6 +1152,82 @@ class NaturalNeighborExactInterpolator:
         return weighted
 
     def evaluate(self, X, Y):
+        Z = self._evaluate_grid(X, Y)
+        return self._mask_beyond_coverage(Z)
+
+    def _extend_past_hull(
+        self,
+        pts: np.ndarray,
+        out: np.ndarray,
+        outside_idx: np.ndarray,
+        nearest_core: np.ndarray,
+    ) -> None:
+        """Carry the surface a bounded distance past the hull of the cores.
+
+        The hull runs through the outermost core, which is the *centre* of the
+        cell it stands for, so a half-cell frame of the domain falls outside it
+        however well the scan covered the corner. ``clamp`` evaluates at the
+        closest point of the hull, which continues the surface without a seam;
+        ``nearest`` just carries the closest core's value out.
+        """
+        if self.boundary_policy == "nan" or self._max_boundary_distance <= 0.0:
+            return
+        if self._hull_polygon is None or self._coords is None or self._values is None:
+            return
+
+        targets = pts[outside_idx]
+        _, hull_dist = _project_onto_polygon(targets, self._hull_polygon)
+        near = hull_dist <= self._max_boundary_distance
+        if not np.any(near):
+            return
+        reach_idx = outside_idx[near]
+
+        if self.boundary_policy == "nearest":
+            out[reach_idx] = self._values[np.asarray(nearest_core[reach_idx], dtype=int)]
+            self.diagnostics.extended_past_hull = int(reach_idx.size)
+            return
+
+        # clamp: step just inside the hull, so the Sibson cell of the query
+        # point is bounded, and read the surface there.
+        proj, _ = _project_onto_polygon(pts[reach_idx], self._hull_polygon)
+        centroid = np.mean(self._hull_polygon, axis=0)
+        inward = centroid[None, :] - proj
+        span = np.linalg.norm(inward, axis=1)
+        safe = span > 0.0
+        step = np.minimum(
+            max(self._vertex_tol * 4.0, 1.0e-3 * self.diagnostics.nominal_point_spacing),
+            0.5 * span,
+        )
+        probe = proj.copy()
+        probe[safe] += (inward[safe] / span[safe, None]) * step[safe, None]
+
+        for slot, point in zip(reach_idx, probe, strict=False):
+            value = self._query_point(point, skip_hull_check=True)
+            if not np.isfinite(value):
+                # Numerically awkward spots on the rim fall back to the core
+                # rather than punching the hole back into the picture.
+                value = float(self._values[int(nearest_core[int(slot)])])
+            out[int(slot)] = value
+        self.diagnostics.extended_past_hull = int(reach_idx.size)
+
+    def _mask_beyond_coverage(self, Z: np.ndarray) -> np.ndarray:
+        """Blank whatever sits farther from a core than the caller allows."""
+        self.diagnostics.masked_by_coverage = 0
+        if not np.isfinite(self._max_fill_distance):
+            return Z
+        if self._tree is None or self._last_query_distance is None:
+            return Z
+        Z = np.asarray(Z, dtype=float)
+        far = np.asarray(self._last_query_distance, dtype=float).reshape(Z.shape)
+        far = np.isfinite(far) & (far > self._max_fill_distance)
+        dropped = far & np.isfinite(Z)
+        self.diagnostics.masked_by_coverage = int(np.count_nonzero(dropped))
+        if np.any(dropped):
+            Z = Z.copy()
+            Z[dropped] = np.nan
+        return Z
+
+    def _evaluate_grid(self, X, Y):
         X = _as_grid_float(X, name="X")
         Y = _as_grid_float(Y, name="Y")
         if X.shape != Y.shape:
@@ -970,6 +1235,7 @@ class NaturalNeighborExactInterpolator:
 
         pts = np.column_stack([X.ravel(), Y.ravel()])
         out = np.full(pts.shape[0], np.nan, dtype=float)
+        self._last_query_distance = None
         self.diagnostics.query_points = int(pts.shape[0])
         self.diagnostics.inside_hull = 0
         self.diagnostics.outside_hull = 0
@@ -989,6 +1255,7 @@ class NaturalNeighborExactInterpolator:
             return out.reshape(X.shape)
 
         dist, idx = self._tree.query(pts, k=1)
+        self._last_query_distance = np.asarray(dist, dtype=float)
         exact_mask = np.isfinite(dist) & (dist < self._vertex_tol)
         if np.any(exact_mask):
             out[exact_mask] = self._values[np.asarray(idx[exact_mask], dtype=int)]
@@ -1003,6 +1270,10 @@ class NaturalNeighborExactInterpolator:
         inside_count = int(np.count_nonzero(inside_mask))
         self.diagnostics.inside_hull = int(self.diagnostics.exact_hits + inside_count)
         self.diagnostics.outside_hull = int(remaining.size - inside_count)
+
+        outside_idx = remaining[~inside_mask]
+        if outside_idx.size:
+            self._extend_past_hull(pts, out, outside_idx, idx)
 
         inside_idx = remaining[inside_mask]
         if inside_idx.size == 0:

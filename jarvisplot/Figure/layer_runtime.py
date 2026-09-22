@@ -12,9 +12,15 @@ from .preprocessor_runtime import add_column, filter_df, sort_by
 from .profile_runtime import profiling
 from .method_registry import resolve_callable
 from .colorbar_runtime import collect_and_attach_colorbar
-from .interp_natural_neighbor import resolve_backend
+from .interp_natural_neighbor import (
+    drawing_backend_options,
+    log_backend_diagnostics,
+    resolve_backend,
+)
 from .dynesty_runtime import render_dynesty_runplot
 from .posterior_hpd import prepare_hpd_contour_style
+from ..data_generation_contracts import SEPARATE_DATA_METHODS
+from ..generated_data import generate_dataframe
 from ..utils.expression import eval_scalar_expression
 
 _MISSING_CLIP_PATH = object()
@@ -27,6 +33,43 @@ _MISSING_CLIP_PATH = object()
 #: corrplot reads the whole correlation table -- var names, indices, rho and
 #: the per-pair row count that significance is computed from.
 _GRID_TABLE_METHODS = frozenset({"pcolormesh", "imshow", "corrplot"})
+
+def _normalize_layer_combine(value) -> str:
+    """Return the canonical combine spelling while keeping v1 YAML usable."""
+    raw = str(value or "concat").strip().lower()
+    if raw == "seperate":
+        return "separate"
+    return raw
+
+
+def _data_block_key(block, index: int) -> str:
+    """A deterministic runtime key for one separate data block."""
+    label = block.get("label") if isinstance(block, dict) else None
+    if isinstance(label, str) and label.strip():
+        return label.strip()
+    source = block.get("source") if isinstance(block, dict) else None
+    if isinstance(source, str) and source.strip():
+        return source.strip()
+    return f"generated[{index}]"
+
+
+def separate_block_options(layer) -> dict[str, dict]:
+    """Return per-block styles/labels keyed exactly as ``load_layer_data``."""
+    out: dict[str, dict] = {}
+    for index, block in enumerate(layer.get("data") or ()):
+        if not isinstance(block, dict):
+            continue
+        key = _data_block_key(block, index)
+        if key in out:
+            raise ValueError(
+                f"Layer '{layer.get('name', '')}' has duplicate separate data label/key {key!r}"
+            )
+        raw_style = block.get("style")
+        out[key] = {
+            "label": block.get("label") if isinstance(block.get("label"), str) else None,
+            "style": dict(raw_style) if isinstance(raw_style, dict) else {},
+        }
+    return out
 
 
 def _clip_expr_inside(expr: str, point) -> bool:
@@ -266,88 +309,6 @@ def _build_contour_query_grid(ax, x, y, *, interp_cfg: dict | None = None, logge
     return np.meshgrid(xq, yq)
 
 
-def _log_natural_neighbor_diagnostics(logger, diag) -> None:
-    if logger is None or diag is None:
-        return
-    try:
-        if getattr(diag, "degenerate_input", False):
-            logger.warning("natural_neighbor: input data are too sparse or degenerate for full interpolation")
-        if getattr(diag, "all_nan_cores", False):
-            logger.warning("natural_neighbor: all input z cores are NaN")
-        exact_duplicate_groups = getattr(diag, "exact_duplicate_groups", 0)
-        near_duplicate_groups = getattr(diag, "near_duplicate_groups", 0)
-        merged_points = getattr(diag, "merged_points", 0)
-        if any(int(v) for v in (exact_duplicate_groups, near_duplicate_groups, merged_points)):
-            logger.debug(
-                "natural_neighbor: merged {} exact-duplicate groups, {} near-duplicate groups, {} points merged".format(
-                    int(exact_duplicate_groups),
-                    int(near_duplicate_groups),
-                    int(merged_points),
-                )
-            )
-        nominal_spacing = getattr(diag, "nominal_point_spacing", None)
-        if isinstance(nominal_spacing, (int, float)) and nominal_spacing > 0:
-            logger.debug(
-                "natural_neighbor: nominal point spacing {:.6g}".format(float(nominal_spacing))
-            )
-        vertex_tolerance = getattr(diag, "vertex_tolerance", None)
-        if isinstance(vertex_tolerance, (int, float)) and vertex_tolerance > 0:
-            logger.debug(
-                "natural_neighbor: vertex tolerance {:.6g}".format(float(vertex_tolerance))
-            )
-        boundary_tolerance = getattr(diag, "boundary_tolerance", None)
-        if isinstance(boundary_tolerance, (int, float)) and boundary_tolerance > 0:
-            logger.debug(
-                "natural_neighbor: boundary tolerance {:.6g}".format(float(boundary_tolerance))
-            )
-        if getattr(diag, "masked_by_nan", 0):
-            logger.warning(
-                "natural_neighbor: {} query points were masked because a contributing core is NaN".format(
-                    int(getattr(diag, "masked_by_nan", 0))
-                )
-            )
-        if getattr(diag, "outside_hull", 0):
-            logger.debug(
-                "natural_neighbor: {} query points lie outside the convex hull".format(
-                    int(getattr(diag, "outside_hull", 0))
-                )
-            )
-        if getattr(diag, "exact_hits", 0):
-            logger.debug(
-                "natural_neighbor: {} query points matched an input core exactly".format(
-                    int(getattr(diag, "exact_hits", 0))
-                )
-            )
-        if getattr(diag, "cavity_triangles", 0):
-            logger.debug(
-                "natural_neighbor: visited {} cavity triangles".format(
-                    int(getattr(diag, "cavity_triangles", 0))
-                )
-            )
-        area_of_embedded_polygon = getattr(diag, "area_of_embedded_polygon", None)
-        if isinstance(area_of_embedded_polygon, (int, float)) and area_of_embedded_polygon != 0:
-            logger.debug(
-                "natural_neighbor: area of embedded polygon {:.6f}".format(
-                    float(area_of_embedded_polygon)
-                )
-            )
-        barycentric_coordinate_deviation = getattr(diag, "barycentric_coordinate_deviation", None)
-        if isinstance(barycentric_coordinate_deviation, (int, float)) and barycentric_coordinate_deviation != 0:
-            logger.debug(
-                "natural_neighbor: barycentric coordinate deviation {:.6e}".format(
-                    float(barycentric_coordinate_deviation)
-                )
-            )
-        build_seconds = getattr(diag, "build_seconds", None)
-        eval_seconds = getattr(diag, "eval_seconds", None)
-        if isinstance(build_seconds, (int, float)) and build_seconds > 0:
-            logger.debug(f"natural_neighbor: build time {float(build_seconds):.4f}s")
-        if isinstance(eval_seconds, (int, float)) and eval_seconds > 0:
-            logger.debug(f"natural_neighbor: eval time {float(eval_seconds):.4f}s")
-    except Exception:
-        pass
-
-
 def _reconstruct_grid_from_metadata(df, x, y, z):
     if df is None or not hasattr(df, "columns"):
         return None
@@ -442,7 +403,11 @@ def _prepare_contour_args(fig, ax, method_key: str, style: dict, coor: dict, df=
     y = np.asarray(coor.get("y"), dtype=float)
     z = np.asarray(coor.get("z"), dtype=float)
 
-    grid = _reconstruct_grid_from_metadata(df, x, y, z)
+    # A profile grid carries its own cell indices, and rebuilding the mesh from
+    # them is both exact and cheap -- but only when the layer did not ask for
+    # interpolation. Taking it unconditionally dropped `style.interp` on the
+    # floor for exactly the plots that set it: the binned ones with holes.
+    grid = _reconstruct_grid_from_metadata(df, x, y, z) if interp_cfg is None else None
     if grid is not None:
         X, Y, Z = grid
         style = prepare_hpd_contour_style(
@@ -505,9 +470,12 @@ def _prepare_contour_args(fig, ax, method_key: str, style: dict, coor: dict, df=
         )
 
     backend_name = str(interp_cfg.get("method", "natural_neighbor")).strip()
-    nan_policy = str(interp_cfg.get("nan_policy", "strict"))
+    # A NaN z here is a sample that is not there -- an empty profile cell --
+    # so it is dropped rather than propagated; `nan_policy: strict` restores
+    # the masking.
+    nan_policy = str(interp_cfg.get("nan_policy", "ignore"))
     diagnostics = bool(interp_cfg.get("diagnostics", False))
-    backend_options = interp_cfg.get("backend_options", None)
+    backend_options = drawing_backend_options(interp_cfg.get("backend_options", None))
     X, Y = _build_contour_query_grid(ax, x, y, interp_cfg=interp_cfg, logger=getattr(fig, "logger", None))
     try:
         backend = resolve_backend(backend_name)
@@ -523,7 +491,7 @@ def _prepare_contour_args(fig, ax, method_key: str, style: dict, coor: dict, df=
         diagnostics=diagnostics,
         backend_options=backend_options,
     )
-    _log_natural_neighbor_diagnostics(getattr(fig, "logger", None), getattr(backend, "last_diagnostics", None))
+    log_backend_diagnostics(getattr(fig, "logger", None), getattr(backend, "last_diagnostics", None))
     Z = np.asarray(Z, dtype=float)
 
     if not np.isfinite(Z).any():
@@ -565,7 +533,7 @@ def _prepare_jpcontour_style(
                 call_style[key] = interp_cfg[key]
         if include_diagnostics and "diagnostics" in interp_cfg and "diagnostics" not in call_style:
             call_style["diagnostics"] = bool(interp_cfg.get("diagnostics", False))
-    if method_key == "jpcontour":
+    if method_key in {"jpcontour", "jpcontourf", "jpfield"}:
         call_style["_logger"] = getattr(fig, "logger", None)
 
     coords = {}
@@ -608,7 +576,7 @@ def load_layer_data(fig, layer):
 
 def _load_layer_data(fig, layer):
     lyinfo = layer.get("data", False)
-    lycomb = layer.get("combine", "concat")
+    lycomb = _normalize_layer_combine(layer.get("combine", "concat"))
     share_name = layer.get("share_data")
     layer_demand = None
     if fig.preprocessor is not None:
@@ -631,6 +599,15 @@ def _load_layer_data(fig, layer):
             dts = []
             cache_keys = []
             for ds in lyinfo:
+                if not isinstance(ds, dict):
+                    continue
+                if "generate" in ds:
+                    dt = generate_dataframe(ds.get("generate"))
+                    dt = load_bool_df(fig, dt, ds.get("transform", None))
+                    dts.append(dt)
+                    # Generated data are deliberately not a cache source.
+                    cache_keys.append(None)
+                    continue
                 src = ds.get("source")
                 use_cache = bool(ds.get("cache", True))
                 fig.logger.debug("Loading layer data source -> {}".format(src))
@@ -670,11 +647,23 @@ def _load_layer_data(fig, layer):
             if len(dts) == 1 and combined is dts[0] and len(cache_keys) == 1:
                 cache_ref = cache_keys[0]
             return combined, cache_ref
-        elif lycomb == "seperate":
+        elif lycomb == "separate":
             dts = {}
-            for ds in lyinfo:
+            for index, ds in enumerate(lyinfo):
+                if not isinstance(ds, dict):
+                    continue
+                key = _data_block_key(ds, index)
+                if key in dts:
+                    raise ValueError(
+                        f"Layer '{layer.get('name', '')}' has duplicate separate data label/key {key!r}"
+                    )
+                if "generate" in ds:
+                    dt = generate_dataframe(ds.get("generate"))
+                    dt = load_bool_df(fig, dt, ds.get("transform", None))
+                    if dt is not None:
+                        dts[key] = dt
+                    continue
                 src = ds.get("source")
-                label = ds.get("label")
                 use_cache = bool(ds.get("cache", True))
                 fig.logger.debug("Loading layer data source -> {}".format(src))
                 if src and fig.context:
@@ -693,12 +682,16 @@ def _load_layer_data(fig, layer):
                             dt = deepcopy(fig.context.get(src))
                             dt = load_bool_df(fig, dt, ds.get("transform", None))
                     if dt is not None:
-                        dts[label] = dt
+                        dts[key] = dt
                 else:
                     fig.logger.error("DataSet -> {} not specified".format(src))
             if len(dts) == 0:
                 return None, None
             return dts, None
+        else:
+            raise ValueError(
+                f"Layer '{layer.get('name', '')}' combine must be 'concat' or 'separate', got {lycomb!r}"
+            )
     return None, None
 
 
@@ -831,6 +824,33 @@ def render_layer(fig, ax, layer_info):
         if layer_info.get("style", {}) is not None:
             style.update(layer_info.get("style", {}))
         return render_dynesty_runplot(fig, df, style)
+
+    # ``combine: separate`` preserves each block as a frame keyed by its
+    # label/source/generated index.  Draw each frame independently so line
+    # endpoints from different generated curves can never be joined by a
+    # concat.  Re-entering with a single DataFrame shares the ordinary method
+    # adapters, coordinate handling, clipping, and colorbar logic.
+    raw_data = layer_info.get("data")
+    if isinstance(raw_data, dict) and method_key != "hist":
+        if method_key not in SEPARATE_DATA_METHODS:
+            raise ValueError(
+                f"Layer '{layer_info.get('name', '')}' uses combine: separate with "
+                f"method {method_key!r}; use concat for methods that calculate over one table"
+            )
+        options = separate_block_options(layer_info.get("layer_spec") or {})
+        rendered = []
+        for key, block_data in raw_data.items():
+            option = options.get(key, {})
+            child = dict(layer_info)
+            child_style = dict(layer_info.get("style") or {})
+            child_style.update(option.get("style") or {})
+            label = option.get("label")
+            if label:
+                child_style["label"] = label
+            child["style"] = child_style
+            child["data"] = block_data
+            rendered.append(render_layer(fig, ax, child))
+        return rendered
 
     axes_type = getattr(ax, "_type", "any")
 

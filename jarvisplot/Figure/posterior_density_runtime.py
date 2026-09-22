@@ -203,6 +203,7 @@ def posterior_density(df: pd.DataFrame, cfg: Mapping[str, Any], logger=None) -> 
             },
             "grid": cfg.get("grid", 256),
             "nan_policy": cfg.get("nan_policy", "strict"),
+            "backend_options": cfg.get("backend_options", {}),
         }
         for key in ("triangulation", "griddata"):
             if key in cfg:

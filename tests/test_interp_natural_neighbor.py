@@ -269,6 +269,35 @@ def test_exact_backend_linear_precision_at_symmetric_center():
     assert Z[0, 0] == pytest.approx(1.0, rel=1e-10, abs=1e-10)
 
 
+@pytest.mark.parametrize("seed", [7, 23, 91])
+def test_exact_backend_linear_precision_on_irregular_sparse_support(seed):
+    from scipy.spatial import Delaunay
+
+    pts = np.random.default_rng(seed).random((35, 2))
+    # Sparse interiors and hull vertices exposed the incorrect angular fan
+    # ordering; seed 91 previously had errors up to 0.1358876095.
+    X, Y = np.meshgrid(np.linspace(.05, .95, 37), np.linspace(.05, .95, 37))
+    inside = Delaunay(pts).find_simplex(np.column_stack([X.ravel(), Y.ravel()])) >= 0
+    z = 1.7 * pts[:, 0] - 2.3 * pts[:, 1] + .4
+    out = natural_neighbor_exact_interpolate(pts[:, 0], pts[:, 1], z, X, Y)
+    np.testing.assert_allclose(out.ravel()[inside], (1.7 * X - 2.3 * Y + .4).ravel()[inside], atol=1e-11, rtol=0.)
+    assert natural_neighbor_exact_interpolate.last_diagnostics.degenerate_queries == 0
+
+
+def test_exact_backend_weights_are_nonnegative_and_reproduce_position():
+    pts = np.random.default_rng(91).random((35, 2))
+    queries = np.array([[.225, .5], [.2, .525], [.8, .1]])
+    weights = np.column_stack([
+        natural_neighbor_exact_interpolate(
+            pts[:, 0], pts[:, 1], row, queries[:, 0, None], queries[:, 1, None]
+        ).ravel()
+        for row in np.eye(len(pts))
+    ])
+    assert np.min(weights) >= -1e-12
+    np.testing.assert_allclose(weights.sum(axis=1), 1., atol=1e-12)
+    np.testing.assert_allclose(weights @ pts, queries, atol=1e-12)
+
+
 def test_exact_backend_handles_cavity_wraparound_on_real_example_data():
     sample = (
         Path(__file__).resolve().parents[2]

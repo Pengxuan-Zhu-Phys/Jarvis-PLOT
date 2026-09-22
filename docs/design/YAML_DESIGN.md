@@ -688,7 +688,8 @@ x:
 | `as_density` | `true` | 把 z 当保守质量除以面积 |
 | `normalize` | `true` | 归一化积分为 1 |
 | `output_z` | `density` | 输出 z 列名 |
-| `nan_policy` | `strict` | hull 外为 NaN |
+| `nan_policy` | `strict` | 空核（z 为 NaN）的处理：`strict` 连带屏蔽邻域，`ignore` 丢弃空核让周围补上，`fill` 用 `backend_options.fill_value` 填底 |
+| `backend_options.boundary` | `nan` | hull 外是否续画：`nan` 不画，`clamp` 贴着 hull 外推（绘图路径默认），`nearest` 取最近核值；范围由 `max_boundary_spacing`（默认 2 倍核间距）限定 |
 
 **典型简写：**
 ```yaml

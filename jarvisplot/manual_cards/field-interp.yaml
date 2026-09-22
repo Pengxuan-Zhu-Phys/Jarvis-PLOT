@@ -1,0 +1,138 @@
+id: field-interp
+title: field interpolation and gaps
+summary: Scattered cores to a colour field, and what gets drawn where the scan left holes.
+role: how-to
+priority: 36
+see_also: [type-profile-2d, type-posterior-2d, layer-method, transforms]
+related_cli:
+  - argv: [jplot, man, "transform.make_interp_2d", "--json"]
+    why: the transform contract, backend_options spelled out
+  - argv: [jplot, man, "transform.profile", "--json"]
+    why: where empty cells come from (bin + objective)
+  - argv: [jplot, man, jpfield, "--json"]
+    why: the drawing method that interpolates a layer for you
+  - argv: [jplot, config, expand, "<yaml>", "--figure", "<name>"]
+    why: "see which interp block a type: macro actually wrote"
+live_sources:
+  - verb: cap.transforms
+    truth: make_interp_2d / profile contracts
+human:
+  panels:
+    - kind: overview
+      title: Two grids, three ways to get a hole
+      body: |
+        Interpolation has two grids, and most of the confusion is about which
+        one is which.
+
+          cores   the scattered (x, y, z) you hand in. `profile` reduces a scan
+                  to one core per bin, placed at the CENTRE of that bin; a bin
+                  with no sample in it gets z = NaN.
+          query   the fine grid the picture is drawn on (interp.bin, or the
+                  transform's grid:). Usually much finer than the cores.
+
+        Every query point is answered from the cores around it, so there are
+        exactly three ways one ends up blank:
+
+          1. a core in its neighbourhood has no value  -> nan_policy
+          2. it sits in a region the scan never reached -> max_fill_spacing
+          3. it is outside the convex hull of the cores -> boundary
+
+        They are independent. A white patch in the middle of a map is (1) or
+        (2); a white frame or a chopped corner is (3).
+    - kind: notes
+      title: 1. nan_policy — cores that carry no value
+      items:
+        - "ignore (drop the core): no sample landed there, so there is nothing to interpolate from and the neighbouring cores close over the gap. What every drawing path uses by default."
+        - "strict (keep and propagate): any query point whose stencil touches that core returns NaN. One empty cell therefore blanks the cells around it too — a hole several times its own size. This is the backend default, and what make_interp_2d / posterior_density use."
+        - "fill (substitute): the core keeps its place with backend_options.fill_value (default: the smallest finite core value), flooring the gap instead of smoothing over it. Use when 'no sample here' should read as 'worst likelihood here'."
+        - "The profile transform's method: grid can also floor empty bins before interpolation with fill_empty: true / empty_value: <number>. Bridson instead emits NaN background seeds on a scale-aware lattice; make_interp_2d resolves their nan_policy before duplicate merging."
+    - kind: notes
+      title: 2. max_fill_spacing — how far to close a gap
+      items:
+        - "With nan_policy: ignore an interior gap is closed no matter how big, which is right for a one-cell gap and wrong for a region the scan genuinely never visited."
+        - "backend_options.max_fill_spacing: <n> blanks any query point more than n core spacings from a real core. Off by default; the spacing is the median nearest-core distance, so the number survives a change of bin."
+        - "backend_options.max_fill_distance: <d> is the same bound as an absolute distance in interpolation coordinates."
+    - kind: notes
+      title: 3. boundary — past the hull of the cores
+      items:
+        - "Cores sit at the centre of the bin they summarise, so the hull stops half a cell short of the domain on every side: a blank frame that is an artifact of the binning, not a statement about the scan. At a corner the hull cuts the diagonal, and an empty bin on the rim moves that cut further in."
+        - "clamp: read the surface at the closest point of the hull and carry it outwards — constant normal to the boundary, continuous with the interior, no seam. What every drawing path uses by default."
+        - "nearest: carry the closest core's value outwards. Cheaper, blockier along the rim."
+        - "nan: draw only the hull the cores actually span. The backend default, and what make_interp_2d / posterior_density use — extrapolating a normalized density past its support would move the integral."
+        - "The reach is always bounded: max_boundary_spacing (default 2.0 core spacings) or max_boundary_distance. A max_fill_spacing set for the interior is inherited when no boundary reach is given, so one number can govern both."
+    - kind: yaml
+      title: Defaults depend on the path — check before you set anything
+      lexer: yaml
+      body: |
+        # DRAWING a field: nan_policy: ignore + boundary: clamp already on.
+        # Write these only to turn them OFF or to bound them.
+        - name: profL
+          data:
+            - source: scan
+              transform:
+                - profile: {method: grid, bin: 60, objective: max, coordinates: {...}}
+          method: jpfield                  # or jpcontourf / contourf / contour
+          coordinates: {x: {expr: xx}, y: {expr: yy}, z: {expr: zz}}
+          style:
+            cmap: viridis
+            interp:
+              method: natural_neighbor     # only backend; bin is the query grid
+              bin: 300
+              nan_policy: ignore           # default here
+              backend_options:
+                boundary: clamp            # default here
+                max_fill_spacing: 2.5      # optional: keep real voids blank
+
+        # TRANSFORM producing a table: plain defaults, opt in explicitly.
+        - make_interp_2d:
+            method: natural_neighbor
+            grid: 500
+            nan_policy: ignore             # default is strict here
+            backend_options:
+              boundary: clamp              # default is nan here
+            coordinates: {x: {expr: xx}, y: {expr: yy}, z: {expr: zz}}
+    - kind: traps
+      title: Traps
+      items:
+        - "Holes bigger than the bins that caused them = nan_policy: strict. Interpolating a profile grid with strict blanks the ring of cells around every empty one."
+        - "A white frame or chopped corners with a full-looking map = boundary. The cores are bin centres; the hull cannot reach the domain edge on its own."
+        - "type: profile_2d lowers to make_interp_2d, and the macro turns boundary: clamp on for you. A hand-written make_interp_2d does not — set it yourself."
+        - "Do not switch posterior_density / as_density grids to boundary: clamp and keep normalize: true and expect the same numbers: the integral is taken over the drawn grid."
+        - "interp.bin is the QUERY grid (how smooth the picture is). profile.bin is the CORE grid (how many bins the scan is reduced to). Raising profile.bin empties more cells; raising interp.bin does not."
+        - "style.interp is only read by contour / contourf / jpcontour / jpcontourf / jpfield. Other methods drop it silently."
+    - kind: notes
+      title: Seeing what happened
+      items:
+        - "jplot <yaml> --debug prints what the backend did: cores dropped, query points masked because a core is NaN, masked as too far from any core, carried past the hull, left outside it. Fastest way to tell which of the three causes is blanking a picture."
+        - "style.interp.diagnostics: true additionally makes the exact backend collect its geometry counters (cavity triangles, barycentric deviation, build/eval time); --debug is what prints them."
+agent:
+  anti_patterns:
+    - "Raising interp.bin to fix holes — that refines the query grid, not the cores"
+    - "Leaving nan_policy: strict on a profile grid that has empty bins"
+    - "Setting boundary: clamp on a normalized density grid (as_density + normalize)"
+    - "Expecting style.interp to work on a method other than contour/contourf/jpcontour/jpcontourf/jpfield"
+    - "Writing nan_policy: ignore + boundary: clamp on a drawing layer that already defaults to both"
+  examples:
+    - title: profile map with gaps, real voids kept blank
+      yaml: |
+        method: jpfield
+        style:
+          interp:
+            method: natural_neighbor
+            bin: 300
+            backend_options:
+              max_fill_spacing: 2.0
+    - title: draw only where the scan really is
+      yaml: |
+        method: jpcontourf
+        style:
+          interp:
+            nan_policy: strict
+            backend_options: {boundary: nan}
+    - title: empty bins read as worst likelihood
+      yaml: |
+        method: jpfield
+        style:
+          interp:
+            nan_policy: fill
+            backend_options: {fill_value: -30.0}

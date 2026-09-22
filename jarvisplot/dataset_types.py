@@ -8,13 +8,22 @@ it and the pandas-backed loader need lives here rather than in ``data_loader``.
 
 from __future__ import annotations
 
-__all__ = ["IN_MEMORY_DATASET_TYPES", "FILE_DATASET_TYPES", "is_in_memory_type"]
+__all__ = [
+    "IN_MEMORY_DATASET_TYPES",
+    "GENERATED_DATASET_TYPES",
+    "FILE_DATASET_TYPES",
+    "is_in_memory_type",
+]
 
 #: Types that declare an empty in-memory table instead of naming a file:
 #: ``pd.DataFrame`` is an empty frame, ``pd.Series`` an empty single column.
 #: Transforms fill them in (see the ``to_df`` / ``to_ds`` steps).  Stored
 #: lower-cased, matching ``DataSet.type``.
-IN_MEMORY_DATASET_TYPES = frozenset({"pd.dataframe", "pd.series"})
+IN_MEMORY_DATASET_TYPES = frozenset({"pd.dataframe", "pd.series", "generated"})
+
+#: A generated dataset is in-memory, but unlike ``pd.DataFrame`` it is filled
+#: immediately from an explicit ``generate.columns`` declaration.
+GENERATED_DATASET_TYPES = frozenset({"generated"})
 
 FILE_DATASET_TYPES = frozenset({"csv", "hdf5", "parquet"})
 

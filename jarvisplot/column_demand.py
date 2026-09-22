@@ -235,7 +235,21 @@ def _interp_2d_cfg_output_columns(cfg: Any) -> Set[str]:
         text = str(value).strip()
         return text or default
 
-    return {_name("x", "x"), _name("y", "y"), _name("z", "z")}
+    return {
+        _name("x", "x"),
+        _name("y", "y"),
+        _name("z", "z"),
+        "__grid_ix__",
+        "__grid_iy__",
+        "__grid_nx__",
+        "__grid_ny__",
+        "__grid_xmin__",
+        "__grid_xmax__",
+        "__grid_ymin__",
+        "__grid_ymax__",
+        "__grid_xscale__",
+        "__grid_yscale__",
+    }
 def _collect_expr_columns(obj: Any, out: Set[str]) -> None:
     """Recursively collect column names from expressions inside a config dict/list."""
     if isinstance(obj, Mapping):

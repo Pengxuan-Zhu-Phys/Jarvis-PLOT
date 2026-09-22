@@ -238,7 +238,10 @@ def _profile_interp_transform(info: Mapping[str, Any], opts: Mapping[str, Any]) 
             "z": {"expr": z_name, "name": z_name},
         },
         "grid": opts.get("grid", interp_cfg.get("grid", 500)),
-        "nan_policy": interp_cfg.get("nan_policy", "strict"),
+        # A cell that caught no sample is not a core with an unknown value;
+        # make_interp_2d drops it either way, but the expanded YAML should say
+        # so rather than reading `strict` and meaning `ignore`.
+        "nan_policy": interp_cfg.get("nan_policy", "ignore"),
         "as_density": False,
         "normalize": False,
     }
@@ -249,6 +252,13 @@ def _profile_interp_transform(info: Mapping[str, Any], opts: Mapping[str, Any]) 
     for key, value in interp_cfg.items():
         if key not in {"method", "grid", "nan_policy"}:
             transform[key] = deepcopy(value)
+    # A profile map is a picture, not an integral: close the half-cell frame
+    # the hull of the cell centres leaves around the domain. posterior_density
+    # deliberately does not do this -- extrapolating a normalized density past
+    # its support would move the integral.
+    options = transform.get("backend_options", None)
+    transform["backend_options"] = dict(options) if isinstance(options, Mapping) else {}
+    transform["backend_options"].setdefault("boundary", "clamp")
     return transform
 
 

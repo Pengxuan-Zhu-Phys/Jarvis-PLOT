@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/core/generated-data.json",
+  "title": "Declarative generated table",
+  "type": "object",
+  "x-jarvis-zone": "closed",
+  "required": ["columns"],
+  "properties": {
+    "columns": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/generatedColumn" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "generatedColumn": {
+      "if": { "type": "object" },
+      "then": {
+        "type": "object",
+        "x-jarvis-zone": "closed",
+        "properties": {
+          "linspace": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 3,
+            "prefixItems": [
+              { "type": "number" },
+              { "type": "number" },
+              { "type": "integer", "minimum": 0 }
+            ]
+          },
+          "logspace": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 3,
+            "prefixItems": [
+              { "type": "number" },
+              { "type": "number" },
+              { "type": "integer", "minimum": 0 }
+            ]
+          },
+          "arange": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 3,
+            "prefixItems": [
+              { "type": "number" },
+              { "type": "number" },
+              { "type": "number", "not": { "const": 0 } }
+            ]
+          },
+          "full": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "prefixItems": [
+              { "type": "integer", "minimum": 0 },
+              {}
+            ]
+          },
+          "values": {
+            "type": "array",
+            "items": { "not": { "type": ["array", "object"] } }
+          },
+          "expr": { "type": "string", "minLength": 1 }
+        },
+        "oneOf": [
+          { "required": ["linspace"] },
+          { "required": ["logspace"] },
+          { "required": ["arange"] },
+          { "required": ["full"] },
+          { "required": ["values"] },
+          { "required": ["expr"] }
+        ],
+        "additionalProperties": false
+      },
+      "else": {
+        "oneOf": [
+          { "type": ["number", "string", "boolean", "null"] },
+          {
+            "type": "array",
+            "items": { "not": { "type": ["array", "object"] } }
+          }
+        ]
+      }
+    }
+  }
+}

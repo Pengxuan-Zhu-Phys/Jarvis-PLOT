@@ -88,6 +88,43 @@ def test_dataset_setters_reset_derived_state_on_none(tmp_path):
     assert ds._type is None
 
 
+def test_csv_load_preserves_missing_values_for_explicit_transforms(tmp_path, monkeypatch):
+    path = tmp_path / "incomplete.csv"
+    path.write_text(
+        "x,y,flag\n1,2,False\n3,,False\n4,5,False\n",
+        encoding="utf-8",
+    )
+
+    read_options = {}
+    original_read_csv = pd.read_csv
+
+    def tracked_read_csv(*args, **kwargs):
+        read_options.update(kwargs)
+        return original_read_csv(*args, **kwargs)
+
+    ds = DataSet()
+    ds.logger = _logger()
+    monkeypatch.setattr("jarvisplot.data_loader.pd.read_csv", tracked_read_csv)
+    ds.setinfo(
+        {
+            "path": str(path),
+            "name": "sample",
+            "type": "csv",
+        },
+        rootpath=str(tmp_path),
+        eager=False,
+        cache=None,
+    )
+
+    ds.load()
+
+    assert read_options["low_memory"] is False
+    assert ds.data["x"].tolist() == [1, 3, 4]
+    assert ds.data["flag"].tolist() == [False, False, False]
+    assert ds.data["y"].iloc[[0, 2]].tolist() == [2.0, 5.0]
+    assert np.isnan(ds.data["y"].iloc[1])
+
+
 def test_hdf5_fallback_loads_single_dataset(tmp_path):
     path = tmp_path / "sample.h5"
     with h5py.File(path, "w") as h5:

@@ -3,7 +3,7 @@ title: YAML root shape
 summary: DataSet → Figures → layers/type → output is the stable skeleton.
 role: reference
 priority: 20
-see_also: [type-posterior-2d, layer-method, style-axes, workflow]
+see_also: [generated-data, type-posterior-2d, layer-method, style-axes, workflow]
 related_cli:
   - argv: [jplot, validate, "<yaml>", "--json"]
     why: shape + silent-key diagnostics
@@ -11,6 +11,8 @@ related_cli:
     why: type-first templates
   - argv: [jplot, man, type-posterior-2d, "--json"]
     why: primary figure macro
+  - argv: [jplot, man, generated-data, "--json"]
+    why: named and layer-private NumPy-generated tables
 live_sources:
   - verb: cap.types
     truth: known Figures[].type macros
@@ -21,6 +23,7 @@ human:
       body: |
         Keep the pipe: DataSet → Figures → (type | layers) → output.
         Style cards hold layout/aesthetics; expressions use expr:.
+        `DataSet.type: generated` makes a named virtual table; use layer data[].generate for a private curve.
     - kind: yaml
       title: Root keys
       lexer: yaml

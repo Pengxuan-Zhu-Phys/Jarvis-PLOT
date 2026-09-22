@@ -21,6 +21,7 @@
     "core/common.json",
     "core/dataset.json",
     "core/figure.json",
+    "core/generated-data.json",
     "core/layer.json",
     "core/transform.json",
     "methods/bar.json",

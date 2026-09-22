@@ -6,7 +6,7 @@
   "x-jarvis-zone": "closed",
   "required": ["name", "type"],
   "if": {
-    "properties": { "type": { "enum": ["pd.DataFrame", "pd.Series"] } },
+    "properties": { "type": { "enum": ["pd.DataFrame", "pd.Series", "generated"] } },
     "required": ["type"]
   },
   "then": {
@@ -24,9 +24,10 @@
       "description": "Resolved relative to the config file. A list concatenates sources."
     },
     "type": {
-      "enum": ["csv", "hdf5", "parquet", "pd.DataFrame", "pd.Series"],
-      "description": "File-backed (csv / hdf5 / parquet) or in-memory. `pd.DataFrame` declares an empty table and `pd.Series` an empty single-column table; both take no `path` and are filled by transforms via `to_df` / `to_ds`."
+      "enum": ["csv", "hdf5", "parquet", "pd.DataFrame", "pd.Series", "generated"],
+      "description": "File-backed (csv / hdf5 / parquet), empty in-memory (`pd.DataFrame` / `pd.Series`), or declaratively generated in-memory (`generated`)."
     },
+    "generate": { "$ref": "https://jarvis-plot.org/schema/v2/core/generated-data.json" },
     "dataset": {
       "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString",
       "description": "HDF5 group name. Ignored for csv / parquet."
@@ -81,5 +82,12 @@
     }
   },
   "additionalProperties": false,
-  "x-jarvis-example": "- name: df\n  path: ./samples.hdf5\n  type: hdf5\n  dataset: data\n- name: env\n  type: pd.DataFrame"
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "generated" } }, "required": ["type"] },
+      "then": { "required": ["generate"] },
+      "else": { "not": { "required": ["generate"] } }
+    }
+  ],
+  "x-jarvis-example": "- name: df\n  path: ./samples.hdf5\n  type: hdf5\n  dataset: data\n- name: theory\n  type: generated\n  generate:\n    columns:\n      x: {linspace: [0, 10, 300]}\n      y: {expr: sin(x)}"
 }
