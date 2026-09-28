@@ -139,10 +139,19 @@ The loop `jplot man` prints is:
 5. `jplot <file>` — render, only when the figure itself is needed.
 
 `jplot man --json` is the machine-readable manual: 15 topics, plus a
-live page for every one of the 28 layer methods and 11 transform steps
-(`jplot man scatter`, `jplot man transform.profile`). Method contracts come from
+live pages for every registered layer method and transform step
+(`jplot man scatter`, `jplot man transform.profile`, `jplot man PDF1D`). Method contracts come from
 the same registry `jplot cap methods` reads, so a man page cannot drift from the
 code.
+
+For continuous one-dimensional distributions from raw samples, use `PDF1D`
+(CDF plus PDF) or `CDF1D` in a data transform. `coordinates.x` owns `expr`,
+`lim`, and `grid`; optional `repeat` computes independent batch means and
+standard deviations. See [the contract](docs/specs/PDF_CDF_1D.md) and the
+[runnable example](Example/pdf_cdf_1d.yaml).
+Reconstruction defaults to adaptive true CDF anchors and `monotone_c2`
+interpolation (C2 CDF / C1 PDF). Set `anchors: all` and `interpolation: pchip`
+to reproduce the original all-node reconstruction.
 
 Two things worth knowing before trusting a config:
 

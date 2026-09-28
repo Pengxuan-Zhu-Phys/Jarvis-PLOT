@@ -32,6 +32,7 @@ Examples are grouped by geometry family and paper ratio:
 | `corrplot_matrix.yaml` | `[corrplot, matrix]` via `type: correlation_matrix` — a real correlation matrix, not a layout reference |
 | `corrplot_scales.yaml` | The same card at n = 6 … 100, one glyph method each — where the derivation stops working |
 | `generated_data.yaml` | `[a4paper_2x1, rect]` — named `DataSet.type: generated`, a private generated curve, transforms, and `combine: separate` |
+| `pdf_cdf_1d.yaml` | `[a4paper_2x1, rect]` — raw weighted samples, `PDF1D` repeat mean/std band, and pure `CDF1D` |
 
 These are every style registered in `jarvisplot/cards/style_preference.json`,
 except `a4paper_1x1/Ternary` and `gambit_1x1/Ternary`, whose card JSONs are still

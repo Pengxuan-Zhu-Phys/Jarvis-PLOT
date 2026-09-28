@@ -154,6 +154,12 @@ class DataSet():
             "columns": self.columns,
             "full_load": bool(getattr(self, "full_load", False)),
         }
+        from .distribution_1d_config import distribution_kind
+
+        if isinstance(self.transform, list) and any(distribution_kind(step) for step in self.transform):
+            from .Figure.distribution_1d_runtime import ALGORITHM_REVISION
+
+            extra["distribution_1d_algorithm"] = ALGORITHM_REVISION
         if self.type in IN_MEMORY_DATASET_TYPES:
             # Nothing on disk to fingerprint; identity is the declaration alone.
             return {"path": None, "size": None, "mtime_ns": None, "md5": None, **extra}

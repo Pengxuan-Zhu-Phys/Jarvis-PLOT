@@ -12,6 +12,7 @@ Use these docs when you need to know what a valid scene, style, profile, or laye
 - `STYLE_SCHEMA.md`: partial style contract (cards exist; formal schema ownership is incomplete)
 - `DYNESTY_RUNPLOT.md`: implemented reusable dynesty runplot format
 - `TRANSFORMS.md`: implemented transform contract and runtime scope
+- `PDF_CDF_1D.md`: raw-sample continuous CDF/PDF reconstruction and repeat mean/std
 - `PROFILE_SCHEMA.md`: spec-only profile contract
 - `INTERP_2D.md`: implemented 2D support-to-grid interpolation transform
 - `LAYER_TYPE_REGISTRY.md`: spec-only layer/method registry contract

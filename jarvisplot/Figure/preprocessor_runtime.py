@@ -16,6 +16,8 @@ from ..memtrace import memtrace_checkpoint, memtrace_object_inventory
 from ..utils.expression import eval_dataframe_expression
 from ..utils.pathing import resolve_project_path
 from .bin_stat_runtime import bin_stat, bin_stat_config, is_bin_stat_transform
+from ..distribution_1d_config import distribution_config, distribution_kind
+from .distribution_1d_runtime import distribution_1d
 from .correlation_runtime import correlation, correlation_config, is_correlation_transform
 from .significance_runtime import (
     is_significance_transform,
@@ -74,6 +76,8 @@ HEAVY_TRANSFORM_KEYS = frozenset(
         "make_density_core",
         "posterior_density",
         "make_interp_2d",
+        "PDF1D",
+        "CDF1D",
         "type",
         # Not heavy to compute, but cross-block: what a ``to_df`` name resolves
         # to, and the fact that a producing block hands the layer nothing, only
@@ -599,6 +603,8 @@ def apply_transforms_impl(
                     preprocessor._safe_nrows(df),
                 )
             )
+        elif distribution_kind(trans) is not None:
+            df = distribution_1d(df, distribution_config(trans), distribution_kind(trans), preprocessor.logger)
         elif is_bin_stat_transform(trans):
             before_rows = preprocessor._safe_nrows(df)
             df = bin_stat(df, bin_stat_config(trans), preprocessor.logger)

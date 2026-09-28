@@ -66,7 +66,20 @@ jplot man <topic>                 # 人类：该主题 Rich 手册
 jplot man --json                  # agent：索引结构化
 jplot man <topic> --json          # agent：该主题完整结构化 + 长文
 jplot man -h                      # man 子命令 help（沿用 Rich help 几何）
+jplot man PDF1D                   # 原始样本 → 连续 CDF + PDF；支持 repeat 均值/标准差
+jplot man transform.CDF1D --json  # 纯 CDF 的 live transform contract
 ```
+
+`PDF1D` / `CDF1D` 在 YAML 中大小写敏感；man 查询会解析为规范名称，
+例如 `man transform.pdf1d` 对应 `transform.PDF1D`。它们与其他 transform
+共用 `transform_contracts.py`，并通过 `cap transforms`、man 索引和 schema
+manifest 同步发现。数值约定（归一化、`ddof=1`、单批次 NaN 和支持边界）
+同时出现在人类 Notes 和 agent contract 的 `notes` 中。
+当前默认 `anchors: adaptive`、`interpolation: monotone_c2`：自适应选择真实
+CDF 节点，再构造单调 C2 CDF / C1 PDF。`anchors.tolerance`、`min_mass` 和
+`max_points` 控制细分；输出 `grid` 只控制采样密度。旧算法可显式选用
+`anchors: all`、`interpolation: pchip`。误差和停止原因写入 transform 日志
+及 `DataFrame.attrs['distribution_1d']`，未满足误差目标时给出警告。
 
 兼容别名（可选，实现期二选一写死）：
 

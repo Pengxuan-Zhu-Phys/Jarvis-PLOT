@@ -327,12 +327,16 @@ class DataPreprocessor:
         )
 
     def _transform_input_columns(self, transform: Any) -> List[str]:
+        from ..distribution_1d_config import distribution_config, distribution_input_columns, distribution_kind
+
         out: set[str] = set()
         if not isinstance(transform, list):
             return []
         for step in transform:
             if not isinstance(step, Mapping):
                 continue
+            if distribution_kind(step) is not None:
+                out.update(distribution_input_columns(distribution_config(step)))
             if "filter" in step:
                 out.update(self._expr_symbols(step.get("filter")))
             if "sortby" in step:
@@ -357,12 +361,17 @@ class DataPreprocessor:
         return sorted(out)
 
     def _transform_output_columns(self, transform: Any) -> List[str]:
+        from ..distribution_1d_config import distribution_config, distribution_kind, distribution_output_columns
+
         out: set[str] = set()
         if not isinstance(transform, list):
             return []
         for step in transform:
             if not isinstance(step, Mapping):
                 continue
+            kind = distribution_kind(step)
+            if kind is not None:
+                out.update(distribution_output_columns(kind, distribution_config(step)))
             if "add_column" in step:
                 add_cfg = step.get("add_column", {})
                 if isinstance(add_cfg, Mapping):
@@ -937,12 +946,18 @@ class DataPreprocessor:
         return self._stable_hash(payload)
 
     def _runtime_profile_tokens(self, transform: Any) -> List[Dict[str, Any]]:
+        from ..distribution_1d_config import distribution_kind
+        from .distribution_1d_runtime import ALGORITHM_REVISION
+
         tokens: List[Dict[str, Any]] = []
         if not isinstance(transform, list):
             return tokens
         for step in transform:
             if not isinstance(step, Mapping):
                 continue
+            kind = distribution_kind(step)
+            if kind is not None:
+                tokens.append({"kind": kind, "algo": ALGORITHM_REVISION, "cfg": deepcopy(step)})
             if "profile" in step:
                 cfg = step.get("profile", {})
                 if isinstance(cfg, Mapping):

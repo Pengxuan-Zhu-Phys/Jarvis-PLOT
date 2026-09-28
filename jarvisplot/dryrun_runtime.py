@@ -98,7 +98,8 @@ def dryrun_config(
     datasets_meta, frames = _load_datasets(work, base_dir=base_dir, bag=bag)
     observations: list[LayerObservation] = []
     twins: dict[str, Any] = {}
-    heavy_skipped: list[str] = []
+    dataset_heavy = {name: meta.get("heavy_skipped", []) for name, meta in datasets_meta.items()}
+    heavy_skipped = [f"DataSet/{name}:{step}" for name, steps in dataset_heavy.items() for step in steps]
     # share_data names that were not materialised because their producer
     # transform is heavy and skipped in dryrun.
     incomplete_sources: set[str] = set()
@@ -138,6 +139,7 @@ def dryrun_config(
                 with_data=with_data,
                 twin_root=twin_root,
                 incomplete_sources=incomplete_sources,
+                source_heavy=dataset_heavy,
             )
             if skipped:
                 for step_name in skipped:
@@ -181,11 +183,11 @@ def dryrun_config(
             "JP-VIZ-010",
             "$.Figures",
             f"dryrun skipped {len(heavy_skipped)} heavy transform step(s); "
-            "layer ledgers for density/profile/interp are incomplete "
+            "layer ledgers for heavy transforms are incomplete "
             "(status=partial_renderable — config is OK to render)",
             suggestion=(
                 "Not a failed config. Doctor/dryrun never re-run heavy "
-                "profile/density/interp — that is only `jplot <file>`. "
+                "transforms — that is only `jplot <file>`. "
                 "Proceed to render or agent_output; do not rewrite YAML solely "
                 "because coverage is partial."
             ),
@@ -241,6 +243,7 @@ def _load_datasets(
         if str(entry.get("type") or "").strip().lower() == "generated":
             try:
                 df = generate_dataframe(entry.get("generate"))
+                _heavy = []
                 ds_transform = entry.get("transform")
                 if isinstance(ds_transform, list) and ds_transform:
                     df, _steps, _heavy = _apply_simple_transforms(df, ds_transform)
@@ -250,6 +253,7 @@ def _load_datasets(
                     "type": "generated",
                     "rows": int(len(df)),
                     "columns": [str(c) for c in df.columns],
+                    "heavy_skipped": _heavy,
                 }
             except Exception as exc:
                 bag.error(
@@ -289,6 +293,7 @@ def _load_datasets(
                 group=entry.get("dataset") if isinstance(entry.get("dataset"), str) else None,
             )
             # dataset-level transform (simple steps only)
+            _heavy = []
             ds_transform = entry.get("transform")
             if isinstance(ds_transform, list) and ds_transform:
                 df, _steps, _heavy = _apply_simple_transforms(df, ds_transform)
@@ -299,6 +304,7 @@ def _load_datasets(
                 "type": kind,
                 "rows": rows,
                 "columns": [str(c) for c in df.columns],
+                "heavy_skipped": _heavy,
             }
         except Exception as exc:
             bag.warning(
@@ -493,6 +499,7 @@ def _observe_layer(
     with_data: bool = False,
     twin_root: Path | None = None,
     incomplete_sources: set[str] | None = None,
+    source_heavy: Mapping[str, list[str]] | None = None,
 ) -> tuple[LayerObservation | None, dict[str, Any] | None, list[str]]:
     """Return ``(obs, twin_meta, heavy_step_names_skipped)``.
 
@@ -548,6 +555,8 @@ def _observe_layer(
         else:
             source_names = source if isinstance(source, list) else [source]
             source_names = [name for name in source_names if isinstance(name, str) and name]
+            for name in source_names:
+                heavy_skipped.extend((source_heavy or {}).get(name, []))
             available = [frames[name] for name in source_names if name in frames]
             missing = [name for name in source_names if name not in frames]
             if missing:

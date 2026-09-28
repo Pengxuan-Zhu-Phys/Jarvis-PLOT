@@ -158,7 +158,72 @@ def _c(
     }
 
 
+def _distribution_contract(kind: str) -> dict[str, Any]:
+    axis = {
+        **_COORD_AXIS,
+        "description": "Raw sample expression and common evaluation grid/support.",
+        "properties": {
+            **_COORD_AXIS["properties"],
+            "grid": {"type": "integer", "minimum": 2, "default": 600,
+                     "description": "Number of evaluation points; not histogram bins or smoothing strength."},
+        },
+    }
+    pdf = kind == "PDF1D"
+    return _c(
+        description="Adaptively select true weighted empirical CDF anchors and construct a monotone C2 interpolant"
+        + (" and its analytic PDF derivative." if pdf else "."),
+        form="mapping",
+        required={"coordinates": {
+            "type": "object", "description": "x is required; weight is optional (unit weights by default).",
+            "properties": {"x": axis, "weight": {
+                "type": "object|string", "description": "Nonnegative sample-weight expression.",
+                "properties": {"expr": _COORD_AXIS["properties"]["expr"],
+                               "name": {"type": "string", "description": "Input column fallback when expr is omitted."}},
+            }},
+        }},
+        optional={
+            "repeat": {"type": "string", "description": "Batch-ID column: reconstruct each batch independently, then equal-weight mean and sample std."},
+            "anchors": {"type": "object|enum", "description": "adaptive (default), all, or adaptive-selection settings.",
+                        "properties": {
+                            "method": {"enum": ["adaptive", "all"], "default": "adaptive"},
+                            "tolerance": {"type": "number", "default": 0.005, "description": "Target max absolute CDF error at empirical nodes (0 < value < 1)."},
+                            "min_mass": {"type": "number", "default": 0.01, "description": "Observed probability required on each side of a new anchor (0 < value < 1); prevents chasing sample noise."},
+                            "max_points": {"type": "integer", "minimum": 4, "default": 256, "description": "Anchor budget including support endpoints."},
+                        }},
+            "interpolation": {"type": "enum", "enum": ["monotone_c2", "pchip"], "default": "monotone_c2",
+                              "description": "Local monotone C2 quintic CDF / C1 PDF, or PCHIP C1 cubic CDF / continuous PDF."},
+        },
+        defaults={"coordinates.x.name": "x", "coordinates.x.grid": 600, "coordinates.x.scale": "linear",
+                  "anchors.method": "adaptive", "anchors.tolerance": 0.005, "anchors.min_mass": 0.01,
+                  "anchors.max_points": 256, "interpolation": "monotone_c2"},
+        input_kind="raw sample table",
+        output_kind="grid table: x (or coordinates.x.name), cdf, cdf_std, n_repeats"
+        + (", pdf, pdf_std" if pdf else ""),
+        owner="Figure/distribution_1d_runtime.py",
+        examples=[{"description": "Select one population, then reconstruct its repeat mean/std.",
+                   "yaml": f'transform:\n  - filter: \'(sample == "signal") & (split == "train")\'\n  - {kind}:\n      coordinates:\n        x: {{expr: score, lim: [0, 1], grid: 600}}\n        weight: {{expr: weight}}\n      repeat: repeat\n      anchors: {{method: adaptive, tolerance: 0.005, min_mass: 0.01}}\n      interpolation: monotone_c2\n'}],
+        notes=[
+            "No bins: aggregate duplicate sample values, normalize weights per repeat, interpolate cumulative probabilities, then differentiate for PDF1D.",
+            "repeat is optional. cdf/pdf are equal-weight repeat means; *_std is sample standard deviation (ddof=1), not standard error. A single repeat has NaN std.",
+            "Use filter before the transform to select populations; no groupby option. Input rows and unrelated columns are replaced by the grid table.",
+            "lim is the normalization support and must contain every positive-weight sample. Omit it to pad the pooled sample extrema by half the adjacent distinct-value gap; one unique value requires explicit lim.",
+            "F(lo)=0 and F(hi)=1; the analytic PDF integrates to 1 on lim. Selected interior anchors retain their exact empirical probabilities; unselected nodes are approximated. Lower-boundary mass is spread into the first interval with a warning.",
+            "log changes grid spacing only: interpolation and PDF units remain in physical x.",
+            "Inputs must be finite, weights nonnegative, and each repeat must have positive total weight. Zero-weight samples do not define support.",
+            "Adaptive anchors start at sparse probability seeds, then refine up to eight worst CDF-error intervals per pass. min_mass and max_points bound refinement; tolerance is a target, not an unconditional guarantee.",
+            "monotone_c2 uses quintic Bernstein/Hermite segments with shared first/second derivatives and nonnegative quartic derivative control coefficients on whole intervals; no nonlinear solver or MQSI dependency.",
+            "Reconstruction diagnostics live in DataFrame.attrs['distribution_1d']: per-repeat anchor/candidate counts, max CDF node error, stop reason, and largest empirical jump. Unmet tolerance and significant discrete masses emit warnings.",
+            "For the original exact all-node PCHIP reconstruction set anchors: all and interpolation: pchip. Close scores can still force spikes in that mode.",
+            "Grid changes evaluation density only. A coarse plotted polyline can miss sharp features even though the analytic PDF integral is one.",
+            "Heavy step: dryrun checks structure/columns but skips reconstruction and numerical validation.",
+        ],
+        see_also=["transform.CDF1D" if pdf else "transform.PDF1D", "transform.filter", "plot", "fill_between"],
+    )
+
+
 TRANSFORM_CONTRACTS: dict[str, dict[str, Any]] = {
+    "PDF1D": _distribution_contract("PDF1D"),
+    "CDF1D": _distribution_contract("CDF1D"),
     "filter": _c(
         description=(
             "Boolean expression over columns; rows evaluating false are dropped. "
@@ -923,6 +988,8 @@ TRANSFORM_NAMES: tuple[str, ...] = tuple(sorted(TRANSFORM_CONTRACTS))
 #: For ``profile`` the set was grepped from ``Figure/profile_runtime.py`` (user-facing
 #: ``prof.get(...)`` / ``"pregrid_bin" in prof``) — no ghost ``bins``/``seed``.
 RUNTIME_TOP_LEVEL_KEYS: dict[str, frozenset[str]] = {
+    "PDF1D": frozenset({"coordinates", "repeat", "anchors", "interpolation"}),
+    "CDF1D": frozenset({"coordinates", "repeat", "anchors", "interpolation"}),
     "profile": frozenset(
         {
             "method",
