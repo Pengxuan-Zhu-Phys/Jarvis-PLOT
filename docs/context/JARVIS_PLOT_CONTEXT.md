@@ -44,7 +44,7 @@ Current stable product facts:
   - YAML figure configs, style cards, dataset configs (**implemented**)
   - flowchart scene JSON via `jplot flowchart <scene.json>` or `render_flowchart*` (**implemented**, classic flowchart subset)
   - general semantic scene types beyond flowchart (**partial / mostly spec**)
-- current data pipeline transforms: `filter`, `add_column`, `sortby`, `profile`, `make_density_core`, `make_interp_2d`, `keep_columns`, `drop_columns`, `to_csv`, `to_parquet`
+- current data pipeline transforms include `filter`, `add_column`, `sortby`, `PDF1D`, `CDF1D`, `profile`, `make_density_core`, `make_interp_2d`, `keep_columns`, `drop_columns`, `to_csv`, `to_parquet`
 - computed columns use `add_column`; there is no standalone `type: expression` transform
 - expensive profile work is split across prebuild and runtime phases
 - high-level figure macros expand through `jarvisplot/Figure/figure_types.py` before planning

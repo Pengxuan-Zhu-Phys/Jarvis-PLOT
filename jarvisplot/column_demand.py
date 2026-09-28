@@ -270,6 +270,11 @@ def _collect_expr_columns(obj: Any, out: Set[str]) -> None:
             if key == "make_interp_2d":
                 out.update(_interp_2d_cfg_input_columns(v))
                 continue
+            if key in {"pdf1d", "cdf1d"}:
+                from .distribution_1d_config import distribution_input_columns
+
+                out.update(distribution_input_columns(v))
+                continue
             if key == "bin_stat":
                 out.update(_bin_stat_cfg_columns(v, "input"))
                 continue
@@ -381,12 +386,17 @@ def _transform_needs_all_columns(transform: Any) -> bool:
 
 def _transform_output_columns(transform: Any) -> Set[str]:
     """Return column names produced as outputs by a transform list."""
+    from .distribution_1d_config import distribution_kind, distribution_output_columns
+
     out: Set[str] = set()
     if not isinstance(transform, list):
         return out
     for step in transform:
         if not isinstance(step, Mapping):
             continue
+        kind = distribution_kind(step)
+        if kind is not None:
+            out.update(distribution_output_columns(kind, step.get(kind)))
         if "bin_stat" in step:
             out.update(_bin_stat_cfg_columns(step.get("bin_stat"), "output"))
         ccfg = _correlation_transform_config(step)

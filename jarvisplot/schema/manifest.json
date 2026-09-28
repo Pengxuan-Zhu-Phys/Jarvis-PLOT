@@ -20,6 +20,7 @@
     "plot-config.json",
     "core/common.json",
     "core/dataset.json",
+    "core/distribution-1d.json",
     "core/figure.json",
     "core/generated-data.json",
     "core/layer.json",
@@ -89,6 +90,8 @@
     "voronoif": "https://jarvis-plot.org/schema/v2/methods/voronoif.json"
   },
   "transforms": {
+    "PDF1D": "https://jarvis-plot.org/schema/v2/core/distribution-1d.json",
+    "CDF1D": "https://jarvis-plot.org/schema/v2/core/distribution-1d.json",
     "filter": "https://jarvis-plot.org/schema/v2/core/transform.json",
     "sortby": "https://jarvis-plot.org/schema/v2/core/transform.json",
     "add_column": "https://jarvis-plot.org/schema/v2/core/transform.json",

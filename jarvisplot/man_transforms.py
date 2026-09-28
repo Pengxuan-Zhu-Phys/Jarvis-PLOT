@@ -46,14 +46,15 @@ def parse_transform_topic(topic_id: str) -> str | None:
 
 def resolve_transform_token(token: str) -> str | None:
     text = str(token).strip().lower()
+    canonical = {name.lower(): name for name in TRANSFORM_NAMES}
     if not text:
         return None
     if text in {_CATALOG_ID, "transform", "pipeline", "pipeline-steps"}:
         return _CATALOG_ID
     if text.startswith(TRANSFORM_TOPIC_PREFIX):
         name = text[len(TRANSFORM_TOPIC_PREFIX) :]
-        if name in TRANSFORM_NAMES:
-            return transform_topic_id(name)
+        if name in canonical:
+            return transform_topic_id(canonical[name])
         near = did_you_mean(name, list(TRANSFORM_NAMES))
         hint = f"; did you mean {near[0]!r}?" if near else ""
         raise ValueError(
@@ -61,8 +62,8 @@ def resolve_transform_token(token: str) -> str | None:
             "Use the jplot CLI for full usage and information "
             "(`jplot -h`, `jplot man --json`, `jplot cap --json`)."
         )
-    if text in TRANSFORM_NAMES:
-        return transform_topic_id(text)
+    if text in canonical:
+        return transform_topic_id(canonical[text])
     return None
 
 
@@ -118,7 +119,7 @@ def load_transforms_catalog_card() -> dict[str, Any]:
                     "body": (
                         "Transform steps sit on DataSet or layer data[].transform.\n"
                         "Contracts are live (not delegated stubs). "
-                        "Heavy steps (profile / density / interp) are skipped in dryrun."
+                        "Heavy steps (PDF1D / CDF1D / profile / density / interp) are skipped in dryrun."
                     ),
                 },
                 {
@@ -251,6 +252,7 @@ def load_transform_card(name: str) -> dict[str, Any]:
                         "value": c.get("value") or {},
                         "input": c.get("input"),
                         "output": c.get("output"),
+                        "notes": notes,
                     },
                 }
             ],
@@ -272,6 +274,7 @@ def load_transform_card(name: str) -> dict[str, Any]:
             "output": c.get("output"),
             "owner": c.get("owner"),
             "examples": examples,
+            "notes": notes,
         },
         "card_version": 1,
         "_live": True,

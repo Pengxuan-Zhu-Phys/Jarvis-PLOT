@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/core/distribution-1d.json",
+  "title": "Raw-sample PDF1D / CDF1D reconstruction",
+  "type": "object",
+  "x-jarvis-zone": "closed",
+  "required": ["coordinates"],
+  "properties": {
+    "anchors": {
+      "description": "Adaptive selection of true empirical CDF nodes (default); all retains every node.",
+      "oneOf": [
+        {"enum": ["adaptive", "all"]},
+        {
+          "type": "object",
+          "x-jarvis-zone": "closed",
+          "properties": {
+            "method": {"enum": ["adaptive", "all"], "default": "adaptive"},
+            "tolerance": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1, "default": 0.005, "description": "Target maximum absolute CDF error at empirical nodes; stops if min_mass or budget prevents refinement."},
+            "min_mass": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1, "default": 0.01, "description": "Minimum observed cumulative probability on each side of a new anchor."},
+            "max_points": {"type": "integer", "minimum": 4, "default": 256, "description": "Anchor budget including support endpoints."}
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "interpolation": {"enum": ["monotone_c2", "pchip"], "default": "monotone_c2", "description": "monotone_c2: local C2 quintic CDF / C1 PDF with interval-wide nonnegative derivative; pchip: C1 cubic CDF / continuous PDF."},
+    "coordinates": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "required": ["x"],
+      "properties": {
+        "x": {
+          "oneOf": [
+            {"$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString"},
+            {
+              "type": "object",
+              "x-jarvis-zone": "closed",
+              "anyOf": [{"required": ["expr"]}, {"required": ["name"]}],
+              "properties": {
+                "expr": {"$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/expression"},
+                "name": {"$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString", "description": "Output grid column, default x; input column fallback without expr."},
+                "lim": {"$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/limits", "description": "Normalization support [lo, hi], containing all positive-weight samples."},
+                "grid": {"type": "integer", "minimum": 2, "default": 600, "description": "Number of evaluation points, not bins."},
+                "scale": {"enum": ["linear", "log"], "default": "linear", "description": "Grid spacing only; PDF is always with respect to physical x."}
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "weight": {
+          "oneOf": [
+            {"$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString"},
+            {
+              "type": "object",
+              "x-jarvis-zone": "closed",
+              "anyOf": [{"required": ["expr"]}, {"required": ["name"]}],
+              "properties": {
+                "expr": {"$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/expression"},
+                "name": {"$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString"}
+              },
+              "additionalProperties": false
+            }
+          ],
+          "description": "Nonnegative probability weights; default one per row."
+        }
+      },
+      "additionalProperties": false
+    },
+    "repeat": {"$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString", "description": "Batch-ID column; each batch is normalized independently before mean/sample std."}
+  },
+  "additionalProperties": false
+}

@@ -54,6 +54,7 @@ For each figure item in YAML:
 - `profile`
 - `make_density_core`
 - `make_interp_2d`
+- `PDF1D` / `CDF1D` (raw samples to continuous curves; grid under `coordinates.x`)
 - `keep_columns`
 - `drop_columns`
 - `to_csv`

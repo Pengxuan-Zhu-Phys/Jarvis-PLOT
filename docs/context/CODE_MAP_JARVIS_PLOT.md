@@ -55,6 +55,9 @@ Flowchart layout and rendering live in `jarvisplot/flowchart.py` and do not go t
 - `jarvisplot/Figure/profile_runtime.py`: `profile` implementations and profile prebuild helpers
 - `jarvisplot/Figure/density_cell_runtime.py`: `make_density_core` support/core construction for posterior mass tables
 - `jarvisplot/Figure/interp_2d_runtime.py`: `make_interp_2d` support/core-to-grid interpolation
+- `jarvisplot/Figure/distribution_1d_runtime.py`: raw-sample `PDF1D` / `CDF1D` reconstruction and repeat mean/std
+- `jarvisplot/Figure/adaptive_cdf_runtime.py`: adaptive true-CDF anchors and Bernstein-constrained C2 quintic interpolation
+- `jarvisplot/distribution_1d_config.py`: stdlib-only distribution settings and column-demand helpers
 - `jarvisplot/Figure/posterior_density_runtime.py`: posterior density reconstruction helpers used by density transforms
 - `jarvisplot/Figure/posterior_mesh.py`: mesh construction for posterior / density geometry
 - `jarvisplot/Figure/posterior_hpd.py`: integrated-mass HPD contour threshold computation and contour style preparation

@@ -1,0 +1,74 @@
+# Self-contained raw-sample example. Run: jplot Example/pdf_cdf_1d.yaml
+version: '0.3'
+
+DataSet:
+  - name: events
+    type: generated
+    generate:
+      columns:
+        index: {arange: [120]}
+        repeat: {expr: 'np.floor(index / 40)'}
+        score: {expr: '0.05 + 0.85 * ((index % 40 + 0.5) / 40) ** (1 + 0.15 * repeat)'}
+        weight: {expr: '1 + 0.2 * score'}
+    transform:
+      - PDF1D:
+          coordinates:
+            x: {expr: score, lim: [0, 1], grid: 600}
+            weight: {expr: weight}
+          repeat: repeat
+          anchors: {method: adaptive, tolerance: 0.005, min_mass: 0.01}
+          interpolation: monotone_c2
+
+Figures:
+  - name: pdf_1d
+    style: [a4paper_2x1, rect]
+    frame:
+      ax:
+        labels: {x: Score, y: PDF}
+    layers:
+      - name: repeat_std
+        method: fill_between
+        axes: ax
+        data: [{source: events}]
+        coordinates:
+          x: {expr: x}
+          y1: {expr: pdf - pdf_std}
+          y2: {expr: pdf + pdf_std}
+        style: {color: '#4477aa', alpha: 0.2, linewidth: 0}
+      - name: mean_pdf
+        method: plot
+        axes: ax
+        data: [{source: events}]
+        coordinates:
+          x: {expr: x}
+          y: {expr: pdf}
+        style: {color: '#4477aa', linewidth: 1.5}
+
+  - name: cdf_1d
+    style: [a4paper_2x1, rect]
+    frame:
+      ax:
+        labels: {x: Score, y: CDF}
+    layers:
+      - name: pure_cdf
+        method: plot
+        axes: ax
+        data:
+          - generate:
+              columns:
+                score: {linspace: [0.05, 0.95, 80]}
+            transform:
+              - CDF1D:
+                  coordinates:
+                    x: {expr: score, lim: [0, 1], grid: 600}
+                  anchors: adaptive
+                  interpolation: monotone_c2
+        coordinates:
+          x: {expr: x}
+          y: {expr: cdf}
+        style: {color: '#cc6677', linewidth: 1.5}
+
+output:
+  dir: ./plots
+  formats: [png]
+  dpi: 150

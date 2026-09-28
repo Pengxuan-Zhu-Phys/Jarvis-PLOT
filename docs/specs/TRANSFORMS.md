@@ -15,6 +15,8 @@ runtime. It reflects the dispatch paths in:
 The ordered `transform` list supports these steps:
 
 - `filter`
+- `PDF1D`
+- `CDF1D`
 - `profile`
 - `make_density_core`
 - `make_interp_2d`
@@ -87,6 +89,32 @@ transform:
 ```
 
 ## Reduction And Field Steps
+
+### `PDF1D` / `CDF1D`
+
+Raw weighted samples to an adaptively sampled, monotone C2 CDF. `PDF1D` also evaluates
+its analytic derivative as the PDF; `CDF1D` emits only the CDF. Both run at
+dataset level or inside a layer's `data[].transform`.
+
+```yaml
+transform:
+  - filter: '(sample == "signal") & (split == "train")'
+  - PDF1D:
+      coordinates:
+        x: {expr: score, lim: [0, 1], grid: 600}
+        weight: {expr: weight}  # optional; default one per row
+      repeat: repeat           # optional batch-ID column
+      anchors: {method: adaptive, tolerance: 0.005, min_mass: 0.01}
+      interpolation: monotone_c2
+```
+
+`grid` belongs to `coordinates.x`. Expressions use the shared variable evaluator;
+string coordinates and `name` as an input-column fallback are supported. Output
+columns are `x`, `cdf`, `cdf_std`, `n_repeats`, plus `pdf`, `pdf_std` for `PDF1D`.
+Set `coordinates.x.name` to rename `x`. Select separate populations using
+preceding `filter` steps and ordinary layers. See [PDF_CDF_1D.md](PDF_CDF_1D.md)
+for adaptive anchors, interpolation constraints, diagnostics, normalization, and repeat statistics, and
+[`Example/pdf_cdf_1d.yaml`](../../Example/pdf_cdf_1d.yaml) for a runnable example.
 
 ### `profile`
 
@@ -197,4 +225,4 @@ The output table contains `x`, `y`, and `density` by default. Set
 - Polars pushdown currently covers `filter`, `sortby`, `add_column`,
   `keep_columns`, `drop_columns`, and export steps where the backend supports
   them. `profile`, `make_density_core`, `make_interp_2d`, and
-  `posterior_density` force the pandas transform path.
+  `posterior_density`, `PDF1D`, and `CDF1D` force the pandas transform path.

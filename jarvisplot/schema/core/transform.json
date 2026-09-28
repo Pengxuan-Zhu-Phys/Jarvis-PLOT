@@ -7,6 +7,14 @@
   "x-jarvis-zone": "closed",
   "minProperties": 1,
   "properties": {
+    "PDF1D": {
+      "$ref": "https://jarvis-plot.org/schema/v2/core/distribution-1d.json",
+      "description": "Raw weighted samples to continuous CDF and its PDF derivative; optional repeat mean/std."
+    },
+    "CDF1D": {
+      "$ref": "https://jarvis-plot.org/schema/v2/core/distribution-1d.json",
+      "description": "Raw weighted samples to continuous CDF only; optional repeat mean/std."
+    },
     "type": {
       "$ref": "#/$defs/discriminatedStepName",
       "description": "Discriminated form. Only the density / interp / posterior steps accept it today."

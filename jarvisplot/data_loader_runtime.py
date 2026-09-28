@@ -31,6 +31,8 @@ from .utils.dataframes import polars_to_pandas
 from .utils.pathing import resolve_project_path
 from .Figure.preprocessor_runtime import add_column, drop_columns, filter_df, keep_columns, sort_by
 from .Figure.profile_runtime import profiling
+from .distribution_1d_config import distribution_config, distribution_kind
+from .Figure.distribution_1d_runtime import distribution_1d
 
 JP_ROW_IDX = "__jp_row_idx__"
 
@@ -204,6 +206,8 @@ def apply_dataset_transform(dataset, stage: str = "dataset") -> None:
             cfg = dict(posterior_density_config(trans))
             cfg.setdefault("_base_dir", getattr(dataset, "rootpath", None))
             df = posterior_density(df, cfg, dataset.logger)
+        elif distribution_kind(trans) is not None:
+            df = distribution_1d(df, distribution_config(trans), distribution_kind(trans), dataset.logger)
         elif is_interp_2d_transform(trans):
             df = make_interp_2d(df, interp_2d_config(trans), dataset.logger)
         elif "sortby" in trans:
@@ -411,7 +415,8 @@ def _apply_dataset_transform_polars(
             elif "drop_columns" in trans:
                 lf = drop_columns(lf, trans.get("drop_columns"), dataset.logger)
             elif (
-                "profile" in trans
+                distribution_kind(trans) is not None
+                or "profile" in trans
                 or "make_density_core" in trans
                 or "posterior_density" in trans
                 or "make_interp_2d" in trans
