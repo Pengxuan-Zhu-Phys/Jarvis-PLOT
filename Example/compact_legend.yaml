@@ -1,0 +1,237 @@
+DataSet: []
+Figures:
+- name: compact_legend
+  style:
+  - a4paper_2x1
+  - rect
+  frame:
+    ax:
+      xlim:
+      - 0
+      - 1
+      ylim:
+      - 0
+      - 7
+      labels:
+        x: Score
+        y: Density
+      legend:
+        loc: upper left
+        ncols: 2
+        prop:
+          family: STIXGeneral
+          size: 4.6
+        card: compact
+        order:
+        - signal_train
+        - signal_test
+        - background_train
+        - background_test
+  layers:
+  - name: signal_train_band
+    axes: ax
+    method: fill_between
+    coordinates:
+      x: &id001
+      - 0
+      - 0.15
+      - 0.3
+      - 0.45
+      - 0.6
+      - 0.75
+      - 1
+      y1: &id003
+      - 0.0
+      - 0.16000000000000003
+      - 1.6
+      - 3.2
+      - 1.6
+      - 0.4
+      - 0.0
+      y2: &id002
+      - 0.0
+      - 0.24
+      - 2.4
+      - 4.8
+      - 2.4
+      - 0.6
+      - 0.0
+    style:
+      color: '#56B4E9'
+      alpha: 0.3
+      linewidth: 0
+    legend:
+      object: signal_train
+      label: Signal train
+      role: band
+  - name: signal_train
+    axes: ax
+    method: plot
+    coordinates:
+      x: *id001
+      y:
+      - 0
+      - 0.2
+      - 2
+      - 4
+      - 2
+      - 0.5
+      - 0
+    style:
+      color: '#56B4E9'
+      linewidth: 0.7
+    legend:
+      object: signal_train
+      label: Signal train
+      role: line
+  - name: signal_test_high
+    axes: ax
+    method: plot
+    coordinates:
+      x: *id001
+      y: *id002
+    style:
+      color: '#005A8D'
+      alpha: 0.3
+      linewidth: 0.4
+    legend:
+      object: signal_test
+      label: Signal test
+      role: upper
+  - name: signal_test_low
+    axes: ax
+    method: plot
+    coordinates:
+      x: *id001
+      y: *id003
+    style:
+      color: '#005A8D'
+      alpha: 0.3
+      linewidth: 0.4
+    legend:
+      object: signal_test
+      label: Signal test
+      role: lower
+  - name: signal_test
+    axes: ax
+    method: plot
+    coordinates:
+      x: *id001
+      y:
+      - 0.0
+      - 0.20600000000000002
+      - 2.06
+      - 4.12
+      - 2.06
+      - 0.515
+      - 0.0
+    style:
+      color: '#005A8D'
+      linewidth: 0.7
+    legend:
+      object: signal_test
+      label: Signal test
+      role: line
+  - name: background_train_band
+    axes: ax
+    method: fill_between
+    coordinates:
+      x: *id001
+      y1: &id005
+      - 0.0
+      - 0.8
+      - 3.2
+      - 1.6
+      - 0.4
+      - 0.08000000000000002
+      - 0.0
+      y2: &id004
+      - 0.0
+      - 1.2
+      - 4.8
+      - 2.4
+      - 0.6
+      - 0.12
+      - 0.0
+    style:
+      color: '#E69F00'
+      alpha: 0.3
+      linewidth: 0
+    legend:
+      object: background_train
+      label: Background train
+      role: band
+  - name: background_train
+    axes: ax
+    method: plot
+    coordinates:
+      x: *id001
+      y:
+      - 0
+      - 1
+      - 4
+      - 2
+      - 0.5
+      - 0.1
+      - 0
+    style:
+      color: '#E69F00'
+      linewidth: 0.7
+    legend:
+      object: background_train
+      label: Background train
+      role: line
+  - name: background_test_high
+    axes: ax
+    method: plot
+    coordinates:
+      x: *id001
+      y: *id004
+    style:
+      color: '#A23E00'
+      alpha: 0.3
+      linewidth: 0.4
+    legend:
+      object: background_test
+      label: Background test
+      role: upper
+  - name: background_test_low
+    axes: ax
+    method: plot
+    coordinates:
+      x: *id001
+      y: *id005
+    style:
+      color: '#A23E00'
+      alpha: 0.3
+      linewidth: 0.4
+    legend:
+      object: background_test
+      label: Background test
+      role: lower
+  - name: background_test
+    axes: ax
+    method: plot
+    coordinates:
+      x: *id001
+      y:
+      - 0.0
+      - 1.03
+      - 4.12
+      - 2.06
+      - 0.515
+      - 0.10300000000000001
+      - 0.0
+    style:
+      color: '#A23E00'
+      linewidth: 0.7
+    legend:
+      object: background_test
+      label: Background test
+      role: line
+output:
+  dir: ./plots
+  formats:
+  - png
+  - pdf
+  dpi: 300

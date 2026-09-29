@@ -138,11 +138,21 @@ The loop `jplot man` prints is:
    carry `JP-*` codes; `jplot explain JP-XXX-NNN` expands any of them.
 5. `jplot <file>` — render, only when the figure itself is needed.
 
-`jplot man --json` is the machine-readable manual: 15 topics, plus a
+`jplot man --json` is the machine-readable manual: a topic index, plus
 live pages for every registered layer method and transform step
 (`jplot man scatter`, `jplot man transform.profile`, `jplot man PDF1D`). Method contracts come from
 the same registry `jplot cap methods` reads, so a man page cannot drift from the
 code.
+
+For compact legends and keys composed from real layers, use
+`jplot man legend --json`. Declare `legend: {object, label, role}` on each drawing layer; components
+with the same object regroup automatically using card templates such as
+`band_line`, `line_errorbar` and `error_bounds`. The role is optional for a
+single-component object. `frame.<axes>.legend` owns card selection, `order`,
+`ncols`, position and spacing. JSON cards provide
+reusable defaults, and YAML can override them. See
+[the legend contract](docs/specs/LEGEND.md) and the
+[self-contained example](Example/compact_legend.yaml).
 
 For continuous one-dimensional distributions from raw samples, use `PDF1D`
 (CDF plus PDF) or `CDF1D` in a data transform. `coordinates.x` owns `expr`,

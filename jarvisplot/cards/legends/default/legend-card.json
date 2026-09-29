@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "title": "Native",
+  "legend": {},
+  "items": {
+    "line": {
+      "roles": [
+        "line"
+      ],
+      "key": "overlay",
+      "description": "One line, including its native markers."
+    },
+    "marker": {
+      "roles": [
+        "marker"
+      ],
+      "key": "overlay",
+      "description": "One scatter or marker series."
+    },
+    "band": {
+      "roles": [
+        "band"
+      ],
+      "key": "overlay",
+      "description": "One filled uncertainty band or patch."
+    },
+    "errorbar": {
+      "roles": [
+        "errorbar"
+      ],
+      "key": "overlay",
+      "description": "One native errorbar container, including caps and markers."
+    },
+    "band_line": {
+      "roles": [
+        "band",
+        "line"
+      ],
+      "key": "overlay",
+      "description": "Uncertainty band behind its center line."
+    },
+    "line_marker": {
+      "roles": [
+        "line",
+        "marker"
+      ],
+      "key": "overlay",
+      "description": "Markers over a line from separate layers."
+    },
+    "line_errorbar": {
+      "roles": [
+        "errorbar",
+        "line"
+      ],
+      "key": "overlay",
+      "description": "Native error bars under a separately styled center line."
+    },
+    "error_bounds": {
+      "roles": [
+        "upper",
+        "line",
+        "lower"
+      ],
+      "key": "stack",
+      "description": "Upper boundary, center line and lower boundary, top to bottom."
+    }
+  }
+}

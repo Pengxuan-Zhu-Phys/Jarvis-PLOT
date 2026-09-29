@@ -132,10 +132,53 @@ def validate_config(
     _check_layer_sources(config, set(resolved_paths) | _collect_shared_names(config), bag)
     _check_method_contracts(config, bag)
     _check_corrplot_contracts(config, bag)
+    _check_legend_contracts(config, bag, base_dir=base_dir)
     _check_ignored_keys(config, bag)
     if check_columns:
         _check_columns_exist(config, resolved_paths, bag)
     return bag
+
+
+def _check_legend_contracts(config: dict[str, Any], bag: DiagnosticBag, *, base_dir=None) -> None:
+    """Resolve declarative legend references without importing Matplotlib."""
+    from .legend_cards import (
+        merge_axes_legend, resolve_axes_legend, style_legend_defaults,
+        effective_axes_legend, LayerLegendError, LegendConfigError,
+    )
+    for fi, figure in enumerate(config.get("Figures") or []):
+        if not isinstance(figure, dict):
+            continue
+        layers = figure.get("layers") or []
+        frame = figure.get("frame") or {}
+        if not isinstance(layers, list) or not isinstance(frame, dict):
+            continue
+        defaults = style_legend_defaults(figure.get("style"))
+        layer_axes = {layer.get("axes") for layer in layers if isinstance(layer, dict)
+                      and isinstance(layer.get("axes"), str)}
+        for axes in sorted(set(defaults) | set(frame) | layer_axes):
+            indexed_layers = [(index, layer) for index, layer in enumerate(layers)
+                              if isinstance(layer, dict) and layer.get("axes") == axes]
+            axes_layers = [layer for _, layer in indexed_layers]
+            settings = frame.get(axes)
+            legend = defaults.get(axes, False)
+            disabled = False
+            if isinstance(settings, dict) and "legend" in settings:
+                legend = merge_axes_legend(legend, settings["legend"])
+                disabled = settings["legend"] is False or (
+                    isinstance(settings["legend"], dict) and settings["legend"].get("enabled") is False)
+            legend = effective_axes_legend(legend, axes_layers, explicitly_disabled=disabled)
+            path = join_path("Figures", fi, "frame", axes, "legend")
+            try:
+                resolve_axes_legend(legend, axes_layers, base_dir=base_dir)
+            except ValueError as exc:
+                code = "JP-LEG-001" if isinstance(exc, LegendConfigError) else (
+                    "JP-LEG-005" if isinstance(exc, LayerLegendError) else "JP-LEG-003")
+                if isinstance(exc, LayerLegendError) and exc.layer_index is not None:
+                    path = join_path("Figures", fi, "layers", indexed_layers[exc.layer_index][0], "legend")
+                elif isinstance(exc, LayerLegendError) and "order" in str(exc):
+                    path = join_path(path, "order")
+                bag.error(code, path, str(exc), suggestion="Check the card and item overrides using jplot man legend --json.")
+                continue
 
 
 def _yaml_parse_diagnostic(exc: yaml.YAMLError) -> Diagnostic:

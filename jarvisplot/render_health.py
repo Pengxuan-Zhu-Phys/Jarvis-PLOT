@@ -71,9 +71,10 @@ class LayerObservation:
     colorbar_vmax: Optional[float] = None
     # grid / interp (JP-VIZ-007)
     grid_nan_ratio: Optional[float] = None
-    # legend (JP-VIZ-009)
-    style_label: Optional[str] = None
-    legend_labels: Optional[list[str]] = None
+    # Canonical layer legend membership.
+    legend_object: Optional[str] = None
+    legend_label: Optional[str] = None
+    legend_role: Optional[str] = None
     steps: list[TransformStepObs] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     twin_path: Optional[str] = None
@@ -117,7 +118,6 @@ def evaluate_health(
         _viz_005_log_nonpositive(obs, path, bag)
         _viz_007_grid_nan(obs, path, bag)
         _viz_008_collapsed(obs, path, bag)
-        _viz_009_legend(obs, path, bag)
     _viz_006_occlusion(observations, bag)
     return bag
 
@@ -228,7 +228,6 @@ def observe_layer_dataframe(
     cb_vmax = _as_float_opt(color_cfg.get("vmax"))
 
     zorder = 0.0
-    style_label = None
     style = layer.get("style")
     if isinstance(style, dict):
         if "zorder" in style:
@@ -236,16 +235,8 @@ def observe_layer_dataframe(
                 zorder = float(style["zorder"])
             except Exception:
                 pass
-        if style.get("label") is not None:
-            style_label = str(style["label"])
-
-    legend_labels = None
-    if isinstance(ax_frame, dict) and isinstance(ax_frame.get("legend"), dict):
-        raw = ax_frame["legend"].get("labels")
-        if isinstance(raw, list):
-            legend_labels = [str(x) for x in raw]
-        elif raw is None and "labels" in ax_frame["legend"]:
-            legend_labels = []
+    declaration = layer.get("legend")
+    declaration = declaration if isinstance(declaration, dict) else {}
 
     return LayerObservation(
         figure=figure,
@@ -266,8 +257,9 @@ def observe_layer_dataframe(
         colorbar_vmin=cb_vmin,
         colorbar_vmax=cb_vmax,
         grid_nan_ratio=grid_nan_ratio,
-        style_label=style_label,
-        legend_labels=legend_labels,
+        legend_object=declaration.get("object"),
+        legend_label=declaration.get("label"),
+        legend_role=declaration.get("role"),
         steps=list(steps or ()),
         twin_path=twin_path,
         incomplete=incomplete,
@@ -607,37 +599,4 @@ def _viz_008_collapsed(obs: LayerObservation, path: str, bag: DiagnosticBag) -> 
             "(likely wrong lim scale)",
             suggestion="Tighten xlim/ylim around the data, or check coordinate units.",
             context={"figure": obs.figure, "layer": obs.layer, "area_fraction": frac},
-        )
-
-
-def _viz_009_legend(obs: LayerObservation, path: str, bag: DiagnosticBag) -> None:
-    labels = obs.legend_labels
-    style_label = obs.style_label
-    if not labels:
-        return
-    # legend configured but this layer has no label and is the only candidate — soft
-    if style_label:
-        # if legend labels are explicit list and style label not among them
-        if style_label not in labels and labels != ["auto"]:
-            bag.warning(
-                "JP-VIZ-009",
-                path,
-                f"layer label {style_label!r} is not listed in frame legend labels "
-                f"{labels!r}",
-                suggestion="Add the label to frame.<axes>.legend or fix style.label.",
-                context={
-                    "figure": obs.figure,
-                    "layer": obs.layer,
-                    "style_label": style_label,
-                    "legend_labels": labels,
-                },
-            )
-    # empty legend label list with handles expected
-    if labels == []:
-        bag.warning(
-            "JP-VIZ-009",
-            path,
-            f"legend on axes {obs.axes!r} has an empty label list",
-            suggestion="Provide legend labels or remove the legend block.",
-            context={"figure": obs.figure, "axes": obs.axes},
         )

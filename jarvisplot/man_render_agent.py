@@ -147,4 +147,8 @@ def agent_topic_data(topic: str) -> dict[str, Any]:
         data["transform"] = card["transform"]
     if "transforms" in card:
         data["transforms"] = card["transforms"]
+    if card["id"] == "legend":
+        from .legend_cards import legend_card_catalog
+
+        data["legend_cards"] = legend_card_catalog()
     return data

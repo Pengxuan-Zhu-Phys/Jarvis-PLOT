@@ -205,17 +205,19 @@ def test_viz_007_grid_nan():
     assert any(d.code == "JP-VIZ-007" for d in bag.errors)
 
 
-def test_viz_009_legend_mismatch():
-    bag = evaluate_health(
-        [
-            LayerObservation(
-                figure="f1",
-                layer="pts",
-                method="scatter",
-                n_points=10,
-                style_label="signal",
-                legend_labels=["background"],
-            )
-        ]
+def test_health_reports_declared_legend_membership():
+    import pandas as pd
+    from jarvisplot.render_health import observe_layer_dataframe, report_to_dict
+    obs = observe_layer_dataframe(
+        figure='f1', layer={'name': 'pts', 'axes': 'ax', 'method': 'scatter',
+                          'coordinates': {'x': {'expr': 'x'}, 'y': {'expr': 'y'}},
+                          'legend': {'object': 'signal', 'label': 'Signal', 'role': 'marker'}},
+        df=pd.DataFrame({'x': [0, 1], 'y': [1, 2]}), frame_cfg={}, source='data',
     )
-    assert any(d.code == "JP-VIZ-009" for d in bag.warnings)
+    payload = report_to_dict([obs])['layers'][0]
+    assert payload['legend_object'] == 'signal'
+    assert 'style_label' not in payload and 'legend_labels' not in payload
+    assert obs.legend_object == 'signal'
+    assert obs.legend_label == 'Signal'
+    assert obs.legend_role == 'marker'
+    assert not any(d.code == 'JP-VIZ-009' for d in evaluate_health([obs]))

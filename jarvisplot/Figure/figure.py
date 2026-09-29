@@ -14,6 +14,8 @@ from .method_registry import resolve_callable
 from .style_runtime import resolve_style_bundle_payload
 from .config_runtime import apply_figure_config
 from .design_runtime import draw_design_reference
+from .legend_runtime import apply_legend
+from ..legend_cards import merge_axes_legend, effective_axes_legend
 from .layer_runtime import (
     load_layer_runtime_data as runtime_load_layer_runtime_data,
     release_layer_runtime_data as runtime_release_layer_runtime_data,
@@ -356,15 +358,35 @@ class Figure:
     
     @frame.setter
     def frame(self, value) -> None: 
+        self._legend_disabled_axes = getattr(self, "_legend_disabled_axes", set())
+        for name, node in (value or {}).items():
+            if isinstance(node, dict) and "legend" in node:
+                declared = node["legend"]
+                if declared is False or (isinstance(declared, dict) and declared.get("enabled") is False):
+                    self._legend_disabled_axes.add(name)
+                else:
+                    self._legend_disabled_axes.discard(name)
         if self._frame is None:
             self._frame = value
         else:
+            # Legend order/roles are replacement lists, not deepmerge's
+            # default append lists. Explicit YAML also enables a disabled card
+            # default, unless enabled:false was supplied by the user.
+            value = deepcopy(value)
+            legends = {}
+            for name, node in (value or {}).items():
+                if isinstance(node, dict) and "legend" in node:
+                    legends[name] = merge_axes_legend(
+                        self._frame.get(name, {}).get("legend", False), node.pop("legend")
+                    )
             for _name, _node in (value or {}).items():
                 _color = _node.get("color") if isinstance(_node, dict) else None
                 if isinstance(_color, dict) and "cmap" in _color:
                     self._yaml_axc_cmaps.add(str(_name))
             from deepmerge import always_merger
             self._frame = always_merger.merge(self._frame, value)
+            for name, legend in legends.items():
+                self._frame.setdefault(name, {})["legend"] = legend
 
     @property
     def yaml_colorbar_cmaps(self) -> set:
@@ -383,6 +405,7 @@ class Figure:
             raise TypeError
         family, selected, bundle = resolve_style_bundle_payload(self.jpstyles, value)
         self._frame = deepcopy(bundle["Frame"])
+        self._legend_disabled_axes = set()
         self._yaml_axc_cmaps = set()
         self._style = deepcopy(bundle["Style"])
         self._debug_config = deepcopy(bundle.get("Debug", {}))
@@ -616,7 +639,6 @@ class Figure:
                 clip_path=Path(vertices, codes)  # 用 path 做 clip，transform 使用 ax.transData 已在适配器里处理
             )
             adapter._type = 'tri'
-            adapter._legend = False
             adapter.layers = []
             adapter.status = 'configured'
             self.axes["axtri"] = adapter
@@ -1075,7 +1097,6 @@ class Figure:
             adapter = StdAxesAdapter(raw_ax)
             adapter._type = "rect"
             adapter.layers = []
-            adapter._legend = self.frame['ax'].get("legend", False)
             self.axes['ax'] = adapter 
             adapter.status = 'configured'
         
@@ -1185,19 +1206,13 @@ class Figure:
         self.logger.debug("Loaded main rectangle axes -> ax")
 
     def _apply_legend_on_axes(self, ax_name: str, ax_obj, leg_cfg: dict):
-        """Apply a legend on a specific axes using a YAML dict stored under frame['axes'][ax_name]['legend'].
-        Supports an optional 'enabled' key (default True). Any 'axes' key will be ignored here."""
-        if not isinstance(leg_cfg, dict):
-            return
-        if leg_cfg.get("enabled", True) is False:
-            return
-        kw = dict(leg_cfg)
-        kw.pop("axes", None)  # per-axes legend doesn't need this
-        try:
-            (ax_obj.ax if hasattr(ax_obj, "ax") else ax_obj).legend(**kw)
-        except Exception as e:
-            if self.logger:
-                self.logger.warning(f"Legend apply failed on '{ax_name}': {e}")
+        """Apply frame.<axes>.legend after all real layer handles are available."""
+        target_ax = ax_obj.ax if hasattr(ax_obj, "ax") else ax_obj
+        layer_specs = getattr(self, "_legend_layers", {}).get(ax_name, [])
+        return apply_legend(
+            target_ax, leg_cfg, getattr(self, "_legend_layer_handles", {}).get(ax_name, {}),
+            base_dir=self._yaml_dir, layer_specs=layer_specs,
+        )
 
 
     def _install_tri_auto_clip(self, ax):
@@ -1326,10 +1341,17 @@ class Figure:
         # determined by frame config + data — never by render order.
         self._prescan_colorbar_ranges()
 
+        self._legend_layer_handles = {}
+        self._legend_layers = {}
+        axes_names = {id(ax): name for name, ax in self.axes.items()}
         for ax, ly in self._render_queue:
             runtime_load_layer_runtime_data(self, ly)
             try:
-                runtime_render_layer(self, ax, ly)
+                rendered = runtime_render_layer(self, ax, ly)
+                name = axes_names[id(ax)]
+                specs = self._legend_layers.setdefault(name, [])
+                self._legend_layer_handles.setdefault(name, {})[f"@layer:{len(specs)}"] = rendered
+                specs.append(ly.get("layer_spec", {}))
             finally:
                 runtime_release_layer_runtime_data(self, ly)
 
@@ -1340,12 +1362,14 @@ class Figure:
 
         for name, ax in self.axes.items():
             try:
-                if hasattr(ax, "_legend") and ax._legend:
-                    target_ax = ax.ax if hasattr(ax, "ax") else ax
-                    target_ax.legend(**ax._legend)
+                legend_config = self.frame.get(name, {}).get("legend", False)
+                legend_config = effective_axes_legend(
+                    legend_config, self._legend_layers.get(name, []),
+                    explicitly_disabled=name in getattr(self, "_legend_disabled_axes", set()),
+                )
+                self._apply_legend_on_axes(name, ax, legend_config)
             except Exception as e:
-                if self.logger:
-                    self.logger.warning(f"Legend draw failed on axes '{name}': {e}")
+                raise ValueError(f"Legend draw failed on axes '{name}': {e}") from e
 
         # Finalize all colorbar axes (axc and any named axc*)
         for name in list(self.axes.keys()):

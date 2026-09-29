@@ -36,7 +36,6 @@ class StdAxesAdapter:
         self._defaults = defaults or {}
         self._clip_path = clip_path  # None means no cropping
         self.config = self._load_internal_config()
-        self._legend = False
         self.status = "init"           # lifecycle: init -> configured -> drawn -> finalized
         self.needs_finalize = True      # allow some axes (e.g., logo) to opt out
 

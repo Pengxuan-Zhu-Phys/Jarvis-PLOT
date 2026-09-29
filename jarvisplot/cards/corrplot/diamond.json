@@ -62,6 +62,7 @@
             }
         },
         "axcorr": {
+            "legend": {"enabled": false, "card": "compact"},
             "title_params": {
                 "position": "top",
                 "fontsize": "small",

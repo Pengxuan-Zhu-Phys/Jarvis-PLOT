@@ -45,6 +45,7 @@
             }
         },
         "ax": {
+            "legend": {"enabled": false, "card": "compact"},
             "frame": {
                 "linewidth": 0.8,
                 "solid_capstyle": "projecting",

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/core/legend.json",
+  "title": "Per-axes native legend",
+  "if": {
+    "type": "boolean"
+  },
+  "then": {},
+  "else": {
+    "type": "object",
+    "x-jarvis-zone": "delegated",
+    "properties": {
+      "enabled": {
+        "type": "boolean"
+      },
+      "order": {
+        "type": "array",
+        "uniqueItems": true,
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "Object names in display order; unlisted objects follow in first-appearance order."
+      },
+      "card": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Built-in legend card name or local .json path; YAML-relative paths are supported."
+      },
+      "item_formats": {
+        "type": "object",
+        "x-jarvis-zone": "closed",
+        "additionalProperties": {
+          "$ref": "https://jarvis-plot.org/schema/v2/core/legend-card.json#/$defs/itemFormatOverride"
+        },
+        "description": "Overrides or additions to the card item templates; lists replace inherited lists."
+      }
+    },
+    "additionalProperties": true,
+    "description": "Overall legend layout only; items are declared exclusively by layer.legend object/label/role.",
+    "propertyNames": {
+      "not": {
+        "enum": [
+          "entries",
+          "preset",
+          "handles",
+          "labels",
+          "axes"
+        ]
+      }
+    }
+  }
+}

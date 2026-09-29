@@ -1,0 +1,150 @@
+# Self-contained forward legend declarations: objects regroup by role.
+DataSet: []
+Figures:
+- name: legend_cards
+  style:
+  - a4paper_2x1
+  - rect
+  frame:
+    ax:
+      xlim:
+      - 0
+      - 1
+      ylim:
+      - 0
+      - 1.8
+      labels:
+        x: Score
+        y: Response
+      legend:
+        card: paper
+        loc: upper left
+        ncols: 2
+        prop:
+          family: STIXGeneral
+          size: 4.6
+        item_formats:
+          theory_band:
+            roles:
+            - band
+            - line
+            key: overlay
+        order:
+        - theory
+        - measurement
+  layers:
+  - name: theory_band
+    axes: ax
+    method: fill_between
+    coordinates:
+      x:
+      - 0.1
+      - 0.3
+      - 0.5
+      - 0.7
+      - 0.9
+      y1:
+      - 0.2
+      - 0.4
+      - 0.7
+      - 0.6
+      - 0.3
+      y2:
+      - 0.4
+      - 0.6
+      - 0.9
+      - 0.8
+      - 0.5
+    style:
+      color: '#56B4E9'
+      alpha: 0.3
+      linewidth: 0
+    legend:
+      object: theory
+      label: Theory
+      role: band
+  - name: theory_line
+    axes: ax
+    method: plot
+    coordinates:
+      x:
+      - 0.1
+      - 0.3
+      - 0.5
+      - 0.7
+      - 0.9
+      y:
+      - 0.3
+      - 0.5
+      - 0.8
+      - 0.7
+      - 0.4
+    style:
+      color: '#005A8D'
+      linewidth: 0.7
+    legend:
+      object: theory
+      label: Theory
+      role: line
+  - name: measurement_line
+    axes: ax
+    method: plot
+    coordinates:
+      x:
+      - 0.1
+      - 0.3
+      - 0.5
+      - 0.7
+      - 0.9
+      y:
+      - 0.35
+      - 0.55
+      - 0.75
+      - 0.75
+      - 0.45
+    style:
+      color: '#A23E00'
+      linewidth: 0.7
+      marker: o
+      markersize: 2
+    legend:
+      object: measurement
+      label: Measurement
+      role: line
+  - name: measurement_errors
+    axes: ax
+    method: errorbar
+    coordinates:
+      x:
+      - 0.1
+      - 0.3
+      - 0.5
+      - 0.7
+      - 0.9
+      y:
+      - 0.35
+      - 0.55
+      - 0.75
+      - 0.75
+      - 0.45
+      yerr:
+      - 0.08
+      - 0.1
+      - 0.1
+      - 0.12
+      - 0.08
+    style:
+      fmt: none
+      ecolor: '#A23E00'
+      elinewidth: 0.6
+      capsize: 2
+    legend:
+      object: measurement
+      label: Measurement
+      role: errorbar
+output:
+  dir: ./plots
+  formats:
+  - png
+  - pdf
+  dpi: 360

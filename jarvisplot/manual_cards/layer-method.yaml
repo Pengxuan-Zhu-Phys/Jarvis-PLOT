@@ -3,8 +3,10 @@ title: Layer methods and coordinates
 summary: method + coordinates contracts; live list always from jplot cap methods.
 role: reference
 priority: 40
-see_also: [methods, type-posterior-2d, style-axes, validate]
+see_also: [methods, type-posterior-2d, style-axes, legend, validate]
 related_cli:
+  - argv: [jplot, man, legend, "--json"]
+    why: layer legend object/label/role declarations and automatic composition
   - argv: [jplot, man, methods, "--json"]
     why: full list of drawing methods + contracts
   - argv: [jplot, man, scatter, "--json"]
@@ -35,12 +37,14 @@ human:
               x: {expr: m_A}
               y: {expr: tanb}
             style: {s: 2, alpha: 0.4}
+            legend: {object: samples, label: Samples}
     - kind: traps
       title: Traps
       items:
         - layer.coordinates almost only wants expr (and friends for z).
         - lim / scale / label on layer.coordinates are silently ignored — use frame or type slots.
         - Contour-like methods often need z; cap methods lists required keys.
+        - Layer legend has object, label and optional role; role is required for multi-layer objects. Axes legend controls overall card, order, columns and position.
 agent:
   anti_patterns:
     - Guessing method strings

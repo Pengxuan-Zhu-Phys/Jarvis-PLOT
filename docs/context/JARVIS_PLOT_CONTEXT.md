@@ -35,7 +35,7 @@ Jarvis-PLOT is a plotting, scene, and layout framework.
 
 Current stable product facts:
 
-- package / product version: **1.4.2** (`pyproject.toml`; distribution name `JarvisPLOT`, import package `jarvisplot`)
+- package / product release candidate: **2.1.6** (`pyproject.toml`; distribution name `JarvisPLOT`, import package `jarvisplot`)
 - CLI entry point: `jplot`
 - primary package path: `jarvisplot/`
 - primary orchestrator: `jarvisplot/core.py`

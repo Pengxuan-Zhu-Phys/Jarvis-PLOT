@@ -24,6 +24,8 @@
     "core/figure.json",
     "core/generated-data.json",
     "core/layer.json",
+    "core/legend.json",
+    "core/legend-card.json",
     "core/transform.json",
     "methods/bar.json",
     "methods/barh.json",

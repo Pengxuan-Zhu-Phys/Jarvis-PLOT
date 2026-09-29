@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "title": "Presentation",
+  "extends": "default",
+  "legend": {
+    "frameon": true,
+    "fontsize": 10,
+    "borderpad": 0.5,
+    "labelspacing": 0.5,
+    "handlelength": 2.2,
+    "handleheight": 1.2,
+    "handletextpad": 0.7,
+    "columnspacing": 1.5,
+    "borderaxespad": 0.5
+  }
+}
