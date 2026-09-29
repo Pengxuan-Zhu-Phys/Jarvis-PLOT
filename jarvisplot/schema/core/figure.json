@@ -31,7 +31,19 @@
     "frame": {
       "type": "object",
       "x-jarvis-zone": "delegated",
-      "description": "Per-axes frame settings merged over the style card: limits, scales, labels, ticks, legend, colorbar colour ownership."
+      "description": "Per-axes frame settings merged over the style card: limits, scales, labels, ticks, legend, colorbar colour ownership.",
+      "patternProperties": {
+        "^ax(?!es$)": {
+          "type": "object",
+          "x-jarvis-zone": "delegated",
+          "properties": {
+            "legend": {
+              "$ref": "https://jarvis-plot.org/schema/v2/core/legend.json"
+            }
+          },
+          "additionalProperties": true
+        }
+      }
     },
     "layers": {
       "type": "array",
@@ -128,10 +140,6 @@
     "agent_output": {
       "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/agentOutput",
       "description": "Lossy agent digest export (JSON). Written by `jplot <yaml>`; planned by `jplot doctor`. See `jplot man agent-output`."
-    },
-    "legend": {
-      "x-jarvis-ignored": "frame.<axes>.legend",
-      "description": "Not read here. The renderer only looks for a legend under frame.<axes>.legend."
     },
     "yaml_dir": {
       "x-jarvis-internal": true

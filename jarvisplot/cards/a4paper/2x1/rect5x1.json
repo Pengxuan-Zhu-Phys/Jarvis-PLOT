@@ -68,6 +68,7 @@
             }
         },
         "ax0": {
+            "legend": {"enabled": false, "card": "compact"},
             "title_params": {
                 "position": "top",
                 "fontsize": "small",
@@ -132,6 +133,7 @@
             }
         },
         "ax1": {
+            "legend": {"enabled": false, "card": "compact"},
             "frame": {
                 "linewidth": 0.8,
                 "solid_capstyle": "projecting",
@@ -188,6 +190,7 @@
             }
         },
         "ax2": {
+            "legend": {"enabled": false, "card": "compact"},
             "frame": {
                 "linewidth": 0.8,
                 "solid_capstyle": "projecting",
@@ -244,6 +247,7 @@
             }
         },
         "ax3": {
+            "legend": {"enabled": false, "card": "compact"},
             "frame": {
                 "linewidth": 0.8,
                 "solid_capstyle": "projecting",
@@ -300,6 +304,7 @@
             }
         },
         "ax4": {
+            "legend": {"enabled": false, "card": "compact"},
             "frame": {
                 "linewidth": 0.8,
                 "solid_capstyle": "projecting",

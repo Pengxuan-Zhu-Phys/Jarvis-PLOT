@@ -15,6 +15,9 @@ aliases:
   generate: generated-data
   generated-data: generated-data
   cli: cli-map
+  legends: legend
+  compact-legend: legend
+  composite-legend: legend
   codes: diagnostics
   # methods catalog
   method: methods
@@ -52,6 +55,7 @@ topics:
   - transforms
   - agent-output
   - style-axes
+  - legend
   - data-columns
   - validate
   - dryrun-viz

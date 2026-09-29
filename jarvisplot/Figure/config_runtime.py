@@ -13,6 +13,8 @@ def apply_figure_config(fig, info: Mapping) -> bool:
     fig._setup_error = None
 
     try:
+        if "legend" in info:
+            raise ValueError("Figure-level legend is not supported; declare items on layers and overall layout under frame.<axes>.legend")
         if "name" in info:
             fig.name = info["name"]
 

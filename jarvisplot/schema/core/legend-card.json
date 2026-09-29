@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/core/legend-card.json",
+  "title": "Legend format card",
+  "type": "object",
+  "x-jarvis-zone": "closed",
+  "required": [
+    "schema_version"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "title": {
+      "type": "string"
+    },
+    "extends": {
+      "type": "string",
+      "minLength": 1
+    },
+    "legend": {
+      "type": "object",
+      "x-jarvis-zone": "delegated",
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "card",
+            "preset",
+            "item_formats",
+            "entries",
+            "order",
+            "axes",
+            "enabled",
+            "handles",
+            "labels"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "items": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "additionalProperties": {
+        "$ref": "#/$defs/itemFormatOverride"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "itemFormat": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "required": [
+        "roles",
+        "key"
+      ],
+      "properties": {
+        "roles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "key": {
+          "enum": [
+            "overlay",
+            "stack"
+          ]
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "itemFormatOverride": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "roles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "key": {
+          "enum": [
+            "overlay",
+            "stack"
+          ]
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "title": "Compact",
+  "extends": "default",
+  "legend": {
+    "frameon": false,
+    "borderpad": 0.25,
+    "labelspacing": 0.25,
+    "handlelength": 1.6,
+    "handleheight": 0.7,
+    "handletextpad": 0.5,
+    "columnspacing": 1.0,
+    "borderaxespad": 0.4
+  }
+}

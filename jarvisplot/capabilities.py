@@ -258,6 +258,12 @@ def _styles() -> list[dict[str, Any]]:
             axes = frame.get("axes", {})
             entry["usable"] = True
             entry["axes"] = sorted(axes) if isinstance(axes, dict) else []
+            entry["legend_cards"] = {
+                name: node["legend"]["card"]
+                for name, node in frame.items()
+                if isinstance(node, dict) and isinstance(node.get("legend"), dict)
+                and "card" in node["legend"]
+            }
             contract = card.get("Contract")
             if isinstance(contract, dict):
                 entry["contract"] = {

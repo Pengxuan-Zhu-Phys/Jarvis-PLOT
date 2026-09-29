@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "title": "Paper",
+  "extends": "compact",
+  "legend": {
+    "handlelength": 2.0,
+    "handleheight": 1.0,
+    "labelspacing": 0.35,
+    "columnspacing": 1.2
+  }
+}

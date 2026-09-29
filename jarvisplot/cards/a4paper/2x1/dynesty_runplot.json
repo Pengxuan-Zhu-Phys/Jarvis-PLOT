@@ -68,6 +68,7 @@
       }
     },
     "ax0": {
+      "legend": {"enabled": false, "card": "compact"},
       "ticks": {
         "both": {
           "labelsize": 6,
@@ -109,6 +110,7 @@
       }
     },
     "ax1": {
+      "legend": {"enabled": false, "card": "compact"},
       "ticks": {
         "both": {
           "labelsize": 6,
@@ -162,6 +164,7 @@
       ]
     },
     "ax2": {
+      "legend": {"enabled": false, "card": "compact"},
       "ticks": {
         "both": {
           "labelsize": 6,
@@ -203,6 +206,7 @@
       }
     },
     "ax3": {
+      "legend": {"enabled": false, "card": "compact"},
       "ticks": {
         "both": {
           "labelsize": 6,
@@ -244,6 +248,7 @@
       }
     },
     "ax4": {
+      "legend": {"enabled": false, "card": "compact"},
       "ticks": {
         "both": {
           "labelsize": 6,

@@ -44,6 +44,7 @@
             }
         },
         "ax": {
+            "legend": {"enabled": false, "card": "compact"},
             "title_params": {
                 "position": "top",
                 "fontsize": "small",
@@ -112,6 +113,7 @@
             }
         },
         "axr": {
+            "legend": {"enabled": false, "card": "compact"},
             "title_params": {
                 "position": "top",
                 "fontsize": "small",

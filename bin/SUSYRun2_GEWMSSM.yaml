@@ -3897,8 +3897,6 @@ Figures:
         cmap: seismic_r
         vmin: -3.09
         vmax: 3.09
-  legend:
-    loc: 1
   layers:
   - name: triscatter
     data:
@@ -3945,8 +3943,6 @@ Figures:
         cmap: chrisB
         vmin: -3.09
         vmax: 3.09
-  legend:
-    loc: 1
   layers:
   - name: triscatter
     data:
@@ -3998,8 +3994,6 @@ Figures:
         cmap: chrisB
         vmin: -3.09
         vmax: 3.09
-  legend:
-    loc: 1
   layers:
   - name: triscatter
     data:
@@ -4051,8 +4045,6 @@ Figures:
         cmap: chrisB
         vmin: -3.09
         vmax: 3.09
-  legend:
-    loc: 1
   layers:
   - name: triscatter
     data:
@@ -4104,8 +4096,6 @@ Figures:
         cmap: chrisB
         vmin: -3.09
         vmax: 3.09
-  legend:
-    loc: 1
   layers:
   - name: triscatter
     data:

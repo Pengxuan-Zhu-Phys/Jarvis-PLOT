@@ -46,6 +46,18 @@ coordinates:
 
 # code -> (suggestion, example | None)
 _GUIDANCE_BY_CODE: dict[str, tuple[str, Optional[str]]] = {
+    "JP-LEG-001": (
+        "Declare legend object/label/role on layers. Axes legend accepts overall card/order/ncols/loc settings; entries/preset/handles/labels are unsupported.",
+        "legend: {object: measurement, label: Measurement, role: line}",
+    ),
+    "JP-LEG-003": (
+        "Select an installed legend.card or valid local JSON path; inspect jplot man legend --json for cards and item formats.",
+        None,
+    ),
+    "JP-LEG-005": (
+        "Group layers by legend.object, use a consistent label and unique roles matching one card item; order uses object names.",
+        "legend: {object: measurement, label: Measurement, role: line}",
+    ),
     # YAML load / root
     "JP-YML-000": (
         "Check the path; jplot resolves it relative to the current directory.",
@@ -119,8 +131,8 @@ _GUIDANCE_BY_CODE: dict[str, tuple[str, Optional[str]]] = {
     ),
     # Ownership
     "JP-OWN-001": (
-        "Move legend under frame.<axes>.legend; a figure-level legend key is ignored at render time.",
-        "frame:\n  ax:\n    legend: {loc: best}",
+        "Move the ignored setting to the owner shown in context.belongs_to; axis limits and labels belong under frame.<axes>.",
+        "frame:\n  ax:\n    xlim: [0, 1]",
     ),
     # Expressions (data eval + future validate)
     "JP-EXP-000": (
@@ -232,10 +244,7 @@ _GUIDANCE_BY_CODE: dict[str, tuple[str, Optional[str]]] = {
         "Figure needs 2D x/y (type slots or layer coordinates) for agent_output digest.",
         None,
     ),
-    "JP-VIZ-009": (
-        "Align style.label with frame.<axes>.legend labels, or remove the legend block.",
-        "frame:\n  ax:\n    legend: {labels: [signal]}",
-    ),
+
     # Methods / coordinates
     "JP-MTH-001": (
         "Set layers[].method to a name from jplot cap methods.",

@@ -35,6 +35,18 @@
       "additionalProperties": { "$ref": "#/$defs/layerCoordinate" },
       "description": "Column/expression mapping per coordinate. Which keys are required depends on `method`."
     },
+    "legend": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "required": ["object", "label"],
+      "properties": {
+        "object": {"type": "string", "minLength": 1, "description": "Legend item identity, grouped independently on each axes."},
+        "label": {"type": "string", "minLength": 1, "description": "Display text; all components of an object must agree."},
+        "role": {"type": "string", "minLength": 1, "description": "Component role in the card item; optional for single-component objects."}
+      },
+      "additionalProperties": false,
+      "description": "Forward legend membership. Components are assembled by object and matched to card item templates by role set."
+    },
     "colorbar": {
       "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString",
       "description": "Name of the colorbar axes this layer feeds. Defaults to 'axc'."
@@ -102,7 +114,7 @@
         },
         "label": {
           "type": "string",
-          "description": "Legend label for this block."
+          "description": "Series identity for this data block; legend items are declared by layer.legend."
         },
         "style": {
           "type": "object",

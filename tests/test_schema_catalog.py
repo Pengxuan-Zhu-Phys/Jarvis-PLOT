@@ -269,8 +269,8 @@ def test_combine_accepts_canonical_and_legacy_separate_spellings():
 # --------------------------------------------------------------------------- #
 
 
-def test_figure_level_legend_is_reported_as_having_no_effect():
-    """13 figures in this repo's own configs set it; none of them render a legend."""
+def test_figure_level_legend_is_rejected():
+    """Item declarations belong to layers, layout to frame axes."""
     bag = _validate(
         """
         DataSet: []
@@ -280,10 +280,8 @@ def test_figure_level_legend_is_reported_as_having_no_effect():
             layers: []
         """
     )
-    warning = _find(bag, "JP-OWN-001", "$.Figures[0].legend")
-    assert warning.level == "warning"
-    assert warning.context["belongs_to"] == "frame.<axes>.legend"
-    assert bag.ok, "an ignored key must not fail a config that renders today"
+    assert not bag.ok
+    assert any(d.level == "error" and "legend" in d.message for d in bag)
 
 
 def test_layer_coordinate_lim_and_scale_are_reported():
@@ -305,7 +303,7 @@ def test_layer_coordinate_lim_and_scale_are_reported():
 
 
 def test_ignored_key_annotations_come_from_the_schema():
-    assert ignored_properties(FIGURE_SCHEMA) == {"legend": "frame.<axes>.legend"}
+    assert ignored_properties(FIGURE_SCHEMA) == {}
     coord = ignored_properties(LAYER_SCHEMA, "$defs", "coordinateSpec")
     assert set(coord) == {"name", "lim", "scale", "label"}
     assert all(target for target in coord.values())

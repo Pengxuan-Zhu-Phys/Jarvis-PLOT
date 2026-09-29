@@ -13,6 +13,7 @@ Use these docs when you need to know what a valid scene, style, profile, or laye
 - `DYNESTY_RUNPLOT.md`: implemented reusable dynesty runplot format
 - `TRANSFORMS.md`: implemented transform contract and runtime scope
 - `PDF_CDF_1D.md`: raw-sample continuous CDF/PDF reconstruction and repeat mean/std
+- `LEGEND.md`: JSON legend cards, common item formats, axes defaults and YAML overrides referencing real layers
 - `PROFILE_SCHEMA.md`: spec-only profile contract
 - `INTERP_2D.md`: implemented 2D support-to-grid interpolation transform
 - `LAYER_TYPE_REGISTRY.md`: spec-only layer/method registry contract

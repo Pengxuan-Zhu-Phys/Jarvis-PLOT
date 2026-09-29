@@ -3,8 +3,10 @@ title: Style cards and axes
 summary: Style tokens pick geometry; frame.ax / axc hold labels, scales, colorbar.
 role: trap
 priority: 45
-see_also: [yaml-root, type-posterior-2d, layer-method]
+see_also: [yaml-root, type-posterior-2d, layer-method, legend]
 related_cli:
+  - argv: [jplot, man, legend, "--json"]
+    why: compact spacing and composite keys from real layers
   - argv: [jplot, cap, styles, "--json"]
     why: usable style tokens (bad cards filtered)
   - argv: [jplot, cap, cmaps, "--json"]
@@ -21,6 +23,21 @@ human:
       body: |
         Figure style: [geometry_token, family_token] e.g. a4paper_2x1 + rectcmap.
         Colorbar / axis limits live on frame (or type macro slots), not invented keys.
+    - kind: yaml
+      title: Compact composite legend
+      lexer: yaml
+      body: |
+        frame:
+          ax:
+            legend:
+              card: compact
+              ncols: 2
+              loc: upper left
+              order: [signal_train, signal_test]
+        # Add declarations to the real layers:
+        # train band: legend: {object: signal_train, label: Signal train, role: band}
+        # train line: legend: {object: signal_train, label: Signal train, role: line}
+        # test curves: object signal_test, label Signal test, roles upper/line/lower
     - kind: notes
       title: Traps
       items:
@@ -29,7 +46,13 @@ human:
         - A card may add side panels (axl / axb / axr); each reads its own frame.<name> node, not frame.ax.
         - Prefer cap styles over memorizing card filenames.
         - Unusable cards are reported by cap; do not force them.
+        - Axes JSON styles declare frame.<axes>.legend.card defaults; YAML can select compact, paper, presentation, default or a local JSON card. Native fontsize/prop, ncols, loc and bbox_to_anchor still apply.
+        - Layer legend object/label/role declarations regroup automatically using card item templates such as band_line, line_errorbar and error_bounds. YAML legend.item_formats overrides or adds definitions from the card.
+        - Declare legend object/label/role on each layer; role is optional for a single-component object. axes legend.order uses object names. Axes entries/preset/handles/labels and figure-level legend are unsupported.
+        - Assembled items fill columns first and inherit real artist styles. See jplot man legend --json and docs/specs/LEGEND.md. Delete hand-built legend_key layers and their label text when migrating.
 agent:
   anti_patterns:
     - Inventing style token strings
     - Expecting layer-level lim/scale to drive axes
+    - Drawing legend samples as fake data layers or positioning legend labels with frame text
+    - Repeating one scientific series as separate band and center-line legend entries when one composite key is intended

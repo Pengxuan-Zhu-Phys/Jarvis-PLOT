@@ -1,0 +1,117 @@
+id: legend
+title: Layer legend objects and JSON cards
+summary: Declare object, label and role on layers; automatically regroup components using JSON cards.
+role: reference
+priority: 46
+see_also: [style-axes, layer-method, validate]
+related_cli:
+  - argv: [jplot, cap, styles, --json]
+    why: axes default legend card selections
+  - argv: [jplot, validate, "<yaml>", --json]
+    why: check object grouping, component roles and ordering
+  - argv: [jplot, "<yaml>"]
+    why: render the assembled legend with the figure
+live_sources:
+  - verb: man.legend
+    truth: legend_cards reads resolved layout defaults and item templates from installed JSON cards
+human:
+  panels:
+    - kind: overview
+      title: Forward layer declarations
+      body: |
+        Put legend: {object, label, role} on each real drawing layer. object is the
+        legend item identity, independent of layer names and card format names.
+        Components with the same object regroup on each axes. Labels must agree;
+        roles must be unique. role is optional for a single-layer object.
+        Component role sets automatically match item templates from the selected
+        JSON card; template roles determine paint/stack order. Missing roles or
+        conflicting layouts for the same role set produce validation errors.
+        frame.<axes>.legend holds overall card, order, ncols, loc, bbox_to_anchor,
+        fonts and spacing. Layer declarations activate inherited legend defaults;
+        explicit YAML legend: false or enabled: false disables them.
+    - kind: yaml
+      title: Line and native error bars
+      lexer: yaml
+      body: |
+        frame:
+          ax:
+            legend:
+              card: paper
+              order: [measurement, theory]
+              ncols: 2
+              loc: upper left
+              handleheight: 1.2
+        layers:
+          - name: measured_curve
+            axes: ax
+            method: plot
+            coordinates: {x: [0, 1], y: [0.4, 0.8]}
+            style: {color: '#A23E00'}
+            legend: {object: measurement, label: Measurement, role: line}
+          - name: measured_errors
+            axes: ax
+            method: errorbar
+            coordinates: {x: [0, 1], y: [0.4, 0.8], yerr: [0.1, 0.1]}
+            style: {fmt: none, ecolor: '#A23E00', capsize: 2}
+            legend: {object: measurement, label: Measurement, role: errorbar}
+          - name: theory
+            axes: ax
+            method: plot
+            coordinates: {x: [0, 1], y: [0.5, 0.7]}
+            style: {color: '#005A8D'}
+            legend: {object: theory, label: Theory}
+    - kind: yaml
+      title: JSON card inheritance
+      lexer: json
+      body: |
+        {
+          "schema_version": 1,
+          "extends": "paper",
+          "legend": {"handleheight": 1.2, "labelspacing": 0.4},
+          "items": {
+            "ribbon_curve": {"roles": ["ribbon", "central"], "key": "overlay"}
+          }
+        }
+    - kind: notes
+      title: Cards and templates
+      items:
+        - "Installed cards: default, compact, paper, presentation. Each is stored in cards/legends/<name>/legend-card.json. The JSON manual exposes a live resolved catalog."
+        - "Axes styles declare Frame.<axes>.legend.card. YAML card and native kwargs override it. card: ./my-legend-card.json resolves relative to the YAML; relative extends resolves relative to its JSON file."
+        - "Common role sets: band + line overlays band_line; errorbar + line overlays line_errorbar; upper + line + lower stacks error_bounds. line, marker, band and errorbar also work individually."
+        - "line_errorbar preserves the ErrorbarContainer including caps and paints the center line on top. Separate boundary curves use upper/line/lower instead."
+        - "YAML item_formats adds or overrides templates. New definitions require roles and key. Give custom formats distinct role sets if they need different layouts."
+        - "Multiple templates matching the same role set must agree on ordered roles and key. No format/key field is needed on a layer."
+        - "card is the only card selector. preset is unsupported."
+    - kind: notes
+      title: Ordering and spacing
+      items:
+        - "Default item order is first object appearance. axes legend.order lists object names, not layer names or labels; unlisted objects follow in original order. Duplicates and unknown objects are errors."
+        - "Native multi-column legends fill columns first. ncols sets column count; loc and bbox_to_anchor set position."
+        - "Template key overlay paints components in roles order. stack positions equal-height component slots top to bottom in one key."
+        - "Increase handleheight to separate stacked lines; labelspacing controls item row gaps. Both use font-size units."
+        - "Compact defaults: frameon false, borderpad 0.25, labelspacing 0.25, handlelength 1.6, handleheight 0.7, handletextpad 0.5, columnspacing 1.0, borderaxespad 0.4."
+    - kind: notes
+      title: Single contract and validation
+      items:
+        - "Only layer.legend creates items. An enabled legend without declared objects is an error; style.label and data[].label are metadata and do not create items."
+        - "Axes entries, preset, handles, labels and axes are rejected. Figure-level legend is rejected. Disabled legends still validate their declarations."
+        - "Layer names can be omitted. A declared layer must provide exactly one supported artist/container; multiple series require distinct layers. Native errorbar containers remain intact."
+        - "JP-LEG-005 reports invalid object grouping, roles or order; JP-LEG-003 reports card/template problems. Validation and rendering share the data-only resolver."
+        - "When migrating, move object/label/role onto scientific layers, retain overall axes settings and optional order, and delete hand-built legend_key layers and label text."
+        - "Example/compact_legend.yaml and Example/legend_cards.yaml are complete runnable forward-declaration examples. docs/specs/LEGEND.md defines the contract."
+agent:
+  examples:
+    - title: four train/test objects
+      yaml: Example/compact_legend.yaml
+    - title: band/line and native line/errorbar
+      yaml: Example/legend_cards.yaml
+  schema_ids:
+    - https://jarvis-plot.org/schema/v2/core/layer.json
+    - https://jarvis-plot.org/schema/v2/core/legend.json
+    - https://jarvis-plot.org/schema/v2/core/legend-card.json
+    - https://jarvis-plot.org/schema/v2/core/figure.json
+  anti_patterns:
+    - Drawing legend samples as fake data layers or positioning labels with frame text.
+    - Using axes entries/preset/handles/labels or expecting style.label to create legend items.
+    - Omitting role on a component of a multi-layer object or repeating a role.
+    - Using different labels for components of one object or layer names in legend.order.

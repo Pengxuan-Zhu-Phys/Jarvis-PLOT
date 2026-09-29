@@ -164,7 +164,6 @@ def ensure_rect_axes(fig, ax_name: str, kwgs: dict):
         adapter = StdAxesAdapter(raw_ax)
         adapter._type = "rect"
         adapter.layers = []
-        adapter._legend = fig.frame.get(ax_name, {}).get("legend", False)
         fig.axes[ax_name] = adapter
         adapter.status = "configured"
 
@@ -309,7 +308,6 @@ def ensure_corr_axes(fig, kwgs: dict):
         adapter = StdAxesAdapter(raw_ax)
         adapter._type = "rect"
         adapter.layers = []
-        adapter._legend = False
         fig.axes[name] = adapter
         adapter.status = "configured"
 

@@ -119,6 +119,19 @@ def render_topic(topic: str, *, prog: str = "jplot") -> str:
     header = f"{card['summary']}\nrole: {card.get('role', '')}  ·  id: {card['id']}"
     _panel(console, title=str(card["title"]), body=Text(header))
 
+    if card["id"] == "legend":
+        from .legend_cards import legend_card_catalog
+
+        cards = legend_card_catalog()
+        console.print(help_panel("Installed legend cards", [
+            (item["name"], "", f"{item.get('title', item['name'])}; {len(item.get('items', {}))} item formats")
+            for item in cards
+        ], width=width))
+        console.print(help_panel("Common item formats", [
+            (name, "", f"{item['key']}: {', '.join(item['roles'])}")
+            for name, item in cards[0].get("items", {}).items()
+        ], width=width))
+
     related = card.get("related_cli") or []
     if related:
         rows = []
