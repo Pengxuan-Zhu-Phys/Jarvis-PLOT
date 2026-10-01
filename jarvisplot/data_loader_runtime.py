@@ -25,11 +25,18 @@ from .data_loader_hdf5 import (
     materialized_summary,
     polars_schema_names,
     shape_token,
-    sql_bool_ops,
 )
 from .utils.dataframes import polars_to_pandas
+from .utils.expression import polars_expression
 from .utils.pathing import resolve_project_path
-from .Figure.preprocessor_runtime import add_column, drop_columns, filter_df, keep_columns, sort_by
+from .Figure.preprocessor_runtime import (
+    add_column,
+    add_column_spec_problem,
+    drop_columns,
+    filter_df,
+    keep_columns,
+    sort_by,
+)
 from .Figure.profile_runtime import profiling
 from .distribution_1d_config import distribution_config, distribution_kind
 from .Figure.distribution_1d_runtime import distribution_1d
@@ -386,7 +393,9 @@ def _apply_dataset_transform_polars(
                     elif low in {"false", "f", "no", "n"}:
                         lf = lf.filter(pl.lit(False))
                     else:
-                        lf = lf.filter(pl.sql_expr(sql_bool_ops(s)))
+                        lf = lf.filter(
+                            polars_expression(s, lf.collect_schema(), as_mask=True, logger=dataset.logger)
+                        )
                 else:
                     raise TypeError(
                         "unsupported filter condition type for polars pushdown: {}".format(type(condition))
@@ -395,21 +404,27 @@ def _apply_dataset_transform_polars(
                 expr = str(trans.get("sortby", "")).strip()
                 if not expr:
                     continue
-                cols = polars_schema_names(lf)
-                if expr in cols:
+                schema = lf.collect_schema()
+                if expr in schema:
                     lf = lf.sort(expr)
                 else:
                     skey = "__jp_sortkey__"
-                    lf = lf.with_columns(pl.sql_expr(sql_bool_ops(expr)).alias(skey)).sort(skey).drop(skey)
+                    key = polars_expression(expr, schema, logger=dataset.logger)
+                    lf = lf.with_columns(key.alias(skey)).sort(skey).drop(skey)
             elif "add_column" in trans:
                 adds = trans.get("add_column", {})
                 if not isinstance(adds, dict):
                     raise TypeError("add_column step must be dict")
-                name = str(adds.get("name", "")).strip()
-                expr = str(adds.get("expr", "")).strip()
-                if not name or not expr:
-                    raise ValueError("add_column requires non-empty name and expr")
-                lf = lf.with_columns(pl.sql_expr(sql_bool_ops(expr)).alias(name))
+                problem = add_column_spec_problem(adds)
+                if problem:
+                    # Same outcome as the pandas path: report it, add nothing.
+                    if dataset.logger:
+                        dataset.logger.error(problem)
+                    continue
+                name = str(adds.get("name")).strip()
+                lf = lf.with_columns(
+                    polars_expression(adds.get("expr"), lf.collect_schema(), logger=dataset.logger).alias(name)
+                )
             elif "keep_columns" in trans:
                 lf = keep_columns(lf, trans.get("keep_columns"), dataset.logger)
             elif "drop_columns" in trans:
@@ -489,7 +504,18 @@ def _apply_dataset_transform_polars(
                 )
             )
         narrowed = lf_with_idx.select(keep_cols) if keep_cols else lf_with_idx
-        dataset.data = polars_to_pandas(narrowed, logger=dataset.logger, stage=f"dataset:{dataset.name}.pushdown")
+        try:
+            collected = polars_to_pandas(narrowed, logger=dataset.logger, stage=f"dataset:{dataset.name}.pushdown")
+        except Exception as e:
+            # Expressions run lazily, so an evaluation error surfaces here.
+            # The pandas path re-runs the steps and reports it step by step.
+            dataset._full_lazy_frame = None
+            if dataset.logger:
+                dataset.logger.warning(
+                    "Dataset '{}' polars transform pushdown failed while collecting: {}.".format(dataset.name, e)
+                )
+            return False
+        dataset.data = collected
         dataset._data_backend = "pandas"
         if isinstance(dataset.data, pd.DataFrame):
             dataset.keys = list(dataset.data.columns)

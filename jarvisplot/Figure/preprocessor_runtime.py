@@ -235,7 +235,7 @@ def filter_df(df, condition, logger):
                 return df.copy(deep=False)
             if low in {"false", "f", "no", "n"}:
                 return df.iloc[0:0].copy()
-            s = s.replace("&&", " & ").replace("||", " | ")
+            # `&&` / `||` / and / or / not are handled by the shared parser.
             condition = s
         else:
             raise TypeError(f"Unsupported condition type: {type(condition)}")
@@ -255,25 +255,31 @@ def filter_df(df, condition, logger):
         return pd.DataFrame(index=df.index).iloc[0:0].copy()
 
 
+def add_column_spec_problem(adds) -> Optional[str]:
+    """Why an ``add_column`` step cannot run, or ``None`` when it can."""
+    if not isinstance(adds, Mapping):
+        return f"add_column skipped: expected {{name, expr}}, got {adds!r}"
+    missing = []
+    if not str(adds.get("name") or "").strip():
+        missing.append("name")
+    expr = adds.get("expr")
+    if expr is None or not str(expr).strip():
+        missing.append("expr")
+    if missing:
+        return "add_column skipped: missing {} -> {}".format(" and ".join(missing), dict(adds))
+    return None
+
+
 def add_column(df, adds, logger):
     try:
-        if not isinstance(adds, Mapping):
-            logger.error(f"add_column skipped: expected {{name, expr}}, got {adds!r}")
-            return df
-        name = str(adds.get("name") or "").strip()
-        expr = adds.get("expr")
-        missing = []
-        if not name:
-            missing.append("name")
-        if expr is None or not str(expr).strip():
-            missing.append("expr")
-        if missing:
+        problem = add_column_spec_problem(adds)
+        if problem:
             # Nothing sensible to add: carry on without the column rather than
             # inventing one (an absent expr used to evaluate to False).
-            logger.error(
-                "add_column skipped: missing {} -> {}".format(" and ".join(missing), adds)
-            )
+            logger.error(problem)
             return df
+        name = str(adds.get("name")).strip()
+        expr = adds.get("expr")
         value = eval_dataframe_expression(df, expr, logger=logger, allow_column=True)
         # The frame may be a table other blocks still read (a preprofile pass
         # works on the source itself); add to a copy, never into the caller's.
