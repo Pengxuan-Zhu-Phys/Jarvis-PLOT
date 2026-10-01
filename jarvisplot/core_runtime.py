@@ -203,6 +203,83 @@ def prepare_usage_plan(core):
     )
 
 
+def default_parse_data_output(yaml_path) -> str:
+    """Where ``--parse-data`` writes when neither ``--out`` nor ``--inplace`` is given."""
+    path = Path(str(yaml_path))
+    return str(path.with_name(f"{path.stem}.parsed{path.suffix or '.yaml'}"))
+
+
+_PARSE_DATA_DROPPED_KEYS = ("is_gambit", "columnmap")
+
+
+def _write_parse_data_yaml(core, columns_by_index: Dict[int, dict]) -> None:
+    """Write the parsed config, keeping the source file's comments and layout.
+
+    The edits are replayed on a round-trip load of the source file rather than
+    dumping the already-parsed dict, which is what used to strip every comment.
+    PyYAML is only the fallback when ruamel is unavailable.
+    """
+    out_path = Path(str(core.args.out))
+    try:
+        from ruamel.yaml import YAML
+        from ruamel.yaml.comments import CommentedMap
+        from ruamel.yaml.scalarstring import DoubleQuotedScalarString
+        from ruamel.yaml.util import load_yaml_guess_indent
+    except Exception:
+        with open(out_path, "w", encoding="utf-8") as f1:
+            yaml.dump(
+                core.yaml.config,
+                f1,
+                Dumper=_QuotedDumper,
+                sort_keys=False,
+                default_flow_style=False,
+                indent=2,
+                allow_unicode=True,
+                width=100000,
+            )
+        return
+
+    def _quoted(value):
+        if isinstance(value, _QuotedString):
+            return DoubleQuotedScalarString(str(value))
+        if isinstance(value, list):
+            return [_quoted(item) for item in value]
+        if isinstance(value, dict):
+            return {key: _quoted(item) for key, item in value.items()}
+        return value
+
+    source_text = Path(core.yaml.path).read_text(encoding="utf-8")
+    # Sequences are written both ways in the wild (`- item` flush with its key,
+    # or indented by two); reuse whichever the source file uses.
+    _, seq_indent, seq_offset = load_yaml_guess_indent(source_text)
+    seq_offset = int(seq_offset or 0)
+    seq_indent = max(int(seq_indent or 2), seq_offset + 2)
+    rt = YAML(typ="rt")
+    rt.preserve_quotes = True
+    rt.width = 100000
+    rt.indent(mapping=2, sequence=seq_indent, offset=seq_offset)
+    doc = rt.load(source_text)
+
+    datasets = doc.get("DataSet") if isinstance(doc, dict) else None
+    for index, entry in enumerate(datasets if isinstance(datasets, list) else []):
+        if not isinstance(entry, dict):
+            continue
+        for key in _PARSE_DATA_DROPPED_KEYS:
+            entry.pop(key, None)
+        payload = columns_by_index.get(index)
+        if payload is None:
+            continue
+        columns = entry.get("columns")
+        if not isinstance(columns, CommentedMap):
+            columns = CommentedMap()
+            entry["columns"] = columns
+        for key, value in payload.items():
+            columns[key] = _quoted(value)
+
+    with open(out_path, "w", encoding="utf-8") as f1:
+        rt.dump(doc, f1)
+
+
 def parse_hdf5_metadata_and_renew_yaml(core):
     def _as_quoted_str(value: Any) -> _QuotedString:
         return _QuotedString(str(value))
@@ -218,10 +295,11 @@ def parse_hdf5_metadata_and_renew_yaml(core):
 
     for dcfg in core.yaml.config.get("DataSet", []):
         if isinstance(dcfg, dict):
-            dcfg.pop("is_gambit", None)
-            dcfg.pop("columnmap", None)
+            for key in _PARSE_DATA_DROPPED_KEYS:
+                dcfg.pop(key, None)
 
-    for dcfg in core.yaml.config.get("DataSet", []):
+    columns_by_index: Dict[int, dict] = {}
+    for index, dcfg in enumerate(core.yaml.config.get("DataSet", [])):
         if not isinstance(dcfg, dict):
             continue
         if str(dcfg.get("type", "")).strip().lower() != "hdf5":
@@ -262,24 +340,17 @@ def parse_hdf5_metadata_and_renew_yaml(core):
             if k in {"rename", "load_whitelist"}:
                 continue
             columns_payload[k] = v
-        columns_payload["rename"] = vmap_list
-
+        changed = {"rename": vmap_list}
         if "load_whitelist" in old_columns:
-            columns_payload["load_whitelist"] = _normalize_whitelist_as_quoted(old_columns.get("load_whitelist"))
+            changed["load_whitelist"] = _normalize_whitelist_as_quoted(old_columns.get("load_whitelist"))
+        columns_payload.update(changed)
 
-        core.yaml.update_dataset(name, {"columns": columns_payload})
+        dcfg["columns"] = columns_payload
+        columns_by_index[index] = changed
 
-    with open(core.args.out, "w", encoding="utf-8") as f1:
-        yaml.dump(
-            core.yaml.config,
-            f1,
-            Dumper=_QuotedDumper,
-            sort_keys=False,
-            default_flow_style=False,
-            indent=2,
-            allow_unicode=True,
-            width=100000,
-        )
+    _write_parse_data_yaml(core, columns_by_index)
+    if core.logger:
+        core.logger.warning(f"Parsed dataset metadata written -> {core.args.out}")
 
 
 # --------------------------------------------------------------------------- #
