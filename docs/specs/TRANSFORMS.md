@@ -43,7 +43,24 @@ Filters rows by a boolean expression or boolean-like scalar.
 ```yaml
 transform:
   - filter: x > 0
+  - filter: x > 0 && y < 5          # same as: x > 0 and y < 5
+  - filter: (x >= 0) & (x <= 5)     # same as: 0 <= x <= 5
 ```
+
+Expressions are Python expressions over whole columns (see
+`jarvisplot/utils/expression.py`), with logic made elementwise:
+
+- `and` / `or` / `not` and their spellings `&&` / `||` combine conditions row
+  by row. They bind looser than comparisons, so `x > 0 && y < 5` needs no
+  parentheses.
+- Chained comparisons such as `0 <= x <= 5` are elementwise too.
+- `&` / `|` / `~` keep Python's meaning and bind *tighter* than comparisons:
+  `x > 0 & y < 5` is `x > (0 & y) < 5`. Parenthesise each side, or use
+  `&&` / `and`; the unparenthesised form is reported as a warning.
+- A comparison with NaN is False, as in numpy.
+
+Every engine evaluates the same parsed expression, so a filter keeps the same
+rows whether it runs on pandas or in the polars pushdown.
 
 ### `add_column`
 
@@ -224,5 +241,8 @@ The output table contains `x`, `y`, and `density` by default. Set
   preprocessor runtime path.
 - Polars pushdown currently covers `filter`, `sortby`, `add_column`,
   `keep_columns`, `drop_columns`, and export steps where the backend supports
-  them. `profile`, `make_density_core`, `make_interp_2d`, and
+  them. Expressions are not translated to polars: the pushdown feeds the
+  referenced columns to the same compiled expression the pandas path runs
+  (`polars_expression` via `map_batches`), and falls back to pandas when an
+  expression cannot be evaluated that way. `profile`, `make_density_core`, `make_interp_2d`, and
   `posterior_density`, `PDF1D`, and `CDF1D` force the pandas transform path.

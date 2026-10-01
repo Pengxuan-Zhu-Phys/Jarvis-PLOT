@@ -299,8 +299,6 @@ def materialized_summary(dataset, manifest: Dict[str, Any], stats: Optional[Dict
                 )
             )
     return "\n".join(lines)
-def sql_bool_ops(expr: Any) -> str:
-    return str(expr).replace("&&", " AND ").replace("||", " OR ")
 
 
 def polars_schema_names(lf) -> List[str]:
