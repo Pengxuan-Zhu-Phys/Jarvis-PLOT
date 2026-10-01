@@ -179,7 +179,13 @@ def apply_dataset_transform(dataset, stage: str = "dataset") -> None:
 
     if pl is not None and isinstance(dataset.data, pl.LazyFrame):
         dataset.logger.warning(f"Materializing polars LazyFrame for dataset transform -> {dataset.name}")
-        dataset.data = polars_to_pandas(dataset.data, logger=dataset.logger, stage=f"dataset:{dataset.name}")
+        available = polars_schema_names(dataset.data)
+        planned = dataset.planned_columns(available)
+        frame = dataset.data
+        if planned is not None:
+            dataset._log_column_plan(len(planned), len(available))
+            frame = frame.select(planned)
+        dataset.data = polars_to_pandas(frame, logger=dataset.logger, stage=f"dataset:{dataset.name}")
         dataset._data_backend = "pandas"
     elif pl is not None and isinstance(dataset.data, pl.DataFrame):
         dataset.logger.warning(f"Materializing polars DataFrame for dataset transform -> {dataset.name}")
@@ -467,7 +473,10 @@ def _apply_dataset_transform_polars(
         cols_after_transform = polars_schema_names(lf_with_idx)
     dataset._full_lazy_frame = lf_with_idx
 
-    keep_cols = list(cols_after_transform)
+    # Only the planned columns are collected. The full lazy frame stays behind,
+    # so a column the plan missed is still fetched by row index on demand
+    # (DataSet.fetch_rows_columns).
+    keep_cols = dataset.planned_columns(cols_after_transform, stage="keep") or list(cols_after_transform)
     if materialize_to_pandas:
         manifest_rows = None
         manifest_bytes = None
@@ -845,9 +854,18 @@ def load_parquet(dataset):
         dataset.logger.debug("Loading parquet from {}".format(dataset.path))
 
     loaded = None
+    columns = None
+    if dataset.required_columns and pl is not None:
+        try:
+            available = pl.scan_parquet(dataset.path).collect_schema().names()
+            columns = dataset.planned_columns(available)
+            if columns is not None:
+                dataset._log_column_plan(len(columns), len(available))
+        except Exception:
+            columns = None
     if pl is not None:
         try:
-            parquet_df = pl.read_parquet(dataset.path)
+            parquet_df = pl.read_parquet(dataset.path, columns=columns)
             try:
                 loaded = parquet_df.to_pandas()
             except ModuleNotFoundError:
@@ -859,7 +877,7 @@ def load_parquet(dataset):
             loaded = None
 
     if loaded is None:
-        loaded = pd.read_parquet(dataset.path)
+        loaded = pd.read_parquet(dataset.path, columns=columns)
         dataset._data_backend = "pandas"
 
     dataset.data = loaded

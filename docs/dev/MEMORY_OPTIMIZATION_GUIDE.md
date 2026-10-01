@@ -48,7 +48,8 @@ Implemented in `jarvisplot/core.py`.
 
 Impact:
 
-- datasets keep the smallest safe working set without an implicit pruning layer
+- datasets read only the planned columns (CSV `usecols`, Parquet column selection, HDF5 pre-collect
+  projection); `JP_DATASET_COLUMN_PRUNE=0` turns the plan off
 - wide-table regressions become visible at planning time
 
 ### 3. Selection-Table Profiling

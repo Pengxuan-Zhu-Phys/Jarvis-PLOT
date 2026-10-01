@@ -101,6 +101,31 @@ class DataSet():
         else:
             self.retained_columns = kept if kept else None
 
+    def planned_columns(self, available, *, stage: str = "load") -> Optional[List[str]]:
+        """The planned subset of ``available``, in file order, or ``None`` for all.
+
+        ``stage="load"`` answers with the columns to read (what the dataset
+        transform consumes plus what the figures ask for); ``stage="keep"``
+        with what has to outlive the dataset transform. The plan is an
+        over-approximation, so when it matches none of the real columns it is
+        not trusted and nothing is pruned.
+        """
+        wanted = self.required_columns if stage == "load" else self.retained_columns
+        if not wanted:
+            return None
+        names = [str(c) for c in available]
+        keep = [c for c in names if c in wanted]
+        if not any(c != JP_ROW_IDX for c in keep) or len(keep) == len(names):
+            return None
+        return keep
+
+    def _log_column_plan(self, kept: int, total: int) -> None:
+        if self.logger:
+            self.logger.warning(
+                "Dataset '{}' column plan -> reading {} of {} columns "
+                "(set JP_DATASET_COLUMN_PRUNE=0 to read them all).".format(self.name, kept, total)
+            )
+
     def _prepare_lazy_metadata(self):
         """Fetch cheap metadata only; avoid full table load."""
         if self.type == "csv":
@@ -265,7 +290,7 @@ class DataSet():
                     except Exception:
                         total_rows = 0
                 if uniq.size > 0 and (total_rows <= 0 or uniq.size < total_rows):
-                    lf = lf.filter(pl.col(row_key).is_in(pl.Series(name=row_key, values=uniq.tolist())))
+                    lf = lf.filter(pl.col(row_key).is_in(uniq.tolist()))
                 pulled = polars_to_pandas(lf, logger=self.logger, stage=f"dataset:{self.name}.lookup")
                 if isinstance(pulled, pd.DataFrame) and row_key in pulled.columns:
                     pulled = pulled.drop_duplicates(subset=[row_key], keep="last").set_index(row_key).reindex(order)
@@ -397,7 +422,17 @@ class DataSet():
             # of the table: dropping them here would silently apply a policy
             # across every column before an explicit transform can decide how
             # required and optional fields should be handled.
-            self.data = pd.read_csv(self.path, low_memory=False)
+            usecols = None
+            if self.required_columns:
+                header = list(pd.read_csv(self.path, nrows=0).columns)
+                planned = self.planned_columns(header)
+                if planned is not None:
+                    # By position: the names above are pandas' own (duplicated
+                    # headers already read as x, x.1), not the raw header text.
+                    wanted = set(planned)
+                    usecols = [i for i, name in enumerate(header) if str(name) in wanted]
+                    self._log_column_plan(len(usecols), len(header))
+            self.data = pd.read_csv(self.path, low_memory=False, usecols=usecols)
             self.keys = list(self.data.columns)
             runtime.apply_dataset_transform(self, stage="csv")
 

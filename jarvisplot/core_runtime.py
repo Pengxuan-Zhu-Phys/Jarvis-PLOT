@@ -1,17 +1,20 @@
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
-from typing import Any, Dict, Mapping, Set
+from typing import Any, Dict, Mapping, Optional, Set
 
 import yaml
 
 from .cache_store import ProjectCache
 from .column_demand import (
+    FIXED_COLUMN_METHODS,
     _layer_columns,
     _transform_columns,
     _transform_needs_all_columns,
     _transform_output_columns,
+    expression_texts,
 )
 from .data_loader import JP_ROW_IDX
 from .data_loader_hdf5 import scan_hdf5_leaf_metadata
@@ -74,23 +77,78 @@ def expand_figure_types(core) -> None:
     expand_figure_types_in_config(core.yaml.config, logger=getattr(core, "logger", None))
 
 
+#: Set to 0 / off / false to load every dataset whole, as before the column
+#: plan was applied -- the escape hatch if the plan ever misses a column.
+COLUMN_PRUNE_ENV = "JP_DATASET_COLUMN_PRUNE"
+
+
+def column_pruning_enabled() -> bool:
+    raw = str(os.getenv(COLUMN_PRUNE_ENV, "on")).strip().lower()
+    return raw not in {"0", "false", "no", "off", "disable", "disabled"}
+
+
+def _transform_exports(transform: Any) -> bool:
+    if not isinstance(transform, list):
+        return False
+    return any(isinstance(step, Mapping) and ("to_csv" in step or "to_parquet" in step) for step in transform)
+
+
+def _block_runtime_projection(preprocessor, layer: Mapping, entry: Mapping) -> Set[str]:
+    """The columns the render pipeline itself will keep for this data block.
+
+    Read from the preprocessor's own projection, so the plan can never be
+    narrower than what a layer would have received from an unpruned table.
+    """
+    if preprocessor is None:
+        return set()
+    try:
+        transform = preprocessor._effective_transform(entry.get("source"), entry.get("transform"))
+        projection = preprocessor._runtime_projection(transform, preprocessor.layer_demand_columns(layer))
+    except Exception:
+        return set()
+    return set(projection or ())
+
+
+def _source_names(source: Any) -> list[str]:
+    if isinstance(source, str):
+        return [source]
+    if isinstance(source, (list, tuple)):
+        return [item for item in source if isinstance(item, str)]
+    return []
+
+
 def plan_dataset_required_columns(core) -> None:
+    """Decide which columns each dataset reads from disk.
+
+    The demand is an over-approximation: every column any layer, transform or
+    render projection could ask for (lineage through share_data / to_df is not
+    tracked, so a layer's columns count against every dataset). A dataset whose
+    needs cannot be written down as names loads whole.
+    """
     if not isinstance(core.yaml.config, dict):
         return
     ds_names = {str(dts.name): dts for dts in core.dataset}
-    demand: Dict[str, Set[str]] = {name: set() for name in ds_names.keys()}
+    if not column_pruning_enabled():
+        for dts in core.dataset:
+            dts.set_required_columns(None, retained=None)
+        if core.logger:
+            core.logger.info(f"Dataset column pruning disabled by {COLUMN_PRUNE_ENV}.")
+        return
 
-    for dts in core.dataset:
-        name = str(dts.name)
-        demand.setdefault(name, set())
+    preprocessor = getattr(core, "preprocessor", None)
+    demand: Dict[str, Set[str]] = {name: set() for name in ds_names.keys()}
 
     figures = core.yaml.config.get("Figures", [])
     if not isinstance(figures, list):
         figures = []
     global_layer_cols: Set[str] = set()
-    #: Sources feeding a step that picks its own columns out of the table.
-    #: No name set describes what such a step needs, so these load whole.
+    #: Sources whose needs no name set describes -- a step that picks its own
+    #: columns out of the table, or a method that reads columns by fixed name.
+    #: These load whole.
     unprunable: Set[str] = set()
+    #: A by-name reader fed from a table whose lineage is not tracked: no
+    #: dataset can be pruned safely.
+    prune_nothing: Optional[str] = None
     for fig in figures:
         if not isinstance(fig, Mapping):
             continue
@@ -102,8 +160,9 @@ def plan_dataset_required_columns(core) -> None:
         for layer in layers:
             if not isinstance(layer, Mapping):
                 continue
-            layer_cols = _layer_columns(layer)
+            layer_cols = _layer_columns(layer) | expression_texts(layer)
             global_layer_cols.update(layer_cols)
+            by_name = str(layer.get("method", "")).strip().lower() in FIXED_COLUMN_METHODS
             entries = layer.get("data", [])
             if not isinstance(entries, list):
                 continue
@@ -112,38 +171,48 @@ def plan_dataset_required_columns(core) -> None:
                     continue
                 cols = set(layer_cols)
                 cols.update(_transform_columns(entry.get("transform", None)))
-                open_ended = _transform_needs_all_columns(entry.get("transform", None))
-                src = entry.get("source")
-                if isinstance(src, str):
-                    if src in demand:
-                        demand[src].update(cols)
+                cols.update(_block_runtime_projection(preprocessor, layer, entry))
+                global_layer_cols.update(cols)
+                open_ended = by_name or _transform_needs_all_columns(entry.get("transform", None))
+                for item in _source_names(entry.get("source")):
+                    if item in demand:
+                        demand[item].update(cols)
                         if open_ended:
-                            unprunable.add(src)
-                elif isinstance(src, (list, tuple)):
-                    for item in src:
-                        if isinstance(item, str) and item in demand:
-                            demand[item].update(cols)
-                            if open_ended:
-                                unprunable.add(item)
+                            unprunable.add(item)
+                    elif by_name and prune_nothing is None:
+                        prune_nothing = (
+                            "layer '{}' draws {} from '{}', which is not a dataset, and "
+                            "that method reads columns by name".format(
+                                layer.get("name", ""), layer.get("method"), item
+                            )
+                        )
 
     if global_layer_cols:
         for name in demand.keys():
             demand[name].update(global_layer_cols)
 
     for name, dts in ds_names.items():
-        if name in unprunable or _transform_needs_all_columns(getattr(dts, "transform", None)):
+        dataset_transform = getattr(dts, "transform", None)
+        reason = prune_nothing
+        if reason is None and name in unprunable:
+            reason = "a transform step selects its own columns, or the layer method reads columns by name"
+        if reason is None and _transform_needs_all_columns(dataset_transform):
+            reason = "a transform step selects its own columns"
+        if reason is None and _transform_exports(dataset_transform):
+            reason = "a dataset-level to_csv / to_parquet exports the whole table"
+        if reason is not None:
             # `None` is this API's way of saying "no restriction": load the
             # table whole and let the step choose from what is actually there.
             dts.set_required_columns(None, retained=None)
             if core.logger:
                 core.logger.info(
                     "Dataset required columns planned:\n\t dataset \t-> {}\n\t required \t-> all"
-                    "\n\t reason \t-> a transform step selects its own columns".format(name)
+                    "\n\t reason \t-> {}".format(name, reason)
                 )
             continue
         cols = set(demand.get(name, set()))
         cols.add(JP_ROW_IDX)
-        dataset_inputs = _transform_columns(getattr(dts, "transform", None))
+        dataset_inputs = _transform_columns(dataset_transform) | expression_texts(dataset_transform)
         dataset_outputs = _transform_output_columns(getattr(dts, "transform", None))
         retained = set(cols)
         retained.update(dataset_outputs)

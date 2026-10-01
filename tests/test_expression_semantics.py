@@ -6,8 +6,6 @@ on pandas. A filter is only trustworthy if it keeps the same rows on both.
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 import h5py
 import numpy as np
 import pandas as pd
@@ -15,7 +13,7 @@ import pytest
 
 from jarvisplot.cache_store import ProjectCache
 from jarvisplot.data_loader import JP_ROW_IDX, DataSet
-from jarvisplot.Figure.preprocessor_runtime import add_column, filter_df, sort_by
+from jarvisplot.Figure.preprocessor_runtime import add_column, filter_df
 from jarvisplot.utils import expression as expression_module
 from jarvisplot.utils.expression import compile_dataframe_expression, eval_dataframe_expression
 

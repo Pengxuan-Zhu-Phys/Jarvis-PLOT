@@ -883,6 +883,7 @@ class DataPreprocessor:
             "mode": str(mode),
             "projection": self._projection_list(projection),
         }
+        self._add_source_column_scope(payload, source, projection)
         if self.cache is not None:
             return self.cache.cache_key(payload)
         return self._stable_hash(payload)
@@ -896,7 +897,7 @@ class DataPreprocessor:
         projection: Optional[Sequence[str]] = None,
     ) -> Dict[str, Any]:
         eff_transform = self._effective_transform(source, transform)
-        return {
+        payload = {
             "schema": "jp-demand-v8",
             "source": self._source_token(source, combine=combine),
             "extra_sources": self._transform_extra_source_tokens(eff_transform),
@@ -905,6 +906,29 @@ class DataPreprocessor:
             "mode": str(mode),
             "projection": self._projection_list(projection),
         }
+        self._add_source_column_scope(payload, source, projection)
+        return payload
+
+    def _add_source_column_scope(self, payload: Dict[str, Any], source: Any, projection) -> None:
+        """Key an unprojected pipeline on the columns its datasets were loaded with.
+
+        A projected pipeline keeps the same columns whatever the column plan
+        loaded. An unprojected one (a published table, a step that takes the
+        whole table) carries every loaded column, so a result cached under one
+        plan would be missing columns a later config asks for. The scope is only
+        added when a dataset is actually pruned, so other keys stay as they were.
+        """
+        if self._projection_list(projection) is not None:
+            return
+        names = [source] if isinstance(source, str) else list(source) if isinstance(source, (list, tuple)) else []
+        scope = {}
+        for name in names:
+            dts = self.dataset_registry.get(str(name))
+            planned = getattr(dts, "required_columns", None) if dts is not None else None
+            if planned:
+                scope[str(name)] = sorted(planned)
+        if scope:
+            payload["source_columns"] = scope
 
     def _demand_fingerprint(
         self,
@@ -935,6 +959,9 @@ class DataPreprocessor:
                 profile_sig = self._runtime_profile_signature(tf)
                 if profile_sig is not None:
                     token["profile_signature"] = profile_sig
+                self._add_source_column_scope(
+                    token, src, self._runtime_projection(tf, self.layer_demand_columns(layer))
+                )
                 tokens.append(token)
         payload = {
             "name": layer.get("name"),

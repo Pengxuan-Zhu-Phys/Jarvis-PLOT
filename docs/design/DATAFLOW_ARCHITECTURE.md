@@ -24,8 +24,8 @@ Properties:
 - Created by `DataSet.load_csv()` or `DataSet.load_hdf5()`
 - Always includes `__jp_row_idx__` once the dataset becomes runtime-visible
 - Follows the dataset `transform` list strictly in YAML order
-- Only explicit `keep_columns` / `drop_columns` steps prune columns
-- If no pruning step appears in `transform`, no implicit column pruning is applied
+- Inside the `transform` list, only explicit `keep_columns` / `drop_columns` steps prune columns
+- The load itself reads only the planned columns (see "Column plan" below); a dataset whose needs cannot be named loads whole
 - May originate from:
   - CSV loaded directly to pandas
   - HDF5 materialized to `.cache/materialized/<key>/part-*.parquet`, then exposed as a polars lazy scan before the pandas boundary
@@ -48,6 +48,31 @@ What must not be in it by default:
 - every raw source column from a wide HDF5 group
 - columns that are only needed by unrelated layers
 - columns that have not been explicitly pruned by the transform list
+
+### Column plan
+
+`core_runtime.plan_dataset_required_columns()` runs once, after the
+preprocessor exists and before any data is read. For each dataset it unions:
+
+- every column any layer's coordinates, style or data-block transforms
+  mention (lineage through `share_data` / `to_df` is not tracked, so every
+  layer counts against every dataset), plus the raw text of each expression so
+  a non-identifier column name such as `Var0@scan` survives;
+- each data block's own render projection, taken from
+  `DataPreprocessor._runtime_projection()`, so the plan is never narrower than
+  what a layer would have received from an unpruned table;
+- the dataset transform's inputs and outputs, and `__jp_row_idx__`.
+
+The loaders apply it: CSV reads only those columns (`usecols`), Parquet reads
+only those columns, and the HDF5 pushdown collects only the retained columns
+into pandas while `_full_lazy_frame` keeps the rest reachable by row index
+(`DataSet.fetch_rows_columns`). A dataset loads whole when a step selects its
+own columns (dynamic `correlation`), a layer method reads columns by name
+(`dynesty_runplot`), or a dataset-level `to_csv` / `to_parquet` exports the
+table. Pipelines without a projection key their cache on the plan, so a table
+cached under one plan is not served to a config that needs more columns.
+
+`JP_DATASET_COLUMN_PRUNE=0` turns the plan off and every dataset loads whole.
 
 ## 2. Selection Table
 

@@ -21,7 +21,9 @@ from __future__ import annotations
 from typing import Any, Dict, Mapping, Set
 
 __all__ = [
+    "FIXED_COLUMN_METHODS",
     "SourceDemand",
+    "expression_texts",
     "layer_columns",
     "plan_source_demand",
     "transform_columns",
@@ -286,6 +288,39 @@ def _collect_expr_columns(obj: Any, out: Set[str]) -> None:
     if isinstance(obj, (list, tuple)):
         for item in obj:
             _collect_expr_columns(item, out)
+
+
+def expression_texts(obj: Any) -> Set[str]:
+    """The whole text of every expression in a config block.
+
+    For column pruning only: a bare reference to a column whose name is not an
+    identifier -- ``Var0@scan``, as ``--parse-data`` writes them -- is split
+    apart by the identifier scan, while the evaluator looks the whole text up
+    as a column first. Texts that are not column names cost nothing.
+    """
+    out: Set[str] = set()
+
+    def _walk(node: Any) -> None:
+        if isinstance(node, Mapping):
+            for key, value in node.items():
+                if str(key).strip().lower() in {"expr", "filter", "sortby"} and isinstance(value, str):
+                    if value.strip():
+                        out.add(value.strip())
+                else:
+                    _walk(value)
+        elif isinstance(node, (list, tuple)):
+            for item in node:
+                _walk(item)
+
+    _walk(obj)
+    return out
+
+
+#: Methods that read columns by fixed or configured *names* rather than through
+#: expressions (``dynesty_runplot`` looks for logl / logwt / ... or the names in
+#: ``style.columns``). No expression scan sees those reads, so a source drawn by
+#: one of them is never column-pruned.
+FIXED_COLUMN_METHODS = frozenset({"dynesty_runplot"})
 
 
 def _transform_columns(transform: Any) -> Set[str]:

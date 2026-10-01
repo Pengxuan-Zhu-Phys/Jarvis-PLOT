@@ -78,7 +78,6 @@ class JarvisPLOT():
             runtime_expand_figure_types(self)
             runtime_prepare_project_layout(self)
             self.load_dataset(eager=False)
-            runtime_plan_dataset_required_columns(self)
             if self.shared is None:
                 self.shared = SharedContent(logger=self.logger)
             self.ctx = DataContext(self.shared)
@@ -104,6 +103,9 @@ class JarvisPLOT():
                 logger=self.logger,
                 base_dir=self.workdir or self.yaml.dir,
             )
+            # Before anything loads: the plan decides which columns each
+            # dataset reads, and it uses the preprocessor's own projection.
+            runtime_plan_dataset_required_columns(self)
             self.style = load_styles(self.load_path, logger=self.logger)
             self.prebuild_profile_pipelines()
             runtime_prebuild_correlations(self)
