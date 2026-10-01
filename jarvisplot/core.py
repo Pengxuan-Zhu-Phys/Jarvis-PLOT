@@ -215,6 +215,10 @@ class JarvisPLOT():
 
                     self.logger.debug(traceback.format_exc())
                 continue
+            finally:
+                # A figure that failed after plt.figure() was never closed and
+                # stayed in pyplot's registry for the rest of the run.
+                self._close_figure(figobj)
         if report_figures and getattr(self.args, "report", False):
             self._write_render_report(report_figures, failures=failures)
         if failures:
@@ -222,6 +226,19 @@ class JarvisPLOT():
                 f"Render failed for {len(failures)} figure(s): {', '.join(failures)}"
             )
             sys.exit(1)
+
+    @staticmethod
+    def _close_figure(figobj) -> None:
+        mpl_fig = getattr(figobj, "fig", None)
+        if mpl_fig is None:
+            return
+        try:
+            import matplotlib.pyplot as plt
+
+            plt.close(mpl_fig)
+        except Exception:
+            pass
+
     def _evaluate_render_health(self, figobj) -> None:
         """Run JP-VIZ rules on post-transform observations collected during plot."""
         try:
