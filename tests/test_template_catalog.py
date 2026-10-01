@@ -61,6 +61,13 @@ def test_corrplot_validation_catches_card_specific_formals():
     assert any(d.code == "JP-COR-001" for d in check({"methd": "circle"}).errors)
     assert any(d.code == "JP-COR-004" for d in check({"addrect": 3}).errors)
 
+    selected = {"stripe": "selected", "stripe.variables": ["a01", "b02"]}
+    assert check(selected, ["corrplot", "diamond"]).ok
+    unquoted = {"stripe": "selected", "stripe.variables": ["a01", 7]}
+    assert any(d.code == "JP-COR-003" for d in check(unquoted, ["corrplot", "diamond"]).errors)
+    one_name = {"stripe": "selected", "stripe.variables": "a01"}
+    assert any(d.code == "JP-COR-003" for d in check(one_name, ["corrplot", "diamond"]).errors)
+
 
 def test_show_posterior_yaml_validates_shape(tmp_path):
     text = render_template_yaml(
