@@ -511,7 +511,7 @@ class Figure:
             return {kk: self._ensure_pandas_data(vv, reason=reason) for kk, vv in data.items()}
         return data
 
-    def _concat_loaded_data(self, items):
+    def _concat_loaded_data(self, items, layer_name: str = ""):
         if len(items) == 0:
             return None
         if len(items) == 1:
@@ -522,7 +522,28 @@ class Figure:
         pandas_items = [self._ensure_pandas_data(item, reason="concat-layer") for item in items]
         try:
             return pd.concat(pandas_items, ignore_index=False)
-        except Exception:
+        except Exception as exc:
+            # Keep drawing what can be drawn, but never drop data silently.
+            if self.logger:
+                shapes = ", ".join(
+                    str(getattr(item, "shape", type(item).__name__)) for item in pandas_items
+                )
+                self.logger.warning(
+                    "Layer '{}': the {} data blocks could not be concatenated, so only "
+                    "the first block is drawn and the other {} are dropped.\n"
+                    "\t reason \t-> {}: {}\n"
+                    "\t blocks \t-> {}\n"
+                    "\t hint \t\t-> blocks combined with `combine: concat` must be tables "
+                    "with compatible columns (no duplicated column names); use "
+                    "`combine: separate` to draw them independently.".format(
+                        layer_name or "<unnamed>",
+                        len(pandas_items),
+                        len(pandas_items) - 1,
+                        type(exc).__name__,
+                        exc,
+                        shapes,
+                    )
+                )
             return pandas_items[0]
 
     def _store_share_data_if_needed(self, layer, data, cache_ref: str | None = None):

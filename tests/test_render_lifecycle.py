@@ -80,3 +80,21 @@ def test_failed_figures_do_not_stay_open(tmp_path):
     assert code == 1
     assert (tmp_path / "plots" / "good.png").is_file()
     assert plt.get_fignums() == []
+
+
+def test_failed_layer_concat_warns_with_the_reason():
+    from jarvisplot.Figure.figure import Figure
+
+    warnings: list[str] = []
+    fig = Figure()
+    fig.logger = type("Log", (), {"warning": lambda self, msg: warnings.append(str(msg))})()
+    duplicated = pd.DataFrame([[1.0, 2.0]], columns=["x", "x"])
+    other = pd.DataFrame({"x": [3.0], "y": [4.0]})
+
+    out = fig._concat_loaded_data([duplicated, other], layer_name="points")
+
+    assert out is duplicated
+    assert len(warnings) == 1
+    assert "Layer 'points'" in warnings[0]
+    assert "only the first block is drawn" in warnings[0]
+    assert "InvalidIndexError" in warnings[0]

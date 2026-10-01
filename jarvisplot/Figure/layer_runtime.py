@@ -642,7 +642,7 @@ def _load_layer_data(fig, layer):
                     fig.logger.error("DataSet -> {} not specified".format(src))
             if len(dts) == 0:
                 return None, None
-            combined = fig._concat_loaded_data(dts)
+            combined = fig._concat_loaded_data(dts, layer_name=str(layer.get("name", "") or ""))
             cache_ref = None
             if len(dts) == 1 and combined is dts[0] and len(cache_keys) == 1:
                 cache_ref = cache_keys[0]
