@@ -229,9 +229,9 @@ def merge_axes_legend(base, override):
 
 def style_legend_defaults(style=None):
     """Read axes legend declarations from a style bundle without rendering."""
-    from .Figure.style_runtime import resolve_style_bundle_payload
+    from .Figure.style_runtime import normalize_style_tokens, resolve_style_bundle_payload
 
-    style = style or ["a4paper_2x1"]
+    style = normalize_style_tokens(style or ["a4paper_2x1"])
     if (not isinstance(style, list) or len(style) not in (1, 2)
             or not all(isinstance(token, str) for token in style)):
         return {}
