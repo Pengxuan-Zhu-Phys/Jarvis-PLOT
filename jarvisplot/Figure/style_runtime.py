@@ -8,8 +8,22 @@ from typing import Any, Mapping, Tuple
 PREFERRED_STYLE_VARIANTS = ("rect", "Ternary", "rect_5x1", "dynesty_runplot", "rectcmap", "TernaryCmap")
 
 
+def normalize_style_tokens(value):
+    """``style: a4paper_2x1`` and ``style: [a4paper_2x1]`` name the same card.
+
+    The schema accepts both spellings; everything downstream indexes tokens,
+    and a bare string would be read one character at a time.
+    """
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, tuple):
+        return list(value)
+    return value
+
+
 def resolve_style_bundle_payload(jpstyles: Mapping[str, Any], value) -> Tuple[str, str, dict]:
     """Resolve style tokens to a full bundle payload."""
+    value = normalize_style_tokens(value)
     if len(value) == 2:
         family_name = value[0]
         variant_name = value[1]

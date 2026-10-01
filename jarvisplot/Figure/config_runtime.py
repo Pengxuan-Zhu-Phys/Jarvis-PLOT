@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Mapping
 
+from .style_runtime import normalize_style_tokens
+
 
 def apply_figure_config(fig, info: Mapping) -> bool:
     """Apply a YAML figure block to a Figure instance."""
@@ -55,7 +57,7 @@ def apply_figure_config(fig, info: Mapping) -> bool:
             )
 
         if "style" in info:
-            style_tokens = info["style"]
+            style_tokens = normalize_style_tokens(info["style"])
         else:
             style_tokens = ["a4paper_2x1"]
         fig.style = style_tokens

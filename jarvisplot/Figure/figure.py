@@ -11,7 +11,7 @@ from types import MethodType
 from .adapters_rect import StdAxesAdapter
 from .adapters_ternary import TernaryAxesAdapter
 from .method_registry import resolve_callable
-from .style_runtime import resolve_style_bundle_payload
+from .style_runtime import normalize_style_tokens, resolve_style_bundle_payload
 from .config_runtime import apply_figure_config
 from .design_runtime import draw_design_reference
 from .legend_runtime import apply_legend
@@ -399,10 +399,13 @@ class Figure:
     
     
     @style.setter
-    def style(self, value) -> None: 
-        if len(value) not in (1, 2):
-            self.logger.error("Undefined style -> {}".format(value))
-            raise TypeError
+    def style(self, value) -> None:
+        value = normalize_style_tokens(value)
+        if not isinstance(value, list) or len(value) not in (1, 2):
+            raise TypeError(
+                "style must name a card family or [family, variant], e.g. "
+                "a4paper_2x1 or [a4paper_2x1, rect]; got {!r}".format(value)
+            )
         family, selected, bundle = resolve_style_bundle_payload(self.jpstyles, value)
         self._frame = deepcopy(bundle["Frame"])
         self._legend_disabled_axes = set()
