@@ -13,6 +13,7 @@ from .cache_store import ProjectCache
 from .Figure.preprocessor import DataPreprocessor
 from .utils.pathing import resolve_project_path
 from .core_runtime import (
+    default_parse_data_output as runtime_default_parse_data_output,
     expand_figure_types as runtime_expand_figure_types,
     plan_dataset_required_columns as runtime_plan_dataset_required_columns,
     prebuild_correlations as runtime_prebuild_correlations,
@@ -62,13 +63,15 @@ class JarvisPLOT():
 
         # sys.exit()
         if self.args.parse_data:
-            if self.args.out is None and not self.args.inplace:
-                self.args.out = self.yaml.path
-            elif self.args.out is None and self.args.inplace:
-                self.args.out = self.yaml.path
-            elif self.args.out is not None and self.args.inplace:
+            if self.args.out is not None and self.args.inplace:
                 self.logger.error("Conflicting arguments: --out and --inplace. Please choose only one.")
                 sys.exit(2)
+            if self.args.inplace:
+                self.args.out = self.yaml.path
+            elif self.args.out is None:
+                # Never rewrite the input unless --inplace says so: the
+                # parsed copy goes next to it.
+                self.args.out = runtime_default_parse_data_output(self.yaml.path)
             runtime_parse_hdf5_metadata_and_renew_yaml(self)
             return
         else:
