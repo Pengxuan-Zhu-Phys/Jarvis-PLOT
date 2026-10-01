@@ -257,11 +257,27 @@ def filter_df(df, condition, logger):
 
 def add_column(df, adds, logger):
     try:
-        name = adds.get("name", False)
-        expr = adds.get("expr", False)
-        if not (name and expr):
-            logger.error("Error in loading add_column -> {}".format(adds))
+        if not isinstance(adds, Mapping):
+            logger.error(f"add_column skipped: expected {{name, expr}}, got {adds!r}")
+            return df
+        name = str(adds.get("name") or "").strip()
+        expr = adds.get("expr")
+        missing = []
+        if not name:
+            missing.append("name")
+        if expr is None or not str(expr).strip():
+            missing.append("expr")
+        if missing:
+            # Nothing sensible to add: carry on without the column rather than
+            # inventing one (an absent expr used to evaluate to False).
+            logger.error(
+                "add_column skipped: missing {} -> {}".format(" and ".join(missing), adds)
+            )
+            return df
         value = eval_dataframe_expression(df, expr, logger=logger, allow_column=True)
+        # The frame may be a table other blocks still read (a preprofile pass
+        # works on the source itself); add to a copy, never into the caller's.
+        df = df.copy(deep=False)
         df[name] = value
         return df
     except Exception as e:
