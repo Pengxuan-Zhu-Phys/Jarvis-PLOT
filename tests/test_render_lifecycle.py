@@ -67,3 +67,16 @@ def test_style_written_as_a_single_string_renders(tmp_path):
     assert code == 0
     assert (tmp_path / "plots" / "one_token.png").is_file()
 
+
+def test_failed_figures_do_not_stay_open(tmp_path):
+    figures = [
+        _scatter_figure("unknown_axes", axes="no_such_axes"),
+        _scatter_figure("unknown_column", y="no_such_column"),
+        _scatter_figure("good"),
+    ]
+
+    code = _render(tmp_path, figures)
+
+    assert code == 1
+    assert (tmp_path / "plots" / "good.png").is_file()
+    assert plt.get_fignums() == []
