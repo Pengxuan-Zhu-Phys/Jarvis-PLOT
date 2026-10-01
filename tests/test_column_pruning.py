@@ -106,6 +106,23 @@ def test_by_name_method_on_an_untracked_table_disables_pruning_everywhere():
     assert scan.required_columns is None and other.required_columns is None
 
 
+def test_dynamic_step_on_a_published_table_disables_pruning_everywhere():
+    # `tbl` comes from `scan` via to_df, but that lineage is not tracked: a
+    # correlation over "every numeric column" of it needs `scan` whole.
+    scan = _dataset("scan")
+    publish = _scatter("scan", x="a", y="b", transform=[{"to_df": "tbl"}])
+    correlate = {
+        "name": "corr",
+        "method": "corrplot",
+        "axes": "ax",
+        "data": [{"source": "tbl", "transform": [{"correlation": {}}]}],
+    }
+
+    _plan([publish, correlate], [scan])
+
+    assert scan.required_columns is None
+
+
 def test_environment_switch_turns_pruning_off(monkeypatch):
     monkeypatch.setenv(COLUMN_PRUNE_ENV, "0")
     ds = _dataset("scan")

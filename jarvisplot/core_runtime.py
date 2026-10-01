@@ -146,8 +146,8 @@ def plan_dataset_required_columns(core) -> None:
     #: columns out of the table, or a method that reads columns by fixed name.
     #: These load whole.
     unprunable: Set[str] = set()
-    #: A by-name reader fed from a table whose lineage is not tracked: no
-    #: dataset can be pruned safely.
+    #: Such a source that is a published / shared table, whose lineage is not
+    #: tracked: no dataset can be pruned safely.
     prune_nothing: Optional[str] = None
     for fig in figures:
         if not isinstance(fig, Mapping):
@@ -179,11 +179,16 @@ def plan_dataset_required_columns(core) -> None:
                         demand[item].update(cols)
                         if open_ended:
                             unprunable.add(item)
-                    elif by_name and prune_nothing is None:
+                    elif open_ended and prune_nothing is None:
+                        # A published / shared table: which dataset it came
+                        # from is not tracked, so every dataset loads whole.
                         prune_nothing = (
-                            "layer '{}' draws {} from '{}', which is not a dataset, and "
-                            "that method reads columns by name".format(
-                                layer.get("name", ""), layer.get("method"), item
+                            "layer '{}' reads '{}', which is not a dataset, and {}".format(
+                                layer.get("name", ""),
+                                item,
+                                "its method reads columns by name"
+                                if by_name
+                                else "a transform step selects its own columns",
                             )
                         )
 
