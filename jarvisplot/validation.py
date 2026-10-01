@@ -702,9 +702,26 @@ def _check_corrplot_option_value(
     integer_or_null = value is None or (
         isinstance(value, int) and not isinstance(value, bool)
     )
-    valid = (kind == "boolean" and boolean_value) or (
-        kind == "integer_or_null" and integer_or_null
+    list_of_strings = value is None or (
+        isinstance(value, (list, tuple))
+        and all(isinstance(item, str) for item in value)
     )
+    valid = (
+        (kind == "boolean" and boolean_value)
+        or (kind == "integer_or_null" and integer_or_null)
+        or (kind == "list_of_strings" and list_of_strings)
+    )
+    if kind == "list_of_strings" and isinstance(value, (list, tuple)) and not valid:
+        bad = [item for item in value if not isinstance(item, str)]
+        bag.error(
+            "JP-COR-003",
+            path,
+            f"corrplot option expects a list of variable names; "
+            f"{len(bad)} item(s) are not strings: {bad!r}",
+            suggestion="Quote names that YAML would read as numbers or booleans.",
+            context={"style": ["corrplot", variant], "expected": kind, "received": value},
+        )
+        return
     if kind and not valid:
         bag.error(
             "JP-COR-003",
