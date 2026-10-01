@@ -153,7 +153,7 @@
         {
             "long": "--out",
             "dest": "out",
-            "help": "with --parse-data: output YAML path; with flowchart: image path. Does NOT redirect normal figure PNG/PDF (those use YAML output.dir)",
+            "help": "with --parse-data: output YAML path (default <stem>.parsed.yaml beside the input; the input is never rewritten without --inplace); with flowchart: image path. Does NOT redirect normal figure PNG/PDF (those use YAML output.dir)",
             "action": "store",
             "metavar": "PATH"
         },

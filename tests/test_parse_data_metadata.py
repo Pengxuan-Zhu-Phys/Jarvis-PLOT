@@ -115,6 +115,81 @@ def test_parse_data_writes_yaml_from_metadata_only(tmp_path, monkeypatch):
     assert cols["note"] == "keep-me"
 
 
+_COMMENTED_PARSE_YAML = """\
+# project notes that must survive --parse-data
+DataSet:
+  - name: h5
+    type: hdf5
+    path: fixture.hdf5   # relative to this file
+    dataset: data
+    is_gambit: true
+    columns:
+      isvalid_policy: clean   # drop invalid rows
+Figures: []   # filled in later
+"""
+
+
+def _write_commented_parse_fixture(tmp_path: Path) -> Path:
+    with h5py.File(tmp_path / "fixture.hdf5", "w") as h5f:
+        grp = h5f.create_group("data")
+        grp.create_dataset("signal", data=np.array([1.0, 2.0, 3.0]))
+        grp.create_dataset("other", data=np.array([4.0, 5.0, 6.0]))
+    yaml_path = tmp_path / "scan.yaml"
+    yaml_path.write_text(_COMMENTED_PARSE_YAML, encoding="utf-8")
+    return yaml_path
+
+
+def _run_parse_data(monkeypatch, yaml_path: Path, *, out=None, inplace=False) -> JarvisPLOT:
+    app = JarvisPLOT()
+    args = _make_parse_args(yaml_path, out)
+    args.out = None if out is None else str(out)
+    args.inplace = inplace
+    monkeypatch.setattr(app.cli.args, "parse_args", lambda: args)
+    app.init()
+    return app
+
+
+def test_parse_data_without_out_leaves_input_untouched(tmp_path, monkeypatch):
+    yaml_path = _write_commented_parse_fixture(tmp_path)
+
+    _run_parse_data(monkeypatch, yaml_path)
+
+    assert yaml_path.read_text(encoding="utf-8") == _COMMENTED_PARSE_YAML
+    parsed_path = tmp_path / "scan.parsed.yaml"
+    parsed_text = parsed_path.read_text(encoding="utf-8")
+    assert "# project notes that must survive --parse-data" in parsed_text
+    assert "# relative to this file" in parsed_text
+    assert "# drop invalid rows" in parsed_text
+    assert "# filled in later" in parsed_text
+    assert 'source: "data/signal"' in parsed_text
+
+    ds = yaml.safe_load(parsed_text)["DataSet"][0]
+    assert "is_gambit" not in ds
+    assert ds["columns"]["isvalid_policy"] == "clean"
+    assert {item["source"] for item in ds["columns"]["rename"]} == {"data/signal", "data/other"}
+
+
+def test_parse_data_inplace_rewrites_input_and_keeps_comments(tmp_path, monkeypatch):
+    yaml_path = _write_commented_parse_fixture(tmp_path)
+
+    _run_parse_data(monkeypatch, yaml_path, inplace=True)
+
+    text = yaml_path.read_text(encoding="utf-8")
+    assert "# project notes that must survive --parse-data" in text
+    assert "rename:" in text
+    assert not (tmp_path / "scan.parsed.yaml").exists()
+
+
+def test_parse_data_rejects_out_with_inplace(tmp_path, monkeypatch):
+    yaml_path = _write_commented_parse_fixture(tmp_path)
+
+    with pytest.raises(SystemExit) as excinfo:
+        _run_parse_data(monkeypatch, yaml_path, out=tmp_path / "x.yaml", inplace=True)
+
+    assert excinfo.value.code == 2
+    assert yaml_path.read_text(encoding="utf-8") == _COMMENTED_PARSE_YAML
+
+
 def test_load_yaml_missing_file_logs_error_and_exits(tmp_path):
     app = JarvisPLOT()
     app.args = SimpleNamespace(file=str(tmp_path / "missing.yaml"))
