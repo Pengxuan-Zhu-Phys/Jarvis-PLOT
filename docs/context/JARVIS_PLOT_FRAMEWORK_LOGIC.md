@@ -113,6 +113,9 @@ frame:
 - `.cache/data/*.pkl` + `*.json` meta
 - `.cache/named/*.pkl` for `share_data`
 - `.cache/summary/*.txt`
+- `.cache/materialized/<key>/` for HDF5-to-parquet slots
+- `.cache/agent_twins/` for default `dryrun --with-data` exports
+- `.cache/.jarvisplot.json` records owned components, workdir, related YAMLs, and last use; `~/.jarvis/plot.json` indexes cache roots (`JARVIS_HOME` overrides its parent)
 
 ### Keying Inputs
 
@@ -125,6 +128,12 @@ frame:
 
 - `--rebuild-cache` wipes `.cache`
 - metadata mismatch invalidates target cache
+- `--print` means final output: announce cleanup before data loading, retain logo suppression, and call `ProjectCache.clear_used()` only after at least one figure renders and all enabled figures finish successfully. Any render/setup/output failure preserves the session cache. Cleanup removes session-used/generated payloads and dangling named references; unrelated payloads and source-fingerprint manifest records remain. No per-figure cleanup runs while shared caches may still be needed by later figures.
+- `jplot cache list|scan|clean` is a lazy non-render verb with Rich help, JSON envelopes, stderr human output, and exit codes 0/1/2. `clean` requires `--workdir` (repeatable) or `--all`, with optional `--older-than DAYS` and `--dry-run`. It verifies the local ownership marker and removes owned components, manifest, and marker; unrelated `.cache` content stays. Missing records are dropped, failed removals retain records, and active caches are skipped with a partial verdict.
+- `clean --workdir PATH` selects registered workdirs at PATH and in all descendant directories by path components, including parents with no cache of their own. Multiple or overlapping selectors are deduplicated; similarly prefixed sibling directories are excluded. Any selector without registered matches is a usage error before deletion. Selection uses the registry without automatic scanning, so `--dry-run` preserves the index and legacy caches require `cache scan` first.
+- Human cache results use the same buffered console and panel geometry as `jplot man`: left-aligned magenta titles, dim rounded borders, and terminal width with an 80-column minimum. `list` uses full-width numbered paths, followed by a compact status/size/last-use line and associated YAML paths; entries have a blank separator, byte sizes use adaptive binary units, and timestamps show UTC to the second. Other result sections use the shared 24+6 field grid. Registry/summary, cache records, skipped/missing records, and errors all render inside panels. JSON envelopes remain independent of this presentation.
+- `cache_registry.py` owns global index updates and per-workdir leases. Registry updates are serialized and atomically replaced. `ProjectCache` acquires a shared lease before filesystem setup and holds it until `close()` (or finalization); render initialization closes it even on failure. `data describe` cache accesses use context managers, and default twin exports hold a lease for their entire dryrun. Cleanup requires a nonblocking exclusive lease, so active processes are skipped and crashes release locks automatically.
+- `cache scan <directory> …` searches only explicitly supplied trees, preserving last-use timestamps. It adopts marked caches or the legacy four-directory layout plus schema-1 `files`/`named` manifest. Unmarked twin-only directories are not inferred, and custom twin export directories are not managed caches. Global registration failures do not block plotting. `--print` retains the registry record while its small marker/manifest or unused payloads remain; listing reports their current size.
 
 
 ## 7) Extension Points

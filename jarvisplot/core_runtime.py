@@ -66,6 +66,7 @@ def prepare_project_layout(core) -> None:
         core.workdir,
         logger=core.logger,
         rebuild=bool(getattr(core.args, "rebuild_cache", False)),
+        config_path=getattr(core.yaml, "path", None),
     )
     core.logger.debug(f"Project workdir -> {core.workdir}")
     core.logger.debug(f"Cache dir -> {core.cache.root}")

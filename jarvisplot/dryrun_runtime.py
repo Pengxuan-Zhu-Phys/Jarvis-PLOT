@@ -50,12 +50,44 @@ def dryrun_file(
         base_dir=os.path.dirname(resolved),
         with_data=with_data,
         out_dir=out_dir,
+        config_path=resolved,
     )
     report["file"] = resolved
     return report, bag
 
 
 def dryrun_config(
+    config: Any,
+    *,
+    base_dir: str | None = None,
+    with_data: bool = False,
+    out_dir: str | None = None,
+    config_path: str | None = None,
+) -> tuple[dict[str, Any], DiagnosticBag]:
+    """Hold the default twin cache's lease until all exports finish."""
+    from .cache_registry import CacheRegistry
+
+    lease = None
+    warning = None
+    registry = CacheRegistry()
+    workdir = Path(base_dir or ".").expanduser().resolve()
+    try:
+        if with_data and out_dir is None and isinstance(config, dict):
+            try:
+                lease = registry.lease(workdir)
+                registry.register(workdir, components=("agent_twins",), config_path=config_path)
+            except (OSError, ValueError) as exc:
+                warning = f"Failed registering plot cache: {exc}"
+        report, bag = _dryrun_config(config, base_dir=base_dir, with_data=with_data, out_dir=out_dir)
+        if warning:
+            bag.warning("JP-VIZ-000", "$.output", warning)
+        return report, bag
+    finally:
+        if lease is not None:
+            lease.close()
+
+
+def _dryrun_config(
     config: Any,
     *,
     base_dir: str | None = None,

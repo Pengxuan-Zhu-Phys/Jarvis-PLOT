@@ -1,0 +1,57 @@
+id: cache
+title: Plot cache maintenance
+summary: Centrally discover and clean workdir-local plot caches through ~/.jarvis/plot.json.
+role: how-to
+priority: 65
+see_also: [cli-map, dryrun-viz]
+related_cli:
+  - argv: [jplot, cache, list, "--json"]
+    why: current cache paths, sizes, last use, and active/missing status
+  - argv: [jplot, cache, scan, "<directory>", "--json"]
+    why: register existing caches in a specified tree
+  - argv: [jplot, cache, clean, "--all", "--dry-run", "--json"]
+    why: preview selected inactive caches
+  - argv: [jplot, cache, clean, "--workdir", "<path>", "--json"]
+    why: clean registered caches in a directory and all nested projects
+  - argv: [jplot, cache, clean, "--all", "--older-than", "30", "--json"]
+    why: clean registered caches unused for at least 30 days
+live_sources:
+  - verb: cache.list
+    truth: global registry and verified local ownership markers
+human:
+  panels:
+    - kind: overview
+      title: Registry
+      body: |
+        Cache payloads stay in <workdir>/.cache; ~/.jarvis/plot.json indexes their locations.
+        JARVIS_HOME overrides the registry directory. Workdirs shared by multiple YAMLs have one entry.
+        Plotting, data describe, and default dryrun --with-data exports register automatically.
+    - kind: steps
+      title: Commands
+      items:
+        - "jplot cache list"
+        - "jplot cache scan <directory>  # register old caches"
+        - "jplot cache clean --workdir <path>  # includes all subdirectories; repeatable"
+        - "jplot cache clean --all --dry-run"
+        - "jplot cache clean --all --older-than 30"
+        - "jplot cache clean --all"
+    - kind: notes
+      title: Cleanup behavior
+      items:
+        - "--workdir selects registered caches in the directory and all subdirectories; overlapping paths are deduplicated."
+        - "The selected directory need not have its own cache. Scan old unregistered caches first."
+        - "Active caches are skipped. Source data, plots, and unrelated cache content stay."
+        - "Missing records are pruned; failed deletions retain their records."
+        - "--dry-run changes neither payloads nor registry records."
+        - "--print cleans session-used payloads; cache clean also handles historical payloads."
+        - "Legacy scan requires the four pipeline directories and a compatible manifest."
+        - "Unmarked twin-only caches register on their next default dryrun; custom --out-dir exports are unmanaged."
+agent:
+  body_markdown: |
+    All subcommands accept --json; non-TTY stdout also emits one standard envelope.
+    Exit codes: 0 success or partial, 1 failure, 2 usage error.
+    A skipped active cache yields ok: null when no other errors occur; inspect data.skipped.
+    clean requires --all or repeatable --workdir. --older-than uses whole-workdir last use in days.
+    Each --workdir selects registered caches in that directory and all nested directories, including when the parent has no cache.
+    Overlapping selectors are deduplicated; an unmatched selector is a usage error before any cleanup.
+    Use --dry-run to inspect the same selection without deleting payloads or changing the index.

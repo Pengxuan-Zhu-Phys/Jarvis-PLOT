@@ -45,6 +45,13 @@ class JarvisPLOT():
         self.preprocessor: Optional[DataPreprocessor] = None
 
     def init(self):
+        try:
+            return self._init()
+        finally:
+            if self.cache is not None:
+                self.cache.close()
+
+    def _init(self):
         if self.argv is None:
             self.args = self.cli.args.parse_args()
         else:
@@ -77,6 +84,13 @@ class JarvisPLOT():
         else:
             runtime_expand_figure_types(self)
             runtime_prepare_project_layout(self)
+            if getattr(self.args, "no_logo", False):
+                self.logger.warning(
+                    "--print: accepting all settings for final output (without the logo). "
+                    "After all enabled figures are saved successfully, the cache entries "
+                    f"used or created by this run will be deleted from {self.cache.root}. "
+                    "If rendering fails, the cache will be kept."
+                )
             self.load_dataset(eager=False)
             if self.shared is None:
                 self.shared = SharedContent(logger=self.logger)
@@ -159,6 +173,7 @@ class JarvisPLOT():
 
     def plot(self):
         failures: list[str] = []
+        rendered = 0
         report_figures: list[dict] = []
         for fig in self.yaml.config["Figures"]:
             from .Figure.figure import Figure
@@ -186,6 +201,7 @@ class JarvisPLOT():
                     if isinstance(fig, dict) and isinstance(fig.get("frame"), dict):
                         figobj._yaml_frame = fig.get("frame")
                     figobj.plot()
+                    rendered += bool(figobj.fmts)
                     self._evaluate_render_health(figobj)
                     self._maybe_write_agent_digest(fig, figobj)
                     # Always drop temporary expand stash after a successful figure.
@@ -228,6 +244,12 @@ class JarvisPLOT():
                 f"Render failed for {len(failures)} figure(s): {', '.join(failures)}"
             )
             sys.exit(1)
+        if rendered and getattr(self.args, "no_logo", False) and self.cache is not None:
+            stats = self.cache.clear_used()
+            self.logger.info(
+                "--print: final figures saved; cache cleanup finished "
+                f"(removed={stats['removed']}, failed={stats['failed']})."
+            )
 
     @staticmethod
     def _close_figure(figobj) -> None:

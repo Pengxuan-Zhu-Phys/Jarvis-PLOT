@@ -44,6 +44,7 @@ Render with a bare path — there is no `jplot run`:
 ```bash
 jplot path/to/config.yaml
 jplot path/to/config.yaml --rebuild-cache
+jplot path/to/config.yaml --print
 ```
 
 Everything else is discovery and judgement, in three groups.
@@ -196,8 +197,44 @@ from jarvisplot import render_flowchart, render_flowchart_file
 - You can set `project.workdir` in YAML.
 - If `output.dir` is omitted, Jarvis-PLOT defaults to `<workdir>/plots/`.
 - Data cache is stored in `<workdir>/.cache/`.
+- `--print` accepts the current settings and renders final figures without the logo. It announces that, after all enabled figures are saved successfully, cache payloads used or created by this run will be deleted (pipeline data and metadata, named/shared data, summaries, and HDF5 materialization slots). Rendering failures or a run with no enabled figures keep the cache. Unrelated cache entries and the lightweight fingerprint manifest are retained; later renders rebuild deleted entries as needed.
 - Profiling pipelines are prebuilt once and reused from cache when source fingerprint and profile settings are unchanged.
 - Profiling uses a fast two-stage grid reduction (`pregrid` + render `bin`) for large datasets.
+
+Plot caches are automatically registered in `~/.jarvis/plot.json` (or
+`$JARVIS_HOME/plot.json`). The registry groups caches by workdir and records
+associated YAML paths and last use; payloads stay in their original directories.
+This includes caches created by `data describe` and default `dryrun --with-data`
+exports. Sizes are calculated when listing, rather than stored in the registry.
+
+```bash
+jplot cache list
+jplot cache scan ~/Jarvis-Workshop               # register existing plot caches
+jplot cache clean --workdir /path/to/project    # this directory and all nested projects; repeatable
+jplot cache clean --all --older-than 30         # unused for at least 30 days
+jplot cache clean --all --dry-run               # preview; no deletion/index changes
+jplot cache clean --all                         # clean all registered inactive caches
+jplot cache -h
+jplot man cache
+```
+
+`--workdir PATH` selects registered caches in PATH itself and all of its
+subdirectories, even when PATH has no cache of its own. Repeat it to select
+multiple directory trees; overlapping selections are deduplicated. Use
+`cache scan PATH` first for old caches that have not been registered.
+
+All cache subcommands accept `--json` and use the existing CLI envelope and
+exit codes (0 success/partial, 1 failure, 2 usage). Non-TTY stdout defaults to
+JSON; human results go to stderr. Active caches are skipped (`ok: null` when
+the remaining operation succeeds), and records for missing paths are pruned
+during cleanup. Only marked Jarvis-PLOT components are removed; source data,
+plots, and unrelated `.cache` content are retained. Failed deletions retain
+their registry entries. Scanning adopts legacy caches only when the four
+pipeline directories and a compatible `manifest.json` identify them; old
+unmarked twin-only directories need a new `dryrun --with-data` run to register.
+An explicitly supplied `--out-dir` is an export directory and is not registered.
+Concurrent registry writes use a lock and atomic replacement. Registration
+failures warn without preventing rendering.
 
 ### Example: SUSYRun2 Ternary Plots
 

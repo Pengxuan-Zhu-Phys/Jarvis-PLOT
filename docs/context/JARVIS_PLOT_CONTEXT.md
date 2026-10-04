@@ -53,6 +53,7 @@ Current stable product facts:
 - dataset-level runtime helpers live in `jarvisplot/data_loader_runtime.py`; pipeline runtime helpers live in `jarvisplot/Figure/preprocessor_runtime.py`
 - flowchart runtime lives in `jarvisplot/flowchart.py` (standalone path; not the YAML figure stack)
 - runtime artifacts: output images plus workdir-local cache under `.cache/` for the YAML figure pipeline
+- cache maintenance: `jplot cache list|scan|clean` manages roots indexed in `~/.jarvis/plot.json` (`JARVIS_HOME` override), verifies local ownership markers, and skips active caches; `clean --workdir PATH` includes all registered nested projects; `--print` cleans session-used payloads after successful final rendering
 
 Treat the project as a framework that converts semantic plotting or diagram input into final rendered output.
 Do not reduce it to a bag of plotting helpers.

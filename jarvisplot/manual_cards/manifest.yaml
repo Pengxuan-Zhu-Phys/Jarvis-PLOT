@@ -61,4 +61,5 @@ topics:
   - dryrun-viz
   - diagnostics
   - cli-map
+  - cache
   - debug-overlay
