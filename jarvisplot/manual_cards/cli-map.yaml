@@ -3,7 +3,7 @@ title: CLI verb map
 summary: All jplot agent verbs; live list also from jplot cap cli.
 role: catalog
 priority: 15
-see_also: [workflow, validate, data-columns]
+see_also: [workflow, validate, data-columns, cache]
 related_cli:
   - argv: [jplot, cap, cli, "--json"]
     why: live command catalogue (do not hardcode forever)
@@ -23,6 +23,7 @@ human:
         Judge: validate, dryrun, doctor
         Editor tools: config get|set|rm|expand (optional)
         Render: jplot <file>  (bare path; no jplot run)
+        Maintenance: cache list|scan|clean
     - kind: steps
       title: Core verbs
       items:
@@ -32,6 +33,7 @@ human:
         - "jplot validate|dryrun|doctor"
         - "jplot config expand  # type → layers"
         - "jplot <file>         # render"
+        - "jplot cache list|scan|clean"
     - kind: notes
       title: Human help style
       items:

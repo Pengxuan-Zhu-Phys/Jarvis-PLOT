@@ -33,6 +33,7 @@ Flowchart layout and rendering live in `jarvisplot/flowchart.py` and do not go t
 
 - `jarvisplot/client.py`: `main()` entry point that boots `JarvisPLOT`
 - `jarvisplot/cli.py`: argparse bootstrap from `jarvisplot/cards/args.json`
+- `jarvisplot/verbs/cache.py`: Rich `cache list|scan|clean` command parsing and existing human/JSON output conventions; no renderer or dataframe imports
 - `jarvisplot/core.py`: runtime init, YAML load, dataset registration, prebuild pass, figure loop; also short-circuits to flowchart mode via `jplot flowchart <scene.json>`
 - `jarvisplot/core_runtime.py`: project layout, expression analysis helpers (`_expr_symbols`, `_collect_expr_columns`, `_transform_columns`, etc.), dataset demand planning, usage plan, YAML rewrite helpers, and figure-type expansion hook
 - `jarvisplot/core_assets.py`: colormap, interpolator, and style bootstrap helpers used by `core.py`
@@ -46,6 +47,7 @@ Flowchart layout and rendering live in `jarvisplot/flowchart.py` and do not go t
 - `jarvisplot/data_loader_runtime.py`: dataset-level transform execution, HDF5 runtime loading/materialization, dataset transform wrappers
 - `jarvisplot/data_loader_hdf5.py`: HDF5 whitelist/rename policy, materialization keys/manifests, HDF5 summary helpers
 - `jarvisplot/cache_store.py`: workdir-local cache root, dataframe cache, named cache, materialized HDF5 manifest, summaries
+- `jarvisplot/cache_registry.py`: global `~/.jarvis/plot.json` index, local ownership markers, atomic locked writes, active-cache leases, legacy discovery, and selected cleanup
 - `jarvisplot/Figure/data_pipelines.py`: support-layer `SharedContent` / `DataContext` only — lazy shared values, usage counts, invalidation; not a transform or render owner
 
 ### Transform and profiling pipeline [implemented]

@@ -32,6 +32,10 @@
             ]
         },
         {
+            "title": "Maintain",
+            "commands": ["cache"]
+        },
+        {
             "title": "Flowchart",
             "commands": [
                 "flowchart"
@@ -39,6 +43,13 @@
         }
     ],
     "commands": [
+        {
+            "name": "cache",
+            "help": "list, discover, or clean registered plot caches",
+            "usage": "jplot cache list|scan|clean … [--json]",
+            "kind": "agent",
+            "group": "Maintain"
+        },
         {
             "name": "data",
             "help": "inspect a data file (describe / head / eval / suggest-axes)",
@@ -166,7 +177,7 @@
         {
             "long": "--print",
             "dest": "no_logo",
-            "help": "disable the Jarvis-HEP logo panel",
+            "help": "accept settings and render final figures without the logo; delete this run's cache entries after successful output",
             "action": "store_true"
         },
         {

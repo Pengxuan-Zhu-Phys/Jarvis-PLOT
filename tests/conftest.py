@@ -18,6 +18,11 @@ from jarvisplot.inner_func import clear_external_funcs
 
 
 @pytest.fixture(autouse=True)
+def _isolate_plot_registry(tmp_path, monkeypatch):
+    monkeypatch.setenv("JARVIS_HOME", str(tmp_path / "jarvis-home"))
+
+
+@pytest.fixture(autouse=True)
 def _close_matplotlib_figures():
     yield
     plt.close("all")

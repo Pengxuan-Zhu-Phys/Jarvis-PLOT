@@ -648,17 +648,17 @@ def _cache_key_payload(path: str, *, kind: str, group: str | None, stats: bool) 
     from .cache_store import ProjectCache
 
     workdir = str(Path(path).resolve().parent)
-    cache = ProjectCache(workdir)
-    fp = cache.source_fingerprint(
-        path,
-        extra={
-            "verb": "data.describe",
-            "version": DESCRIBE_CACHE_VERSION,
-            "kind": kind,
-            "group": group,
-            "stats": bool(stats),
-        },
-    )
+    with ProjectCache(workdir) as cache:
+        fp = cache.source_fingerprint(
+            path,
+            extra={
+                "verb": "data.describe",
+                "version": DESCRIBE_CACHE_VERSION,
+                "kind": kind,
+                "group": group,
+                "stats": bool(stats),
+            },
+        )
     return {"fp": fp, "workdir": workdir}
 
 
@@ -669,8 +669,8 @@ def _cache_get_describe(
         from .cache_store import ProjectCache
 
         meta = _cache_key_payload(path, kind=kind, group=group, stats=stats)
-        cache = ProjectCache(meta["workdir"])
-        text = cache.get_summary(meta["fp"])
+        with ProjectCache(meta["workdir"]) as cache:
+            text = cache.get_summary(meta["fp"])
         if not text:
             return None
         data = json.loads(text)
@@ -693,9 +693,9 @@ def _cache_put_describe(
         from .cache_store import ProjectCache
 
         meta = _cache_key_payload(path, kind=kind, group=group, stats=stats)
-        cache = ProjectCache(meta["workdir"])
         to_store = {k: v for k, v in payload.items() if k != "cache"}
-        cache.put_summary(meta["fp"], json.dumps(to_store, ensure_ascii=False, default=str))
+        with ProjectCache(meta["workdir"]) as cache:
+            cache.put_summary(meta["fp"], json.dumps(to_store, ensure_ascii=False, default=str))
     except Exception:
         pass
 

@@ -9,15 +9,17 @@ import os
 import re
 import shutil
 import time
+import weakref
 
 import pandas as pd
 from .memtrace import memtrace_checkpoint, memtrace_file_checkpoint, memtrace_object_inventory
+from .cache_registry import CacheRegistry
 
 
 class ProjectCache:
     """Workdir-local cache store: <workdir>/.cache."""
 
-    def __init__(self, workdir: str, logger=None, rebuild: bool = False):
+    def __init__(self, workdir: str, logger=None, rebuild: bool = False, *, config_path: str | None = None):
         self.logger = logger
         self.workdir = Path(workdir).expanduser().resolve()
         self.root = self.workdir / ".cache"
@@ -27,6 +29,13 @@ class ProjectCache:
         self.materialized_dir = self.root / "materialized"
         self.manifest_path = self.root / "manifest.json"
         self.rebuild = bool(rebuild)
+        self._lease_finalizer = None
+        self.registry = CacheRegistry()
+        try:
+            lease = self.registry.lease(self.workdir)
+            self._lease_finalizer = weakref.finalize(self, lease.close)
+        except OSError as exc:
+            self._warn(f"Failed locking plot cache: {exc}")
 
         if self.rebuild and self.root.exists():
             shutil.rmtree(self.root, ignore_errors=True)
@@ -47,6 +56,62 @@ class ProjectCache:
         self._written_materialized_keys: set[str] = set()
         self._written_named_keys: set[str] = set()
         self._written_summary_keys: set[str] = set()
+        self._used_paths: set[Path] = set()
+        self._used_named_names: set[str] = set()
+        try:
+            self.registry.register(self.workdir, config_path=config_path)
+        except (OSError, ValueError) as exc:
+            self._warn(f"Failed registering plot cache: {exc}")
+
+    def close(self) -> None:
+        if self._lease_finalizer is not None:
+            self._lease_finalizer()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+    def _track_path(self, path: Path) -> Path:
+        # Named paths come from the manifest; never clean outside this cache.
+        resolved = path.resolve()
+        if resolved != self.root and resolved.is_relative_to(self.root):
+            self._used_paths.add(path)
+        return path
+
+    def clear_used(self) -> dict[str, int]:
+        """Remove this session's payloads after successful final rendering."""
+        removed: set[Path] = set()
+        failed = 0
+        for path in sorted(self._used_paths):
+            try:
+                if path.resolve() == self.root or not path.resolve().is_relative_to(self.root):
+                    raise ValueError("cache path resolves outside the cache root")
+                existed = path.exists() or path.is_symlink()
+                if path.is_dir() and not path.is_symlink():
+                    shutil.rmtree(path)
+                else:
+                    path.unlink(missing_ok=True)
+                if existed:
+                    removed.add(path)
+            except Exception as exc:
+                failed += 1
+                self._warn(f"Failed removing cache '{path}': {exc}")
+
+        # Drop references to deleted payloads, including aliases not read in
+        # this session. Keep source fingerprints and unrelated named entries.
+        named = self.manifest.get("named", {})
+        for name, item in list(named.items()):
+            if item.get("kind") == "dataframe-ref":
+                path = self.data_dir / f"{item.get('ref_key', '')}.pkl"
+            else:
+                path = self.root / item.get("path", "")
+            if path in removed or (name in self._used_named_names and not path.exists()):
+                del named[name]
+        self._save_manifest()
+        self._used_paths.difference_update(removed)
+        return {"removed": len(removed), "failed": failed}
 
     def _debug(self, msg: str) -> None:
         if self.logger:
@@ -147,7 +212,7 @@ class ProjectCache:
     def get_dataframe(self, key: str):
         if self.rebuild and str(key) not in self._written_dataframe_keys:
             return None
-        p = self.data_dir / f"{key}.pkl"
+        p = self.dataframe_cache_path(key)
         if not p.exists():
             return None
         try:
@@ -157,7 +222,8 @@ class ProjectCache:
             return None
 
     def dataframe_cache_path(self, key: str) -> Path:
-        return self.data_dir / f"{key}.pkl"
+        self._track_path(self.data_dir / f"{key}.json")
+        return self._track_path(self.data_dir / f"{key}.pkl")
 
     def is_dataframe_meta_consistent(self, key: str, meta: Optional[Dict[str, Any]]) -> bool:
         if self.rebuild and str(key) not in self._written_dataframe_keys:
@@ -193,7 +259,7 @@ class ProjectCache:
     def get_dataframe_meta(self, key: str) -> Optional[Dict[str, Any]]:
         if self.rebuild and str(key) not in self._written_dataframe_keys:
             return None
-        p = self.data_dir / f"{key}.json"
+        p = self._track_path(self.data_dir / f"{key}.json")
         if not p.exists():
             return None
         try:
@@ -207,7 +273,7 @@ class ProjectCache:
             return None
 
     def put_dataframe(self, key: str, df, meta: Optional[Dict[str, Any]] = None) -> None:
-        p = self.data_dir / f"{key}.pkl"
+        p = self.dataframe_cache_path(key)
         try:
             memtrace_checkpoint(
                 self.logger,
@@ -255,10 +321,10 @@ class ProjectCache:
 
     def _summary_path(self, source_fp: Dict[str, Any]) -> Path:
         key = self.cache_key({"kind": "summary", "source": source_fp})
-        return self.summary_dir / f"{key}.txt"
+        return self._track_path(self.summary_dir / f"{key}.txt")
 
     def materialized_slot(self, key: str) -> Path:
-        return self.materialized_dir / str(key)
+        return self._track_path(self.materialized_dir / str(key))
 
     def get_materialized_manifest(self, key: str) -> Optional[Dict[str, Any]]:
         if self.rebuild and str(key) not in self._written_materialized_keys:
@@ -320,6 +386,8 @@ class ProjectCache:
         safe = self._safe_name(name)
         slot = self.cache_key({"name": name, "signature": signature})[:12]
         p = self.named_dir / f"{safe}__{slot}.pkl"
+        self._track_path(p)
+        self._used_named_names.add(str(name))
         try:
             memtrace_checkpoint(
                 self.logger,
@@ -380,6 +448,7 @@ class ProjectCache:
             "size": int(st.st_size),
         }
         self._written_named_keys.add(str(name))
+        self._used_named_names.add(str(name))
         self._save_manifest()
 
     def get_named(self, name: str, signature: str):
@@ -391,6 +460,7 @@ class ProjectCache:
             return None
         if str(item.get("signature")) != str(signature):
             return None
+        self._used_named_names.add(str(name))
         try:
             kind = str(item.get("kind", "dataframe")).strip().lower()
             if kind == "dataframe-ref":
@@ -401,7 +471,7 @@ class ProjectCache:
                     return self.get_dataframe(ref_key)
                 except Exception:
                     return None
-            p = self.root / item["path"]
+            p = self._track_path(self.root / item["path"])
             if not p.exists():
                 return None
             try:
