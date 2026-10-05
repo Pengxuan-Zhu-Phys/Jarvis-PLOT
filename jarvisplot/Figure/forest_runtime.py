@@ -153,7 +153,7 @@ class ForestFigure(Figure):
                     b = style['box']
                     box = Rectangle((to_x(c['q1']), yc-b['height_mm']/2), to_x(c['q3'])-to_x(c['q1']), b['height_mm'], facecolor=b['facecolor'], edgecolor=b['edgecolor'], alpha=b['alpha'], linewidth=b['linewidth_pt'], zorder=3)
                     ax.add_patch(box)
-                    median, = ax.plot([to_x(c['median'])]*2, [yc-b['height_mm']/2, yc+b['height_mm']/2], color=b['edgecolor'], linewidth=b['linewidth_pt'], zorder=4)
+                    median, = ax.plot([to_x(c['median'])]*2, [yc-b['height_mm']/2, yc+b['height_mm']/2], color=b['median_color'], linewidth=b['linewidth_pt'], zorder=4)
                     glyph = ForestGlyph((whisker, box, median), glyph='box')
                     extent = b['height_mm']/2+b['linewidth_pt']*MM_PER_PT/2
                 else:

@@ -442,6 +442,11 @@
             "height_mm": {
               "type": "number",
               "exclusiveMinimum": 0
+            },
+            "median_color": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Box median line colour, independent of the box border. Default black."
             }
           },
           "additionalProperties": false

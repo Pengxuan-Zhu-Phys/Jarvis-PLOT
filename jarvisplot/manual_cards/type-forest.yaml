@@ -107,7 +107,7 @@ human:
       mm. Height = 20 + row_count * 5.5 + 20 mm. Upper text centre 1 mm; lower plot centre 3.6
       mm. Title 9 pt, body 5–6 pt. Helvetica and black/white/Jarvis blue border #2F7FD8/light blue fill #73B8F4/#DA291C remain. The 12-column grid
       is a design reference; table widths follow actual text metrics.'
-    - forest merges sparse box/interval/scatter/rows/axis/grid/reference appearance. forest.geometry
+    - forest merges sparse box/interval/scatter/rows/axis/grid/reference appearance. Box borders and whisker/cap strokes use Jarvis blue; fill uses Jarvis light blue. forest.box.median_color independently controls the median line, default black. forest.geometry
       and forest.typography provide explicit physical layout/font overrides, including a larger
       point_band_mm/row_band_mm/row_pitch_mm for crowded rows. The canvas width stays fixed
       at 82.5 mm.
