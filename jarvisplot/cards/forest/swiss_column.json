@@ -115,8 +115,8 @@
         "separators": false
       },
       "box": {
-        "facecolor": "#2F7FD8",
-        "edgecolor": "#000000",
+        "facecolor": "#73B8F4",
+        "edgecolor": "#2F7FD8",
         "alpha": 1,
         "linewidth_pt": 0.5,
         "height_mm": 1.3
@@ -190,6 +190,6 @@
     ],
     "exclusive": true,
     "geometry": "physical_mm",
-    "note": "Compact content-sized left columns and right-aligned right columns; 12-column reference grid, shared top numerical axis and vertical data grid; Helvetica, black/white/Jarvis blue #2F7FD8/#DA291C; no automatic metadata or heading."
+    "note": "Compact content-sized left columns and right-aligned right columns; 12-column reference grid, shared top numerical axis and vertical data grid; Helvetica, black/white/Jarvis blue border #2F7FD8/light blue fill #73B8F4/#DA291C; no automatic metadata or heading."
   }
 }
