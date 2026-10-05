@@ -151,4 +151,11 @@ def agent_topic_data(topic: str) -> dict[str, Any]:
         from .legend_cards import legend_card_catalog
 
         data["legend_cards"] = legend_card_catalog()
+    if card['id'] == 'type-forest':
+        from .forest_contract import appearance
+        from .schema_catalog import subschema
+        geometry, typography, style, _ = appearance({})
+        data['forest'] = {'schema': subschema('https://jarvis-plot.org/schema/v2/types/forest.json'),
+                          'defaults': {'geometry': geometry, 'typography': typography, 'style': style},
+                          'x_scale': 'shared', 'legend_contract': 'object/label/role', 'legend_location': 'footer'}
     return data

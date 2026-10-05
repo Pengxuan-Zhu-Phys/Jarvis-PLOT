@@ -129,6 +129,12 @@ def plan_dataset_required_columns(core) -> None:
     if not isinstance(core.yaml.config, dict):
         return
     ds_names = {str(dts.name): dts for dts in core.dataset}
+    from .forest_contract import plan_forest_sources
+    forest_plan = plan_forest_sources(core.yaml.config)
+    for name, plan in forest_plan.items():
+        if name in ds_names:
+            ds_names[name].literal_columns = plan['literal_columns']
+            ds_names[name].preserve_empty_strings = True
     if not column_pruning_enabled():
         for dts in core.dataset:
             dts.set_required_columns(None, retained=None)
@@ -138,6 +144,9 @@ def plan_dataset_required_columns(core) -> None:
 
     preprocessor = getattr(core, "preprocessor", None)
     demand: Dict[str, Set[str]] = {name: set() for name in ds_names.keys()}
+    for name, plan in forest_plan.items():
+        if name in demand:
+            demand[name].update(plan['columns'])
 
     figures = core.yaml.config.get("Figures", [])
     if not isinstance(figures, list):
@@ -251,6 +260,11 @@ def prepare_usage_plan(core):
         if not isinstance(fig, dict):
             continue
         if fig.get("enable", True) is False:
+            continue
+        if fig.get('type') == 'forest':
+            for key in ('data', 'points'):
+                if isinstance(fig.get(key), str):
+                    counts[fig[key]] = counts.get(fig[key], 0) + 1
             continue
         layers = fig.get("layers", [])
         if not isinstance(layers, list):

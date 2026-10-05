@@ -1,0 +1,244 @@
+id: type-forest
+title: type forest
+summary: One continuous physical column from generic row glyphs and optional observations; one
+  shared x axis.
+role: how-to
+priority: 37
+see_also:
+- legend
+- style-axes
+- data-columns
+- debug-overlay
+related_cli:
+- argv:
+  - jplot
+  - man
+  - forest
+  - --json
+  why: canonical forest contract
+- argv:
+  - jplot
+  - cap
+  - types
+  - --json
+  why: native formats and styles
+- argv:
+  - jplot
+  - template
+  - show
+  - forest
+  - --json
+  why: short skeleton and source slots
+- argv:
+  - jplot
+  - validate
+  - <yaml>
+  - --json
+  why: shape, sources, fields and appearance
+- argv:
+  - jplot
+  - doctor
+  - <yaml>
+  - --json
+  why: table validation and shared physical layout solve
+- argv:
+  - jplot
+  - config
+  - expand
+  - <yaml>
+  - --figure
+  - <name>
+  - --json
+  why: inspect native rows, points, global limits/ticks and geometry
+- argv:
+  - jplot
+  - <yaml>
+  - --report
+  why: render and measure text/mark/legend bounds
+live_sources:
+- verb: cap.types
+  truth: forest is native, not a layer macro
+- verb: cap.styles
+  truth: '[forest, swiss_column] owns fixed mm geometry'
+human:
+  panels:
+  - kind: overview
+    title: Use forest
+    body: Supply a row table and optional point table. File order is panel order. Default glyph
+      is interval (estimate/lower/upper); box reads supplied lower/q1/median/q3/upper. Jarvis
+      draws supplied coordinates and point classes; their statistical meanings belong to the
+      producer. No quartile, confidence interval or outlier computation is performed.
+  - kind: yaml
+    title: Minimal interval
+    lexer: yaml
+    body: "DataSet:\n  - {name: studies, path: ./studies.csv, type: csv}\nFigures:\n  - {name:\
+      \ comparison, type: forest, data: studies}\n"
+  - kind: yaml
+    title: Box and observations
+    lexer: yaml
+    body: "Figures:\n  - name: distributions\n    type: forest\n    data: rows\n    points:\
+      \ observations\n    glyph: box\n    x: {label: \"Deviation [%]\", reference: 0}\n    forest:\n\
+      \      box: {alpha: 0.12}\n      scatter:\n        classes:\n          outlier: {color:\
+      \ \"#cc3311\", diameter_mm: 1.2}\n"
+  - kind: notes
+    title: Tables
+    items:
+    - 'Rows: unique nonempty string row; optional literal label/detail/stats; interval coordinates
+      or five box coordinates. Entirely blank glyphs require observations. Partial or unordered
+      glyphs fail.'
+    - 'Points: row/id/x, optional class (normal). Unique (row,id), existing foreign key, finite
+      x. Strings including leading zeros remain strings when read from CSV.'
+    - Optional fields and point_fields map canonical roles to column names. annotations selects
+      literal label/detail/stats columns; false hides a slot. Explicit mappings must exist.
+      Extra metadata is retained in the source, never interpreted by the renderer.
+  - kind: notes
+    title: Shared numerical axis
+    items:
+    - All rows use one domain, tick set and x-to-mm mapping. Tick numbers appear only at top
+      and bottom. All drawn points, including outliers, and glyph coordinates plus reference
+      contribute to inference.
+    - x.lim is shared and must include every drawable value/reference. x.minimum_span is positive
+      (default 1). Degenerate inputs get a deterministic nonzero domain. Per-row rescaling,
+      nonlinear axes and silent clipping are unsupported.
+  - kind: notes
+    title: Physical layout and errors
+    items:
+    - 'Compact defaults: canvas 82.5 mm, numerical span 78.5 mm; row pitch 5.5 mm, band 5.2
+      mm. Height = 20 + row_count * 5.5 + 20 mm. Upper text centre 1 mm; lower plot centre 3.6
+      mm. Title 9 pt, body 5–6 pt. Helvetica and black/white/Jarvis blue #2F7FD8/#DA291C remain. The 12-column grid
+      is a design reference; table widths follow actual text metrics.'
+    - forest merges sparse box/interval/scatter/rows/axis/grid/reference appearance. forest.geometry
+      and forest.typography provide explicit physical layout/font overrides, including a larger
+      point_band_mm/row_band_mm/row_pitch_mm for crowded rows. The canvas width stays fixed
+      at 82.5 mm.
+    - Points pack deterministically in mm, preserving numerical x. Packing overflow is an error
+      naming the row; no observations are dropped, jittered in x, or shrunk. Doctor measures
+      columns with literal font metrics without creating a figure; native render checks final
+      text, legend and glyph bounds.
+    - Point classes normal/outlier/unrated/singleton are styles, not inferred decisions. Unknown
+      classes require forest.scatter.classes entries. Native class marks generate single-component
+      object/label declarations; only frame.ax.legend controls overall order/columns/location/card.
+    - Forest owns the canvas. layers, method, axes.rect, figsize and incompatible type slots
+      are rejected. debug uses the existing design overlay with the solved frame.
+  - kind: yaml
+    title: Table columns and text blocks
+    lexer: yaml
+    body: "title:\n  text: thinpr | bin distributions\ndescription:\n  text: 'W = sidewt; P\
+      \ = P8; E = EMA. Outliers: 1.5 x IQR, n >= 6.\n\n    Box = IQR; whiskers = non-outlier\
+      \ extent. CV includes all points.'\ncolumns:\n- field: label\n  label: Bin\n  role: row_name\n\
+      - field: W\n  label: W\n  role: left\n- field: P\n  label: P\n  role: left\n- field: E\n\
+      \  label: E\n  role: left\n- field: n\n  label: n\n  format: .0f\n  role: right\n- field:\
+      \ cv\n  label: CV [%]\n  format: .1f\n  role: right\n"
+  - kind: notes
+    title: Table and footer ownership
+    items:
+    - columns requires literal field and header label; role is row_name, left (default) or right.
+      At most one bold row_name appears first on the left. Left columns are left aligned and
+      compact; right columns are right aligned against the far-right grid boundary. Declaration
+      order is retained on each side, so n/CV puts CV far right and n to its left. Format/missing/fontsize/fontweight
+      control cell text; header labels hold units.
+    - Each width follows the actual font metrics of the header and all formatted body values,
+      with small padding and column_gap_mm (default 0.8 mm) between columns. No grid rounding,
+      manual width_mm or align option exists. group_gap_mm reserves the minimum separation between
+      the two text groups. The lower numerical span follows outer margins independently of these
+      widths; text stays above the mark band. Oversized text groups/ink or marks fail explicitly.
+    - 'title and description use the same standard text block: {text, fontsize?, color?, fontweight?}.
+      Multiline description uses text: |. Content belongs to YAML; fonts/layout defaults belong
+      to the style card. No automatic row-count or explanatory text is inserted into the figure.
+      Title stays in the header; description appears in the third footer section, default 5
+      pt, retaining the supplied content.'
+    - The footer contains a glyph example and present point classes, resolved through the canonical
+      object/label/role legend. glyph_label personalises the producer-supplied glyph meaning;
+      default is Box + whiskers or Estimate + bounds. frame.ax.legend controls overall ordering/columns/card/location.
+      Default ncols 2 groups the glyph at reference column 2 and all point classes at column
+      5; ordering applies within each group. forest.geometry.legend_start_columns defaults [2,
+      5]. YAML description forms the third footer section at description_start_column 8, spanning
+      description_columns 5; its first baseline is footer-relative description_y_mm. Long labels
+      and description wrap without shrinking fonts. frame.ax.legend.ncols remains 2 for the
+      actual glyph/point legend. The lower-left logo shares the point column height.
+    - 'The Swiss axlogo uses the shared JarvisHEP.png icon and wordmark on the grid. frame.axlogo:
+      false disables it; a mapping overrides text or selects an image file. --print policy applies.
+      Default 20 mm header and 20 mm footer yield an 82.5 x 573.5 mm figure for 97 rows.'
+    - Plain white canvas; no row shading, automatic numbered metadata or legend heading. Point
+      legend keys use legend_point_key_mm (default 1.2 mm) with consistently left-aligned marker
+      centres and adjacent labels.
+  - kind: yaml
+    title: Debug reference grid
+    lexer: yaml
+    body: "debug:\n  forest_grid:\n    columns: {show: true}\n    baselines: {show: true}\n\
+      \    bands: {show: true}\n    labels: {show: true}\n"
+  - kind: yaml
+    title: Numerical grid and row rules
+    lexer: yaml
+    body: "forest:\n  grid: {show: true, divisions: 4}\n  rows: {separators: false}\n"
+agent:
+  body_markdown: 'Create native forest YAML from standard row and optional point tables. Use
+    validate for schema/sources, doctor for data/physical layout, config expand for the solved
+    scene, and render for actual ink/legend bounds. Row names and left columns are compact and
+    left aligned; right columns are compact and right aligned from the far-right boundary. Widths
+    follow actual header and formatted body font metrics, with no grid rounding or manual widths.
+    Upper text and lower marks share horizontal space. All rows share numerical limits/mapping.
+    Defaults use a 20 mm header, 9 pt title and 5–6 pt body. A shared top numerical axis and
+    continuous vertical numerical grid replace per-row horizontal axes/rules. forest.grid configures
+    the normal numerical grid; rows.separators defaults false. debug: true separately shows
+    the 12-column design grid, baselines and row bands. Helvetica regular/bold and black/white/Jarvis blue #2F7FD8/#DA291C
+    remain. Structured title/description/meta are YAML-owned. Canonical legend and native badge
+    remain grid-aligned.'
+  examples:
+  - title: Generic interval
+    yaml: "version: '0.3'\nDataSet:\n- name: rows\n  path: ./data/interval.csv\n  type: csv\n\
+      Figures:\n- name: forest-interval\n  type: forest\n  data: rows\n  glyph: interval\n \
+      \ title:\n    text: Generic interval comparison\n  x:\n    label: Supplied coordinates\n\
+      \    reference: 0\noutput:\n  dir: ../../Workshop/forest_native\n  formats:\n  - png\n\
+      \  - svg\n  dpi: 220\n"
+  - title: Box and points
+    yaml: "version: '0.3'\nDataSet:\n- name: rows\n  path: ./data/box.csv\n  type: csv\n- name:\
+      \ observations\n  path: ./data/points.csv\n  type: csv\nFigures:\n- name: forest-box\n\
+      \  type: forest\n  data: rows\n  glyph: box\n  title:\n    text: Generic box comparison\n\
+      \  x:\n    label: Supplied coordinates\n    reference: 0\n  points: observations\noutput:\n\
+      \  dir: ../../Workshop/forest_native\n  formats:\n  - png\n  - svg\n  dpi: 220\n"
+  - title: Table columns, footer legend and axlogo
+    yaml: "version: '0.3'\nDataSet:\n- name: rows\n  path: ./data/forest-rows.csv\n  type: csv\n\
+      - name: observations\n  path: ./data/forest-points.csv\n  type: csv\nFigures:\n- name:\
+      \ forest-all-97\n  type: forest\n  style:\n  - forest\n  - swiss_column\n  data: rows\n\
+      \  points: observations\n  glyph: box\n  title:\n    text: thinpr | bin distributions\n\
+      \  x:\n    label: Deviation from bin mean [%]\n    reference: 0\n  description:\n    text:\
+      \ |-\n      W = sidewt; P = P8; E = EMA. Outliers: 1.5 x IQR, n >= 6.\n      Box = IQR;\
+      \ whiskers = non-outlier extent. CV includes all points.\n  columns:\n  - field: label\n\
+      \    label: Bin\n    role: row_name\n  - field: W\n    label: W\n    role: left\n  - field:\
+      \ P\n    label: P\n    role: left\n  - field: E\n    label: E\n    role: left\n  - field:\
+      \ n\n    label: n\n    format: .0f\n    role: right\n  - field: cv\n    label: CV [%]\n\
+      \    format: .1f\n    role: right\noutput:\n  dir: ../../Workshop/forest_native\n  formats:\n\
+      \  - svg\n  - png\n  dpi: 220\n"
+  schema_ids:
+  - https://jarvis-plot.org/schema/v2/types/forest.json
+  diagnostics:
+  - code: JP-FOR-001
+    meaning: forest appearance or source contract
+    fix: Select [forest, swiss_column], correct the named field and use closed schema keys.
+  - code: JP-FOR-002
+    meaning: invalid data or physical packing
+    fix: Correct the named row/id/coordinate/class; increase band/pitch for overflow. Render
+      checks measured text bounds.
+  anti_patterns:
+  - Do not infer quartiles/outliers or interval meaning.
+  - Do not declare per-row axes, rescale rows, paginate or preset column widths.
+  - Do not drop observations or silently shrink marks/fonts.
+  verification:
+    validate:
+      argv:
+      - jplot
+      - validate
+      - <yaml>
+      - --json
+    doctor:
+      argv:
+      - jplot
+      - doctor
+      - <yaml>
+      - --json
+    render:
+      argv:
+      - jplot
+      - <yaml>
+      - --report

@@ -200,6 +200,13 @@ def _types() -> list[dict[str, Any]]:
                 else f"jplot explain {name}"
             ),
         }
+        if name == 'forest':
+            from .forest_contract import ROW_FIELDS, POINT_FIELDS
+            entry.update(expands_to='native', styles=[['forest', 'swiss_column']], axes=['ax', 'axlogo'],
+                         required=['data'], optional=['points', 'glyph', 'x', 'title', 'description', 'columns', 'glyph_label', 'fields', 'point_fields', 'annotations', 'forest', 'frame', 'debug'],
+                         glyphs=['interval', 'box'], default_glyph='interval', row_fields=list(ROW_FIELDS), point_fields=list(POINT_FIELDS),
+                         geometry='physical_mm', x_scale='shared', tick_labels='top_and_bottom',
+                         schema='https://jarvis-plot.org/schema/v2/types/forest.json', man='jplot man forest')
         if name == "correlation_matrix":
             matching = [
                 item

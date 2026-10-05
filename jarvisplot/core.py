@@ -177,7 +177,11 @@ class JarvisPLOT():
         report_figures: list[dict] = []
         for fig in self.yaml.config["Figures"]:
             from .Figure.figure import Figure
-            figobj = Figure()
+            if isinstance(fig, dict) and fig.get('type') == 'forest':
+                from .Figure.forest_runtime import ForestFigure
+                figobj = ForestFigure()
+            else:
+                figobj = Figure()
             figobj._yaml_dir = self.yaml.dir
             figobj.config = self.yaml.config
             figobj.logger = self.logger
@@ -292,6 +296,8 @@ class JarvisPLOT():
         observations = getattr(figobj, "health_observations", None) or []
         block = report_to_dict(observations, diagnostics=bag)
         block["figure"] = str(fig_name)
+        if hasattr(figobj, 'forest_layout'):
+            block['forest'] = figobj.forest_layout
         return block
 
     def _write_render_report(self, figures: list, *, failures: list[str]) -> None:

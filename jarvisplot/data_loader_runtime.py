@@ -866,10 +866,15 @@ def load_parquet(dataset):
     if pl is not None:
         try:
             parquet_df = pl.read_parquet(dataset.path, columns=columns)
-            try:
-                loaded = parquet_df.to_pandas()
-            except ModuleNotFoundError:
-                loaded = pd.DataFrame(parquet_df.to_dict(as_series=False))
+            if getattr(dataset, 'preserve_empty_strings', False):
+                # Preserve deliberate null glyphs separately from invalid IEEE
+                # NaN; a normal pandas float conversion conflates these values.
+                loaded = pd.DataFrame(parquet_df.to_dict(as_series=False), dtype=object)
+            else:
+                try:
+                    loaded = parquet_df.to_pandas()
+                except ModuleNotFoundError:
+                    loaded = pd.DataFrame(parquet_df.to_dict(as_series=False))
             dataset._data_backend = "pandas"
         except Exception as e:
             if dataset.logger:

@@ -212,3 +212,11 @@ Use that file for:
 - validation and test work that should not be mixed into this boundary doc
 
 Keep this context doc focused on current state, ownership, and boundaries.
+
+Native `type: forest` retains high-level YAML and solves a continuous physical canvas from generic row/point tables. All rows share x limits/ticks; the default 82.5 mm Swiss card uses 5.5 mm pitch. It consumes supplied glyphs/classifications without statistical inference and uses canonical class object/label legend declarations. `config expand` reports its solved scene rather than lowering it to layers. See `docs/specs/FOREST.md`.
+
+Forest columns declare row_name/left/right roles. Actual header and formatted body font metrics determine each column width; compact text groups sit on the upper row line, above one common full-width distribution band. Text and marks overlap horizontally but remain separated vertically. Users configure roles, formats and fonts, rather than manual column widths.
+
+Forest table revision: `columns` owns header names, literal fields, widths/alignment/number formatting; `title` and `description` use structured text blocks. The native glyph/class legend sits in the footer with standard `axlogo`; row pitch remains 5.5 mm and default footer is 20 mm. Two legend columns group glyphs at reference column 2 and point classes at column 5; YAML description wraps in a third footer section at column 8; the standard Jarvis-HEP icon remains at bottom left, sharing height with the point column.
+
+Forest Swiss card uses 12 reference columns, Helvetica regular/bold, compact left-aligned left columns and right-aligned right columns and black/white/Jarvis blue #2F7FD8/#DA291C. Measured columns use actual widths without grid rounding. A shared top numerical axis and vertical grid replace row rules/per-row axes; compact header is 20 mm, with description moved to the footer. The native forest debug overlay shows grid lines, baselines and row bands through the standard debug switch; metadata is optional and omitted from default examples; no automatic numbered legend heading or row shading. Point legend keys and labels are left aligned with compact spacing.

@@ -298,6 +298,13 @@ def _run_expand(args, *, as_json: bool) -> int:
     try:
         doc, meta = load_yaml_doc(path)
         before = meta.get("raw_text") or dump_yaml_doc(doc, meta=meta)
+        native = [dict(f) for f in doc.get('Figures', []) if isinstance(f, dict) and f.get('type') == 'forest' and (names is None or f.get('name') in names) and f.get('enable', True)]
+        forests = []
+        if native:
+            from ..forest_contract import load_forest_tables, solve_forest
+            native_config = {**_to_plain(doc), 'Figures': native}
+            frames = load_forest_tables(native_config, base_dir=str(path.resolve().parent))
+            forests = [solve_forest(f, frames) for f in native]
         expanded = expand_typed_figures(
             doc,
             figure_names=names,
@@ -318,7 +325,7 @@ def _run_expand(args, *, as_json: bool) -> int:
         )
         return emit(env) if as_json else _fail(env)
 
-    if not expanded:
+    if not expanded and not forests:
         data = {
             "file": str(path.resolve()),
             "figures": names,
@@ -349,7 +356,7 @@ def _run_expand(args, *, as_json: bool) -> int:
         write=bool(args.write),
         show_diff=bool(args.diff) if args.diff is not None else not bool(args.write),
         check_columns=bool(getattr(args, "check_columns", True)),
-        extra={"figures": names, "expanded": expanded, "status": "expanded"},
+        extra={"figures": names, "expanded": expanded, "status": "expanded" if expanded else 'resolved', 'forests': forests},
     )
 
 

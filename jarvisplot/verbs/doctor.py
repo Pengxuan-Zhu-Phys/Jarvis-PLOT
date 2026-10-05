@@ -135,6 +135,7 @@ def run(argv: Sequence[str], *, prog: str = "jplot doctor") -> int:
             "renderable": report.get("renderable"),
             "datasets": report.get("datasets") or {},
             "layers": report.get("layers") or [],
+            "forests": report.get('forests') or [],
         },
         "error_count": len(merged.errors),
         "warning_count": len(merged.warnings),

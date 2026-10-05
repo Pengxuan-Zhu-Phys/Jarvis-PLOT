@@ -1,0 +1,21 @@
+version: '0.3'
+DataSet:
+- name: rows
+  path: ./data/interval.csv
+  type: csv
+Figures:
+- name: forest-interval
+  type: forest
+  data: rows
+  glyph: interval
+  title:
+    text: Generic interval comparison
+  x:
+    label: Supplied coordinates
+    reference: 0
+output:
+  dir: ../../Workshop/forest_native
+  formats:
+  - png
+  - svg
+  dpi: 220

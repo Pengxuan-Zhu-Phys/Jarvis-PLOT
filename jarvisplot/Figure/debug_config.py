@@ -71,6 +71,13 @@ _LABEL_FONT = {
 
 
 DEFAULT_DEBUG = {
+    "forest_grid": {
+        "show": True,
+        "columns": {"show": True, "plot": {"color": "#DA291C", "linewidth": 0.3, "linestyle": ":", "alpha": 0.7}},
+        "baselines": {"show": True, "plot": {"color": "#DA291C", "linewidth": 0.2, "linestyle": "--", "alpha": 0.5}},
+        "bands": {"show": True, "Rectangle": {"edgecolor": "#DA291C", "linewidth": 0.25, "fill": False, "alpha": 0.5}},
+        "labels": {"show": True, "text": {"color": "#DA291C", "fontsize": 4, "ha": "left", "va": "top"}},
+    },
     # Which axes gets fully dimensioned and hosts the info panel. First match wins.
     "primary_order": ["ax", "ax0", "ax1", "axtri"],
     "units": {"cm_per_inch": 2.54, "pt_per_inch": 72.0},

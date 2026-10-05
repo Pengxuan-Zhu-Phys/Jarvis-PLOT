@@ -328,3 +328,5 @@ Read the context docs and roadmap before changing parsing, transforms, rendering
 ## License
 
 MIT License
+
+Create a continuous forest figure with `type: forest`, a generic row table and optional point table. The default Swiss-column card uses 82.5 mm width and 5.5 mm row pitch; every row shares one numerical x domain. See [the forest contract](docs/specs/FOREST.md), [native examples](Example/forest/README.md), or `jplot man forest --json`.

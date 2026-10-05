@@ -132,11 +132,28 @@ def validate_config(
     _check_layer_sources(config, set(resolved_paths) | _collect_shared_names(config), bag)
     _check_method_contracts(config, bag)
     _check_corrplot_contracts(config, bag)
+    _check_forest_contracts(config, bag, base_dir=base_dir)
     _check_legend_contracts(config, bag, base_dir=base_dir)
     _check_ignored_keys(config, bag)
     if check_columns:
         _check_columns_exist(config, resolved_paths, bag)
     return bag
+
+
+def _check_forest_contracts(config, bag, *, base_dir=None):
+    from .forest_contract import appearance
+    names = {e.get('name') for e in config.get('DataSet', []) if isinstance(e, dict)}
+    for index, figure in enumerate(config.get('Figures', [])):
+        if not isinstance(figure, dict) or figure.get('type') != 'forest' or figure.get('enable', True) is False:
+            continue
+        path = join_path('Figures', index)
+        for key in ('data', 'points'):
+            if key in figure and isinstance(figure[key], str) and figure[key] not in names:
+                bag.error('JP-FOR-001', join_path(path, key), f"unknown DataSet {figure[key]!r}", suggestion='Use a declared DataSet.name.')
+        try:
+            appearance(figure)
+        except (ValueError, TypeError, KeyError) as exc:
+            bag.error('JP-FOR-001', path, str(exc), suggestion='Use jplot man forest --json for the native format and appearance contract.')
 
 
 def _check_legend_contracts(config: dict[str, Any], bag: DiagnosticBag, *, base_dir=None) -> None:
@@ -147,6 +164,10 @@ def _check_legend_contracts(config: dict[str, Any], bag: DiagnosticBag, *, base_
     )
     for fi, figure in enumerate(config.get("Figures") or []):
         if not isinstance(figure, dict):
+            continue
+        if figure.get('type') == 'forest':
+            # Class membership is resolved from input tables by the native
+            # solve. No public layers exist to inspect at schema time.
             continue
         layers = figure.get("layers") or []
         frame = figure.get("frame") or {}

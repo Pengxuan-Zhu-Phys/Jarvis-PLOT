@@ -18,7 +18,7 @@
     },
     "type": {
       "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/nonemptyString",
-      "description": "Figure-type shorthand expanded into layers before rendering. Run `jplot cap types` for the list."
+      "description": "Registered high-level figure format. Most types expand to layers; forest retains a native data-driven physical layout. Run jplot cap types."
     },
     "style": {
       "$ref": "https://jarvis-plot.org/schema/v2/core/common.json#/$defs/stringOrStringList",
@@ -33,7 +33,7 @@
       "x-jarvis-zone": "delegated",
       "description": "Per-axes frame settings merged over the style card: limits, scales, labels, ticks, legend, colorbar colour ownership.",
       "patternProperties": {
-        "^ax(?!es$)": {
+        "^ax(?!es$)(?!logo$)": {
           "type": "object",
           "x-jarvis-zone": "delegated",
           "properties": {
@@ -42,6 +42,16 @@
             }
           },
           "additionalProperties": true
+        }
+      },
+      "properties": {
+        "axlogo": {
+          "type": [
+            "object",
+            "boolean"
+          ],
+          "x-jarvis-zone": "delegated",
+          "description": "Forest badge settings or false; ordinary figures use a settings mapping."
         }
       }
     },
@@ -163,6 +173,195 @@
       "type": "object",
       "description": "type: correlation_matrix -- options for the `correlation` transform itself (missing, min_periods, triangle, include_diagonal). Column selection lives in `variables`. Expanded away before render.",
       "x-jarvis-zone": "delegated"
+    },
+    "points": {
+      "type": "string",
+      "minLength": 1
+    },
+    "glyph": {
+      "enum": [
+        "interval",
+        "box"
+      ],
+      "default": "interval"
+    },
+    "title": {
+      "x-jarvis-zone": "delegated",
+      "description": "Forest text block: {text, fontsize?, color?, fontweight?}."
+    },
+    "fields": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "row": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stats": {
+          "type": "string",
+          "minLength": 1
+        },
+        "estimate": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lower": {
+          "type": "string",
+          "minLength": 1
+        },
+        "q1": {
+          "type": "string",
+          "minLength": 1
+        },
+        "median": {
+          "type": "string",
+          "minLength": 1
+        },
+        "q3": {
+          "type": "string",
+          "minLength": 1
+        },
+        "upper": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "point_fields": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "row": {
+          "type": "string",
+          "minLength": 1
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "x": {
+          "type": "string",
+          "minLength": 1
+        },
+        "class": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "label": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "const": false
+            }
+          ]
+        },
+        "detail": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "const": false
+            }
+          ]
+        },
+        "stats": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "const": false
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "forest": {
+      "$ref": "https://jarvis-plot.org/schema/v2/types/forest.json#/$defs/appearance"
+    },
+    "description": {
+      "x-jarvis-zone": "delegated",
+      "description": "Forest text block: {text, fontsize?, color?, fontweight?}."
+    },
+    "columns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "x-jarvis-zone": "closed",
+        "properties": {
+          "field": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "format": {
+            "type": "string",
+            "minLength": 1
+          },
+          "missing": {
+            "type": "string"
+          },
+          "fontsize": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "fontweight": {
+            "enum": [
+              "normal",
+              "bold"
+            ]
+          },
+          "role": {
+            "enum": [
+              "row_name",
+              "left",
+              "right"
+            ],
+            "default": "left",
+            "description": "row_name: first bold left column; left: compact left-aligned group; right: compact right-aligned group anchored at the right edge. Width follows actual header and cell text."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "field",
+          "label"
+        ]
+      }
+    },
+    "glyph_label": {
+      "type": "string",
+      "minLength": 1
+    },
+    "meta": {
+      "type": "object",
+      "x-jarvis-zone": "delegated"
     }
   },
   "additionalProperties": false,
@@ -243,10 +442,105 @@
           "x-jarvis-zone": "delegated",
           "additionalProperties": true,
           "description": "Debug 'ternary' group. Keys are validated at runtime against the packaged defaults, which report unknown keys with a did-you-mean; see jarvisplot/Figure/debug_config.py."
+        },
+        "forest_grid": {
+          "type": "object",
+          "x-jarvis-zone": "closed",
+          "properties": {
+            "show": {
+              "type": "boolean"
+            },
+            "columns": {
+              "type": "object",
+              "x-jarvis-zone": "closed",
+              "properties": {
+                "show": {
+                  "type": "boolean"
+                },
+                "plot": {
+                  "type": "object",
+                  "x-jarvis-zone": "delegated"
+                }
+              },
+              "additionalProperties": false
+            },
+            "baselines": {
+              "type": "object",
+              "x-jarvis-zone": "closed",
+              "properties": {
+                "show": {
+                  "type": "boolean"
+                },
+                "plot": {
+                  "type": "object",
+                  "x-jarvis-zone": "delegated"
+                }
+              },
+              "additionalProperties": false
+            },
+            "bands": {
+              "type": "object",
+              "x-jarvis-zone": "closed",
+              "properties": {
+                "show": {
+                  "type": "boolean"
+                },
+                "Rectangle": {
+                  "type": "object",
+                  "x-jarvis-zone": "delegated"
+                }
+              },
+              "additionalProperties": false
+            },
+            "labels": {
+              "type": "object",
+              "x-jarvis-zone": "closed",
+              "properties": {
+                "show": {
+                  "type": "boolean"
+                },
+                "text": {
+                  "type": "object",
+                  "x-jarvis-zone": "delegated"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false,
       "x-jarvis-example": "debug:\n  panel: {show: false}\n  dimension: {cap: {plot: {color: \"#888888\"}}}"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "forest"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "$ref": "https://jarvis-plot.org/schema/v2/types/forest.json"
+      },
+      "else": {
+        "properties": {
+          "frame": {
+            "properties": {
+              "axlogo": {
+                "type": "object",
+                "x-jarvis-zone": "delegated"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

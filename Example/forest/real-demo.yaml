@@ -1,0 +1,55 @@
+version: '0.3'
+DataSet:
+- name: rows
+  path: ./data/forest-rows.csv
+  type: csv
+- name: observations
+  path: ./data/forest-points.csv
+  type: csv
+Figures:
+- name: forest-all-97
+  type: forest
+  style:
+  - forest
+  - swiss_column
+  data: rows
+  points: observations
+  glyph: box
+  title:
+    text: thinpr | bin distributions
+  x:
+    label: Deviation from bin mean [%]
+    reference: 0
+  description:
+    text: |-
+      Outliers: 1.5 x IQR, n >= 6.
+      Box = IQR;
+      whiskers = non-outlier extent.
+      CV includes all points.
+  columns:
+  - field: label
+    label: Bin
+    role: row_name
+  - field: W
+    label: sidewt
+    role: left
+  - field: P
+    label: P8
+    role: left
+  - field: E
+    label: EMA
+    role: left
+  - field: n
+    label: N
+    format: .0f
+    role: right
+  - field: cv
+    label: CV [%]
+    format: .1f
+    role: right
+output:
+  dir: ../../Workshop/forest_native
+  formats:
+  - svg
+  - png
+  dpi: 220

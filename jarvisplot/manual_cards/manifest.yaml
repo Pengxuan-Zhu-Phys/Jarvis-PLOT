@@ -1,6 +1,7 @@
 schema_version: 1
 default_topic: null
 aliases:
+  forest: type-forest
   playbook: workflow
   agent: workflow
   posterior: type-posterior-2d
@@ -63,3 +64,4 @@ topics:
   - cli-map
   - cache
   - debug-overlay
+  - type-forest

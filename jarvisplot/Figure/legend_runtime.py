@@ -41,12 +41,12 @@ class HandlerStack(HandlerBase):
         return artists
 
 
-def representative_handle(rendered):
+def representative_handle(rendered, handler_map=None):
     """Require one supported artist/container; multiple series are ambiguous."""
     from matplotlib.artist import Artist
     from matplotlib.container import Container
 
-    handler_map = Legend.get_default_handler_map()
+    handler_map = {**Legend.get_default_handler_map(), **(handler_map or {})}
     def collect(value):
         if isinstance(value, (Artist, Container)):
             return [value] if Legend.get_legend_handler(handler_map, value) is not None else []
@@ -74,7 +74,7 @@ def apply_legend(ax, config, layer_handles=None, *, base_dir=None, layer_specs=N
         for name in names:
             if name not in layer_handles:
                 raise ValueError(f"Legend object {entry['object']!r} is missing its rendered component {name!r}")
-            handle = representative_handle(layer_handles[name])
+            handle = representative_handle(layer_handles[name], kw.get('handler_map'))
             if handle is None:
                 raise ValueError(f"Legend object {entry['object']!r} component {name!r} has no supported legend handle")
             parts.append(handle)

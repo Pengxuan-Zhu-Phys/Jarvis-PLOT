@@ -188,3 +188,12 @@ Jarvis-PLOT owns:
 
 Jarvis-HEP should still export semantic graph information only, not final geometry.
 Future general diagram types should extend a clearer scene/layout split rather than growing ad hoc paths inside `figure.py`.
+
+## Native forest format
+
+- `jarvisplot/forest_contract.py`: generic rows/points validation, source demand, physical domain/packing solve; shared by doctor/inspection/render.
+- `jarvisplot/forest_text.py`: lazy literal font metrics for content-sized row_name/left/right columns, without creating a canvas.
+- `jarvisplot/Figure/forest_runtime.py`: one-canvas native renderer and measured annotation/glyph/legend bounds; standard Figure output/debug integration.
+- `schema/types/forest.json`, `cards/forest/swiss_column.json`, `manual_cards/type-forest.yaml`, template `forest`: packaged discovery contract.
+
+- `jarvisplot/Figure/forest_debug.py`: separate read-only 12-column grid, baseline and row-band overlay, dispatched by design_runtime through the standard debug switch.

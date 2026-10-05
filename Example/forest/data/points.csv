@@ -1,0 +1,5 @@
+row,id,x,class
+01,001,-2,normal
+01,002,0,normal
+01,003,7,outlier
+02,004,1,singleton

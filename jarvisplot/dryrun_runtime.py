@@ -128,6 +128,7 @@ def _dryrun_config(
         }, bag
 
     datasets_meta, frames = _load_datasets(work, base_dir=base_dir, bag=bag)
+    forest_layouts = []
     observations: list[LayerObservation] = []
     twins: dict[str, Any] = {}
     dataset_heavy = {name: meta.get("heavy_skipped", []) for name, meta in datasets_meta.items()}
@@ -148,6 +149,19 @@ def _dryrun_config(
         if not isinstance(figure, dict):
             continue
         fig_name = str(figure.get("name") or f"figure_{figure_index}")
+        if figure.get('enable', True) is False:
+            continue
+        if figure.get('type') == 'forest':
+            sources = [figure['data'], *([figure['points']] if figure.get('points') else [])]
+            if any(dataset_heavy.get(s) for s in sources):
+                forest_layouts.append({'figure': fig_name, 'status': 'partial_renderable', 'note': 'Input has skipped heavy transforms; solve occurs during native render.'})
+                continue
+            try:
+                from .forest_contract import solve_forest
+                forest_layouts.append(solve_forest(figure, frames))
+            except (ValueError, TypeError, KeyError) as exc:
+                bag.error('JP-FOR-002', f'$.Figures[{figure_index}]', str(exc), suggestion='Fix the named row/field or enlarge the physical row band; see jplot man forest.')
+            continue
         if "type" in figure:
             # Unknown type left unexpanded → hard error (not silent skip).
             bag.error(
@@ -238,6 +252,7 @@ def _dryrun_config(
         observations, diagnostics=bag, datasets=datasets_meta, twins=twins
     )
     report["type_expanded"] = list(expanded_names)
+    report['forests'] = forest_layouts
     report["heavy_skipped"] = list(heavy_skipped)
     report["ok"] = verdict_ok
     report["coverage"] = coverage
@@ -265,6 +280,15 @@ def _load_datasets(
 
     meta: dict[str, Any] = {}
     frames: dict[str, Any] = {}
+    from .forest_contract import plan_forest_sources, load_forest_tables
+    forest_plan = plan_forest_sources(config)
+    forest_frames = {}
+    forest_heavy = {}
+    if forest_plan:
+        try:
+            forest_frames = load_forest_tables(config, base_dir=base_dir, light_only=True, skipped=forest_heavy)
+        except Exception as exc:
+            bag.error('JP-FOR-002', '$.DataSet', f'forest input load failed: {exc}')
     for index, entry in enumerate(config.get("DataSet") or ()):
         if not isinstance(entry, dict):
             continue
@@ -272,6 +296,12 @@ def _load_datasets(
         if not isinstance(name, str) or not name.strip():
             continue
         name = name.strip()
+        if name in forest_plan:
+            if name in forest_frames:
+                df = forest_frames[name]
+                frames[name] = df
+                meta[name] = {'path': entry.get('path'), 'rows': len(df), 'columns': list(df.columns), 'heavy_skipped': forest_heavy.get(name, [])}
+            continue
         if str(entry.get("type") or "").strip().lower() == "generated":
             try:
                 df = generate_dataframe(entry.get("generate"))

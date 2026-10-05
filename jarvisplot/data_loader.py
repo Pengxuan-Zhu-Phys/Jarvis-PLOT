@@ -41,6 +41,10 @@ class DataSet():
         self.generate               = None
         self.required_columns: Optional[set[str]] = None
         self.retained_columns: Optional[set[str]] = None
+        # Assigned by formats whose identifiers/annotations are literal CSV
+        # strings. Not a new YAML dtype surface, and does not widen projection.
+        self.literal_columns: set[str] = set()
+        self.preserve_empty_strings = False
         self._whitelist_base_paths  = None
         self.cache                  = None
         self._loaded                = False
@@ -432,7 +436,11 @@ class DataSet():
                     wanted = set(planned)
                     usecols = [i for i, name in enumerate(header) if str(name) in wanted]
                     self._log_column_plan(len(usecols), len(header))
-            self.data = pd.read_csv(self.path, low_memory=False, usecols=usecols)
+            self.data = pd.read_csv(
+                self.path, low_memory=False, usecols=usecols,
+                dtype={name: str for name in self.literal_columns},
+                keep_default_na=not self.preserve_empty_strings,
+            )
             self.keys = list(self.data.columns)
             runtime.apply_dataset_transform(self, stage="csv")
 

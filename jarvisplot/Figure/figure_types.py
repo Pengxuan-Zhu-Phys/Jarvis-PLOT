@@ -752,7 +752,8 @@ def expand_correlation_matrix(info: Mapping[str, Any]) -> dict[str, Any]:
 
 # Types that expand_figure_type can lower to layers. Keep in sync with
 # expand_figure_type dispatch and capabilities.figure_types.
-KNOWN_FIGURE_TYPES = frozenset({"posterior_2d", "profile_2d", "correlation_matrix"})
+NATIVE_FIGURE_TYPES = frozenset({"forest"})
+KNOWN_FIGURE_TYPES = frozenset({"posterior_2d", "profile_2d", "correlation_matrix"}) | NATIVE_FIGURE_TYPES
 
 
 def expand_figure_type(info: Any) -> Any:
@@ -849,6 +850,7 @@ def expand_typed_figures(
             raise KeyError(f"figure(s) not found: {', '.join(missing)}")
 
     expanded_names: list[str] = []
+    native_found = False
     for index, fig in enumerate(figures):
         if not isinstance(fig, Mapping):
             continue
@@ -876,6 +878,12 @@ def expand_typed_figures(
             _note(logger, msg)
             continue
 
+        if fig_type in NATIVE_FIGURE_TYPES:
+            # Native table-driven formats keep their public contract. Their
+            # physical solve is inspectable, not a list of hand-authored layers.
+            native_found = True
+            continue
+
         try:
             out = expand_figure_type(fig)
         except Exception as exc:
@@ -897,6 +905,7 @@ def expand_typed_figures(
 
     if (
         not expanded_names
+        and not native_found
         and not allow_noop
         and raise_on_error
         and wanted is not None

@@ -69,6 +69,24 @@ def _apply_slots(node: Any, slots: dict[str, Any]) -> None:
 
 
 TEMPLATE_KINDS: dict[str, dict[str, Any]] = {
+    'forest': {
+        'title': 'Continuous forest (type: forest)', 'family': 'forest',
+        'requires': ['data'],
+        'description': 'Generic row glyphs and optional observations on one continuous physical canvas; shared x limits/ticks.',
+        'slots': [
+            {'name': 'path', 'type': 'string', 'default': './rows.csv', 'required': True},
+            {'name': 'data', 'type': 'string', 'default': 'rows', 'required': True},
+            {'name': 'name', 'type': 'string', 'default': 'comparison', 'required': True},
+        ],
+        'skeleton': {
+            'version': '0.3',
+            'DataSet': [{'name': '${data}', 'path': '${path}', 'type': 'csv'}],
+            'Figures': [{'name': '${name}', 'type': 'forest', 'data': '${data}', 'style': ['forest', 'swiss_column']}],
+            'output': {'dir': './plots', 'formats': ['png', 'svg'], 'dpi': 220},
+        },
+        'variants': [{'name': 'interval', 'glyph': 'interval'}, {'name': 'box_points', 'glyph': 'box', 'points': '<DataSet.name>'}],
+        'schema': 'https://jarvis-plot.org/schema/v2/types/forest.json',
+    },
     "posterior_2d": {
         "title": "2D posterior density (type: posterior_2d)",
         "family": "rect",

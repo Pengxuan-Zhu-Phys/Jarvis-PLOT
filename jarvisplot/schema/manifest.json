@@ -56,9 +56,12 @@
     "methods/tripcolor_axes.json",
     "methods/triplot.json",
     "methods/voronoi.json",
-    "methods/voronoif.json"
+    "methods/voronoif.json",
+    "types/forest.json"
   ],
-  "figure_types": {},
+  "figure_types": {
+    "forest": "https://jarvis-plot.org/schema/v2/types/forest.json"
+  },
   "methods": {
     "bar": "https://jarvis-plot.org/schema/v2/methods/bar.json",
     "barh": "https://jarvis-plot.org/schema/v2/methods/barh.json",

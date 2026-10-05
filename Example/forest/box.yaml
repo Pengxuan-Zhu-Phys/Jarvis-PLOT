@@ -1,0 +1,25 @@
+version: '0.3'
+DataSet:
+- name: rows
+  path: ./data/box.csv
+  type: csv
+- name: observations
+  path: ./data/points.csv
+  type: csv
+Figures:
+- name: forest-box
+  type: forest
+  data: rows
+  glyph: box
+  title:
+    text: Generic box comparison
+  x:
+    label: Supplied coordinates
+    reference: 0
+  points: observations
+output:
+  dir: ../../Workshop/forest_native
+  formats:
+  - png
+  - svg
+  dpi: 220

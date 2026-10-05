@@ -26,3 +26,5 @@ Use these docs when you need to know what a valid scene, style, profile, or laye
 
 1. `SCENE_JSON_SCHEMA.md`
 2. the schema doc relevant to the field or contract you are touching
+
+- [FOREST.md](FOREST.md): native continuous forest rows/points, shared numerical axis and physical layout.

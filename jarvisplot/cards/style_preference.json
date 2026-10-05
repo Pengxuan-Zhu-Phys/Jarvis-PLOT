@@ -26,5 +26,8 @@
     "corrplot": {
         "matrix": "&JP/jarvisplot/cards/corrplot/matrix.json",
         "diamond": "&JP/jarvisplot/cards/corrplot/diamond.json"
+    },
+    "forest": {
+        "swiss_column": "&JP/jarvisplot/cards/forest/swiss_column.json"
     }
 }

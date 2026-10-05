@@ -1,0 +1,819 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis-plot.org/schema/v2/types/forest.json",
+  "title": "Native continuous forest format",
+  "type": "object",
+  "x-jarvis-zone": "closed",
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "type": {
+      "const": "forest"
+    },
+    "enable": {
+      "type": "boolean"
+    },
+    "style": {
+      "const": [
+        "forest",
+        "swiss_column"
+      ]
+    },
+    "data": {
+      "type": "string",
+      "minLength": 1
+    },
+    "points": {
+      "type": "string",
+      "minLength": 1
+    },
+    "glyph": {
+      "enum": [
+        "interval",
+        "box"
+      ],
+      "default": "interval"
+    },
+    "title": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "fontsize": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "color": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fontweight": {
+          "enum": [
+            "normal",
+            "bold"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "text"
+      ]
+    },
+    "x": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "reference": {
+          "type": "number"
+        },
+        "lim": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          }
+        },
+        "minimum_span": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "fields": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "row": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stats": {
+          "type": "string",
+          "minLength": 1
+        },
+        "estimate": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lower": {
+          "type": "string",
+          "minLength": 1
+        },
+        "q1": {
+          "type": "string",
+          "minLength": 1
+        },
+        "median": {
+          "type": "string",
+          "minLength": 1
+        },
+        "q3": {
+          "type": "string",
+          "minLength": 1
+        },
+        "upper": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "point_fields": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "row": {
+          "type": "string",
+          "minLength": 1
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "x": {
+          "type": "string",
+          "minLength": 1
+        },
+        "class": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "label": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "const": false
+            }
+          ]
+        },
+        "detail": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "const": false
+            }
+          ]
+        },
+        "stats": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "const": false
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "forest": {
+      "$ref": "#/$defs/appearance"
+    },
+    "frame": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "ax": {
+          "type": "object",
+          "x-jarvis-zone": "closed",
+          "properties": {
+            "legend": {
+              "$ref": "https://jarvis-plot.org/schema/v2/core/legend.json"
+            }
+          },
+          "additionalProperties": false
+        },
+        "axlogo": {
+          "type": [
+            "boolean",
+            "object"
+          ],
+          "if": {
+            "type": "object"
+          },
+          "then": {
+            "type": "object",
+            "x-jarvis-zone": "closed",
+            "properties": {
+              "file": {
+                "type": "string",
+                "minLength": 1
+              },
+              "text": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "x-jarvis-zone": "delegated"
+                }
+              },
+              "clip": {
+                "type": "boolean"
+              },
+              "anchor": {
+                "enum": [
+                  "left",
+                  "right"
+                ]
+              },
+              "color": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "debug": {
+      "$ref": "https://jarvis-plot.org/schema/v2/core/figure.json#/properties/debug"
+    },
+    "description": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "fontsize": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "color": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fontweight": {
+          "enum": [
+            "normal",
+            "bold"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "text"
+      ]
+    },
+    "columns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "x-jarvis-zone": "closed",
+        "properties": {
+          "field": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "format": {
+            "type": "string",
+            "minLength": 1
+          },
+          "missing": {
+            "type": "string"
+          },
+          "fontsize": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "fontweight": {
+            "enum": [
+              "normal",
+              "bold"
+            ]
+          },
+          "role": {
+            "enum": [
+              "row_name",
+              "left",
+              "right"
+            ],
+            "default": "left",
+            "description": "row_name: first bold left column; left: compact left-aligned group; right: compact right-aligned group anchored at the right edge. Width follows actual header and cell text."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "field",
+          "label"
+        ]
+      }
+    },
+    "glyph_label": {
+      "type": "string",
+      "minLength": 1
+    },
+    "meta": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "number": {
+          "type": "string",
+          "pattern": "^[0-9]{2}$"
+        },
+        "year": {
+          "type": "string",
+          "pattern": "^[0-9]{4}$"
+        },
+        "place": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "type",
+    "data"
+  ],
+  "$defs": {
+    "appearance": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "rows": {
+          "type": "object",
+          "x-jarvis-zone": "closed",
+          "properties": {
+            "fills": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "separator_color": {
+              "type": "string",
+              "minLength": 1
+            },
+            "separator_linewidth_pt": {
+              "type": "number",
+              "minimum": 0
+            },
+            "text_color": {
+              "type": "string",
+              "minLength": 1
+            },
+            "secondary_color": {
+              "type": "string",
+              "minLength": 1
+            },
+            "background": {
+              "type": "string",
+              "minLength": 1
+            },
+            "accent": {
+              "type": "string",
+              "minLength": 1
+            },
+            "legend_heading": {
+              "type": "string"
+            },
+            "separators": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "box": {
+          "type": "object",
+          "x-jarvis-zone": "closed",
+          "properties": {
+            "facecolor": {
+              "type": "string",
+              "minLength": 1
+            },
+            "edgecolor": {
+              "type": "string",
+              "minLength": 1
+            },
+            "alpha": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "linewidth_pt": {
+              "type": "number",
+              "minimum": 0
+            },
+            "height_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "interval": {
+          "type": "object",
+          "x-jarvis-zone": "closed",
+          "properties": {
+            "color": {
+              "type": "string",
+              "minLength": 1
+            },
+            "linewidth_pt": {
+              "type": "number",
+              "minimum": 0
+            },
+            "cap_height_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "marker": {
+              "enum": [
+                "o",
+                "x"
+              ]
+            },
+            "diameter_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "scatter": {
+          "type": "object",
+          "x-jarvis-zone": "closed",
+          "properties": {
+            "diameter_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "linewidth_pt": {
+              "type": "number",
+              "minimum": 0
+            },
+            "gap_mm": {
+              "type": "number",
+              "minimum": 0
+            },
+            "classes": {
+              "type": "object",
+              "x-jarvis-zone": "delegated",
+              "additionalProperties": {
+                "type": "object",
+                "x-jarvis-zone": "closed",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "color": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "edgecolor": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "marker": {
+                    "enum": [
+                      "o",
+                      "x"
+                    ]
+                  },
+                  "fill": {
+                    "type": "boolean"
+                  },
+                  "diameter_mm": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "linewidth_pt": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "gap_mm": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "axis": {
+          "type": "object",
+          "x-jarvis-zone": "closed",
+          "properties": {
+            "color": {
+              "type": "string",
+              "minLength": 1
+            },
+            "linewidth_pt": {
+              "type": "number",
+              "minimum": 0
+            },
+            "tick_align": {
+              "enum": [
+                "left",
+                "center",
+                "right"
+              ]
+            },
+            "tick_suffix": {
+              "type": "string",
+              "description": "Literal unit suffix for displayed ticks; no numerical rescaling. Default %."
+            }
+          },
+          "additionalProperties": false
+        },
+        "reference": {
+          "type": "object",
+          "x-jarvis-zone": "closed",
+          "properties": {
+            "color": {
+              "type": "string",
+              "minLength": 1
+            },
+            "linewidth_pt": {
+              "type": "number",
+              "minimum": 0
+            },
+            "linestyle": {
+              "enum": [
+                "-",
+                "--",
+                ":",
+                "-."
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "geometry": {
+          "type": "object",
+          "x-jarvis-zone": "closed",
+          "properties": {
+            "width_mm": {
+              "const": 82.5
+            },
+            "header_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "footer_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "row_pitch_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "row_band_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "plot_y_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "point_band_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "top_tick_y_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "padding_fraction": {
+              "type": "number",
+              "minimum": 0
+            },
+            "title_y_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "description_y_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Description first-line centre relative to the start of the footer."
+            },
+            "text_line_pitch_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "x_label_y_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "column_header_y_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "column_gap_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "legend_y_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "logo_size_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "logo_bottom_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "margin_left_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "margin_right_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "group_gap_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "cell_y_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "cell_padding_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "grid_columns": {
+              "const": 12
+            },
+            "title_columns": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "description_columns": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "title_line_pitch_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "meta_y_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "legend_heading_y_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "top_axis_y_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "legend_start_columns": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 12
+              },
+              "description": "One-based reference column starts for glyph and point legend columns (ncols: 2). Default [2, 5]."
+            },
+            "description_start_column": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12,
+              "description": "One-based reference column start for the footer description; default 8."
+            },
+            "legend_point_key_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Physical width of the compact left-aligned point key; default 1.2 mm."
+            }
+          },
+          "additionalProperties": false
+        },
+        "typography": {
+          "type": "object",
+          "x-jarvis-zone": "closed",
+          "properties": {
+            "family": {
+              "type": "string",
+              "minLength": 1
+            },
+            "title_pt": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "header_pt": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "label_pt": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "detail_pt": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stats_pt": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "tick_pt": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "footer_pt": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "meta_pt": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "grid": {
+          "type": "object",
+          "x-jarvis-zone": "closed",
+          "properties": {
+            "show": {
+              "type": "boolean"
+            },
+            "divisions": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "color": {
+              "type": "string",
+              "minLength": 1
+            },
+            "linewidth_pt": {
+              "type": "number",
+              "minimum": 0
+            },
+            "alpha": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "linestyle": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

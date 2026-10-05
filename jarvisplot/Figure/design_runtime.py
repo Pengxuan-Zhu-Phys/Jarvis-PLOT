@@ -185,6 +185,10 @@ def draw_design_reference(fig) -> None:
 
 
 def _draw(fig) -> None:
+    if hasattr(fig, 'forest_layout'):
+        from .forest_debug import draw_forest_reference
+        draw_forest_reference(fig, _debug_config(fig)['forest_grid'])
+        return
     F = fig.fig
     w_in, h_in = (float(v) for v in F.get_size_inches())
     debug = _debug_config(fig)

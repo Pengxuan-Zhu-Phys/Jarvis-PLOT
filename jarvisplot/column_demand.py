@@ -629,6 +629,12 @@ def _note_type_figure_demand(
 ) -> None:
     """Attribute type-macro expr symbols to the figure's ``data`` source(s)."""
     base = f"$.Figures[{fig_index}]"
+    if figure.get('type') == 'forest':
+        from .forest_contract import source_columns
+        if isinstance(figure.get('data'), str):
+            for source, columns, _ in source_columns(figure, required=True):
+                slot(source).note(columns, base)
+        return
     raw = figure.get("data")
     if isinstance(raw, str) and raw.strip():
         sources = [raw.strip()]
