@@ -57,6 +57,8 @@
     "row_pitch_mm": 5.5,
     "row_band_mm": 5.2,
     "plot_y_mm": 3.6,
+    "glyph_offset_mm": 0,
+    "value_column_mm": 0,
     "point_band_mm": 3.0,
     "top_tick_y_mm": 16.2,
     "padding_fraction": 0.08,
@@ -101,6 +103,10 @@
   },
   "Style": {
     "forest": {
+      "legend_math": false,
+      "overlays": {
+        "classes": {}
+      },
       "rows": {
         "fills": [
           "none"

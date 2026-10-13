@@ -28,9 +28,11 @@ jobs:
 
       - name: Build release distributions
         run: |
-          # NOTE: put your own distribution build steps here.
-          python -m pip install build
+          python -m pip install build twine
+          python tools/check_release.py --tag "$GITHUB_REF_NAME"
           python -m build
+          python -m twine check dist/*
+          python tools/check_release.py --wheel dist/*.whl
 
       - name: Upload distributions
         uses: actions/upload-artifact@v4

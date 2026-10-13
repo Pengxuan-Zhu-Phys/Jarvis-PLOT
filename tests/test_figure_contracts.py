@@ -22,7 +22,7 @@ from jarvisplot.Figure.method_registry import resolve_method
 from jarvisplot.Figure.preprocessor import DataPreprocessor
 from jarvisplot.Figure.profile_runtime import regular_grid_mesh
 from jarvisplot.core import _format_console_record
-from jarvisplot.core_assets import load_styles
+from jarvisplot.core_assets import load_cmaps, load_styles
 from jarvisplot.data_loader import JP_ROW_IDX
 
 
@@ -85,8 +85,11 @@ def test_style_bundle_can_provide_default_layers(monkeypatch):
     assert fig._render_queue[0][1]["method"] == "dynesty_runplot"
 
 
-def test_savefig_writes_creator_and_version_metadata(tmp_path):
+def test_savefig_writes_creator_and_version_metadata(tmp_path, monkeypatch):
     calls = []
+    # This unit double only records backend kwargs; it deliberately writes no
+    # image. Actual PNG chunks and metadata I/O failures have separate coverage.
+    monkeypatch.setattr(figure_mod, '_write_png_metadata', lambda *args: None)
 
     class DummyFigure:
         def savefig(self, path, *, dpi=None, metadata=None):
@@ -767,6 +770,8 @@ def test_colorbar_manual_y_ticks_override_auto_ticks(axc_name):
 def test_colorbar_tick_side_follows_merged_rectcmap_json():
     fig = Figure()
     fig.logger = _logger()
+    # Do not depend on an earlier test having registered this JSON palette.
+    load_cmaps(fig.load_path)
     fig.jpstyles = load_styles(fig.load_path)
     fig.style = ["a4paper_2x1", "rectcmap"]
     fig.fig = plt.figure(**fig.frame["figure"])

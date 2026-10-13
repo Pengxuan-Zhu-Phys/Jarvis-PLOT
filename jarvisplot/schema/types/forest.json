@@ -29,6 +29,28 @@
       "type": "string",
       "minLength": 1
     },
+    "intervals": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional row-linked intervals DataSet containing supplied estimates and bounds; no statistics are inferred."
+    },
+    "interval_fields": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "row": {"type": "string", "minLength": 1},
+        "id": {"type": "string", "minLength": 1},
+        "estimate": {"type": "string", "minLength": 1},
+        "lower": {"type": "string", "minLength": 1},
+        "upper": {"type": "string", "minLength": 1},
+        "class": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "header_note": {
+      "$ref": "#/properties/title",
+      "description": "Caller-supplied full-width header note above the title, such as prepared MC-entry counts."
+    },
     "glyph": {
       "enum": [
         "interval",
@@ -56,6 +78,11 @@
             "normal",
             "bold"
           ]
+        },
+        "math": {
+          "type": "boolean",
+          "default": false,
+          "description": "Opt into measured MathText; complete dollar-delimited formulas remain intact when wrapping."
         }
       },
       "additionalProperties": false,
@@ -85,6 +112,13 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "default": 1
+        },
+        "ticks": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {"type": "number"},
+          "description": "Explicit finite strictly ascending shared axis ticks within the domain, independent of grid divisions."
         }
       },
       "additionalProperties": false
@@ -282,6 +316,15 @@
             "normal",
             "bold"
           ]
+        },
+        "math": {
+          "type": "boolean",
+          "default": false,
+          "description": "Opt into measured MathText, preserving paragraphs, blank lines and whole formulas."
+        },
+        "math_fontfamily": {
+          "enum": ["stix", "dejavusans"],
+          "description": "MathText glyph font for this description only. stix gives LaTeX-like serif mathematics; dejavusans gives sans-serif mathematics. Omission preserves the existing active MathText default. Requires math: true to parse formulas."
         }
       },
       "additionalProperties": false,
@@ -320,6 +363,11 @@
               "normal",
               "bold"
             ]
+          },
+          "math": {
+            "type": "boolean",
+            "default": false,
+            "description": "Opt into measured MathText for this column's header and values."
           },
           "role": {
             "enum": [
@@ -447,6 +495,10 @@
               "type": "string",
               "minLength": 1,
               "description": "Box median line colour, independent of the box border. Default black."
+            },
+            "annotation": {
+              "$ref": "https://jarvis-plot.org/schema/v2/types/forest.json#/$defs/valueAnnotation",
+              "description": "Supplied literal CSV value text; requires glyph: box. Position box aligns with its glyph, row_text with the upper row text line."
             }
           },
           "additionalProperties": false
@@ -738,6 +790,22 @@
               "type": "number",
               "exclusiveMinimum": 0,
               "description": "Physical width of the compact left-aligned point key; default 1.2 mm."
+            },
+            "glyph_offset_mm": {
+              "type": "number",
+              "default": 0,
+              "description": "Vertical offset of the primary glyph and observations from plot_y_mm; all actual mark extents must fit the point band."
+            },
+            "value_column_mm": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0,
+              "description": "Reserved right-side annotation strip. Zero retains the full-width numerical axis."
+            },
+            "header_note_y_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Header note baseline above title_y_mm; defaults to meta_y_mm."
             }
           },
           "additionalProperties": false
@@ -785,6 +853,63 @@
           },
           "additionalProperties": false
         },
+        "legend_math": {
+          "type": "boolean",
+          "default": false,
+          "description": "Opt into measured MathText for forest legend labels."
+        },
+        "overlays": {
+          "type": "object",
+          "x-jarvis-zone": "closed",
+          "properties": {
+            "classes": {
+              "type": "object",
+              "x-jarvis-zone": "delegated",
+              "additionalProperties": {
+                "type": "object",
+                "x-jarvis-zone": "closed",
+                "properties": {
+                  "label": {"type": "string", "minLength": 1},
+                  "color": {"type": "string", "minLength": 1},
+                  "alpha": {"type": "number", "minimum": 0, "maximum": 1},
+                  "linewidth_pt": {"type": "number", "minimum": 0},
+                  "cap_height_mm": {"type": "number", "exclusiveMinimum": 0},
+                  "diameter_mm": {"type": "number", "exclusiveMinimum": 0},
+                  "marker": {"enum": ["o", "x"]},
+                  "linestyle": {"enum": ["-", "--", ":", "-."]},
+                  "offset_mm": {"type": "number"}
+                },
+                "additionalProperties": false
+              }
+            },
+            "annotation": {
+              "type": "object",
+              "x-jarvis-zone": "closed",
+              "properties": {
+                "field": {"type": "string", "minLength": 1},
+                "label": {"type": "string"},
+                "fontsize": {"type": "number", "exclusiveMinimum": 0},
+                "gap_mm": {"type": "number", "minimum": 0},
+                "math": {"type": "boolean", "default": false}
+              },
+              "required": ["field"],
+              "additionalProperties": false,
+              "description": "Supplied CSV value text aligned to each interval lane in its class colour; no computation."
+            },
+            "legend": {
+              "type": "object",
+              "x-jarvis-zone": "closed",
+              "properties": {
+                "label": {"type": "string", "minLength": 1},
+                "color": {"type": "string", "minLength": 1}
+              },
+              "required": ["label"],
+              "additionalProperties": false,
+              "description": "One neutral shared interval-format key; class labels retain group colours."
+            }
+          },
+          "additionalProperties": false
+        },
         "grid": {
           "type": "object",
           "x-jarvis-zone": "closed",
@@ -818,6 +943,20 @@
           "additionalProperties": false
         }
       },
+      "additionalProperties": false
+    },
+    "valueAnnotation": {
+      "type": "object",
+      "x-jarvis-zone": "closed",
+      "properties": {
+        "field": {"type": "string", "minLength": 1},
+        "fontsize": {"type": "number", "exclusiveMinimum": 0},
+        "color": {"type": "string", "minLength": 1},
+        "position": {"enum": ["box", "row_text"], "default": "box"},
+        "gap_mm": {"type": "number", "minimum": 0},
+        "math": {"type": "boolean", "default": false}
+      },
+      "required": ["field"],
       "additionalProperties": false
     }
   }

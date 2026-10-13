@@ -10,6 +10,10 @@ from .utils.pathing import resolve_project_path
 
 CARDS_DIR = Path(__file__).with_name("cards") / "legends"
 CARD_SCHEMA = "https://jarvis-plot.org/schema/v2/core/legend-card.json"
+MATH_FONT_FAMILIES = {
+    'stix': 'STIX serif mathematics',
+    'dejavusans': 'DejaVu Sans mathematics (previous appearance)',
+}
 
 
 def merge_legend_settings(base, override):
@@ -26,6 +30,14 @@ def _validate_card(card, location, *, resolved=False):
     from jsonschema import Draft202012Validator
     from .schema_catalog import subschema
 
+    legend = card.get('legend') if isinstance(card, dict) else None
+    prop = legend.get('prop') if isinstance(legend, dict) else None
+    if isinstance(prop, dict) and 'math_fontfamily' in prop:
+        selected = prop['math_fontfamily']
+        if not isinstance(selected, str) or selected not in MATH_FONT_FAMILIES:
+            raise ValueError(
+                f"Invalid legend card {location} at legend.prop.math_fontfamily: "
+                f"choose {', '.join(MATH_FONT_FAMILIES)}; got {selected!r}")
     errors = list(Draft202012Validator(subschema(CARD_SCHEMA)).iter_errors(card))
     if errors:
         error = errors[0]
@@ -81,6 +93,27 @@ def legend_card_catalog():
     ]
 
 
+def legend_font_contract():
+    """Data-only font discovery shared by the human and agent manuals."""
+    return {
+        'yaml_path': 'frame.<axes>.legend.prop',
+        'math_fontfamily': {
+            'default': load_legend_card('default')['legend']['prop']['math_fontfamily'],
+            'choices': dict(MATH_FONT_FAMILIES),
+            'affects': 'Only mathematical glyphs in legend labels; ordinary text keeps prop.family.',
+        },
+        'ordinary_text': ['family', 'size', 'weight', 'style'],
+        'size_precedence': 'prop.size overrides legend.fontsize; when omitted, legend.fontsize is retained.',
+        'forest': {'yaml_path': 'frame.ax.legend.prop',
+                   'enable_mathtext': 'forest.legend_math: true',
+                   'default_family': 'forest.typography.family (Helvetica in the Swiss card)'},
+        'examples': {
+            'stix': {'prop': {'math_fontfamily': 'stix'}},
+            'previous': {'prop': {'math_fontfamily': 'dejavusans'}},
+        },
+    }
+
+
 class LegendConfigError(ValueError):
     """Legend configuration violates the single declaration contract."""
 
@@ -110,7 +143,14 @@ def resolve_legend_config(config, *, base_dir=None):
         raise ValueError("legend.item_formats must be a mapping")
     items = merge_legend_settings(card.get("items", {}), item_overrides)
     _validate_card({"schema_version": 1, "legend": {}, "items": items}, "YAML item_formats", resolved=True)
-    return merge_legend_settings(card.get("legend", {}), override), items
+    kwargs = merge_legend_settings(card.get("legend", {}), override)
+    if isinstance(kwargs.get('prop'), dict):
+        _validate_card({'schema_version': 1, 'legend': {'prop': kwargs['prop']}}, 'legend.prop')
+        # A native prop mapping otherwise ignores the explicit fontsize when
+        # size is absent. Adding only a math font must preserve card/YAML size.
+        if 'size' not in kwargs['prop'] and 'fontsize' in kwargs:
+            kwargs['prop']['size'] = kwargs['fontsize']
+    return kwargs, items
 
 
 class LayerLegendError(ValueError):

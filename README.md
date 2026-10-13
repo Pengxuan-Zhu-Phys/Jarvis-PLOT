@@ -5,7 +5,8 @@ but it can also be used as a **standalone scientific plotting tool**.
 
 It provides a simple command-line interface (CLI) to generate publication-quality figures from YAML configuration files, with most layout and style decisions handled by predefined profiles and style cards.
 
-Current release: **2.0.6** (`jplot -v` reports the installed version).
+Current source candidate: **2.1.10** (`jplot -v` reports the installed version).
+Local release review does not publish or tag a release; see [release notes](docs/release/releases/v2.1.10.md).
 
 ---
 
@@ -80,7 +81,7 @@ jplot config expand plot.yaml --figure p --write   # type: → layers
 **Judge** — check without rendering:
 
 ```bash
-jplot validate plot.yaml            # schema + contracts, no data touched
+jplot validate plot.yaml            # schema/contracts + source paths/column headers; no transforms
 jplot dryrun plot.yaml              # load data + transforms, row ledger, JP-VIZ health
 jplot doctor plot.yaml              # validate + dryrun in one pass
 ```
@@ -329,4 +330,6 @@ Read the context docs and roadmap before changing parsing, transforms, rendering
 
 MIT License
 
-Create a continuous forest figure with `type: forest`, a generic row table and optional point table. The default Swiss-column card uses 82.5 mm width and 5.5 mm row pitch; every row shares one numerical x domain. See [the forest contract](docs/specs/FOREST.md), [native examples](Example/forest/README.md), or `jplot man forest --json`.
+Create a continuous forest figure with `type: forest`, a generic row table, optional points and multiple supplied intervals per row. Native YAML supports class-specific interval lanes, CSV value annotations, explicit `x.ticks`, opt-in MathText, header notes and a shared-format legend. The default Swiss-column card uses 82.5 mm width and 5.5 mm row pitch; every row shares one numerical x domain. See [the forest contract](docs/specs/FOREST.md), [native examples](Example/forest/README.md), or `jplot man forest --json`.
+
+AI agents: start with `jplot man agent-readme --json` for the official-package YAML workflow and missing-feature reporting instructions. Feature requests include the installed version from `jplot --version`; the CLI does not send email automatically.

@@ -1,13 +1,13 @@
 # Jarvis-PLOT Implementation Roadmap
 
 Status: active backlog
-Last updated: 2026-07-16
+Last updated: 2026-10-13
 
-This document is the project-wide task list after the docs-alignment pass for **v1.4.2**.
+This document is the project-wide task list for the **v2.1.10** source candidate.
 
 - Release notes / historical release tasks live under `docs/release/releases/`.
 - Longer-horizon v2.0 architecture work lives in `docs/roadmap/soft-cooking-wilkinson.md`.
-- This roadmap tracks remaining 1.x implementation work that should not be hidden inside boundary docs.
+- This roadmap tracks remaining implementation work, not historical 1.x version claims.
 
 ## 1. Current Code Review Summary
 
@@ -15,16 +15,16 @@ The current codebase is functional. The main engineering risks are mixed ownersh
 
 Key observations aligned with the current tree:
 
-- package version is **1.4.2** (`pyproject.toml` distribution name `JarvisPLOT`; import package `jarvisplot`)
+- package version is **2.1.10** (`pyproject.toml` distribution name `JarvisPLOT`; import package `jarvisplot`)
 - `jarvisplot/Figure/figure.py` remains a large mixed-responsibility module, but many helpers already live in focused runtimes
 - `jarvisplot/Figure/preprocessor.py` owns projection, cache identity, and prebuild rewrite policy; runtime execution lives in `preprocessor_runtime.py`
 - `jarvisplot/data_loader.py` is mostly source-loading and lifecycle wiring; HDF5/runtime/summary helpers are split out
 - `jarvisplot/core.py` delegates planning/layout policy to `core_runtime.py` and short-circuits flowchart mode
 - `jarvisplot/flowchart.py` is an implemented classic flowchart scene path (not spec-only)
 - path resolution is centralized in `utils/pathing.py`
-- expression evaluation is centralized in `utils/expression.py`, with a remaining local `clip_expr` eval surface in `layer_runtime.py`
+- expression evaluation, including layer `clip_expr`, is centralized in `utils/expression.py`
 - adapter-family logic lives in `adapters_rect.py` and `adapters_ternary.py`
-- Agent Data API remains **spec only**
+- current discovery/judgement CLI verbs are implemented (`cap`, `man`, `schema`, `template`, `data`, `config`, `validate`, `dryrun`, `doctor`); the legacy Agent Data API analysis/reducer protocol remains **spec only / frozen**
 
 Refactor priority is therefore:
 
@@ -110,6 +110,13 @@ The following implementation items are now in place in the current tree:
 
 **Status: frozen** — do not implement until unfrozen by an explicit product decision.
 
+This freeze concerns the legacy bridge protocol below, especially `--analyze` and
+new statistical report reducers. It does not mean the current verb-based CLI is
+missing: discovery, validation, doctor, templates and render-health/data-twin
+surfaces already have runtime owners and regression tests. Use `jplot cap cli`
+and `jplot man cli-map` for their actual supported spellings; do not implement
+the old flag-based aliases just to make this historical task list appear done.
+
 Contract: `docs/specs/AGENT_DATA_API.md` (spec only). Consumer: Jarvis-Agent milestone M4.6
 (`Jarvis-Agent/docs/PLOT_TOOLS.md`). All verbs are additive flags on `jplot`; the human YAML
 surface does not change.
@@ -172,3 +179,14 @@ Remaining optional 1.x work (Agent API stays frozen):
 
 - **Agent Data API (JP-A1…A5)**: frozen; keep the spec, do not implement until unfrozen.
 
+## 8. v2.1.10 release preparation
+
+This carries forward the verified 2.1.9 local closure; the maintainer selected
+2.1.10 as the release version. Prior verification remains in `v2.1.9.md` and
+new version/package gates are recorded in `v2.1.10.md`.
+
+- [x] Native forest multi-interval CSV display, annotations, explicit ticks and MathText/font controls, including measured physical bounds and unchanged input numerics.
+- [x] One runtime version owner for CLI and export metadata; live-version documentation aligned.
+- [x] TTC numeric weight/italic selection and explicit-font overhang regressions.
+- [x] Source/wheel resource gates, portable Linux forest CLI fixtures and a macOS Helvetica/TTC CI job.
+- [ ] Publication/tagging: a separate explicitly authorized release step.

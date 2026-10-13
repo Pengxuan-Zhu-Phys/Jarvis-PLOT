@@ -3,12 +3,14 @@ title: CLI verb map
 summary: All jplot agent verbs; live list also from jplot cap cli.
 role: catalog
 priority: 15
-see_also: [workflow, validate, data-columns, cache]
+see_also: [agent-readme, workflow, validate, data-columns, cache]
 related_cli:
   - argv: [jplot, cap, cli, "--json"]
     why: live command catalogue (do not hardcode forever)
   - argv: [jplot, man, "--json"]
     why: manual index
+  - argv: [jplot, man, agent-readme, "--json"]
+    why: AI workflow and missing-feature reporting
   - argv: [jplot, "-h"]
     why: human root help (Rich panels)
 live_sources:
@@ -30,6 +32,7 @@ human:
         - "jplot data describe|head|eval|suggest-axes"
         - "jplot cap [section]"
         - "jplot man [topic]"
+        - "jplot man agent-readme --json  # official package workflow and feature gaps"
         - "jplot validate|dryrun|doctor"
         - "jplot config expand  # type → layers"
         - "jplot <file>         # render"

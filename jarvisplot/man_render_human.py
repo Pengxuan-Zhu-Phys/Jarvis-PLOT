@@ -51,7 +51,7 @@ def render_index(*, prog: str = "jplot") -> str:
     width = console.width
     overview = (
         "CLI discovers and judges; you write YAML in an editor.\n"
-        "Humans: skim panels below. Agents: jplot man <topic> --json."
+        "Humans: skim panels below. Agents: start with jplot man agent-readme --json."
     )
     _panel(console, title="Jarvis-PLOT manual", body=Text(overview))
 
@@ -100,6 +100,7 @@ def render_index(*, prog: str = "jplot") -> str:
     usage_rows = [
         (f"{prog} man", "", "this index"),
         (f"{prog} man <topic>", "", "human Rich manual for one topic"),
+        (f"{prog} man agent-readme", "", "AI workflow and missing-feature reporting"),
         (f"{prog} man methods", "", "all layer drawing methods"),
         (f"{prog} man scatter", "", "one method (any name from cap methods)"),
         (f"{prog} man transforms", "", "all pipeline transforms"),

@@ -4,7 +4,7 @@ This directory is the tracked documentation entry point for Jarvis-PLOT.
 
 Use it to find the current implementation boundary, subsystem design notes, schema contracts, and developer rules.
 
-Current package version: **1.4.2** (`pyproject.toml`).
+Current package version: **2.1.10** (`pyproject.toml`; local release candidate, not a publication claim).
 
 ## Structure
 

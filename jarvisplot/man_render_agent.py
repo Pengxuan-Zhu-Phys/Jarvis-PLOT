@@ -37,6 +37,10 @@ def agent_index_data() -> dict[str, Any]:
         "transforms": idx.get("transforms") or [],
         "related_cli": [
             {
+                "argv": ["jplot", "man", "agent-readme", "--json"],
+                "why": "official package workflow and missing-feature reporting",
+            },
+            {
                 "argv": ["jplot", "man", "workflow", "--json"],
                 "why": "recommended coding-agent loop",
             },
@@ -138,6 +142,11 @@ def agent_topic_data(topic: str) -> dict[str, Any]:
     }
     if isinstance(agent.get("verification"), dict) and agent["verification"]:
         data["verification"] = agent["verification"]
+    if card["id"] == "agent-readme":
+        from .cli import JPLOT_VERSION
+
+        data["installed_version"] = JPLOT_VERSION
+        data["feature_request"] = dict(agent.get("feature_request") or {})
     # Live method / transform pages attach structured contract blobs.
     if "method" in card:
         data["method"] = card["method"]
@@ -148,14 +157,24 @@ def agent_topic_data(topic: str) -> dict[str, Any]:
     if "transforms" in card:
         data["transforms"] = card["transforms"]
     if card["id"] == "legend":
-        from .legend_cards import legend_card_catalog
+        from .legend_cards import legend_card_catalog, legend_font_contract
 
         data["legend_cards"] = legend_card_catalog()
+        data["legend_fonts"] = legend_font_contract()
     if card['id'] == 'type-forest':
         from .forest_contract import appearance
         from .schema_catalog import subschema
+        from .legend_cards import legend_font_contract
         geometry, typography, style, _ = appearance({})
         data['forest'] = {'schema': subschema('https://jarvis-plot.org/schema/v2/types/forest.json'),
                           'defaults': {'geometry': geometry, 'typography': typography, 'style': style},
                           'x_scale': 'shared', 'legend_contract': 'object/label/role', 'legend_location': 'footer'}
+        data['forest']['legend_fonts'] = legend_font_contract()
+        data['forest']['description_fonts'] = {
+            'yaml_path': 'description.math_fontfamily',
+            'choices': data['forest']['schema']['properties']['description']['properties']['math_fontfamily']['enum'],
+            'enable_mathtext': 'description.math: true',
+            'omitted': 'Preserves the active MathText font default; independent of legend fonts.',
+            'engine': 'Matplotlib MathText (LaTeX-style syntax), not external LaTeX.',
+        }
     return data

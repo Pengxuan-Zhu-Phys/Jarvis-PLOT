@@ -127,7 +127,7 @@ What it must not contain:
 
 - It finds the first `profile` step in a transform chain.
 - It builds a reusable preprofile table with `_preprofiling()`.
-- `_preprofiling()` keeps representative rows per cell for both local maxima and minima, so later runtime objective changes can reuse the same reduced table.
+- `_preprofiling()` keeps the requested finite maximum or minimum source row per occupied cell. Objective and pregrid settings are part of cache identity; changing objective does not reuse an incompatible one-sided reduction.
 - The layer source is rewritten to `__jp_preprofile_<hash>`, and only the remaining runtime transform tail is left in the layer config.
 
 That means the prebuild cache is a reusable selection table, not a rendered artifact.

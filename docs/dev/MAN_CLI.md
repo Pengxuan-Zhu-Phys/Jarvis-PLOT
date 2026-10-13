@@ -66,9 +66,24 @@ jplot man <topic>                 # 人类：该主题 Rich 手册
 jplot man --json                  # agent：索引结构化
 jplot man <topic> --json          # agent：该主题完整结构化 + 长文
 jplot man -h                      # man 子命令 help（沿用 Rich help 几何）
+jplot man agent-readme            # AI agent README、正式包工作流和功能缺口反馈
+jplot man agent-readme --json     # 同一 README 的结构化版；包含当前安装版本
 jplot man PDF1D                   # 原始样本 → 连续 CDF + PDF；支持 repeat 均值/标准差
 jplot man transform.CDF1D --json  # 纯 CDF 的 live transform contract
 ```
+
+`agent-readme` 是随正式包安装的声明式手册卡片，支持 `ai-readme` 和
+`agent-guide` 别名。既有 `man agent` 继续指向 `agent-output`，不改变旧入口。
+AI 应先检查当前安装版本的 cap/man/schema，再写 YAML，并以正式 `jplot`
+运行 validate、doctor 和渲染；不能用研究目录里的包副本、PYTHONPATH 预览包
+或独立画图脚本冒充原生支持。
+
+缺失功能应立即在对话中说明。维护者自己的 AI 会话直接在当前对话反馈；
+其他用户应获知邮箱 `Jarvis.HEP.AI@mail.grokbot.com` 和精确标记
+`Resquest@Jarvis-PLOT`，由用户提交需求。请求应包含 `jplot --version` 的
+Jarvis-PLOT 安装版本、OS/Python/安装方式、最小 YAML 和数据字段或匿名样本、
+执行命令、诊断、现状、期望行为及具体限制。不自动发送邮件。
+不确定是否维护者会话时，在对话中报告并提供邮箱提交说明；不能根据路径猜测身份。
 
 `PDF1D` / `CDF1D` 在 YAML 中大小写敏感；man 查询会解析为规范名称，
 例如 `man transform.pdf1d` 对应 `transform.PDF1D`。它们与其他 transform

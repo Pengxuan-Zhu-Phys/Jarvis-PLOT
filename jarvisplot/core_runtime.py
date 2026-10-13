@@ -262,9 +262,9 @@ def prepare_usage_plan(core):
         if fig.get("enable", True) is False:
             continue
         if fig.get('type') == 'forest':
-            for key in ('data', 'points'):
-                if isinstance(fig.get(key), str):
-                    counts[fig[key]] = counts.get(fig[key], 0) + 1
+            sources = {fig[key] for key in ('data', 'points', 'intervals') if isinstance(fig.get(key), str)}
+            for source in sources:
+                counts[source] = counts.get(source, 0) + 1
             continue
         layers = fig.get("layers", [])
         if not isinstance(layers, list):

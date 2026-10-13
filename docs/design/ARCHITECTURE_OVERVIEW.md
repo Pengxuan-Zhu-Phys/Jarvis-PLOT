@@ -1,9 +1,9 @@
 # JarvisPLOT Architecture Overview
 
 Status: implemented
-Last updated: 2026-07-16
+Last updated: 2026-10-13
 
-This document captures the runtime architecture of the current Jarvis-PLOT tree (**v1.4.2**).
+This document captures the runtime architecture of the current Jarvis-PLOT tree (**v2.1.10**).
 The narrow-table pipeline introduced in the 1.3.x memory work remains the core constraint for the YAML figure path.
 
 The main architectural constraint is deliberate: JarvisPLOT must keep a narrow, selection-table pipeline. Full source tables must not flow through runtime profiling, cache storage, or layer rendering by default.

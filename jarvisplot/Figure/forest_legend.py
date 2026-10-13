@@ -18,9 +18,10 @@ class PhysicalLegendColumn(VPacker):
 
 
 class ForestGlyph(Container):
-    def __init__(self, artists, *, glyph):
+    def __init__(self, artists, *, glyph, legend_color=None):
         super().__init__(artists)
         self.glyph = glyph
+        self.legend_color = legend_color
 
 
 class HandlerForestPoint(HandlerPathCollection):
@@ -34,7 +35,7 @@ class HandlerForestPoint(HandlerPathCollection):
         return [x, x], [x]
 
 
-def group_glyph_and_points(legend, config, layers, glyph_object, *, base_dir=None):
+def group_glyph_and_points(legend, config, layers, glyph_object, *, base_dir=None, left_objects=None):
     """Use the canonical native items, with glyphs left and point classes right.
 
     Matplotlib normally balances item counts across columns, which would place
@@ -52,10 +53,11 @@ def group_glyph_and_points(legend, config, layers, glyph_object, *, base_dir=Non
     objects = {id(text): entry['object'] for text, entry in zip(legend.get_texts(), entries)}
     columns = legend._legend_handle_box.get_children()
     groups = [[], []]
+    left_objects = set(left_objects or [glyph_object])
     for column in columns:
         for item in column.get_children():
             label = item.get_children()[-1]._text
-            groups[0 if objects[id(label)] == glyph_object else 1].append(item)
+            groups[0 if objects[id(label)] in left_objects else 1].append(item)
     # Preserve the empty semantic column when only one group is present.
     legend._legend_handle_box._children = [
         VPacker(pad=0, sep=legend.labelspacing*legend._fontsize,
@@ -71,7 +73,7 @@ class HandlerForestGlyph(HandlerBase):
         left, right = -xdescent, width-xdescent
         yc = (height-ydescent)/2
         half = height*.32
-        stroke = {'color': whisker.get_color(), 'linewidth': whisker.get_linewidth(), 'transform': trans}
+        stroke = {'color': orig_handle.legend_color or whisker.get_color(), 'linewidth': whisker.get_linewidth(), 'alpha': 1 if orig_handle.legend_color else whisker.get_alpha(), 'transform': trans}
         artists = [Line2D([left, right], [yc, yc], **stroke)]
         for xx in (left, right):
             artists.append(Line2D([xx, xx], [yc-half, yc+half], **stroke))
@@ -83,6 +85,6 @@ class HandlerForestGlyph(HandlerBase):
             artists.append(Line2D([(left+right)/2]*2, [yc-half, yc+half], color=median.get_color(), linewidth=median.get_linewidth(), transform=trans))
         else:
             point = orig_handle[1]
-            artists.append(Line2D([(left+right)/2], [yc], linestyle='', marker=point.get_marker(), color=point.get_color(),
-                                  markersize=point.get_markersize(), markeredgewidth=point.get_markeredgewidth(), transform=trans))
+            artists.append(Line2D([(left+right)/2], [yc], linestyle='', marker=point.get_marker(), color=orig_handle.legend_color or point.get_color(),
+                                  markersize=point.get_markersize(), markeredgewidth=point.get_markeredgewidth(), alpha=1 if orig_handle.legend_color else point.get_alpha(), transform=trans))
         return artists

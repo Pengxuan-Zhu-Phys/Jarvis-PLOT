@@ -51,7 +51,7 @@ def test_custom_json_inheritance_and_yaml_precedence(tmp_path):
     original = deepcopy(config)
     kwargs, items = resolve_legend_config(config, base_dir=tmp_path)
     assert kwargs['handlelength'] == 3
-    assert kwargs['prop'] == {'family': 'STIXGeneral', 'size': 8}
+    assert kwargs['prop'] == {'family': 'STIXGeneral', 'size': 8, 'math_fontfamily': 'stix'}
     assert items['error_bounds']['roles'] == ['lower', 'line', 'upper']
     assert items['error_bounds']['key'] == 'overlay'
     assert config == original
@@ -61,6 +61,33 @@ def test_custom_json_inheritance_and_yaml_precedence(tmp_path):
     ], items)
     assert entries[0]['layers'] == ['@layer:2', '@layer:0', '@layer:1']
     assert entries[0]['key'] == 'overlay'
+
+
+def test_legend_cards_default_to_stix_and_preserve_explicit_font_size():
+    from jarvisplot.legend_cards import legend_font_contract
+    assert all(card['legend']['prop']['math_fontfamily'] == 'stix'
+               for card in legend_card_catalog())
+    config = {'card': 'compact', 'fontsize': 5, 'prop': {'math_fontfamily': 'dejavusans'}}
+    original = deepcopy(config)
+    kwargs, _ = resolve_legend_config(config)
+    assert kwargs['prop'] == {'math_fontfamily': 'dejavusans', 'size': 5}
+    assert config == original
+    kwargs, _ = resolve_legend_config({**config, 'prop': {'size': 7, 'math_fontfamily': 'stix'}})
+    assert kwargs['prop']['size'] == 7
+    assert legend_font_contract()['math_fontfamily']['default'] == 'stix'
+
+
+def test_unknown_legend_formula_font_fails_schema_and_data_only_resolution(tmp_path):
+    config = _config({'prop': {'math_fontfamily': 'invented'}})
+    assert list(config_validator().iter_errors(config))
+    assert not validate_config(config, check_columns=False).ok
+    with pytest.raises(ValueError, match='stix|dejavusans'):
+        resolve_legend_config(config['Figures'][0]['frame']['ax']['legend'])
+    path = tmp_path/'invalid-math-card.json'
+    path.write_text(json.dumps({'schema_version': 1,
+                                'legend': {'prop': {'math_fontfamily': 'invented'}}}))
+    with pytest.raises(ValueError, match='stix|dejavusans'):
+        load_legend_card(str(path))
 
 
 def test_relative_parent_card_and_invalid_cycle(tmp_path):

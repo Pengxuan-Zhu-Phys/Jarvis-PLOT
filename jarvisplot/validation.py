@@ -147,7 +147,7 @@ def _check_forest_contracts(config, bag, *, base_dir=None):
         if not isinstance(figure, dict) or figure.get('type') != 'forest' or figure.get('enable', True) is False:
             continue
         path = join_path('Figures', index)
-        for key in ('data', 'points'):
+        for key in ('data', 'points', 'intervals'):
             if key in figure and isinstance(figure[key], str) and figure[key] not in names:
                 bag.error('JP-FOR-001', join_path(path, key), f"unknown DataSet {figure[key]!r}", suggestion='Use a declared DataSet.name.')
         try:

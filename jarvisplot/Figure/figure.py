@@ -61,7 +61,6 @@ except Exception:
     pl = None
 
 
-_JPLOT_VERSION_CACHE = None
 
 
 def _resolve_colorbar_tick_position(
@@ -110,44 +109,9 @@ def _resolve_colorbar_tick_position(
 
 
 def _resolve_jplot_version() -> str:
-    """Return the source/package version used for figure metadata."""
-    global _JPLOT_VERSION_CACHE
-    if _JPLOT_VERSION_CACHE is not None:
-        return _JPLOT_VERSION_CACHE
-
-    pyproject = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "..", "pyproject.toml")
-    )
-    try:
-        with open(pyproject, "r", encoding="utf-8") as handle:
-            in_project = False
-            for line in handle:
-                stripped = line.strip()
-                if stripped == "[project]":
-                    in_project = True
-                    continue
-                if in_project and stripped.startswith("["):
-                    break
-                if in_project and stripped.startswith("version"):
-                    _JPLOT_VERSION_CACHE = stripped.split("=", 1)[1].strip().strip('"').strip("'")
-                    return _JPLOT_VERSION_CACHE
-    except Exception:
-        pass
-
-    try:
-        from importlib.metadata import version as pkg_version
-
-        for dist_name in ("Jarvis-PLOT", "JarvisPLOT", "jarvisplot"):
-            try:
-                _JPLOT_VERSION_CACHE = pkg_version(dist_name)
-                return _JPLOT_VERSION_CACHE
-            except Exception:
-                continue
-    except Exception:
-        pass
-
-    _JPLOT_VERSION_CACHE = "0.0.0"
-    return _JPLOT_VERSION_CACHE
+    """Share installed-version provenance with CLI and manuals."""
+    from ..version import get_version
+    return get_version()
 
 
 def _savefig_metadata(fmt: str, extra=None) -> dict:
@@ -166,6 +130,10 @@ def _savefig_metadata(fmt: str, extra=None) -> dict:
     if fmt_key in {"pdf", "ps", "eps"}:
         metadata["Subject"] = provenance_text
         metadata["Keywords"] = f"Jarvis-PLOT; Jarvis-HEP; {version_text}"
+    elif fmt_key in {'svg', 'svgz'}:
+        # SVG accepts Dublin Core keys, not PNG's arbitrary text chunks.
+        metadata.pop('Author')
+        metadata['Description'] = provenance_text
     else:
         metadata["Software"] = "Jarvis-PLOT"
         metadata["Description"] = provenance_text
@@ -178,23 +146,24 @@ def _savefig_metadata(fmt: str, extra=None) -> dict:
 
 
 def _write_png_metadata(path: str, metadata: dict) -> None:
-    try:
-        from PIL import Image, PngImagePlugin
-    except Exception:
-        return
-    try:
-        image = Image.open(path)
+    """Fill missing PNG provenance; never re-encode already complete exports."""
+    from PIL import Image, PngImagePlugin
+    expected = {str(key): str(value) for key, value in (metadata or {}).items() if value is not None}
+    with Image.open(path) as original:
+        if all(original.info.get(key) == value for key, value in expected.items()):
+            return
         pnginfo = PngImagePlugin.PngInfo()
-        for key, value in (metadata or {}).items():
-            if value is None:
-                continue
-            pnginfo.add_text(str(key), str(value))
-        save_kwargs = {"pnginfo": pnginfo}
-        if "dpi" in image.info:
-            save_kwargs["dpi"] = image.info["dpi"]
+        existing = {key: value for key, value in original.info.items() if isinstance(value, str)}
+        for key, value in {**existing, **expected}.items():
+            pnginfo.add_text(key, value)
+        save_kwargs = {'pnginfo': pnginfo}
+        if 'dpi' in original.info:
+            save_kwargs['dpi'] = original.info['dpi']
+        image = original.copy()
+    try:
         image.save(path, **save_kwargs)
-    except Exception:
-        return
+    finally:
+        image.close()
 
 
 class Figure:
@@ -1281,22 +1250,25 @@ class Figure:
             _wrap_add(m)
 
     def savefig(self):
-        # self.ax.tight_layout()
-        for fmt in self.fmts: 
+        log = self.logger
+        if log is None:
+            from loguru import logger as log
+        for fmt in self.fmts:
             spf = os.path.join(self.dir, "{}.{}".format(self.name, fmt))
-            try:
-                self.logger.warning(
-                        "JarvisPlot successfully draw {}\t in {:.3f}s sec\n\t-> {}".format(self.name, float(time.perf_counter() - self.t0), spf)
-                    )
-            except Exception:
-                pass 
             metadata = _savefig_metadata(fmt, self._output_metadata)
             try:
                 self.fig.savefig(spf, dpi=self.dpi, metadata=metadata)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError) as exc:
+                message = str(exc).lower()
+                unsupported = ('metadata not supported' in message or
+                               ('unexpected keyword argument' in message and "'metadata'" in message))
+                if not unsupported:
+                    raise
+                log.warning(f'{fmt} backend does not support metadata; saving without provenance: {exc}')
                 self.fig.savefig(spf, dpi=self.dpi)
             if str(fmt).lower().lstrip(".") == "png":
                 _write_png_metadata(spf, metadata)
+            log.info(f'Saved {self.name!r} -> {spf}')
 
     def load_axes(self):
         for ax, kws in self.frame['axes'].items():

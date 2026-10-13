@@ -83,6 +83,27 @@ human:
         - "Multiple templates matching the same role set must agree on ordered roles and key. No format/key field is needed on a layer."
         - "card is the only card selector. preset is unsupported."
     - kind: notes
+      title: Legend text and formula fonts
+      items:
+        - "JSON cards set legend.prop.math_fontfamily; YAML overrides it at frame.<axes>.legend.prop.math_fontfamily. Two supported formula styles: stix (default, serif mathematics) and dejavusans (previous sans-serif appearance)."
+        - "prop.family controls ordinary text independently. prop.size controls the point size; prop.weight and prop.style select text weight/style. prop.size wins over fontsize; changing only math_fontfamily preserves the existing fontsize."
+        - "Write formulas inside $...$. For native forest, explicitly enable forest.legend_math: true. Setting a formula font does not turn literal labels into formulas."
+        - "Forest ordinary legend text defaults to forest.typography.family (Helvetica in the Swiss card). Explicit prop.family/fname overrides it. Mathematical glyphs use the independently selected math_fontfamily."
+        - "jplot man legend --json exposes legend_fonts with supported styles, defaults, YAML paths, precedence and examples; jplot man forest --json exposes the forest-specific font settings too."
+    - kind: yaml
+      title: STIX formulas with independent ordinary text
+      lexer: yaml
+      body: |
+        frame:
+          ax:
+            legend:
+              fontsize: 5
+              prop:
+                family: DejaVu Sans
+                math_fontfamily: stix  # or dejavusans for the previous appearance
+        forest:
+          legend_math: true
+    - kind: notes
       title: Ordering and spacing
       items:
         - "Default item order is first object appearance. axes legend.order lists object names, not layer names or labels; unlisted objects follow in original order. Duplicates and unknown objects are errors."

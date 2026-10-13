@@ -152,7 +152,7 @@ def _dryrun_config(
         if figure.get('enable', True) is False:
             continue
         if figure.get('type') == 'forest':
-            sources = [figure['data'], *([figure['points']] if figure.get('points') else [])]
+            sources = [figure['data'], *[figure[key] for key in ('points', 'intervals') if figure.get(key)]]
             if any(dataset_heavy.get(s) for s in sources):
                 forest_layouts.append({'figure': fig_name, 'status': 'partial_renderable', 'note': 'Input has skipped heavy transforms; solve occurs during native render.'})
                 continue

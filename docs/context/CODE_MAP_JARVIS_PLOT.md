@@ -1,6 +1,6 @@
 # CODE_MAP_JARVIS_PLOT
 
-Last updated: 2026-07-16
+Last updated: 2026-10-13
 
 ## Purpose
 
@@ -33,6 +33,7 @@ Flowchart layout and rendering live in `jarvisplot/flowchart.py` and do not go t
 
 - `jarvisplot/client.py`: `main()` entry point that boots `JarvisPLOT`
 - `jarvisplot/cli.py`: argparse bootstrap from `jarvisplot/cards/args.json`
+- `jarvisplot/version.py`: stdlib-only shared installed-version provenance for CLI, manuals, reports and image metadata; source VERSION fallback only for an uninstalled checkout
 - `jarvisplot/verbs/cache.py`: Rich `cache list|scan|clean` command parsing and existing human/JSON output conventions; no renderer or dataframe imports
 - `jarvisplot/core.py`: runtime init, YAML load, dataset registration, prebuild pass, figure loop; also short-circuits to flowchart mode via `jplot flowchart <scene.json>`
 - `jarvisplot/core_runtime.py`: project layout, expression analysis helpers (`_expr_symbols`, `_collect_expr_columns`, `_transform_columns`, etc.), dataset demand planning, usage plan, YAML rewrite helpers, and figure-type expansion hook
@@ -70,6 +71,7 @@ Flowchart layout and rendering live in `jarvisplot/flowchart.py` and do not go t
 ### Figure runtime and rendering [implemented]
 
 - `jarvisplot/Figure/figure.py`: axis construction, layer binding, coordinate evaluation, design-reference overlay hook, `savefig()`
+  - Output provenance is format-specific (PNG text / SVG Dublin Core / PDF metadata); unsupported-metadata fallback is explicit and bounded, while render/I/O failures propagate. Complete PNGs are not re-encoded merely to rewrite matching metadata.
 - `jarvisplot/Figure/figure_types.py`: expands high-level figure types (for example profile/posterior 2D macros) into concrete layer configs before planning
 - `jarvisplot/Figure/config_runtime.py`: figure config ingestion from YAML dictionaries, style bundle resolution, `rcParams` setup
 - `jarvisplot/Figure/layer_runtime.py`: layer data loading, style merge, coordinate validation, expression evaluation, clip_expr support, and render dispatch to adapters
@@ -82,6 +84,8 @@ Flowchart layout and rendering live in `jarvisplot/flowchart.py` and do not go t
 - `jarvisplot/Figure/layout_runtime.py`: axis-geometry helpers for numbered axes, ticks, and endpoint application
 - `jarvisplot/Figure/colorbar_runtime.py`: colorbar assembly and frame-driven colorbar config (`frame.axc.color`); accumulates shared state across layers via `fig.axc._cb`
 - `jarvisplot/Figure/design_runtime.py`: optional design-reference debug overlay for style cards
+- `jarvisplot/legend_cards.py`: data-only canonical legend-card resolution and formula-font discovery for schema/manuals; native `prop.math_fontfamily` selects STIX (default) or previous DejaVu Sans mathematics without global rc changes
+- `jarvisplot/forest_text.py`: physical text measurements, including resolved native legend FontProperties for MathText wrapping and bounds checks
 
 ### Flowchart scene path [implemented / partial]
 
@@ -126,7 +130,7 @@ These concepts exist in docs, but they do not yet have a dedicated runtime owner
 - explicit style schema ownership as a first-class validator
 - explicit profile schema ownership as a first-class validator
 - layer type registry as a first-class runtime contract (registry code exists; schema doc is still aspirational)
-- Agent Data API verbs (`docs/specs/AGENT_DATA_API.md`)
+- legacy Agent Data API analysis/reducer protocol (`docs/specs/AGENT_DATA_API.md`); current discovery/judgement verbs are already implemented under `jarvisplot/verbs/`, not spec-only
 
 Track remaining work in `docs/roadmap/IMPLEMENTATION_ROADMAP.md`.
 
@@ -191,9 +195,22 @@ Future general diagram types should extend a clearer scene/layout split rather t
 
 ## Native forest format
 
-- `jarvisplot/forest_contract.py`: generic rows/points validation, source demand, physical domain/packing solve; shared by doctor/inspection/render.
-- `jarvisplot/forest_text.py`: lazy literal font metrics for content-sized row_name/left/right columns, without creating a canvas.
-- `jarvisplot/Figure/forest_runtime.py`: one-canvas native renderer and measured annotation/glyph/legend bounds; standard Figure output/debug integration.
+- `jarvisplot/forest_contract.py`: generic rows/points/intervals validation, narrow source demand (including annotation fields), shared explicit ticks, physical lane/domain/packing solve; shared by doctor/inspection/render.
+- `jarvisplot/forest_text.py`: lazy plain-text/opt-in MathText metrics, formula-preserving wrapping and content-sized row_name/left/right columns, without creating a canvas for doctor.
+- `jarvisplot/Figure/forest_runtime.py`: one-canvas native renderer, independent axis tick/grid artists, multi-interval lanes, CSV annotations and measured text/glyph/legend bounds; standard Figure output/debug integration.
+- `jarvisplot/Figure/forest_legend.py`: native glyph/interval legend symbols and physical key/label layout; common interval-format key plus present class labels, without per-row numeric legend items.
 - `schema/types/forest.json`, `cards/forest/swiss_column.json`, `manual_cards/type-forest.yaml`, template `forest`: packaged discovery contract.
 
 - `jarvisplot/Figure/forest_debug.py`: separate read-only 12-column grid, baseline and row-band overlay, dispatched by design_runtime through the standard debug switch.
+
+## Packaged AI README
+
+- `jarvisplot/manual_cards/agent-readme.yaml`: official-package YAML workflow and missing-capability feedback contract, including the exact Resquest@Jarvis-PLOT marker and user-submitted email instructions.
+- `jarvisplot/manual_cards/manifest.yaml`: manual topic/alias discovery; `agent-readme`, `ai-readme` and `agent-guide` are additive, while `agent` retains the agent-output topic.
+- `jarvisplot/man_render_human.py` / `man_render_agent.py`: shared declarative README rendered as Rich or structured JSON; JSON adds the current installed version and feature-request metadata without executing rendering or sending email.
+
+## Release gates
+
+- `tools/check_release.py`: read-only source-version/live-doc and built-wheel module/resource checks, also used by CI; not a runtime renderer or publication tool.
+- `tests/test_version.py`, `test_release_contract.py`: version authority and release-gate regressions.
+- CI covers Python 3.10–3.13 on Linux with portable native forest examples, plus a macOS 3.13 job for the Helvetica/TTC regression fixtures. Missing Helvetica never triggers a silent production-font substitution.

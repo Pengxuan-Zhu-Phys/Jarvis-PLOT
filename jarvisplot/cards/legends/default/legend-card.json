@@ -1,7 +1,11 @@
 {
   "schema_version": 1,
   "title": "Native",
-  "legend": {},
+  "legend": {
+    "prop": {
+      "math_fontfamily": "stix"
+    }
+  },
   "items": {
     "line": {
       "roles": [

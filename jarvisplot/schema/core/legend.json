@@ -34,6 +34,9 @@
           "$ref": "https://jarvis-plot.org/schema/v2/core/legend-card.json#/$defs/itemFormatOverride"
         },
         "description": "Overrides or additions to the card item templates; lists replace inherited lists."
+      },
+      "prop": {
+        "$ref": "https://jarvis-plot.org/schema/v2/core/legend-card.json#/$defs/fontProperties"
       }
     },
     "additionalProperties": true,

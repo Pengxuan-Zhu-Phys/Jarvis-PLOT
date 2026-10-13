@@ -86,6 +86,15 @@ def test_catalog_lints_clean():
     assert catalog_lint_errors() == []
 
 
+def test_formula_font_choices_have_one_consistent_public_vocabulary():
+    from jarvisplot.legend_cards import MATH_FONT_FAMILIES
+    legend = subschema('https://jarvis-plot.org/schema/v2/core/legend-card.json')
+    forest = subschema('https://jarvis-plot.org/schema/v2/types/forest.json')
+    prop = legend['$defs']['fontProperties']['anyOf'][1]['properties']['math_fontfamily']
+    description = forest['properties']['description']['properties']['math_fontfamily']
+    assert set(prop['enum']) == set(description['enum']) == set(MATH_FONT_FAMILIES)
+
+
 def test_no_open_zone():
     """Jarvis-HEP v2 has an `open` zone for legacy surfaces; PLOT V2 does not."""
     assert ZONES == {"closed", "delegated"}

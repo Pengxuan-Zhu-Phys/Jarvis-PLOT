@@ -1,0 +1,52 @@
+# No primary glyph coordinates or points; every row displays three supplied intervals.
+DataSet:
+- {name: rows, path: ./data/summary-labels.csv, type: csv}
+- {name: intervals, path: ./data/summary-intervals.csv, type: csv}
+Figures:
+- name: forest-intervals-only
+  type: forest
+  data: rows
+  intervals: intervals
+  title: {text: Supplied intervals only, fontsize: 7}
+  header_note: {text: 'MC entries supplied by the caller', fontsize: 4.3}
+  columns:
+  - {field: label, label: Input set, role: row_name, math: true}
+  - {field: N, label: N inputs, role: left}
+  x:
+    label: Supplied coordinate
+    lim: [0.60, 0.66]
+    ticks: [0.60, 0.61, 0.62, 0.63, 0.64, 0.65, 0.66]
+  description:
+    text: |
+      Supplied summaries.
+      SD is not a CI.
+
+      Example cut:
+      $p_T > 25\,\mathrm{GeV}$
+    fontsize: 4.3
+    math: true
+  frame: {axlogo: false}
+  forest:
+    legend_math: true
+    typography: {family: DejaVu Sans}
+    geometry:
+      footer_mm: 32
+      point_band_mm: 7
+      row_band_mm: 10
+      row_pitch_mm: 10.3
+      plot_y_mm: 6
+      cell_y_mm: 1.2
+      value_column_mm: 0
+      legend_start_columns: [2, 6]
+      description_start_column: 9
+      description_columns: 4
+    axis: {tick_suffix: ''}
+    grid: {show: true, divisions: 4, alpha: 0.12}
+    overlays:
+      legend: {label: '$\mathrm{mean}\pm\mathrm{SD}$', color: '#000000'}
+      annotation: {field: stats, fontsize: 4.3, gap_mm: 0.5}
+      classes:
+        cohort_a: {label: A, color: '#0072B2', offset_mm: -1.6}
+        cohort_b: {label: B, color: '#D55E00', alpha: 0.6, linestyle: '--', offset_mm: 0}
+        repeat: {label: Repeat, color: '#009E73', marker: x, offset_mm: 1.6}
+output: {dir: /tmp/jarvisplot-forest-examples, formats: [png, pdf], dpi: 220}

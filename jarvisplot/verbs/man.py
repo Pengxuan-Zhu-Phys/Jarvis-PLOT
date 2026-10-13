@@ -24,12 +24,14 @@ def build_parser(prog: str = "jplot man") -> argparse.ArgumentParser:
         description=(
             "Show the Jarvis-PLOT manual (index, topic, method, transform, or generated data). "
             "Methods: man methods | man scatter. "
-            "Transforms: man transforms | man transform.profile | man filter."
+            "Transforms: man transforms | man transform.profile | man filter. "
+            "AI agents: man agent-readme."
         ),
         rich_title="man",
         rich_usage=(
             f"{prog}\n"
             f"{prog} <topic>\n"
+            f"{prog} agent-readme             # AI workflow and feature requests\n"
             f"{prog} methods | transforms\n"
             f"{prog} <method>                 # e.g. scatter\n"
             f"{prog} transform.<name>         # e.g. transform.profile\n"

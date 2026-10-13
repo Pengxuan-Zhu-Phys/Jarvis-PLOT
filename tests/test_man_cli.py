@@ -105,6 +105,15 @@ def test_man_generated_data_is_discoverable_and_links_to_live_capability(capsys)
     assert any(source["verb"] == "cap.datasets" for source in data["live_sources"])
 
 
+def test_man_forest_exposes_independent_cut_formula_fonts(capsys):
+    assert main(['man', 'forest', '--json']) == 0
+    data = json.loads(capsys.readouterr().out)['data']['forest']['description_fonts']
+    assert data['yaml_path'] == 'description.math_fontfamily'
+    assert data['choices'] == ['stix', 'dejavusans']
+    assert data['enable_mathtext'] == 'description.math: true'
+    assert 'not external LaTeX' in data['engine']
+
+
 def test_man_unknown_topic_json(capsys):
     assert main(["man", "no-such-topic", "--json"]) == 1
     env = json.loads(capsys.readouterr().out)
@@ -116,6 +125,74 @@ def test_man_alias_playbook(capsys):
     assert main(["man", "playbook", "--json"]) == 0
     env = json.loads(capsys.readouterr().out)
     assert env["data"]["topic"] == "workflow"
+
+
+def test_agent_readme_human_and_json_reporting_contract(capsys):
+    assert main(["man", "agent-readme"]) == 0
+    human = capsys.readouterr().out
+    assert "AI agent README" in human
+    assert "Resquest@Jarvis-PLOT" in human
+    assert "Jarvis.HEP.AI@mail.grokbot.com" in human
+    assert "Do not send email automatically" in human
+
+    assert main(["man", "agent-readme", "--json"]) == 0
+    env = json.loads(capsys.readouterr().out)
+    assert env["kind"] == "man.agent-readme"
+    data = env["data"]
+    from jarvisplot.cli import JPLOT_VERSION
+
+    assert data["installed_version"] == JPLOT_VERSION
+    request = data["feature_request"]
+    assert request["recipient"] == "Jarvis.HEP.AI@mail.grokbot.com"
+    assert request["subject_marker"] == "Resquest@Jarvis-PLOT"
+    assert request["automatic_send"] is False
+    assert "current conversation" in request["maintainer_session"]
+    assert any("version" in detail for detail in request["required_details"])
+
+
+def test_agent_readme_discovery_preserves_agent_output_alias(capsys):
+    assert main(["man", "--json"]) == 0
+    env = json.loads(capsys.readouterr().out)
+    data = env["data"]
+    assert any(topic["id"] == "agent-readme" for topic in data["topics"])
+    assert any(item["argv"] == ["jplot", "man", "agent-readme", "--json"]
+               for item in data["related_cli"])
+    assert data["aliases"]["agent"] == "agent-output"
+    assert main(["man", "ai-readme", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["data"]["topic"] == "agent-readme"
+
+
+def test_forest_manual_documents_public_intervals_math_ticks_and_annotations(capsys):
+    assert main(["man", "forest", "--json"]) == 0
+    data = json.loads(capsys.readouterr().out)["data"]
+    contract = data["forest"]["schema"]
+    assert {"intervals", "interval_fields", "header_note"} <= set(contract["properties"])
+    assert "ticks" in contract["properties"]["x"]["properties"]
+    body = data["body_markdown"]
+    for feature in ("overlays.annotation", "box.annotation", "value_column_mm", "glyph_offset_mm",
+                    "columns[].math", "forest.legend_math", "header_note", "x.ticks"):
+        assert feature in body
+    examples = {item["title"]: item["yaml"] for item in data["examples"]}
+    assert "intervals: intervals" in examples["Box, points and multiple intervals"]
+    assert "points:" not in examples["Intervals-only row table"]
+
+
+def test_legend_font_choices_and_yaml_controls_are_discoverable_without_rendering(capsys):
+    assert main(['man', 'legend', '--json']) == 0
+    data = json.loads(capsys.readouterr().out)['data']
+    fonts = data['legend_fonts']
+    assert fonts['math_fontfamily']['default'] == 'stix'
+    assert set(fonts['math_fontfamily']['choices']) == {'stix', 'dejavusans'}
+    assert fonts['yaml_path'] == 'frame.<axes>.legend.prop'
+    assert fonts['ordinary_text'] == ['family', 'size', 'weight', 'style']
+    assert all(card['legend']['prop']['math_fontfamily'] == 'stix' for card in data['legend_cards'])
+    assert main(['man', 'forest', '--json']) == 0
+    forest = json.loads(capsys.readouterr().out)['data']['forest']
+    assert forest['legend_fonts']['forest']['yaml_path'] == 'frame.ax.legend.prop'
+    assert main(['man', 'legend']) == 0
+    human = capsys.readouterr().out
+    for option in ('math_fontfamily', 'stix', 'dejavusans', 'prop.size', 'prop.family'):
+        assert option in human
 
 
 def test_man_does_not_import_matplotlib():

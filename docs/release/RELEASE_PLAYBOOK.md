@@ -11,11 +11,16 @@ This doc describes the release workflow for Jarvis-PLOT.
 
 ## Typical Release Flow
 
-1. confirm the release note exists under `docs/release/releases/`
-2. update the version note with the current acceptance criteria or task list
-3. run the documentation integrity check from `docs/roadmap/IMPLEMENTATION_ROADMAP.md`
-4. verify the referenced YAML/template files still match the docs
-5. publish or tag the release artifact
+1. align `VERSION`, `[project].version` in `pyproject.toml`, live-version docs and `docs/release/releases/vVERSION.md`
+2. run `python tools/check_release.py`, focused regressions, the full suite and fatal-error lint
+3. build sdist/wheel in a temporary directory and run `python -m twine check <dist files>`
+4. run `python tools/check_release.py --wheel <wheel>` and install that wheel non-editably into an isolated temporary target; verify CLI/man/validate/doctor/render from outside the checkout
+5. record exact acceptance results and platform limitations in the version note
+6. only when explicitly authorized, commit/tag/publish; the tag must be VERSION or vVERSION and the publish workflow repeats the source/wheel gates
+
+CLI and image metadata use `jarvisplot/version.py`, not independent version
+parsers. Source fallback is only for an uninstalled checkout. Keep a local
+candidate clearly distinguished from a published package.
 
 ## Guardrail
 

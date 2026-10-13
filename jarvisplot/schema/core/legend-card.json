@@ -21,6 +21,9 @@
     "legend": {
       "type": "object",
       "x-jarvis-zone": "delegated",
+      "properties": {
+        "prop": {"$ref": "#/$defs/fontProperties"}
+      },
       "propertyNames": {
         "not": {
           "enum": [
@@ -48,6 +51,39 @@
   },
   "additionalProperties": false,
   "$defs": {
+    "fontProperties": {
+      "description": "Native legend font properties. Ordinary text and mathematical glyphs are configured independently.",
+      "anyOf": [
+        {"type": "string", "minLength": 1},
+        {
+          "type": "object",
+          "x-jarvis-zone": "delegated",
+          "properties": {
+            "family": {
+              "oneOf": [
+                {"type": "string", "minLength": 1},
+                {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+              ]
+            },
+            "size": {
+              "oneOf": [
+                {"type": "number", "exclusiveMinimum": 0},
+                {"type": "string", "minLength": 1}
+              ],
+              "description": "Legend text size in points (or a native relative size). Overrides legend.fontsize."
+            },
+            "math_fontfamily": {
+              "enum": ["stix", "dejavusans"],
+              "default": "stix",
+              "description": "STIX serif mathematical glyphs by default; dejavusans restores the previous DejaVu Sans appearance. This does not enable MathText parsing."
+            },
+            "weight": {"type": ["string", "number"]},
+            "style": {"enum": ["normal", "italic", "oblique"]}
+          },
+          "additionalProperties": true
+        }
+      ]
+    },
     "itemFormat": {
       "type": "object",
       "x-jarvis-zone": "closed",

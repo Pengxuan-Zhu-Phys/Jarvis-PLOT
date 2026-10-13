@@ -4,13 +4,15 @@ This directory contains per-version release notes and release-specific task list
 
 ## Current Files
 
-- `v2.1.6.md`: current release candidate, review fixes and acceptance checks
+- `v2.1.10.md`: current release preparation, carried-forward fixes and acceptance checks
+- `v2.1.9.md`: superseded local closure and detailed verification record
+- `v2.1.6.md`: superseded candidate review, retained as prior acceptance evidence
 
 - `v1.2.6.md`: historical note for the `frame.axc.color` interface work (shipped / superseded)
 
 ## Current Package Version
 
-Live version is tracked in repo-root `pyproject.toml` (current candidate **2.1.6**).
+Live version is tracked in repo-root `pyproject.toml` (current candidate **2.1.10**).
 Add a new file here when starting the next release-specific task list.
 
 ## Rule

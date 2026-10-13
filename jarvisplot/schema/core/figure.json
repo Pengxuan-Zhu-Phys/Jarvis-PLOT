@@ -304,7 +304,7 @@
     },
     "description": {
       "x-jarvis-zone": "delegated",
-      "description": "Forest text block: {text, fontsize?, color?, fontweight?}."
+      "description": "Forest description block: {text, fontsize?, color?, fontweight?, math?, math_fontfamily?}."
     },
     "columns": {
       "type": "array",
@@ -338,6 +338,10 @@
               "bold"
             ]
           },
+          "math": {
+            "type": "boolean",
+            "description": "Opt into measured MathText for forest column headers and values."
+          },
           "role": {
             "enum": [
               "row_name",
@@ -362,6 +366,15 @@
     "meta": {
       "type": "object",
       "x-jarvis-zone": "delegated"
+    },
+    "intervals": {
+      "$ref": "https://jarvis-plot.org/schema/v2/types/forest.json#/properties/intervals"
+    },
+    "interval_fields": {
+      "$ref": "https://jarvis-plot.org/schema/v2/types/forest.json#/properties/interval_fields"
+    },
+    "header_note": {
+      "$ref": "https://jarvis-plot.org/schema/v2/types/forest.json#/properties/header_note"
     }
   },
   "additionalProperties": false,

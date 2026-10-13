@@ -3,7 +3,6 @@ default_topic: null
 aliases:
   forest: type-forest
   playbook: workflow
-  agent: workflow
   posterior: type-posterior-2d
   profile: type-profile-2d
   correlation: type-correlation-matrix
@@ -31,6 +30,8 @@ aliases:
   agent: agent-output
   agent_output: agent-output
   digest: agent-output
+  ai-readme: agent-readme
+  agent-guide: agent-readme
   # field interpolation / gaps
   interp: field-interp
   interpolation: field-interp
@@ -44,6 +45,7 @@ aliases:
   overlay: debug-overlay
   design-reference: debug-overlay
 topics:
+  - agent-readme
   - workflow
   - yaml-root
   - generated-data

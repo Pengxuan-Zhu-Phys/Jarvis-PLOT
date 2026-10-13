@@ -1,7 +1,7 @@
 # Jarvis-PLOT Framework Logic (Execution Contract)
 
 Status: implemented
-Last updated: 2026-07-16
+Last updated: 2026-10-13
 
 ## 1) Execution Layers
 
@@ -68,6 +68,8 @@ Order is authoritative; transforms run sequentially. `keep_columns` and `drop_co
 
 - prebuild phase rewrites expensive profile inputs to alias data (`__jp_preprofile_*`)
 - runtime phase reuses alias/cache and applies remaining transforms
+- pregrid support retains the requested finite `objective: max|min` extremum per
+  occupied cell, not both extrema; objective/pregrid settings participate in cache identity
 
 
 ## 4) Render Dispatch Contract

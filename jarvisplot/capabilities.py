@@ -201,10 +201,11 @@ def _types() -> list[dict[str, Any]]:
             ),
         }
         if name == 'forest':
-            from .forest_contract import ROW_FIELDS, POINT_FIELDS
+            from .forest_contract import ROW_FIELDS, POINT_FIELDS, INTERVAL_FIELDS
             entry.update(expands_to='native', styles=[['forest', 'swiss_column']], axes=['ax', 'axlogo'],
-                         required=['data'], optional=['points', 'glyph', 'x', 'title', 'description', 'columns', 'glyph_label', 'fields', 'point_fields', 'annotations', 'forest', 'frame', 'debug'],
-                         glyphs=['interval', 'box'], default_glyph='interval', row_fields=list(ROW_FIELDS), point_fields=list(POINT_FIELDS),
+                         required=['data'], optional=['points', 'intervals', 'glyph', 'x', 'title', 'header_note', 'description', 'columns', 'glyph_label', 'fields', 'point_fields', 'interval_fields', 'annotations', 'forest', 'frame', 'debug'],
+                         glyphs=['interval', 'box'], default_glyph='interval', row_fields=list(ROW_FIELDS), point_fields=list(POINT_FIELDS), interval_fields=list(INTERVAL_FIELDS),
+                         mathtext=['columns[].math', 'title.math', 'header_note.math', 'description.math', 'forest.legend_math', 'forest.box.annotation.math', 'forest.overlays.annotation.math'],
                          geometry='physical_mm', x_scale='shared', tick_labels='top_and_bottom',
                          schema='https://jarvis-plot.org/schema/v2/types/forest.json', man='jplot man forest')
         if name == "correlation_matrix":

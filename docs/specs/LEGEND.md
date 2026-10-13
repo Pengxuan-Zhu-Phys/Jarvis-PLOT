@@ -77,6 +77,37 @@ Native multi-column legends fill columns first. Use `ncols`, `loc`,
 `bbox_to_anchor`, `fontsize`/`prop`, `handleheight`, `labelspacing`, etc. to
 configure the whole legend.
 
+Legend JSON cards default to `legend.prop.math_fontfamily: "stix"`. Their native `prop`
+mapping separates formula glyphs from ordinary text. YAML overrides it under
+`frame.<axes>.legend.prop`: choose `math_fontfamily: stix` for STIX serif mathematics,
+or `math_fontfamily: dejavusans` for the previous DejaVu Sans appearance. This selection
+does not change ordinary `prop.family` or enable formula parsing. Use `$...$` labels;
+native forest additionally requires `forest.legend_math: true`.
+
+`prop.family`, `prop.size`, `prop.weight` and `prop.style` configure ordinary legend text.
+`prop.size` has precedence over `fontsize`. When a prop mapping only selects a formula
+font, the resolver preserves the existing card/YAML `fontsize`, avoiding Matplotlib's
+fallback to its global legend size. Font choices are local to each legend; global
+MathText settings, row labels, description fonts and data coordinates are unchanged.
+
+```yaml
+frame:
+  ax:
+    legend:
+      fontsize: 5
+      prop:
+        family: DejaVu Sans
+        math_fontfamily: stix  # alternative: dejavusans
+forest:
+  legend_math: true
+```
+
+`jplot man legend --json` exposes the live `legend_fonts` contract, including the two
+styles, JSON-card default, YAML paths, ordinary font fields and size precedence.
+`jplot man forest --json` includes the same information under `forest.legend_fonts`.
+Forest wrapping and actual rendered bounds use the selected legend FontProperties,
+including the math family, rather than borrowing the row typography or global font set.
+
 With layer declarations, only declared objects appear: unrelated `style.label`
 values are not collected. A layer declaration activates the axes' inherited
 legend card even if its default has `enabled: false`. Explicit YAML

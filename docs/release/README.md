@@ -13,7 +13,9 @@ Project-wide backlog work stays in `docs/roadmap/IMPLEMENTATION_ROADMAP.md`.
 
 - `RELEASE_PLAYBOOK.md`: release workflow and checklist
 - `releases/README.md`: index of version-specific release notes
-- `releases/v2.1.6.md`: current release candidate and acceptance checks
+- `releases/v2.1.10.md`: current release preparation and local acceptance checks
+- `releases/v2.1.9.md`: superseded local closure and detailed verification record
+- `releases/v2.1.6.md`: superseded candidate review (not a publication record)
 - `releases/v1.2.6.md`: historical note for the colorbar interface work (superseded)
 
 ## Reading Order
@@ -24,4 +26,4 @@ Project-wide backlog work stays in `docs/roadmap/IMPLEMENTATION_ROADMAP.md`.
 
 ## Current Product Version
 
-Track the live package version in `pyproject.toml` (current candidate **2.1.6**, distribution name `JarvisPLOT`).
+Track the live package version in `pyproject.toml` (current candidate **2.1.10**, distribution name `JarvisPLOT`).

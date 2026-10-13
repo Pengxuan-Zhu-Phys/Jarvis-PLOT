@@ -1,0 +1,102 @@
+id: agent-readme
+title: AI agent README
+summary: Official YAML workflow and prompt reporting of missing capabilities.
+role: how-to
+priority: 5
+card_version: 1
+see_also: [workflow, cli-map, type-forest, diagnostics, agent-output]
+related_cli:
+  - argv: [jplot, "--version"]
+    why: record the installed Jarvis-PLOT version before reporting a feature gap
+  - argv: [jplot, cap, all, "--json"]
+    why: discover supported types, methods, styles, transforms and CLI commands
+  - argv: [jplot, man, "<topic>", "--json"]
+    why: read the current public contract and packaged schema for the requested format
+  - argv: [jplot, data, describe, "<file>", "--json"]
+    why: confirm real source fields instead of inventing names
+  - argv: [jplot, validate, "<yaml>", "--json"]
+    why: check schema, source names and explicit field references
+  - argv: [jplot, doctor, "<yaml>", "--json"]
+    why: check data and layout with the official runtime
+  - argv: [jplot, "<yaml>", "--report"]
+    why: render and inspect the final figure
+live_sources:
+  - verb: cap.all
+    truth: installed runtime capability catalog
+  - verb: man.<topic>
+    truth: packaged public contract, examples and schema references
+  - verb: data.describe
+    truth: actual input fields
+human:
+  panels:
+    - kind: steps
+      title: Use the official package
+      items:
+        - Read jplot --version, jplot cap all --json and jplot man <topic> --json first.
+        - Inspect input fields with data describe; author a YAML file against the published contract.
+        - Use the installed Jarvis-PLOT package plus YAML. Keep producer-supplied coordinates and statistics unchanged unless the user requested a calculation.
+        - Run validate, doctor and the bare-path render command; inspect the actual output. Store verification output in a temporary directory when existing figures must be preserved.
+        - Do not copy Jarvis-PLOT into an analysis outputs directory, silently add a PYTHONPATH preview implementation, or introduce a separate plotting script to claim native support.
+    - kind: notes
+      title: Report a missing capability promptly
+      items:
+        - Check the installed cap, man and schema before concluding a capability is absent. Distinguish an unsupported feature from an invalid YAML field, data error or layout overflow.
+        - For the maintainer's own AI session, state the missing feature and evidence directly in the current conversation, with a minimal example and the desired result.
+        - For another user's session, tell the user how to submit the request to Jarvis.HEP.AI@mail.grokbot.com. Use the exact subject or request marker Resquest@Jarvis-PLOT.
+        - Include the installed Jarvis-PLOT version, Python/OS environment, relevant YAML and source columns or a small anonymized sample, commands and diagnostics, current result, desired behavior, and detailed constraints.
+        - If maintainer context is unknown, report the gap in chat and provide the email submission instructions. Do not infer ownership from a local path or machine name.
+        - Do not send email automatically. Do not claim that a workaround is an implemented native feature.
+    - kind: text
+      title: Feature request checklist
+      body: |
+        To: Jarvis.HEP.AI@mail.grokbot.com
+        Subject / marker: Resquest@Jarvis-PLOT
+        Jarvis-PLOT version: output of jplot --version
+        Environment: OS, Python, installation method
+        Request: required behavior and why it matters
+        Reproducer: minimal YAML, source fields/sample, exact commands
+        Evidence: diagnostics/current output versus expected output
+        Constraints: geometry, output formats, compatibility and data preservation
+agent:
+  body_markdown: |
+    Start with `jplot --version`, `jplot cap all --json`, and `jplot man <topic> --json`.
+    The manual and capability catalog describe the installed package; inspect their schemas
+    and the real source fields before authoring YAML. Run `validate`, `doctor`, then
+    `jplot <yaml> --report` and inspect exported figures. Doctor's partial coverage is not
+    proof that heavy transforms or final rendered ink were checked.
+
+    Use formal Jarvis-PLOT plus YAML. A study may supply already calculated rows, points,
+    interval endpoints, labels, and classes; display them without inventing statistics or
+    changing the upstream scientific meaning. Do not copy the package into study outputs,
+    silently use a preview package via PYTHONPATH, or add an independent plotting script.
+
+    When a required capability is absent, report it promptly with the installed version,
+    the unsupported contract field or behavior, evidence, and a minimal reproducer.
+    In the maintainer's own AI session, report directly in the current conversation.
+    For other users, ask the user to submit a request to Jarvis.HEP.AI@mail.grokbot.com,
+    using the exact subject or marker `Resquest@Jarvis-PLOT`. Include the current
+    Jarvis-PLOT version from `jplot --version` (not an email client version), OS/Python,
+    installation method, relevant YAML/data fields or an anonymized sample, commands,
+    diagnostics/current output, expected behavior, and detailed constraints.
+    If ownership is unknown, report the gap in chat and provide those submission instructions.
+    Do not send email automatically or present a workaround as native feature support.
+  feature_request:
+    maintainer_session: report directly in the current conversation
+    other_user_session: ask the user to submit the request by email
+    unknown_session: report in chat and provide email submission instructions
+    recipient: Jarvis.HEP.AI@mail.grokbot.com
+    subject_marker: Resquest@Jarvis-PLOT
+    automatic_send: false
+    required_details:
+      - installed Jarvis-PLOT version from jplot --version
+      - OS, Python version and installation method
+      - minimal YAML and relevant data fields or anonymized source sample
+      - exact commands and diagnostics
+      - current output and expected behavior
+      - detailed requirements and compatibility constraints
+  anti_patterns:
+    - Inventing unsupported YAML keys without checking the installed contract.
+    - Reporting validate success as proof of final rendered layout.
+    - Copying the package into research outputs or hiding a preview implementation in PYTHONPATH.
+    - Recalculating supplied statistical or physics results to make a figure fit.
+    - Sending a feature-request email without explicit user authorization.

@@ -1,6 +1,6 @@
 # Project Context For Codex
 
-Last updated: 2026-07-16
+Last updated: 2026-10-13
 Audience: Codex, maintainers, and contributors making implementation changes.
 Status: implemented
 Document role: primary pre-read for Jarvis-PLOT changes.
@@ -35,7 +35,7 @@ Jarvis-PLOT is a plotting, scene, and layout framework.
 
 Current stable product facts:
 
-- package / product release candidate: **2.1.6** (`pyproject.toml`; distribution name `JarvisPLOT`, import package `jarvisplot`)
+- package / product release candidate: **2.1.10** (`pyproject.toml`; distribution name `JarvisPLOT`, import package `jarvisplot`)
 - CLI entry point: `jplot`
 - primary package path: `jarvisplot/`
 - primary orchestrator: `jarvisplot/core.py`
@@ -213,7 +213,17 @@ Use that file for:
 
 Keep this context doc focused on current state, ownership, and boundaries.
 
-Native `type: forest` retains high-level YAML and solves a continuous physical canvas from generic row/point tables. All rows share x limits/ticks; the default 82.5 mm Swiss card uses 5.5 mm pitch. It consumes supplied glyphs/classifications without statistical inference and uses canonical class object/label legend declarations. `config expand` reports its solved scene rather than lowering it to layers. See `docs/specs/FOREST.md`.
+Native `type: forest` retains high-level YAML and solves a continuous physical canvas from generic row/point/interval tables. Multiple interval classes form explicit physical lanes and may coexist with a box and every original observation, or form an intervals-only row. CSV field annotations, structured header notes and opt-in MathText use the same measured layout as doctor/render. All rows share x limits and optional explicit x.ticks; numerical grid divisions never add axis ticks. The default 82.5 mm Swiss card uses 5.5 mm pitch. It consumes supplied glyphs/classifications/statistics without inference and uses canonical object/label legend declarations, including a common interval-format key plus present class labels. `config expand` reports its solved scene rather than lowering it to layers. See `docs/specs/FOREST.md`.
+
+Legend formula fonts use the canonical JSON-card/YAML `legend.prop.math_fontfamily`: STIX is the shipped default; `dejavusans` retains the previous formula appearance. This is per legend, not a global MathText change. `jplot man legend --json` and `jplot man forest --json` expose both choices and ordinary font/size controls. Forest wrapping and collision checks measure the actual resolved legend font. The multi-interval example explicitly splits a 10 mm distribution band into equal 5 mm halves, with the primary glyph above and three supplied intervals below; this is YAML geometry, not a data transformation.
+
+Cut description formulas independently select `description.math_fontfamily: stix` or `dejavusans`, alongside `description.math: true`. Omission preserves the active MathText font default, so changing legend fonts never silently changes cuts. The same explicit FontProperties drives description wrapping, overhang and rendered bounds; render receipts include `description_fonts`. This supports LaTeX-style MathText syntax, not an external LaTeX compiler.
+
+`jarvisplot/version.py` is the single runtime version owner: CLI/manuals/render reports and image metadata prefer installed JarvisPLOT distribution metadata, with a bounded legacy-name fallback and VERSION fallback only in an uninstalled source checkout. No renderer parses pyproject or maintains a separate version cache. `tools/check_release.py` gates source-version/docs consistency and built-wheel module/resource completeness without tagging or publishing.
+
+Output provenance is format-specific: SVG uses valid Dublin Core fields; PNG/PDF keep their native metadata. Export retries only explicit backend rejection of the metadata keyword, with a warning. Render/layout and I/O errors propagate; success is logged only after writing. Complete native PNG metadata avoids a redundant bitmap rewrite, and metadata patch failures are not hidden.
+
+`jplot man agent-readme` is a packaged AI README, also available as JSON with the installed version. It directs agents to the installed cap/man/schema and official-package YAML workflow, and requires prompt reporting of missing capabilities: direct chat feedback in the maintainer's session, or user-submitted email to Jarvis.HEP.AI@mail.grokbot.com marked Resquest@Jarvis-PLOT for other users. It never sends email automatically.
 
 Forest columns declare row_name/left/right roles. Actual header and formatted body font metrics determine each column width; compact text groups sit on the upper row line, above one common full-width distribution band. Text and marks overlap horizontally but remain separated vertically. Users configure roles, formats and fonts, rather than manual column widths.
 

@@ -6,7 +6,7 @@ import argparse
 import json
 import os
 import sys
-from importlib.metadata import version as _pkg_version
+from .version import get_version
 from typing import Any, Sequence
 
 from .cli_help import (
@@ -32,13 +32,8 @@ __all__ = [
 
 
 def _resolve_version() -> str:
-    """Resolve the installed distribution version without making imports fragile."""
-    for dist_name in ("JarvisPLOT", "jarvisplot", "Jarvis-PLOT"):
-        try:
-            return _pkg_version(dist_name)
-        except Exception:
-            continue
-    return "0.0.0"
+    """Use the same provenance version as figure exports and manuals."""
+    return get_version()
 
 
 JPLOT_VERSION = _resolve_version()
@@ -237,6 +232,7 @@ def render_man_help(*, prog: str = "jplot") -> str:
         usage=(
             f"{prog} man\n"
             f"{prog} man <topic>\n"
+            f"{prog} man agent-readme\n"
             f"{prog} man <topic> --json\n"
             f"{prog} man --json"
         ),

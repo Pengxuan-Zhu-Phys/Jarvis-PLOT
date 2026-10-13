@@ -1,7 +1,6 @@
 id: type-forest
 title: type forest
-summary: One continuous physical column from generic row glyphs and optional observations; one
-  shared x axis.
+summary: One shared numerical canvas for supplied glyphs, observations and multiple interval layers.
 role: how-to
 priority: 37
 see_also:
@@ -9,6 +8,7 @@ see_also:
 - style-axes
 - data-columns
 - debug-overlay
+- agent-readme
 related_cli:
 - argv:
   - jplot
@@ -49,7 +49,7 @@ related_cli:
   - --figure
   - <name>
   - --json
-  why: inspect native rows, points, global limits/ticks and geometry
+  why: inspect native rows, points, intervals, global limits/ticks and geometry
 - argv:
   - jplot
   - <yaml>
@@ -64,10 +64,11 @@ human:
   panels:
   - kind: overview
     title: Use forest
-    body: Supply a row table and optional point table. File order is panel order. Default glyph
+    body: Supply a row table, optional point table and optional intervals table. File order is panel order. Default glyph
       is interval (estimate/lower/upper); box reads supplied lower/q1/median/q3/upper. Jarvis
-      draws supplied coordinates and point classes; their statistical meanings belong to the
-      producer. No quartile, confidence interval or outlier computation is performed.
+      draws supplied coordinates and classes; their statistical meanings belong to the
+      producer. Multiple interval classes can coexist with a box and every observation or
+      form an intervals-only row. No mean, SD, quartile, CI or outlier calculation is performed.
   - kind: yaml
     title: Minimal interval
     lexer: yaml
@@ -84,22 +85,90 @@ human:
     title: Tables
     items:
     - 'Rows: unique nonempty string row; optional literal label/detail/stats; interval coordinates
-      or five box coordinates. Entirely blank glyphs require observations. Partial or unordered
+      or five box coordinates. Entirely blank primary coordinates require observations
+      or overlays in that row; all primary coordinate columns may be absent when intervals
+      is declared. Partial or unordered
       glyphs fail.'
     - 'Points: row/id/x, optional class (normal). Unique (row,id), existing foreign key, finite
       x. Strings including leading zeros remain strings when read from CSV.'
-    - Optional fields and point_fields map canonical roles to column names. annotations selects
+    - 'Intervals: row/id/estimate/lower/upper/class. Unique (row,id), existing row,
+      finite lower <= estimate <= upper, and a declared overlays.classes style. No interval is removed or recomputed.'
+    - Optional fields, point_fields and interval_fields map canonical roles to column names. annotations selects
       literal label/detail/stats columns; false hides a slot. Explicit mappings must exist.
       Extra metadata is retained in the source, never interpreted by the renderer.
+  - kind: yaml
+    title: Box, observations and multiple supplied intervals
+    lexer: yaml
+    body: &multi_interval_yaml |
+      DataSet:
+      - {name: rows, path: ./rows.csv, type: csv}
+      - {name: points, path: ./points.csv, type: csv}
+      - {name: intervals, path: ./intervals.csv, type: csv}
+      Figures:
+      - name: supplied-summary
+        type: forest
+        data: rows
+        points: points
+        intervals: intervals
+        glyph: box
+        title: {text: Supplied summaries, fontsize: 7}
+        header_note: {text: 'MC entries: S=100; B=200', fontsize: 4.3}
+        columns:
+        - {field: label, label: Input set, role: row_name, math: true}
+        x: {lim: [0.60, 0.66], ticks: [0.60, 0.61, 0.62, 0.63, 0.64, 0.65, 0.66]}
+        forest:
+          legend_math: true
+          geometry:
+            point_band_mm: 10
+            row_band_mm: 13
+            row_pitch_mm: 13.3
+            plot_y_mm: 7.5
+            cell_y_mm: 1.35
+            glyph_offset_mm: -2.5
+            value_column_mm: 0
+          axis: {tick_suffix: ''}
+          grid: {show: true, divisions: 4}
+          box:
+            annotation: {field: stats, position: row_text, fontsize: 4.3}
+          overlays:
+            legend: {label: '$\mathrm{mean}\pm\mathrm{SD}$', color: '#000000'}
+            annotation: {field: stats, fontsize: 4.3, gap_mm: 0.5}
+            classes:
+              first: {label: A, color: '#0072B2', offset_mm: 0.85}
+              second: {label: B, color: '#D55E00', alpha: 0.6, linestyle: '--', offset_mm: 2.5}
+              repeat: {label: Repeat, color: '#009E73', marker: x, offset_mm: 4.15}
+      output: {dir: /tmp/jarvisplot-forest-demo, formats: [png, pdf]}
+  - kind: notes
+    title: Interval lanes and annotations
+    items:
+    - intervals names a standard DataSet. interval_fields maps row/id/estimate/lower/upper/class
+      to literal source names. Rows may contain only identifiers and labels when overlays supply their marks.
+    - forest.overlays.classes configures label/color/alpha/linewidth_pt/linestyle/marker/diameter_mm/cap_height_mm/offset_mm.
+      Positive offset_mm moves the interval downward from the row plot centre. Base styles inherit forest.interval.
+      glyph_offset_mm moves the primary glyph and its points together; it does not shift overlay lanes.
+    - forest.box.annotation references a row CSV field; position row_text aligns it with the upper
+      row text, while default box aligns it with the primary lane. forest.overlays.annotation references
+      an interval CSV field and uses its class color on its own lane. Both accept fontsize/gap_mm/math;
+      no statistical string is computed by the renderer.
+    - value_column_mm is a nonnegative right-hand values reservation. Zero keeps the numerical axis
+      across the full column; values must then fit to the right of their interval with gap_mm clearance.
+      Positive values reserve a separate strip. Long values or edge intervals that do not fit fail explicitly.
+    - The footer uses one common interval-format key from forest.overlays.legend (for example black mean ± SD)
+      and one color label per present class. Per-row numbers are not legend entries; absent primary/point keys are omitted.
+    - With a common overlay-format key, the left legend group contains the primary glyph, point keys and
+      common interval format; the right group contains overlay class colors. Without that key the earlier glyph/point grouping remains.
   - kind: notes
     title: Shared numerical axis
     items:
     - All rows use one domain, tick set and x-to-mm mapping. Tick numbers appear only at top
-      and bottom. All drawn points, including outliers, and glyph coordinates plus reference
+      and bottom. All drawn points, including outliers, primary/overlay glyph coordinates plus reference
       contribute to inference.
     - x.lim is shared and must include every drawable value/reference. x.minimum_span is positive
       (default 1). Degenerate inputs get a deterministic nonzero domain. Per-row rescaling,
       nonlinear axes and silent clipping are unsupported.
+    - x.ticks supplies at least two finite strictly ascending values inside the shared domain.
+      Axis short marks and top/bottom labels use only these shared ticks. Grid divisions independently
+      add numerical grid lines, merged with tick lines using floating-point tolerance; grid changes never add ticks.
   - kind: notes
     title: Physical layout and errors
     items:
@@ -107,14 +176,14 @@ human:
       mm. Height = 20 + row_count * 5.5 + 20 mm. Upper text centre 1 mm; lower plot centre 3.6
       mm. Title 9 pt, body 5–6 pt. Helvetica and black/white/Jarvis blue border #2F7FD8/light blue fill #73B8F4/#DA291C remain. The 12-column grid
       is a design reference; table widths follow actual text metrics.'
-    - forest merges sparse box/interval/scatter/rows/axis/grid/reference appearance. Box borders and whisker/cap strokes use Jarvis blue; fill uses Jarvis light blue. forest.box.median_color independently controls the median line, default black. forest.geometry
+    - forest merges sparse box/interval/scatter/overlays/rows/axis/grid/reference appearance. Box borders and whisker/cap strokes use Jarvis blue; fill uses Jarvis light blue. forest.box.median_color independently controls the median line, default black. forest.geometry
       and forest.typography provide explicit physical layout/font overrides, including a larger
       point_band_mm/row_band_mm/row_pitch_mm for crowded rows. The canvas width stays fixed
       at 82.5 mm.
     - Points pack deterministically in mm, preserving numerical x. Packing overflow is an error
       naming the row; no observations are dropped, jittered in x, or shrunk. Doctor measures
-      columns with literal font metrics without creating a figure; native render checks final
-      text, legend and glyph bounds.
+      columns with plain-text/MathText metrics without creating a figure; native render checks actual
+      text ink, annotation collisions, title/header_note/footer/legend and every glyph lane.
     - Point classes normal/outlier/unrated/singleton are styles, not inferred decisions. Unknown
       classes require forest.scatter.classes entries. Native class marks generate single-component
       object/label declarations; only frame.ax.legend controls overall order/columns/location/card.
@@ -136,17 +205,27 @@ human:
       At most one bold row_name appears first on the left. Left columns are left aligned and
       compact; right columns are right aligned against the far-right grid boundary. Declaration
       order is retained on each side, so n/CV puts CV far right and n to its left. Format/missing/fontsize/fontweight
-      control cell text; header labels hold units.
+      control cell text; math true explicitly enables MathText for that header and its values. Header labels hold units.
     - Each width follows the actual font metrics of the header and all formatted body values,
       with small padding and column_gap_mm (default 0.8 mm) between columns. No grid rounding,
       manual width_mm or align option exists. group_gap_mm reserves the minimum separation between
       the two text groups. The lower numerical span follows outer margins independently of these
       widths; text stays above the mark band. Oversized text groups/ink or marks fail explicitly.
-    - 'title and description use the same standard text block: {text, fontsize?, color?, fontweight?}.
+    - 'title, header_note and description use the same standard text block: {text, fontsize?, color?, fontweight?, math?}.
       Multiline description uses text: |. Content belongs to YAML; fonts/layout defaults belong
       to the style card. No automatic row-count or explanatory text is inserted into the figure.
-      Title stays in the header; description appears in the third footer section, default 5
-      pt, retaining the supplied content.'
+      Title and header_note use distinct measured header slots; header_note can display supplied MC-entry counts.
+      description appears in the third footer section, default 5 pt, preserving paragraphs and blank lines.
+      math true enables measured MathText; wrapping never splits a complete $...$ formula.'
+    - 'Cut/description formula fonts are independent of legend fonts. Use description.math: true
+      plus description.math_fontfamily: stix for LaTeX-like serif mathematics, or dejavusans
+      for sans-serif mathematics. Omitting math_fontfamily preserves the active MathText default.
+      These are Matplotlib MathText formulas, not an external LaTeX compiler. Actual selected
+      fonts are used for wrapping and rendered bounds; ordinary description text keeps the forest font.'
+    - 'MathText recognizes formulas inside a single pair of dollar signs: $p_T > 25$.
+      LaTeX display-math delimiters $$...$$ are not supported. In YAML, use text: | or
+      single-quoted text so backslashes in formula commands remain literal. Delimiters
+      mark the formula; math enables parsing; math_fontfamily selects the glyph style.'
     - The footer contains a glyph example and present point classes, resolved through the canonical
       object/label/role legend. glyph_label personalises the producer-supplied glyph meaning;
       default is Box + whiskers or Estimate + bounds. frame.ax.legend controls overall ordering/columns/card/location.
@@ -156,6 +235,13 @@ human:
       description_columns 5; its first baseline is footer-relative description_y_mm. Long labels
       and description wrap without shrinking fonts. frame.ax.legend.ncols remains 2 for the
       actual glyph/point legend. The lower-left logo shares the point column height.
+    - forest.legend_math true enables MathText in glyph/class/format labels. The same opt-in exists
+      for columns, title, header_note, description and value annotations. Plain text remains literal by default.
+    - 'Legend formulas default to STIX from the JSON legend card. Set frame.ax.legend.prop.math_fontfamily:
+      dejavusans to select the previous appearance, or stix explicitly. prop.family changes ordinary
+      legend text; prop.size/weight/style control its typography. Changing only the formula font
+      retains the existing fontsize. The formula choice affects only legend mathematical glyphs.
+      man legend --json and this manual expose legend_fonts with defaults and YAML paths.'
     - 'The Swiss axlogo uses the shared JarvisHEP.png icon and wordmark on the grid. frame.axlogo:
       false disables it; a mapping overrides text or selects an image file. --print policy applies.
       Default 20 mm header and 20 mm footer yield an 82.5 x 573.5 mm figure for 97 rows.'
@@ -172,19 +258,58 @@ human:
     lexer: yaml
     body: "forest:\n  grid: {show: true, divisions: 4}\n  rows: {separators: false}\n"
 agent:
-  body_markdown: 'Create native forest YAML from standard row and optional point tables. Use
-    validate for schema/sources, doctor for data/physical layout, config expand for the solved
-    scene, and render for actual ink/legend bounds. Row names and left columns are compact and
-    left aligned; right columns are compact and right aligned from the far-right boundary. Widths
-    follow actual header and formatted body font metrics, with no grid rounding or manual widths.
-    Upper text and lower marks share horizontal space. All rows share numerical limits/mapping.
-    Defaults use a 20 mm header, 9 pt title and 5–6 pt body. A shared top numerical axis and
-    continuous vertical numerical grid replace per-row horizontal axes/rules. forest.grid configures
-    the normal numerical grid; rows.separators defaults false. debug: true separately shows
-    the 12-column design grid, baselines and row bands. Helvetica regular/bold and black/white/Jarvis blue border #2F7FD8/light blue fill #73B8F4/#DA291C
-    remain. Structured title/description/meta are YAML-owned. Canonical legend and native badge
-    remain grid-aligned.'
+  body_markdown: |
+    Create native forest YAML from standard row, optional point and optional interval DataSets.
+    Use validate for schema/sources, doctor for data/physical solve, config expand for the
+    solved scene, and formal jplot rendering for actual text/legend/glyph bounds. All supplied
+    coordinates and statistics belong to the producer. Every original point and interval is
+    retained; the renderer does not compute means, SDs, quartiles, cuts or classifier results.
+
+    intervals and interval_fields support generic row/id/estimate/lower/upper/class roles.
+    forest.overlays.classes declares class colors, alpha, line/marker styles and offset_mm
+    lanes. A row can display a box plus points and multiple intervals, or only intervals.
+    glyph_offset_mm moves the primary glyph and points together. value_column_mm: 0 gives
+    the full numerical width; a positive value reserves a right-hand values strip.
+    box.annotation and overlays.annotation reference literal CSV fields, with measured
+    fontsize/gap_mm/math. Overlay values use their class color and align with their own lane;
+    box position: row_text uses the upper row text. Insufficient annotation room is an error.
+
+    columns[].math, title.math, header_note.math, description.math, annotation.math and
+    forest.legend_math explicitly enable MathText. Wrapping preserves whole $...$ formulas
+    and description blank lines. Title/header_note/column headings have measured separate slots.
+    Legend formulas default to STIX. frame.ax.legend.prop.math_fontfamily chooses stix or
+    dejavusans (previous appearance); prop.family/size/weight/style independently configure
+    ordinary legend text. prop.size overrides fontsize, which is otherwise preserved.
+    The common black interval-format legend key comes from overlays.legend; present class
+    labels show group colors. Per-row numeric strings and absent glyphs do not create legend items.
+
+    All rows share x.lim and one numerical mapping. Explicit x.ticks supplies the shared
+    short axis marks and both top/bottom labels. forest.grid controls independent numerical
+    lines; divisions never add ticks and coincident tick/division coordinates are deduplicated.
+    Row names/left cells stay compact and left aligned; right cells align from the far-right
+    edge. Physical measurements cover plain text, MathText and mark strokes. No data is
+    silently clipped, hidden, rescaled, thinned or shrunk to fit. Default geometry/fonts,
+    the 12-column debug grid, canonical legend and standard badge remain backward compatible.
   examples:
+  - title: Box, points and multiple intervals
+    yaml: *multi_interval_yaml
+  - title: Intervals-only row table
+    yaml: |
+      DataSet:
+      - {name: rows, path: ./labels.csv, type: csv}
+      - {name: intervals, path: ./intervals.csv, type: csv}
+      Figures:
+      - name: supplied-intervals
+        type: forest
+        data: rows
+        intervals: intervals
+        columns:
+        - {field: label, label: Input set, role: row_name}
+        forest:
+          overlays:
+            classes:
+              first: {label: A, color: '#0072B2', offset_mm: -0.8}
+              second: {label: B, color: '#D55E00', offset_mm: 0.8}
   - title: Generic interval
     yaml: "version: '0.3'\nDataSet:\n- name: rows\n  path: ./data/interval.csv\n  type: csv\n\
       Figures:\n- name: forest-interval\n  type: forest\n  data: rows\n  glyph: interval\n \
@@ -224,6 +349,8 @@ agent:
   - Do not infer quartiles/outliers or interval meaning.
   - Do not declare per-row axes, rescale rows, paginate or preset column widths.
   - Do not drop observations or silently shrink marks/fonts.
+  - Do not place numeric per-row values into the legend or compute them from interval endpoints.
+  - Do not split dollar-delimited formulas, or enable math implicitly for literal text.
   verification:
     validate:
       argv:

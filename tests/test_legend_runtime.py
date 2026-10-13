@@ -31,6 +31,30 @@ def _specs():
                               ('test', 'upper'), ('test', 'line'), ('test', 'lower')]]
 
 
+@pytest.mark.parametrize('math_fontfamily', ['stix', 'dejavusans'])
+def test_legend_formula_family_is_local_and_keeps_ordinary_font_and_size(math_fontfamily):
+    import matplotlib as mpl
+    with mpl.rc_context({'mathtext.fontset': 'cm', 'legend.fontsize': 17}):
+        fig, ax = plt.subplots()
+        try:
+            line, = ax.plot([0, 1], [0, 1])
+            config = {'fontsize': 5, 'prop': {'family': 'DejaVu Sans',
+                                            'math_fontfamily': math_fontfamily}}
+            original = deepcopy(config)
+            legend = apply_legend(ax, config, {'@layer:0': line},
+                                  layer_specs=[{'legend': {'object': 'summary',
+                                                          'label': r'$\mathrm{mean}\pm\mathrm{SD}$'}}])
+            fig.canvas.draw()
+            label = legend.get_texts()[0]
+            assert label.get_math_fontfamily() == math_fontfamily
+            assert label.get_fontfamily() == ['DejaVu Sans']
+            assert label.get_fontsize() == 5
+            assert mpl.rcParams['mathtext.fontset'] == 'cm'
+            assert config == original
+        finally:
+            plt.close(fig)
+
+
 def test_compact_composite_keys_keep_real_styles_and_data_limits():
     fig, ax = plt.subplots()
     handles = {f'@layer:{i}': handle for i, handle in enumerate(_parts(ax))}
