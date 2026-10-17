@@ -5,7 +5,7 @@ but it can also be used as a **standalone scientific plotting tool**.
 
 It provides a simple command-line interface (CLI) to generate publication-quality figures from YAML configuration files, with most layout and style decisions handled by predefined profiles and style cards.
 
-Current source candidate: **2.1.10** (`jplot -v` reports the installed version).
+Current source candidate: **2.1.11** (`jplot -v` reports the installed version).
 Release history: [CHANGELOG.md](CHANGELOG.md). Design documents and specifications: [Jarvis-Books `Docs/Jarvis-PLOT/`](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/README.md).
 
 ---
@@ -88,6 +88,39 @@ jplot doctor plot.yaml              # validate + dryrun in one pass
 
 Every one of these takes `--json`.
 
+### Default fonts
+
+The bundled font card recommends **Helvetica** for sans text and **STIXGeneral**
+for serif text, with **STIX** MathText formulas. Normal YAML rendering applies
+the card automatically; explicit YAML fonts and sizes take precedence.
+When Helvetica is absent, Jarvis-PLOT selects the first installed similar family:
+Arial, Liberation Sans, Nimbus Sans, then DejaVu Sans. `check` and `resolve`
+report the actual font and substitution reason.
+
+```bash
+jplot fonts                         # role card: title, labels, ticks, legend, text, annotations, caption
+jplot fonts show title --json       # current defaults for one role
+jplot fonts show --recommended --json
+jplot fonts list --filter Helvetica --json
+jplot fonts list --refresh --json   # rescan after installing fonts
+jplot fonts resolve Helvetica --weight bold --json
+jplot fonts check --json            # actual installed faces used by the card
+jplot fonts set roles.title.family sans
+jplot fonts set roles.legend.family serif
+jplot fonts set roles.title.size_pt 9
+jplot fonts set roles.title.size_pt null  # inherit the plot style's size
+jplot fonts reset roles.title.size_pt
+jplot fonts reset                   # remove all personal overrides
+jplot man fonts --json
+```
+
+Personal overrides persist in `~/.jarvis/plot-fonts.json` (`JARVIS_HOME` overrides
+the directory). Queries never create that file. `size_pt: null` preserves the
+plot style's canvas-specific size; `recommended_size_pt` is drafting advice.
+Font discovery uses Matplotlib's cached system and bundled font index, while
+TTC face selection preserves the requested weight and slant. `$...$` uses
+MathText; an external LaTeX compiler has its own font configuration.
+
 ### Design-Reference Overlay
 
 Set `debug: true` on a figure and Jarvis-PLOT draws a dimension overlay on top
@@ -129,6 +162,9 @@ humans and logs on stderr:
 TTY** — piping is enough.
 
 The loop `jplot man` prints is:
+
+Before drafting, inspect `jplot fonts show --json` and `jplot fonts check --json`
+for the typography defaults and actual installed font choices.
 
 1. `jplot data describe <file> --json` — column names from the real file. Never
    invent one; a wrong name is a hard error, not a warning.
@@ -227,24 +263,26 @@ multiple directory trees; overlapping selections are deduplicated. Use
 All cache subcommands accept `--json` and use the existing CLI envelope and
 exit codes (0 success/partial, 1 failure, 2 usage). Non-TTY stdout defaults to
 JSON; human results go to stderr. Active caches are skipped (`ok: null` when
-the remaining operation succeeds), and records for missing paths are pruned
-during cleanup. Only marked Jarvis-PLOT components are removed; source data,
+the remaining operation succeeds), and records for missing paths or unmarked
+`.cache` directories containing only empty Jarvis-PLOT component directories
+are pruned during cleanup. Only marked
+Jarvis-PLOT components are removed; source data,
 plots, and unrelated `.cache` content are retained. Failed deletions retain
-their registry entries. Scanning adopts legacy caches only when the four
+their registry entries; nonempty unmarked directories remain invalid and are
+not deleted. Scanning adopts legacy caches only when the four
 pipeline directories and a compatible `manifest.json` identify them; old
 unmarked twin-only directories need a new `dryrun --with-data` run to register.
 An explicitly supplied `--out-dir` is an export directory and is not registered.
 Concurrent registry writes use a lock and atomic replacement. Registration
 failures warn without preventing rendering.
 
-### Example: SUSYRun2 Ternary Plots
+### Example: Ternary Layouts
 
 ```bash
-jplot ./bin/SUSYRun2_EWMSSM.yaml
-jplot ./bin/SUSYRun2_GEWMSSM.yaml
+jplot ./Example/gambit_2x1.yaml
 ```
 
-> **Note:** The data file paths inside the YAML files must be updated to match your local setup.
+This layout reference uses bundled style cards and renders without external data.
 
 ### Example: Dynesty Runplot
 
@@ -318,7 +356,7 @@ specifications and the roadmap live in Jarvis-Books:
 - [CODE_MAP_JARVIS_PLOT.md](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/context/CODE_MAP_JARVIS_PLOT.md) - code owner map
 - [JARVIS_PLOT_FRAMEWORK_LOGIC.md](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/context/JARVIS_PLOT_FRAMEWORK_LOGIC.md) - runtime execution contract
 - [IMPLEMENTATION_ROADMAP.md](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/roadmap/IMPLEMENTATION_ROADMAP.md) - open work
-- [RELEASING.md](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/release/RELEASING.md) - versioning, `tools/check_release.py` and CI publishing
+- [RELEASING.md](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/release/RELEASING.md) - versioning, `tools/check_release.py` and CI verification
 - [STYLE_SCHEMA.md](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/specs/STYLE_SCHEMA.md) - style card contract, including the `Debug` overlay block
 - [DEVELOPER_RULES.md](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/dev/DEVELOPER_RULES.md) - pipeline and cache rules
 
@@ -333,3 +371,22 @@ MIT License
 Create a continuous forest figure with `type: forest`, a generic row table, optional points and multiple supplied intervals per row. Native YAML supports class-specific interval lanes, CSV value annotations, explicit `x.ticks`, opt-in MathText, header notes and a shared-format legend. The default Swiss-column card uses 82.5 mm width and 5.5 mm row pitch; every row shares one numerical x domain. See [the forest contract](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/specs/FOREST.md), [native examples](Example/forest/README.md), or `jplot man forest --json`.
 
 AI agents: start with `jplot man agent-readme --json` for the official-package YAML workflow and missing-feature reporting instructions. Feature requests include the installed version from `jplot --version`; the CLI does not send email automatically.
+
+## Releasing
+
+`jprel` is a maintainer-local script, excluded from Git and distribution archives.
+
+Record changes in `CHANGELOG.md`, then run from this checkout (replace the
+example version with the intended release):
+
+```bash
+./jprel 2.1.11 --dry
+./jprel 2.1.11
+```
+
+`--dry` performs read-only source and release-note checks. The normal command
+requires a clean Git checkout, builds and checks the wheel and sdist, uploads
+to PyPI, refreshes the local version with `python3 -m pip install -e .`, and
+verifies the installed version. Only then does it commit the version, push the
+`vX.Y.Z` tag, and create a GitHub release with changelog notes. Configure Twine
+and `gh` authentication before publishing.

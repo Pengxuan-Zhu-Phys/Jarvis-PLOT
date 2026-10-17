@@ -16,6 +16,9 @@ aliases:
   generated-data: generated-data
   cli: cli-map
   legends: legend
+  font: fonts
+  typography: fonts
+  font-card: fonts
   compact-legend: legend
   composite-legend: legend
   codes: diagnostics
@@ -58,6 +61,7 @@ topics:
   - transforms
   - agent-output
   - style-axes
+  - fonts
   - legend
   - data-columns
   - validate

@@ -4,8 +4,26 @@ Release history of the `JarvisPLOT` distribution (import package `jarvisplot`,
 CLI `jplot`). Design documents, specifications and the roadmap live in
 [Jarvis-Books `Docs/Jarvis-PLOT/`](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/README.md).
 
-## Unreleased
+## 2.1.11 — 2026-10-18
 
+- Exclude maintainer release helpers, local configuration, credentials, and
+  generated files from distribution archives.
+
+- `./jprel X.Y.Z` now completes PyPI upload, local editable install, Git tag,
+  and GitHub release. `--dry` checks inputs without changing the checkout.
+- Remove private research cards and scripts under `bin/` from version control
+  and distribution archives; public examples remain under `Example/`.
+- Cache cleanup removes empty registered cache directories whose marker is
+  missing, while retaining unmarked directories containing files.
+- Font card: `jplot fonts show|list|resolve|check|set|reset` and
+  `jplot man fonts`. Normal YAML rendering applies the bundled role card
+  (Helvetica sans, STIXGeneral serif, STIX MathText); explicit YAML fonts and
+  sizes take precedence. Personal overrides live in
+  `~/.jarvis/plot-fonts.json` (`JARVIS_HOME` overrides the directory).
+- When Helvetica is absent, the first installed of Arial, Liberation Sans,
+  Nimbus Sans and DejaVu Sans is used; `check` and `resolve` report the actual
+  font and the substitution reason.
+- Cut descriptions take their MathText font from the font card by default.
 - Documentation moved to Jarvis-Books; the repository keeps only `README.md`,
   `CHANGELOG.md` and the example READMEs. The source distribution ships
   `CHANGELOG.md` instead of a `docs/` tree, and `tools/check_release.py` checks

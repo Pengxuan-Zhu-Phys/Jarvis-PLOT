@@ -142,7 +142,9 @@ def test_axes_declaration_and_yaml_order_replace_card_defaults():
     fig.logger = SimpleNamespace(**{key: lambda *a, **k: None for key in ('debug', 'info', 'warning', 'error')})
     fig.jpstyles = load_styles(fig.load_path)
     fig.style = ['a4paper_2x1', 'rectRatio']
-    assert fig.frame['ax']['legend'] == {'enabled': False, 'card': 'compact'}
+    assert fig.frame['ax']['legend']['enabled'] is False
+    assert fig.frame['ax']['legend']['card'] == 'compact'
+    assert fig.frame['ax']['legend']['prop']['math_fontfamily'] == 'stix'
     fig.frame['ax']['legend']['order'] = ['old']
     override = {'ax': {'legend': {'order': ['new'], 'handleheight': 1.2}}}
     original = deepcopy(override)

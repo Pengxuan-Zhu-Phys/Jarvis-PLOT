@@ -15,9 +15,11 @@ def font_path(family, weight, style='normal'):
     selected installed face to a process-local temporary file; never package it.
     fontTools is an existing Matplotlib dependency.
     """
-    from matplotlib.font_manager import FontProperties, findfont, weight_dict
+    from matplotlib.font_manager import weight_dict
+    from .fonts import match_font
     try:
-        path = findfont(FontProperties(family=family, weight=weight, style=style), fallback_to_default=False)
+        match = match_font(family, weight=weight, style=style)
+        path = match['path']
     except ValueError as exc:
         raise ValueError(f'forest font {family!r} is unavailable; install it or explicitly select an installed family') from exc
     if Path(path).suffix.lower() != '.ttc':
@@ -29,7 +31,7 @@ def font_path(family, weight, style='normal'):
     candidates = []
     for index, face in enumerate(collection.fonts):
         names = {n.toUnicode().lower() for n in face['name'].names if n.nameID in (1, 16)}
-        if family.lower() not in names:
+        if match['family'].lower() not in names:
             continue
         italic = bool(face['head'].macStyle & 2)
         candidates.append((italic != requested_italic, abs(face['OS/2'].usWeightClass-target), index))
@@ -41,7 +43,17 @@ def font_path(family, weight, style='normal'):
     if _font_directory is None:
         _font_directory = tempfile.TemporaryDirectory(prefix='jarvisplot-font-')
     output = Path(_font_directory.name)/f'{len(list(Path(_font_directory.name).iterdir()))}-{weight}.ttf'
-    collection.fonts[index].save(output)
+    selected = collection.fonts[index]
+    # Some installed macOS Helvetica hint programs fail in FreeType at small
+    # sizes (including 4 pt logo text). The temporary standalone face retains
+    # its original outlines/advances but does not carry those native programs.
+    # This also keeps direct external canvas.draw safe without global rc state.
+    if 'glyf' in selected:
+        selected['glyf'].removeHinting()
+    for table in ('fpgm', 'prep', 'cvt ', 'hdmx', 'VDMX', 'LTSH', 'cvar'):
+        if table in selected:
+            del selected[table]
+    selected.save(output)
     collection.close()
     return str(output)
 

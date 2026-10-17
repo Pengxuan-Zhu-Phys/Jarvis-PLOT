@@ -3,7 +3,7 @@ title: CLI verb map
 summary: All jplot agent verbs; live list also from jplot cap cli.
 role: catalog
 priority: 15
-see_also: [agent-readme, workflow, validate, data-columns, cache]
+see_also: [agent-readme, workflow, validate, data-columns, fonts, cache]
 related_cli:
   - argv: [jplot, cap, cli, "--json"]
     why: live command catalogue (do not hardcode forever)
@@ -21,7 +21,7 @@ human:
     - kind: overview
       title: Roles
       body: |
-        Sensor: data, cap, man, explain, template, suggest
+        Sensor: data, cap, man, explain, fonts, template, suggest
         Judge: validate, dryrun, doctor
         Editor tools: config get|set|rm|expand (optional)
         Render: jplot <file>  (bare path; no jplot run)
@@ -31,6 +31,7 @@ human:
       items:
         - "jplot data describe|head|eval|suggest-axes"
         - "jplot cap [section]"
+        - "jplot fonts show|list|resolve|check|set|reset"
         - "jplot man [topic]"
         - "jplot man agent-readme --json  # official package workflow and feature gaps"
         - "jplot validate|dryrun|doctor"
@@ -46,3 +47,5 @@ agent:
   body_markdown: |
     Prefer `jplot cap cli --json` for an up-to-date list.
     DR-08: there is no `jplot run`.
+    Read `jplot fonts show --json` and `jplot fonts check --json` before rendering.
+    Use `jplot man fonts --json` for role defaults, font discovery and persistent card edits.

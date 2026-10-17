@@ -44,6 +44,7 @@ VERBS: dict[str, str] = {
     "config": "jarvisplot.verbs.config_cmd:run",
     "man": "jarvisplot.verbs.man:run",
     "cache": "jarvisplot.verbs.cache:run",
+    "fonts": "jarvisplot.verbs.fonts:run",
 }
 
 #: Tokens that must never become verbs or silent aliases (exit 2).

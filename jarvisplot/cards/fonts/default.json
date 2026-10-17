@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "families": {"sans": "Helvetica", "serif": "STIXGeneral"},
+  "math": {"fontset": "stix"},
+  "roles": {
+    "title": {"family": "sans", "size_pt": null, "recommended_size_pt": 9, "weight": "bold", "style": "normal"},
+    "axis_label": {"family": "serif", "size_pt": null, "recommended_size_pt": 6, "weight": "normal", "style": "normal"},
+    "tick": {"family": "sans", "size_pt": null, "recommended_size_pt": 5, "weight": "normal", "style": "normal"},
+    "legend": {"family": "sans", "size_pt": null, "recommended_size_pt": 5, "weight": "normal", "style": "normal"},
+    "text": {"family": "sans", "size_pt": null, "recommended_size_pt": 5, "weight": "normal", "style": "normal"},
+    "annotation": {"family": "serif", "size_pt": null, "recommended_size_pt": 5, "weight": "normal", "style": "normal"},
+    "caption": {"family": "sans", "size_pt": null, "recommended_size_pt": 5, "weight": "normal", "style": "normal"}
+  }
+}

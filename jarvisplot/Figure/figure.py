@@ -327,6 +327,10 @@ class Figure:
     
     @frame.setter
     def frame(self, value) -> None: 
+        from ..font_runtime import prepare_font_overrides, prepare_frame_fonts
+        if getattr(self, '_font_card', None) is not None:
+            value = prepare_frame_fonts(self._frame, value, self._font_card)
+        prepare_font_overrides(self._frame, value)
         self._legend_disabled_axes = getattr(self, "_legend_disabled_axes", set())
         for name, node in (value or {}).items():
             if isinstance(node, dict) and "legend" in node:
@@ -380,6 +384,10 @@ class Figure:
         self._legend_disabled_axes = set()
         self._yaml_axc_cmaps = set()
         self._style = deepcopy(bundle["Style"])
+        from ..fonts import load_font_card
+        from ..font_runtime import apply_font_defaults
+        self._font_card = load_font_card()
+        apply_font_defaults(self._frame, self._style, self._font_card)
         self._debug_config = deepcopy(bundle.get("Debug", {}))
         self._default_layers = deepcopy(bundle.get("Layers", []))
         if self.logger:
@@ -1319,6 +1327,15 @@ class Figure:
         plt.close(self.fig)
         
     def render(self):
+        from ..font_runtime import pin_figure_fonts, rc_font_settings
+        card = getattr(self, '_font_card', None)
+        with mpl.rc_context(rc_font_settings(card) if card is not None else {}):
+            self._render()
+            if card is not None:
+                self.fig._jarvis_axes = self.axes
+                pin_figure_fonts(self.fig, self.frame, card)
+
+    def _render(self):
         """
         Render all layers attached to each axes (we appended them in axtri/axlogo setters).
         """

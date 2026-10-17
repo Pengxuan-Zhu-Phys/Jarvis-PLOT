@@ -304,7 +304,7 @@ def _shaded_variables(n: int, blocks=None, selected=None) -> np.ndarray:
 
 
 def _edge_numbers(ax, n: int, side: str, size: float, color, clip: bool,
-                  zorder: float, gap: float = 0.06, pitch_pt: float = 12.0):
+                  zorder: float, gap: float = 0.06, pitch_pt: float = 12.0, fontproperties=None):
     """The variable's position, repeated where each arm of its V ends.
 
     A variable's two arms run to the two outer edges of the triangle, and at
@@ -334,7 +334,8 @@ def _edge_numbers(ax, n: int, side: str, size: float, color, clip: bool,
     digits = len(str(int(n)))
     from .corr_layout import measure_text_mm
 
-    text_pt = measure_text_mm("0" * digits, size_pt=size, family="sans")[0] / 25.4 * 72.0
+    text_pt = measure_text_mm("0" * digits, size_pt=size,
+                              family=fontproperties if fontproperties is not None else 'sans')[0] / 25.4 * 72.0
     half = (text_pt / 2.0) / max(float(pitch_pt), 1e-9)
     reach = (0.5 * _DIAMOND_ROUND + float(gap) + half) * _DIAMOND_ROUND
     flip = -1.0 if side == "right" else 1.0
@@ -348,12 +349,12 @@ def _edge_numbers(ax, n: int, side: str, size: float, color, clip: bool,
                 flip * u, v, label,
                 ha="center", va="center", rotation=rotation,
                 rotation_mode="anchor", fontsize=size, color=color,
-                fontfamily="sans", clip_on=clip, zorder=zorder,
+                fontproperties=fontproperties, clip_on=clip, zorder=zorder,
             )
 
 
 def _label_numbers(ax, n: int, side: str, offset_mm: float, size: float,
-                   color, clip: bool, zorder: float) -> None:
+                   color, clip: bool, zorder: float, fontproperties=None) -> None:
     """The same numbers again, as their own column beside the names.
 
     Not part of the tick label.  A tick label is one string in one colour, and
@@ -383,7 +384,7 @@ def _label_numbers(ax, n: int, side: str, offset_mm: float, size: float,
         target.text(
             x, k, str(k + 1).zfill(digits),
             ha=ha, va="center", fontsize=size, color=color,
-            fontfamily="sans", transform=transform, clip_on=clip, zorder=zorder,
+            fontproperties=fontproperties, transform=transform, clip_on=clip, zorder=zorder,
         )
 
 
@@ -661,6 +662,19 @@ def draw_corrplot(ax, **kwargs):
     """Draw one correlation matrix.  Returns the glyph collection."""
     from matplotlib.collections import LineCollection, PatchCollection, PolyCollection
     from matplotlib.patches import Polygon, Rectangle
+    from ..font_runtime import text_settings
+    from ..fonts import load_font_card
+    from ..forest_text import font_properties
+    font_roles = kwargs.pop('__corr_fonts__', None)
+    if font_roles is None:
+        card = load_font_card()
+        font_roles = {role: text_settings(role, card) for role in ('tick', 'annotation')}
+    def role_properties(role, size):
+        settings = font_roles[role]
+        prop = font_properties(settings.get('fontsize', size), settings['fontfamily'], settings['fontweight'],
+                               style=settings['fontstyle'])
+        prop.set_math_fontfamily(settings['math_fontfamily'])
+        return prop
 
     df = kwargs.pop("__df__", None)
     if df is None or not hasattr(df, "columns"):
@@ -901,14 +915,16 @@ def draw_corrplot(ax, **kwargs):
     if diamond and grid_color and label_span is not None:
         _label_rules(ax, n, label_span, grid_color, _GRID_LWD, clip, zorder)
     if diamond and edge_numbers:
+        number_prop = role_properties('tick', number_pt)
         _edge_numbers(
-            ax, n, side, number_pt, edge_color, clip, zorder + 40,
+            ax, n, side, number_prop.get_size_in_points(), edge_color, clip, zorder + 40,
             gap=edge_numbers_gap, pitch_pt=cell_pt / _DIAMOND_ROUND,
+            fontproperties=number_prop,
         )
         if number_column_mm > 0.0:
             _label_numbers(
-                ax, n, side, number_column_mm, number_pt,
-                edge_color, clip, zorder + 40,
+                ax, n, side, number_column_mm, number_prop.get_size_in_points(),
+                edge_color, clip, zorder + 40, fontproperties=number_prop,
             )
 
     if diamond and stripe != "none" and np.any(drawn):
@@ -1084,6 +1100,7 @@ def draw_corrplot(ax, **kwargs):
     if coef_color is not None:
         labels = _number_strings(rho, digits, as_percent)
         size = _text_points([l for l, ok in zip(labels, drawn) if ok], cell_pt) * number_cex
+        coefficient_prop = role_properties('annotation', size)
         for x, y, label, value, ok in zip(ix, iy, labels, rho, drawn):
             if not ok or not label:
                 continue
@@ -1092,8 +1109,8 @@ def draw_corrplot(ax, **kwargs):
                 color = _value_color(value, cmap, norm, vmin, vmax)
             ax.text(
                 x, y, label,
-                ha="center", va="center", fontsize=size, color=color,
-                fontfamily="sans", clip_on=clip, zorder=zorder + 20,
+                ha="center", va="center", fontproperties=coefficient_prop, color=color,
+                clip_on=clip, zorder=zorder + 20,
             )
 
     if sig_level is not None and insig == "pch" and np.any(insignificant):
@@ -1111,8 +1128,8 @@ def draw_corrplot(ax, **kwargs):
         for x, y in zip(ix[~finite], iy[~finite]):
             ax.text(
                 x, y, str(na_label),
-                ha="center", va="center", fontsize=cell_pt * 0.45,
-                color=na_color, fontfamily="sans", clip_on=clip, zorder=zorder + 25,
+                ha="center", va="center", fontproperties=role_properties('annotation', cell_pt * 0.45),
+                color=na_color, clip_on=clip, zorder=zorder + 25,
             )
 
     # On the diamond the clusters are told by the shading (see the stripe

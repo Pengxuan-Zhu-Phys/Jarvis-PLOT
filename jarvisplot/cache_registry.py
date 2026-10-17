@@ -171,6 +171,14 @@ def _entry_root(key: str, entry: dict) -> Path:
     return root
 
 
+def _empty_unmarked_root(root: Path) -> bool:
+    """A cache with only empty component directories has no payload to clean."""
+    if root.parent != root.parent.resolve() or root.is_symlink() or not root.is_dir():
+        return False
+    return all(path.name in COMPONENTS and path.is_dir() and not path.is_symlink()
+               and not any(path.iterdir()) for path in root.iterdir())
+
+
 class CacheRegistry:
     def __init__(self, path: Path | None = None):
         self.path = path or registry_path()
@@ -227,7 +235,7 @@ class CacheRegistry:
             try:
                 root = _entry_root(key, entry)
                 row.update(entry)
-                if not root.exists() and not root.is_symlink():
+                if (not root.exists() and not root.is_symlink()) or _empty_unmarked_root(root):
                     row["status"] = "missing"
                 else:
                     marker = _marker(root)
@@ -319,6 +327,14 @@ class CacheRegistry:
                             result["missing"].append(key)
                             if not dry_run:
                                 del entries[key]
+                            continue
+                        if _empty_unmarked_root(root):
+                            if not dry_run:
+                                for path in root.iterdir():
+                                    path.rmdir()
+                                root.rmdir()
+                                del entries[key]
+                            result["missing"].append(key)
                             continue
                         marker = _marker(root)
                         if older_than is not None and (datetime.now(timezone.utc) - _date(marker["last_used"])).total_seconds() < older_than * 86400:

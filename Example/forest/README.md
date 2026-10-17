@@ -54,7 +54,7 @@ The normal chart shows a shared top numerical axis and continuous vertical grid;
 The default canvas is white, with no row shading, numbered metadata or legend heading. Point legend markers and their labels are left aligned using compact keys.
 
 For a study previously using `jarvis_forest_preview`, install the formal project in the same
-Python environment (`python -m pip install -e /Users/p.zhu/Jarvis-Workshop/Jarvis-PLOT`),
+Python environment (`python -m pip install -e .` from the Jarvis-PLOT repository root),
 remove its preview path from the shell/launcher PYTHONPATH, and call the formal `jplot` on
 the existing YAML. The native interface accepts the established `intervals`, annotation,
 MathText, header_note and geometry keys; no task-specific names or data conversion are needed.

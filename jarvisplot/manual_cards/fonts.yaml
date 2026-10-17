@@ -1,0 +1,156 @@
+id: fonts
+title: Font discovery and default typography card
+summary: Query role defaults, resolve installed fonts and edit persistent Helvetica/STIX typography.
+role: how-to
+priority: 42
+card_version: 1
+see_also: [agent-readme, cli-map, style-axes, legend, type-forest]
+related_cli:
+  - argv: [jplot, fonts, show, "--json"]
+    why: effective typography card plus bundled recommendations and resolved role settings
+  - argv: [jplot, fonts, show, legend, "--json"]
+    why: query one role's family, size, weight, style and math font
+  - argv: [jplot, fonts, show, "--recommended", "--json"]
+    why: bundled recommendations without user overrides
+  - argv: [jplot, fonts, list, "--filter", STIX, "--json"]
+    why: discover Matplotlib-visible font faces and file paths
+  - argv: [jplot, fonts, resolve, Helvetica, "--weight", bold, "--json"]
+    why: family resolution with actual selected font, weight and face
+  - argv: [jplot, fonts, check, "--json"]
+    why: verify every font required by the effective card; Helvetica substitutions are reported; other missing families return failure
+  - argv: [jplot, fonts, set, roles.title.size_pt, "14", "--json"]
+    why: validate and persist a default role size
+  - argv: [jplot, fonts, reset, roles.title.size_pt, "--json"]
+    why: restore one field to its bundled recommendation
+live_sources:
+  - verb: fonts.show
+    truth: bundled cards/fonts/default.json plus JARVIS_HOME/plot-fonts.json user overrides
+  - verb: fonts.list
+    truth: current Matplotlib FontManager inventory; --refresh rescans in this process
+  - verb: fonts.resolve
+    truth: resolved family, substitution details, face and real font file
+human:
+  panels:
+    - kind: overview
+      title: Typography defaults
+      body: |
+        Recommended sans: Helvetica. Recommended serif: STIXGeneral. MathText: stix.
+        Bare jplot fonts shows the effective card. fonts show <role> queries one role.
+        Roles: title, axis_label, tick, legend, text, annotation, caption.
+        Direct jplot <yaml> uses these defaults automatically; explicit YAML fonts take priority.
+    - kind: steps
+      title: Discover and configure
+      items:
+        - "jplot fonts show"
+        - "jplot fonts show title --recommended"
+        - "jplot fonts list --filter Helvetica"
+        - "jplot fonts list --refresh  # rescan the current process index"
+        - "jplot fonts resolve Helvetica --weight bold"
+        - "jplot fonts check"
+        - "jplot fonts set families.sans Helvetica"
+        - "jplot fonts set families.serif STIXGeneral"
+        - "jplot fonts set roles.legend.family serif"
+        - "jplot fonts set roles.title.size_pt 14"
+        - "jplot fonts set roles.title.size_pt null  # inherit the style card size"
+        - "jplot fonts reset roles.title.size_pt"
+        - "jplot fonts reset  # remove all user overrides"
+    - kind: notes
+      title: Discovery and missing fonts
+      items:
+        - Matplotlib discovers fonts using its system and bundled font inventory and cache. fonts list reports what the current FontManager can see; this can differ from other applications' font menus.
+        - Helvetica is not installed or redistributed by this CLI. If absent, it uses the first installed similar sans family in this order: Arial, Liberation Sans, Nimbus Sans, DejaVu Sans. Resolve and check report the substitution explicitly. Other missing families fail.
+        - STIXGeneral is an actual text family bundled with Matplotlib; stix is a MathText fontset rather than an installable family name.
+        - Resolve checks the requested family; Helvetica alone has the documented substitution chain. Weight/style select the closest available face within the selected family. Inspect the returned actual family, face and path.
+        - Font discovery does not guarantee glyph coverage for every language. Inspect the rendered output for the text being used.
+    - kind: notes
+      title: Card, sizes and formulas
+      items:
+        - "User overrides persist at ${JARVIS_HOME:-~/.jarvis}/plot-fonts.json. Querying the card does not create this file. The bundled recommendation is read-only."
+        - "Priority: explicit YAML/layer typography > user card > bundled font card > style card. Geometry and non-font styling remain controlled by style cards."
+        - "size_pt: null preserves each style card's existing size. A numeric size_pt overrides it. recommended_size_pt is read-only drafting guidance, not an automatically applied size."
+        - "Role family accepts sans, serif, or a literal installed font family. Changing families.sans/serif updates all roles that reference that family."
+        - "MathText $...$ formulas use math.fontset (default stix). External LaTeX/usetex uses its own font configuration."
+        - "math.fontset accepts stix or dejavusans. Role style accepts normal, italic or oblique; role weight accepts a Matplotlib weight name or a number from 0 to 1000."
+        - "set writes immediately after whole-card validation; reset removes a field's override or all overrides. Use explicit YAML for a single plot's preferences."
+    - kind: notes
+      title: Native forest role mapping
+      items:
+        - "title → forest.title. axis_label → x label and table column headers (header_pt). tick → top/bottom numeric ticks (tick_pt)."
+        - "text → row names and left/body cells (label_pt/detail_pt). annotation → right cells and interval/box annotations (stats_pt)."
+        - "caption → header_note, metadata, footer description, legend heading and logo (meta_pt/footer_pt). legend → native legend labels."
+        - "A null size_pt keeps each native slot's physical layout size. A numeric role size_pt applies before measurement; measurement and drawing use the same fonts."
+        - "Explicit forest.typography.family overrides all native role families. Explicit forest.typography.<slot>_pt, column.fontsize, title.fontsize and description.fontsize override role sizes. Local column/title/description fontweight overrides role weights."
+        - "Forest formulas use MathText with the card fontset, independent of ambient Matplotlib math settings. External usetex is unsupported in the native forest renderer."
+agent:
+  body_markdown: |
+    Every command accepts --json and non-TTY stdout emits one standard envelope.
+    Exit codes: 0 success, 1 card/lookup/check failure, 2 invalid command arguments.
+    Parse errors with --json also emit one JSON object, without human help on stdout.
+
+    `fonts show [role]` returns data.card, data.recommended, data.roles,
+    data.source, data.user_path, data.has_overrides, data.precedence and data.size_policy.
+    data.roles resolves sans/serif to literal family names and reports size_pt,
+    weight, style and math_fontfamily. `--recommended` ignores user overrides.
+    A null size_pt inherits the active style card; recommended_size_pt is guidance.
+
+    `fonts list [--filter TEXT] [--refresh]` returns data.fonts with family, path,
+    weight and style, plus count, refreshed and cache_dir. Refresh rescans this
+    process; it does not install fonts or change persistent font preferences.
+    `fonts resolve FAMILY` reports the matched actual family, face and path;
+    weight/style may match the closest face. If Helvetica is absent, it selects the
+    first available Arial, Liberation Sans, Nimbus Sans or DejaVu Sans and reports
+    fallback, fallback_reason and fallback_candidates. Other missing families fail.
+    `fonts check` reports each required family/face and roles in data.results;
+    unavailable fonts make ok false and exit 1. Helvetica substitutions remain
+    successful and identify the actual selected family and substitution reason.
+
+    Editable dotted paths:
+    - families.sans, families.serif
+    - math.fontset (stix or dejavusans)
+    - roles.<title|axis_label|tick|legend|text|annotation|caption>.family
+    - roles.<role>.size_pt (positive numeric points, or null to inherit)
+    - roles.<role>.weight, roles.<role>.style
+
+    `fonts set PATH VALUE` accepts a JSON scalar or a plain string, validates the
+    complete merged card, then atomically persists the override. Arrays and objects
+    are not scalar values. `fonts reset [PATH]` restores the recommendation for one
+    editable field or clears all overrides. schema_version and recommended_size_pt
+    cannot be edited. Direct YAML rendering uses the card automatically, with
+    explicit figure/layer font settings taking priority.
+
+    Native forest maps roles before measuring and rendering:
+    - title: forest.title
+    - axis_label: x label and table headers (header_pt)
+    - tick: top/bottom numeric ticks (tick_pt)
+    - text: row names and left/body cells (label_pt/detail_pt)
+    - annotation: right cells and interval/box annotations (stats_pt)
+    - caption: header_note, metadata, footer description, legend heading and logo (meta_pt/footer_pt)
+    - legend: native legend labels
+    Null size_pt retains native slot sizes. Explicit forest.typography.family overrides
+    all native role families. Explicit forest.typography.<slot>_pt and local column,
+    title or description fontsize/fontweight override card sizes/weights. MathText
+    uses the card fontset; the native forest renderer does not support external usetex.
+
+    Helvetica is the recommended sans family. STIXGeneral is the recommended serif
+    text family bundled with Matplotlib. stix is the MathText fontset for `$...$`,
+    including TeX-style math syntax; it does not configure external LaTeX/usetex.
+    Font matching does not certify glyph coverage; inspect final exported figures.
+  defaults:
+    sans: Helvetica
+    serif: STIXGeneral
+    math_fontset: stix
+    roles: [title, axis_label, tick, legend, text, annotation, caption]
+  editable_paths:
+    - families.sans
+    - families.serif
+    - math.fontset
+    - roles.<role>.family
+    - roles.<role>.size_pt
+    - roles.<role>.weight
+    - roles.<role>.style
+  anti_patterns:
+    - Treating stix as the literal serif text family instead of STIXGeneral.
+    - Hiding the actual Helvetica substitute or inventing fallback for other families.
+    - Treating read-only recommended_size_pt as an applied size.
+    - Persisting figure-specific font choices when only the current YAML should change.
+    - Assuming MathText font preferences configure an external LaTeX compiler.

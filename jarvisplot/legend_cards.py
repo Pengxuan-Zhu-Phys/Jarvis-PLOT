@@ -261,6 +261,14 @@ def merge_axes_legend(base, override):
     if isinstance(override, bool):
         return {**(deepcopy(base) if isinstance(base, dict) else {}), "enabled": override}
     if isinstance(override, dict):
+        if 'fontsize' in override and isinstance(base, dict):
+            # A local font size outranks an inherited font-card prop.size.
+            # Two explicit local sizes keep native prop.size precedence.
+            prop = override.get('prop')
+            if prop is None or isinstance(prop, dict) and 'size' not in prop:
+                base = deepcopy(base)
+                if isinstance(base.get('prop'), dict):
+                    base['prop'].pop('size', None)
         value = merge_legend_settings(base if isinstance(base, dict) else {}, override)
         value["enabled"] = override.get("enabled", True)
         return value

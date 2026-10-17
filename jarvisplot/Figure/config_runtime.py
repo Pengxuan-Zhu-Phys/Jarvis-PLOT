@@ -71,7 +71,6 @@ def apply_figure_config(fig, info: Mapping) -> bool:
 
         import matplotlib.pyplot as plt
 
-        plt.rcParams["mathtext.fontset"] = "stix"
         if "figure" not in (fig.frame or {}):
             # A card may leave the figure size to be solved from the data
             # (the correlation matrix does).  Say so, rather than letting a
@@ -81,7 +80,10 @@ def apply_figure_config(fig, info: Mapping) -> bool:
                 "solved from the data, so it can only be rendered through the "
                 "figure type that runs the solve.".format(style_tokens)
             )
-        fig.fig = plt.figure(**fig.frame["figure"])
+        from ..font_runtime import rc_font_settings
+        import matplotlib as mpl
+        with mpl.rc_context(rc_font_settings(fig._font_card)):
+            fig.fig = plt.figure(**fig.frame["figure"])
         # An interactive backend sizes the figure to whole window pixels: the
         # macosx one calls set_size_inches(round(w * 100) / 100, ...) while it
         # builds the manager, so a size of 3.377953 in is saved as 3.37.  On an
@@ -101,7 +103,8 @@ def apply_figure_config(fig, info: Mapping) -> bool:
             except Exception:
                 pass
 
-        fig.load_axes()
+        with mpl.rc_context(rc_font_settings(fig._font_card)):
+            fig.load_axes()
 
         if "layers" in info:
             fig.layers = info["layers"]

@@ -4,7 +4,7 @@ summary: Official YAML workflow and prompt reporting of missing capabilities.
 role: how-to
 priority: 5
 card_version: 1
-see_also: [workflow, cli-map, type-forest, diagnostics, agent-output]
+see_also: [workflow, cli-map, fonts, type-forest, diagnostics, agent-output]
 related_cli:
   - argv: [jplot, "--version"]
     why: record the installed Jarvis-PLOT version before reporting a feature gap
@@ -12,6 +12,10 @@ related_cli:
     why: discover supported types, methods, styles, transforms and CLI commands
   - argv: [jplot, man, "<topic>", "--json"]
     why: read the current public contract and packaged schema for the requested format
+  - argv: [jplot, fonts, show, "--json"]
+    why: read effective role typography and bundled recommendations before authoring
+  - argv: [jplot, fonts, check, "--json"]
+    why: confirm default card fonts and inspect the actual Helvetica substitute when needed
   - argv: [jplot, data, describe, "<file>", "--json"]
     why: confirm real source fields instead of inventing names
   - argv: [jplot, validate, "<yaml>", "--json"]
@@ -33,6 +37,7 @@ human:
       title: Use the official package
       items:
         - Read jplot --version, jplot cap all --json and jplot man <topic> --json first.
+        - Read fonts show --json and fonts check --json. Defaults use Helvetica for sans text, STIXGeneral for serif text and stix for MathText formulas. If Helvetica is missing, the runtime selects a similar sans family and reports it through fonts check/resolve; other missing families fail explicitly.
         - Inspect input fields with data describe; author a YAML file against the published contract.
         - Use the installed Jarvis-PLOT package plus YAML. Keep producer-supplied coordinates and statistics unchanged unless the user requested a calculation.
         - Run validate, doctor and the bare-path render command; inspect the actual output. Store verification output in a temporary directory when existing figures must be preserved.
@@ -64,6 +69,20 @@ agent:
     and the real source fields before authoring YAML. Run `validate`, `doctor`, then
     `jplot <yaml> --report` and inspect exported figures. Doctor's partial coverage is not
     proof that heavy transforms or final rendered ink were checked.
+
+    Read `jplot fonts show --json` (or `show title`, `show legend`) and
+    `jplot fonts check --json` to use the current default typography card.
+    Helvetica is the recommended sans family; STIXGeneral is the serif family;
+    stix is the MathText fontset for `$...$` formulas. A null role size_pt inherits
+    the selected style card's size; recommended_size_pt is drafting guidance.
+    Direct YAML rendering applies the card automatically. Explicit YAML typography
+    overrides it. `fonts set PATH VALUE` changes persistent defaults across plots;
+    use explicit YAML for figure-specific choices. Discover available families with
+    `fonts list --json`. Helvetica uses the first available Arial, Liberation Sans,
+    Nimbus Sans or DejaVu Sans when absent; inspect the reported actual family. Other
+    missing families fail explicitly.
+    Read `jplot man fonts --json` for discovery, precedence, editable paths,
+    forest role mapping and the external LaTeX boundary.
 
     Use formal Jarvis-PLOT plus YAML. A study may supply already calculated rows, points,
     interval endpoints, labels, and classes; display them without inventing statistics or

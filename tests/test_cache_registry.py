@@ -143,6 +143,38 @@ def test_age_filter_and_missing_records(tmp_path, capsys):
     assert str(missing) not in json.loads(registry.path.read_text())["caches"]
 
 
+@pytest.mark.parametrize("leftover_components", [(), ("data", "summary")])
+def test_empty_unmarked_cache_is_pruned_but_nonempty_unmarked_cache_is_retained(
+        tmp_path, capsys, leftover_components):
+    empty = _cache(tmp_path / "empty")
+    nonempty = _cache(tmp_path / "nonempty")
+    shutil.rmtree(empty)
+    empty.mkdir()
+    for name in leftover_components:
+        (empty / name).mkdir()
+    (nonempty / MARKER).unlink()
+    foreign = nonempty / "foreign.txt"
+    foreign.write_text("keep")
+    registry = CacheRegistry()
+
+    rows = {row["cache_dir"]: row for row in _command(capsys, "list", expected=1)["data"]["caches"]}
+    assert rows[str(empty)]["status"] == "missing"
+    assert rows[str(nonempty)]["status"] == "invalid"
+    before = registry.path.read_bytes()
+    preview = _command(capsys, "clean", "--all", "--dry-run", expected=1)["data"]
+    assert preview["missing"] == [str(empty)]
+    assert registry.path.read_bytes() == before
+    assert empty.is_dir()
+
+    result = _command(capsys, "clean", "--all", expected=1)["data"]
+    assert result["missing"] == [str(empty)]
+    assert not empty.exists()
+    assert str(empty) not in json.loads(registry.path.read_text())["caches"]
+    assert str(nonempty) in json.loads(registry.path.read_text())["caches"]
+    assert foreign.read_text() == "keep"
+    assert result["errors"]
+
+
 def test_active_cache_is_skipped_until_closed(tmp_path, capsys):
     cache = ProjectCache(str(tmp_path / "active"))
     cache.put_dataframe("payload", pd.DataFrame({"x": [1]}))

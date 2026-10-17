@@ -6,7 +6,8 @@
                 "data",
                 "cap",
                 "man",
-                "explain"
+                "explain",
+                "fonts"
             ]
         },
         {
@@ -33,7 +34,9 @@
         },
         {
             "title": "Maintain",
-            "commands": ["cache"]
+            "commands": [
+                "cache"
+            ]
         },
         {
             "title": "Flowchart",
@@ -68,6 +71,13 @@
             "name": "man",
             "help": "callable manual (index or topic; --json for agents)",
             "usage": "jplot man [topic] [--json]",
+            "kind": "agent",
+            "group": "Discover"
+        },
+        {
+            "name": "fonts",
+            "help": "discover fonts and query or edit the default typography card",
+            "usage": "jplot fonts [show|list|resolve|check|set|reset] … [--json]",
             "kind": "agent",
             "group": "Discover"
         },

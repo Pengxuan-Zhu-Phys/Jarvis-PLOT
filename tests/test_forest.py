@@ -291,14 +291,17 @@ def test_measured_columns_use_all_rows_headers_and_roles(tmp_path):
     layout = fig.forest_layout
     n, w, label = layout['columns']
     from jarvisplot.forest_text import text_metrics_mm
+    from jarvisplot.font_runtime import forest_font_properties
     fonts = layout['typography']
-    assert label['content_width_mm'] == pytest.approx(text_metrics_mm('Longer group', 6, fonts['family'], 'bold')[0])
-    assert w['content_width_mm'] == pytest.approx(text_metrics_mm('Weight', fonts['header_pt'], fonts['family'], 'bold')[0])
+    assert label['content_width_mm'] == pytest.approx(text_metrics_mm('Longer group', 6, fonts['family'], 'normal',
+        prop=forest_font_properties(fonts, 'text', 6))[0])
+    assert w['content_width_mm'] == pytest.approx(text_metrics_mm('Weight', fonts['header_pt'], fonts['family'], 'normal',
+        prop=forest_font_properties(fonts, 'axis_label', fonts['header_pt']))[0])
     assert label['left_mm'] < w['left_mm'] < n['left_mm']
     assert layout['geometry']['plot_left_mm'] < w['left_mm']
     assert layout['geometry']['plot_right_mm'] > n['left_mm']
     assert n['align'] == 'right' and w['align'] == label['align'] == 'left'
-    assert label['fontweight'] == 'bold' and w['fontweight'] == 'normal'
+    assert label['fontweight'] == w['fontweight'] == 'normal'
     assert w['left_mm'] == pytest.approx(label['left_mm']+label['width_mm']+.8)
     assert n['left_mm']+n['width_mm'] == pytest.approx(80.5)
     # A shorter body value never changes a row's common numerical mapping.
@@ -1025,7 +1028,7 @@ def test_math_rows_cut_sections_legend_and_header_note_use_actual_layout(tmp_pat
     label = next(a for a in fig.axes['ax'].texts if a.get_text() == formula)
     assert label.get_parse_math()
     assert fig.forest_layout['columns'][0]['content_width_mm'] == pytest.approx(
-        text_metrics_mm(formula, 6, 'Helvetica', 'bold', math=True)[0])
+        text_metrics_mm(formula, 6, 'Helvetica', 'normal', math=True, prop=label.get_fontproperties())[0])
     assert next(a for a in fig.axes['ax'].texts if a.get_text() == cut).get_parse_math()
     assert all(a.get_parse_math() for a in fig.axes['ax'].get_legend().get_texts())
     g = fig.forest_layout['geometry']
@@ -1413,11 +1416,12 @@ def test_cut_formula_font_does_not_enable_parsing_and_schema_rejects_unknown_fon
     assert validate_config(config, check_columns=False).ok
     info['description']['math_fontfamily'] = 'invented'
     assert not validate_config(config, check_columns=False).ok
-    # Existing YAML without a selector retains its prior active font default.
+    # Omitted local selectors use the effective font card, without changing rc.
     info['description'].pop('math_fontfamily')
     with mpl.rc_context({'mathtext.fontset': 'cm'}):
         fig = draw(info, frames, tmp_path)
-        assert _artist(fig, 'forest-description-00').get_math_fontfamily() == 'cm'
+        assert _artist(fig, 'forest-description-00').get_math_fontfamily() == 'stix'
+        assert mpl.rcParams['mathtext.fontset'] == 'cm'
 
 
 @pytest.mark.parametrize('explicit_family', [False, True])

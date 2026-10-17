@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "JarvisPLOT"
-version = "2.1.10"
+version = "2.1.11"
 description = "Jarvis-PLOT: YAML-driven plotting engine"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -41,3 +41,26 @@ jarvisplot = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["jarvisplot*"]
+
+# Keep local credentials and generated files out of wheel package data.
+[tool.setuptools.exclude-package-data]
+"*" = [
+    "**/.DS_Store",
+    "**/*.py[cod]",
+    "**/.env",
+    "**/.env.*",
+    "**/.envrc",
+    "**/.pypirc",
+    "**/.pypirc.*",
+    "**/.twinerc",
+    "**/.pypi-token*",
+    "**/.mcp.json",
+    "**/release.env",
+    "**/twine.env",
+    "**/*.code-workspace",
+    "**/*.swp",
+    "**/*.swo",
+    "**/*~",
+    "**/*.bak",
+    "**/*.tmp",
+]

@@ -477,6 +477,30 @@ def _corr_card(core, info: Mapping) -> dict | None:
         return None
     if str(contract.get("figure_type", "")) != "correlation_matrix":
         return None
+    from copy import deepcopy
+    from .fonts import load_font_card
+    from .font_runtime import apply_font_defaults, prepare_font_overrides
+    apply_font_defaults(bundle['Frame'], bundle['Style'], load_font_card())
+    # The physical solve must see the same explicit font settings as the
+    # later Figure.frame merge. Copy only font-affecting fields here: geometry
+    # and categorical tick positions remain owned by the correlation solve.
+    font_fields = {'fontfamily', 'family', 'fontproperties', 'fontsize', 'size',
+                   'fontweight', 'weight', 'fontstyle', 'style', 'math_fontfamily',
+                   'labelfontfamily', 'labelfamily', 'labelsize'}
+    def font_overrides(node):
+        result = {}
+        for key, value in node.items():
+            if key in font_fields and not (key == 'style' and isinstance(value, dict)):
+                result[key] = deepcopy(value)
+            elif isinstance(value, dict):
+                nested = font_overrides(value)
+                if nested:
+                    result[key] = nested
+        return result
+    explicit_fonts = font_overrides(info.get('frame', {}))
+    from .legend_cards import merge_legend_settings
+    prepare_font_overrides(bundle['Frame'], explicit_fonts)
+    bundle['Frame'] = merge_legend_settings(bundle['Frame'], explicit_fonts)
     return bundle
 
 
@@ -531,7 +555,7 @@ def _numeric_predicate(dts):
     return None
 
 
-def _corr_tick_sizes(card: Mapping) -> tuple[float, float, str, float]:
+def _corr_tick_sizes(card: Mapping) -> tuple[float, float, Any, float]:
     """Tick text size, colorbar text size, family, and the panel's label pad.
 
     The pad is returned in **millimetres** because it is part of how much room a
@@ -543,17 +567,23 @@ def _corr_tick_sizes(card: Mapping) -> tuple[float, float, str, float]:
     ticks = (frame.get("axcorr", {}) or {}).get("ticks", {}) or {}
     panel = ticks.get("both", {}) or {}
     major = ticks.get("major", {}) or {}
+    y_label = ticks.get('y', {}) or {}
     bar = ((frame.get("axccorr", {}) or {}).get("ticks", {}) or {}).get("both", {}) or {}
-    label_pt = float(panel.get("labelsize", 6.0)) * float(style.get("tl.cex", 1.0) or 1.0)
+    label_pt = float(y_label.get('labelsize', major.get('labelsize', panel.get('labelsize', 6.0)))) * float(style.get("tl.cex", 1.0) or 1.0)
     # An outward tick pushes the label out by its own length first; this card
     # draws none (length 0), but a card that did would need the room.
     pad_pt = float(major.get("pad", 3.5) or 0.0)
     if str(panel.get("direction", "out")).strip().lower() == "out":
         pad_pt += float(major.get("length", 0.0) or 0.0)
+    from .fonts import resolve_role
+    from .forest_text import font_properties
+    role = resolve_role('tick')
+    family = font_properties(label_pt, str(y_label.get('labelfamily', major.get('labelfontfamily', panel.get('labelfontfamily', role['family'])))), role['weight'], style=role['style'])
+    family.set_math_fontfamily(role['math_fontfamily'])
     return (
         label_pt,
         float(bar.get("labelsize", 6.0)),
-        str(panel.get("labelfontfamily", "sans")),
+        family,
         pad_pt / 72.0 * 25.4,
     )
 
@@ -603,6 +633,7 @@ def _solve_corr_square(card, info, style, columns, axes_name):
     show_x, show_y = _corr_tick_visibility(style.get("tl.pos", "lt"))
     label_pt, bar_pt, family, label_pad_mm = _corr_tick_sizes(card)
     cb_title, cb_title_pt = _colorbar_title(card, info)
+    title_family = _corr_title_font(card, cb_title_pt)
     geom = solve_corr_geometry(
         n,
         geometry=card.get("Geometry", {}) or {},
@@ -618,6 +649,7 @@ def _solve_corr_square(card, info, style, columns, axes_name):
         colorbar_label_size_pt=bar_pt,
         colorbar_title_size_pt=cb_title_pt,
         family=family,
+        colorbar_title_family=title_family,
     )
     solved = geom.as_frame()
     solved[axes_name] = {
@@ -670,7 +702,11 @@ def _solve_corr_diamond(card, info, style, columns, axes_name):
 
     label_pt, bar_pt, family, label_pad_mm = _corr_tick_sizes(card)
     number_pt = max(label_pt * float(style.get("edge.numbers.cex", 0.7) or 0.7), 3.2)
+    from .fonts import resolve_role
+    if resolve_role('tick')['size_pt'] is not None:
+        number_pt = resolve_role('tick')['size_pt']
     cb_title, cb_title_pt = _colorbar_title(card, info)
+    title_family = _corr_title_font(card, cb_title_pt)
     geom = solve_diamond_geometry(
         n,
         geometry=card.get("Geometry", {}) or {},
@@ -687,6 +723,7 @@ def _solve_corr_diamond(card, info, style, columns, axes_name):
         colorbar_tick_pad_mm=_corr_bar_tick_pad_mm(card),
         colorbar_title_size_pt=cb_title_pt,
         family=family,
+        colorbar_title_family=title_family,
     )
     on_left = show_names and geom.side == "left"
     on_right = show_names and geom.side == "right"
@@ -1018,6 +1055,23 @@ def _attach_corr_debug(info: dict, lines: list[str]) -> None:
     info["debug"] = node
 
 
+def _corr_title_font(card, size):
+    from .fonts import resolve_role
+    from .forest_text import font_properties
+    from matplotlib.font_manager import FontProperties
+    role = resolve_role('axis_label')
+    config = card.get('Frame', {}).get('axccorr', {}).get('label', {})
+    if 'fontproperties' in config:
+        prop = FontProperties._from_any(config['fontproperties']).copy()
+        prop.set_size(size)
+        return prop
+    prop = font_properties(size, config.get('family', config.get('fontfamily', role['family'])),
+                           config.get('weight', config.get('fontweight', role['weight'])),
+                           style=config.get('style', config.get('fontstyle', role['style'])))
+    prop.set_math_fontfamily(config.get('math_fontfamily', role['math_fontfamily']))
+    return prop
+
+
 def _colorbar_title(card: Mapping, info: Mapping) -> tuple[str, float]:
     """The colorbar's own axis label and its size, YAML over card.
 
@@ -1029,7 +1083,11 @@ def _colorbar_title(card: Mapping, info: Mapping) -> tuple[str, float]:
     yaml_label = ((info.get("frame") or {}).get("axccorr", {}) or {}).get("label", {}) or {}
     merged = {**card_label, **(yaml_label if isinstance(yaml_label, Mapping) else {})}
     try:
-        size = float(merged.get("fontsize", 7.0))
+        if 'fontproperties' in merged and not {'fontsize', 'size'} & merged.keys():
+            from matplotlib.font_manager import FontProperties
+            size = FontProperties._from_any(merged['fontproperties']).get_size_in_points()
+        else:
+            size = float(merged.get('size', merged.get("fontsize", 7.0)))
     except (TypeError, ValueError):
         size = 7.0
     return str(merged.get("ylabel", "") or ""), size

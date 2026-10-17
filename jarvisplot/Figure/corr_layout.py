@@ -53,7 +53,7 @@ _PT_PER_INCH = 72.0
 
 #: Measuring a string means rasterising its glyph outlines, and the same
 #: handful of labels is measured on every solve.  Keyed by (text, pt, family).
-_WIDTH_CACHE: dict[tuple[str, float, str], tuple[float, float]] = {}
+_WIDTH_CACHE: dict[tuple, tuple[float, float]] = {}
 
 
 def _text_to_path():
@@ -77,15 +77,20 @@ def measure_text_mm(text: str, *, size_pt: float, family: str = "sans") -> tuple
     text = "" if text is None else str(text)
     if not text:
         return 0.0, 0.0
-    key = (text, float(size_pt), str(family))
+    from matplotlib import rcParams
+    from matplotlib.font_manager import FontProperties
+    from ..forest_text import font_properties
+    prop = (family.copy() if isinstance(family, FontProperties)
+            else font_properties(float(size_pt), family))
+    prop.set_size(float(size_pt))
+    signature = (tuple(prop.get_family()), prop.get_file(), prop.get_weight(),
+                 prop.get_style(), prop.get_math_fontfamily(), rcParams['mathtext.fontset'])
+    key = (text, float(size_pt), signature)
     hit = _WIDTH_CACHE.get(key)
     if hit is not None:
         return hit
 
     try:
-        from matplotlib.font_manager import FontProperties
-
-        prop = FontProperties(family=family, size=float(size_pt))
         # `$\rho$` measured as literal characters is three glyphs wide instead
         # of one, and a variable name written as mathtext is a normal thing to
         # want on this figure.  Matplotlib decides the same way.
@@ -171,6 +176,7 @@ def solve_corr_geometry(
     colorbar_label_size_pt: float = 5.5,
     colorbar_title_size_pt: float = 7.0,
     family: str = "sans",
+    colorbar_title_family=None,
 ) -> CorrGeometry:
     """Solve the figure size and axes rects for an ``n x n`` matrix.
 
@@ -224,7 +230,8 @@ def solve_corr_geometry(
     # The bar's axis label is rotated upright, so what it costs the width is
     # its line height, not its length.
     cbtitle = (
-        measure_text_mm(colorbar_title, size_pt=colorbar_title_size_pt, family=family)[1]
+        measure_text_mm(colorbar_title, size_pt=colorbar_title_size_pt,
+                        family=colorbar_title_family if colorbar_title_family is not None else family)[1]
         if colorbar_title
         else 0.0
     )

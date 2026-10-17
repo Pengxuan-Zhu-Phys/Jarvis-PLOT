@@ -37,7 +37,11 @@ def appearance(info):
     geometry.setdefault('glyph_offset_mm', 0)
     geometry.setdefault('value_column_mm', 0)
     geometry.setdefault('header_note_y_mm', geometry['meta_y_mm'])
-    typography = merge(card['Typography'], overrides.pop('typography', {}))
+    from .fonts import load_font_card
+    from .font_runtime import forest_typography_defaults, forest_role_data
+    font_card = load_font_card()
+    typography_override = overrides.pop('typography', {})
+    typography = forest_typography_defaults(card['Typography'], typography_override, font_card)
     style = merge(card['Style']['forest'], overrides)
     def check_finite(value, path):
         if isinstance(value, dict):
@@ -81,6 +85,7 @@ def appearance(info):
     if info.get('header_note') and not (0 < g['header_note_y_mm'] < g['title_y_mm']):
         raise ValueError('forest.geometry.header_note_y_mm must precede title_y_mm inside the header')
     style.setdefault('overlays', {}).setdefault('classes', {})
+    typography['_font_roles'] = forest_role_data(typography, typography_override, font_card)
     return geometry, typography, style, card
 
 
@@ -258,14 +263,17 @@ def layout_columns(columns, rows, geometry, typography, name):
     Validation and discovery do not call this data-dependent layout stage.
     """
     from .forest_text import text_metrics_mm
+    from .font_runtime import forest_font_properties
     g = geometry
     if sum(c['role'] == 'row_name' for c in columns) > 1:
         raise ValueError(f'figure {name!r}: columns permits at most one row_name')
     for index, column in enumerate(columns):
-        samples = [(column['label'], typography['header_pt'], 'bold')]
-        samples.extend((r['cells'][index], column['fontsize'], column['fontweight']) for r in rows)
+        samples = [(column['label'], typography['header_pt'], typography['_font_roles']['axis_label']['weight'], 'axis_label')]
+        samples.extend((r['cells'][index], column['fontsize'], column['fontweight'], column['_font_role']) for r in rows)
         try:
-            metrics = [text_metrics_mm(value, size, typography['family'], weight, math=column.get('math', False)) for value, size, weight in samples]
+            metrics = [text_metrics_mm(value, size, typography['family'], weight, math=column.get('math', False),
+                                       prop=forest_font_properties(typography, role, size, weight))
+                       for value, size, weight, role in samples]
         except ValueError as exc:
             raise ValueError(f'figure {name!r}, column {column["field"]!r}: {exc}') from exc
         column['content_width_mm'] = max(m[0] for m in metrics)
@@ -412,7 +420,8 @@ def solve_forest(info, frames):
             raise ValueError(f'column {column["field"]!r}: unknown role {role!r}')
         column['align'] = 'right' if role == 'right' else 'left'
         column.setdefault('fontsize', typography['label_pt'] if role == 'row_name' else typography['stats_pt'] if role == 'right' else typography['detail_pt'])
-        column.setdefault('fontweight', 'bold' if role == 'row_name' else 'normal')
+        column['_font_role'] = 'annotation' if role == 'right' else 'text'
+        column.setdefault('fontweight', typography['_font_roles'][column['_font_role']]['weight'])
         column.setdefault('missing', '—')
     for row, record in zip(rows, records):
         row['cells'] = []
@@ -504,7 +513,9 @@ def solve_forest(info, frames):
     # both ends, according to the alignment and unit suffix in the card.
     axis = style['axis']
     for side, value in [('left', ticks[0]), ('right', ticks[-1])]:
-        advance, left, right = text_metrics_mm(f"{value:g}{axis['tick_suffix']}", typography['tick_pt'], typography['family'], 'normal')
+        from .font_runtime import forest_font_properties
+        advance, left, right = text_metrics_mm(f"{value:g}{axis['tick_suffix']}", typography['tick_pt'], typography['family'], 'normal',
+                                              prop=forest_font_properties(typography, 'tick', typography['tick_pt']))
         shift = {'left': 0, 'center': advance/2, 'right': advance}[axis['tick_align']]
         extent = shift+left if side == 'left' else advance-shift+right
         key = f'margin_{side}_mm'
@@ -554,7 +565,11 @@ def solve_forest(info, frames):
         label = info.get('glyph_label', 'Box + whiskers' if info.get('glyph') == 'box' else 'Estimate + bounds')
         declarations.insert(0, {'legend': {'object': glyph_object, 'label': label}})
     from .legend_cards import merge_axes_legend, resolve_axes_legend
-    legend = merge_axes_legend(card['Frame']['ax']['legend'], info.get('frame', {}).get('ax', {}).get('legend', {}))
+    from .font_runtime import legend_defaults
+    from .fonts import load_font_card
+    default_legend = merge(card['Frame']['ax']['legend'], legend_defaults(card['Frame']['ax']['legend'], load_font_card()))
+    default_legend['prop']['family'] = typography['_font_roles']['legend']['family']
+    legend = merge_axes_legend(default_legend, info.get('frame', {}).get('ax', {}).get('legend', {}))
     if not declarations:
         legend = False
     resolve_axes_legend(legend, declarations)

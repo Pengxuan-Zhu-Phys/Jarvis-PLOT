@@ -166,6 +166,7 @@ def solve_diamond_geometry(
     colorbar_tick_pad_mm: float = 0.6,
     colorbar_title_size_pt: float = 7.0,
     family: str = "sans",
+    colorbar_title_family=None,
 ) -> DiamondGeometry:
     """Solve the figure size and axes rects for an ``n`` variable diamond.
 
@@ -272,7 +273,8 @@ def solve_diamond_geometry(
     # nothing else.
     cblab = max_label_mm(colorbar_labels, size_pt=colorbar_label_size_pt, family=family)
     cbtitle_w, cbtitle_h = (
-        measure_text_mm(colorbar_title, size_pt=colorbar_title_size_pt, family=family)
+        measure_text_mm(colorbar_title, size_pt=colorbar_title_size_pt,
+                        family=colorbar_title_family if colorbar_title_family is not None else family)
         if colorbar_title
         else (0.0, 0.0)
     )

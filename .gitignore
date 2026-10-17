@@ -42,3 +42,53 @@ jarvisplot.egg-info/
 
 # Documentation lives in Jarvis-Books/Docs; a local docs/ is never committed.
 /docs/
+
+# Maintainer release script (local only)
+/jprel
+
+# Local credentials and environment overrides
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+.envrc
+.pypirc
+.pypirc.*
+.twinerc
+.twine/
+.pypi/
+.pypi-token*
+release.env
+twine.env
+/.aws/
+/.ssh/
+
+# Machine-local editor and assistant configuration
+/.codex/
+/.agents/
+/.cursor/
+/.mcp.json
+*.code-workspace
+
+# Local caches, reports, and temporary files
+.cache/
+.tox/
+.nox/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage.*
+coverage.xml
+htmlcov/
+*.dist-info/
+*.swp
+*.swo
+*~
+*.bak
+*.tmp
+
+# Local workflow copies
+/github.ci/
+
+# Maintainer study cards and ad hoc analysis scripts
+/bin/

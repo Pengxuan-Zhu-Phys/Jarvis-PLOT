@@ -73,7 +73,7 @@ class ForestFigure(Figure):
             self.axlogo = self._frame['axes']['axlogo']
             from ..forest_text import font_properties
             for artist in self.axlogo.texts:
-                artist.set_fontproperties(font_properties(artist.get_fontsize(), artist.get_fontfamily()[0], artist.get_fontweight()))
+                artist.set_fontproperties(font_properties(artist.get_fontsize(), artist.get_fontfamily()[0], artist.get_fontweight(), style=artist.get_fontstyle()))
                 artist.set_parse_math(False)
                 artist.set_usetex(False)
         self.forest_layout['canvas_axes'] = len(self.axes)
@@ -82,9 +82,10 @@ class ForestFigure(Figure):
 
     def render(self):
         import matplotlib as mpl
+        from ..font_runtime import rc_font_settings
         # Unhinted glyphs agree with physical font measurements and avoid
         # native-hinting failures for small Helvetica ticks at low DPI.
-        with mpl.rc_context({'text.hinting': 'none', 'text.usetex': False}):
+        with mpl.rc_context({**rc_font_settings(self._font_card), 'text.hinting': 'none', 'text.usetex': False}):
             self._render()
 
     def _render(self):
@@ -102,15 +103,17 @@ class ForestFigure(Figure):
         row_graphics = {}
         header_artists = []
         from ..forest_text import font_properties, wrap_text, text_metrics_mm
+        from ..font_runtime import forest_font_properties
 
         def text(x, y, value, size, *, slot=None, row=None, **kwargs):
             if not value:
                 return None
-            weight = kwargs.pop('fontweight', 'normal')
+            weight = kwargs.pop('fontweight', None)
+            font_role = kwargs.pop('font_role', 'text')
             prop = kwargs.pop('fontproperties', None)
             kwargs.setdefault('ha', 'left')
             parse_math = kwargs.pop('parse_math', False)
-            artist = ax.text(x, y, value, fontproperties=prop if prop is not None else font_properties(size, fonts['family'], weight), va='center', parse_math=parse_math, usetex=False, **kwargs)
+            artist = ax.text(x, y, value, fontproperties=prop if prop is not None else forest_font_properties(fonts, font_role, size, weight), va='center', parse_math=parse_math, usetex=False, **kwargs)
             checks.append((artist, slot, row))
             if row is None and y < g['top_axis_y_mm']:
                 header_artists.append(artist)
@@ -119,43 +122,45 @@ class ForestFigure(Figure):
         title = info.get('title', {})
         origin = g['margin_left_mm']
         title_size = title.get('fontsize', fonts['title_pt'])
-        title_weight = title.get('fontweight', 'bold')
+        title_weight = title.get('fontweight', fonts['_font_roles']['title']['weight'])
+        title_prop = forest_font_properties(fonts, 'title', title_size, title_weight)
         title_right = origin+g['title_columns']*g['grid_unit_mm']
-        for i, line in enumerate(wrap_text(title.get('text', ''), title_size, fonts['family'], title_weight, title_right-origin, math=title.get('math', False))):
-            left_overhang = text_metrics_mm(line, title_size, fonts['family'], title_weight, math=title.get('math', False))[1]
-            artist = text(origin+left_overhang, g['title_y_mm']+i*g['title_line_pitch_mm'], line, title_size, parse_math=title.get('math', False), fontweight=title_weight, color=title.get('color', style['rows']['text_color']), slot=(origin, title_right, g['meta_y_mm']+1, g['x_label_y_mm']-1.5))
+        for i, line in enumerate(wrap_text(title.get('text', ''), title_size, fonts['family'], title_weight, title_right-origin, math=title.get('math', False), prop=title_prop)):
+            left_overhang = text_metrics_mm(line, title_size, fonts['family'], title_weight, math=title.get('math', False), prop=title_prop)[1]
+            artist = text(origin+left_overhang, g['title_y_mm']+i*g['title_line_pitch_mm'], line, title_size, parse_math=title.get('math', False), fontproperties=title_prop, color=title.get('color', style['rows']['text_color']), slot=(origin, title_right, g['meta_y_mm']+1, g['x_label_y_mm']-1.5))
             if artist is not None:
                 artist.set_gid(f'forest-title-{i:02d}')
         note = info.get('header_note', {})
-        note_size, note_weight = note.get('fontsize', fonts['meta_pt']), note.get('fontweight', 'normal')
-        for i, line in enumerate(wrap_text(note.get('text', ''), note_size, fonts['family'], note_weight, width-g['margin_right_mm']-origin, math=note.get('math', False))):
-            left_overhang = text_metrics_mm(line, note_size, fonts['family'], note_weight, math=note.get('math', False))[1]
+        note_size, note_weight = note.get('fontsize', fonts['meta_pt']), note.get('fontweight', fonts['_font_roles']['caption']['weight'])
+        note_prop = forest_font_properties(fonts, 'caption', note_size, note_weight)
+        for i, line in enumerate(wrap_text(note.get('text', ''), note_size, fonts['family'], note_weight, width-g['margin_right_mm']-origin, math=note.get('math', False), prop=note_prop)):
+            left_overhang = text_metrics_mm(line, note_size, fonts['family'], note_weight, math=note.get('math', False), prop=note_prop)[1]
             artist = text(origin+left_overhang, g.get('header_note_y_mm', g['meta_y_mm'])+i*g['text_line_pitch_mm'], line, note_size,
-                          color=note.get('color', style['rows']['text_color']), fontweight=note_weight, parse_math=note.get('math', False),
+                          color=note.get('color', style['rows']['text_color']), fontproperties=note_prop, parse_math=note.get('math', False),
                           slot=(origin, width-g['margin_right_mm'], 0, g['title_y_mm']-1.5))
             if artist is not None:
                 artist.set_gid(f'forest-header-note-{i:02d}')
         meta = info.get('meta', {})
         for key, column in (('number', 0), ('year', 9), ('place', 10)):
-            text(g['grid_lines_mm'][column], g['meta_y_mm'], meta.get(key, ''), fonts['meta_pt'], color=style['rows']['accent'] if key == 'number' else style['rows']['text_color'], slot=(g['grid_lines_mm'][column], g['grid_lines_mm'][10 if key=='year' else 12], 0, g['title_y_mm']-1.5))
+            text(g['grid_lines_mm'][column], g['meta_y_mm'], meta.get(key, ''), fonts['meta_pt'], font_role='caption', color=style['rows']['accent'] if key == 'number' else style['rows']['text_color'], slot=(g['grid_lines_mm'][column], g['grid_lines_mm'][10 if key=='year' else 12], 0, g['title_y_mm']-1.5))
         xlabel = info.get('x', {}).get('label', '')
-        text(origin, g['x_label_y_mm'], xlabel, fonts['header_pt'], slot=(origin, g['plot_right_mm'], g['x_label_y_mm']-1.5, g['column_header_y_mm']-1.5))
+        text(origin, g['x_label_y_mm'], xlabel, fonts['header_pt'], font_role='axis_label', slot=(origin, g['plot_right_mm'], g['x_label_y_mm']-1.5, g['column_header_y_mm']-1.5))
         handles = {}
         class_index = {layer['legend']['object']: i for i, layer in enumerate(layout['legend_layers'])}
         def cell_x(column):
             return column['left_mm'] + (column['width_mm']-column['text_right_padding_mm'] if column['align']=='right' else column['text_left_padding_mm'])
         for column in layout['columns']:
-            text(cell_x(column), g['column_header_y_mm'], column['label'], fonts['header_pt'], parse_math=column.get('math', False), fontweight='bold', ha=column['align'], slot=(column['left_mm'], column['left_mm']+column['width_mm'], g['column_header_y_mm']-1.5, g['top_tick_y_mm']-1))
+            text(cell_x(column), g['column_header_y_mm'], column['label'], fonts['header_pt'], font_role='axis_label', parse_math=column.get('math', False), ha=column['align'], slot=(column['left_mm'], column['left_mm']+column['width_mm'], g['column_header_y_mm']-1.5, g['top_tick_y_mm']-1))
         overlay_annotation = style.get('overlays', {}).get('annotation', {})
         if overlay_annotation.get('label'):
-            text(g.get('value_right_mm', g['plot_right_mm']), g['column_header_y_mm'], overlay_annotation['label'], fonts['header_pt'], parse_math=overlay_annotation.get('math', False), ha='right', fontweight='bold',
+            text(g.get('value_right_mm', g['plot_right_mm']), g['column_header_y_mm'], overlay_annotation['label'], fonts['header_pt'], font_role='axis_label', parse_math=overlay_annotation.get('math', False), ha='right',
                  slot=(g['plot_left_mm'], g.get('value_right_mm', g['plot_right_mm']), g['column_header_y_mm']-1.5, g['top_tick_y_mm']-1))
         tick_artists = []
         def tick_labels(y):
             for value in ticks:
                 # Numerical annotations follow the exact tick coordinate, just
                 # like the data marks; the modular grid governs layout edges.
-                artist = text(to_x(value), y, f"{value:g}{style['axis']['tick_suffix']}", fonts['tick_pt'], ha=style['axis']['tick_align'], color=style['rows']['secondary_color'], slot=(0, width, y-1, y+1))
+                artist = text(to_x(value), y, f"{value:g}{style['axis']['tick_suffix']}", fonts['tick_pt'], font_role='tick', ha=style['axis']['tick_align'], color=style['rows']['secondary_color'], slot=(0, width, y-1, y+1))
                 tick_artists.append(artist)
         tick_labels(g['top_tick_y_mm'])
         base = g['header_mm']+layout['row_count']*g['row_pitch_mm']
@@ -188,7 +193,7 @@ class ForestFigure(Figure):
                 line.set_gid(f'forest-row-separator-{index:03d}')
             trio = [text(cell_x(column), top+g['cell_y_mm'], value, column['fontsize'],
                          slot=(column['left_mm'], column['left_mm']+column['width_mm'], top, top+g['plot_y_mm']-g['point_band_mm']/2), row=row['row'],
-                         parse_math=column.get('math', False), fontweight=column['fontweight'], ha=column['align'], color=rows['text_color'] if column['role'] != 'left' else rows['secondary_color'],
+                         font_role=column['_font_role'], parse_math=column.get('math', False), fontweight=column['fontweight'], ha=column['align'], color=rows['text_color'] if column['role'] != 'left' else rows['secondary_color'],
                          bbox={'facecolor':row_fill if to_rgba(row_fill)[3] else rows['background'], 'edgecolor':'none', 'boxstyle':'square,pad=0.04'})
                     for column, value in zip(layout['columns'], row['cells'])]
             annotations.append((row['row'], [a for a in trio if a is not None]))
@@ -226,7 +231,7 @@ class ForestFigure(Figure):
                     left = to_x(overlay['upper'])+gap
                     if g.get('value_column_mm', 0):
                         left = max(left, g['plot_right_mm']+gap)
-                    label = text(g.get('value_right_mm', g['plot_right_mm']), oy, overlay['annotation'], annotation.get('fontsize', fonts['stats_pt']),
+                    label = text(g.get('value_right_mm', g['plot_right_mm']), oy, overlay['annotation'], annotation.get('fontsize', fonts['stats_pt']), font_role='annotation',
                                  parse_math=annotation.get('math', False), ha='right', color=s['color'], row=row['row'], slot=(left, g.get('value_right_mm', g['plot_right_mm']), top, top+g['row_band_mm']),
                                  bbox={'facecolor':rows['background'], 'edgecolor':'none', 'boxstyle':'square,pad=0.04'})
                     label.set_gid('forest-interval-annotation-'+row['row']+'-'+overlay['id'])
@@ -272,7 +277,7 @@ class ForestFigure(Figure):
                         left = max(left, g['plot_right_mm']+gap)
                     slot = ((g['plot_left_mm'], g.get('value_right_mm', g['plot_right_mm']), top, top+g['plot_y_mm']-g['point_band_mm']/2) if in_text_band else
                             (left, g.get('value_right_mm', g['plot_right_mm']), top, top+g['row_band_mm']))
-                    label = text(g.get('value_right_mm', g['plot_right_mm']), ay, row['box_annotation'], annotation.get('fontsize', fonts['stats_pt']),
+                    label = text(g.get('value_right_mm', g['plot_right_mm']), ay, row['box_annotation'], annotation.get('fontsize', fonts['stats_pt']), font_role='annotation',
                                  parse_math=annotation.get('math', False), ha='right', color=annotation.get('color', style['interval']['color']), row=row['row'], slot=slot,
                                  bbox={'facecolor':rows['background'], 'edgecolor':'none', 'boxstyle':'square,pad=0.04'})
                     label.set_gid('forest-box-annotation-'+row['row'])
@@ -290,8 +295,8 @@ class ForestFigure(Figure):
         description = info.get('description', {})
         desc_origin = g['grid_lines_mm'][g['description_start_column']-1]
         desc_right = desc_origin+g['description_columns']*g['grid_unit_mm']
-        desc_size, desc_weight = description.get('fontsize', fonts['footer_pt']), description.get('fontweight', 'normal')
-        desc_prop = font_properties(desc_size, fonts['family'], desc_weight)
+        desc_size, desc_weight = description.get('fontsize', fonts['footer_pt']), description.get('fontweight', fonts['_font_roles']['caption']['weight'])
+        desc_prop = forest_font_properties(fonts, 'caption', desc_size, desc_weight)
         if 'math_fontfamily' in description:
             desc_prop.set_math_fontfamily(description['math_fontfamily'])
         layout['description_fonts'] = {'family': desc_prop.get_family(), 'size_pt': desc_size,
@@ -308,7 +313,7 @@ class ForestFigure(Figure):
                 description_artists.append(artist)
         grouped = isinstance(legend_config, dict) and legend_config.get('ncols') == 2
         legend_origin = g['grid_lines_mm'][g['legend_start_columns'][0]-1] if grouped else origin
-        text(legend_origin, base+g['legend_heading_y_mm'], style['rows']['legend_heading'], fonts['meta_pt'], fontweight='bold', color=style['rows']['accent'], slot=(legend_origin, g['plot_right_mm'], base+3.5, base+g['legend_y_mm']-1))
+        text(legend_origin, base+g['legend_heading_y_mm'], style['rows']['legend_heading'], fonts['meta_pt'], font_role='caption', color=style['rows']['accent'], slot=(legend_origin, g['plot_right_mm'], base+3.5, base+g['legend_y_mm']-1))
         if isinstance(legend_config, dict):
             legend_config.setdefault('bbox_to_anchor', (legend_origin/width, 1-(base+g['legend_y_mm'])/height))
             legend_config.setdefault('borderpad', 0)
