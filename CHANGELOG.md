@@ -6,6 +6,8 @@ CLI `jplot`). Design documents, specifications and the roadmap live in
 
 ## Unreleased
 
+- Display `Jarvis-PLOT` in text and JSON version reports; the PyPI distribution
+  remains `JarvisPLOT`.
 - Handle `-v` / `--version` without initializing the plotting runtime and
   support structured version output with `--json`, also through `Jarvis plot`.
 

@@ -20,10 +20,10 @@ def main(argv=None, *, prog="jplot"):
         version = get_version()
         if "--json" in tokens:
             import json
-            print(json.dumps({"ok": True, "command": "version", "name": "JarvisPLOT",
+            print(json.dumps({"ok": True, "command": "version", "name": "Jarvis-PLOT",
                               "version": version}, indent=2))
         else:
-            print(f"JarvisPLOT {version}")
+            print(f"Jarvis-PLOT {version}")
         return 0
     handled, code = route(tokens, prog=prog)
     if handled:

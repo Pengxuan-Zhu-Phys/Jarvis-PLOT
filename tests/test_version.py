@@ -18,11 +18,11 @@ def test_cli_version_without_render_runtime(tokens, monkeypatch, capsys):
     output = capsys.readouterr().out
     if "--json" in tokens:
         assert json.loads(output) == {
-            "ok": True, "command": "version", "name": "JarvisPLOT",
+            "ok": True, "command": "version", "name": "Jarvis-PLOT",
             "version": version.get_version(),
         }
     else:
-        assert output.strip() == f"JarvisPLOT {version.get_version()}"
+        assert output.strip() == f"Jarvis-PLOT {version.get_version()}"
 
 
 def test_official_installed_distribution_wins_over_source_and_legacy(monkeypatch):

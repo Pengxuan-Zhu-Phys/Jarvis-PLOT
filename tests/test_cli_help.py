@@ -133,7 +133,7 @@ def test_cli_help_and_version_are_integer_returning_and_forwardable(capsys):
 
     assert main(["-v"]) == 0
     version_output = capsys.readouterr()
-    assert version_output.out.strip() == f"JarvisPLOT {JPLOT_VERSION}"
+    assert version_output.out.strip() == f"Jarvis-PLOT {JPLOT_VERSION}"
     assert version_output.err == ""
 
 

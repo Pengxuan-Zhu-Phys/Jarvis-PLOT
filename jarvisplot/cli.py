@@ -293,7 +293,7 @@ class CLI:
                 "dest": option.get("dest"),
             }
             if action == "version":
-                kwargs.update(action="version", version=f"JarvisPLOT {JPLOT_VERSION}")
+                kwargs.update(action="version", version=f"Jarvis-PLOT {JPLOT_VERSION}")
             else:
                 kwargs["action"] = action
                 if "metavar" in option:
