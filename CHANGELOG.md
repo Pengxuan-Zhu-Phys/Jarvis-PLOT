@@ -4,6 +4,11 @@ Release history of the `JarvisPLOT` distribution (import package `jarvisplot`,
 CLI `jplot`). Design documents, specifications and the roadmap live in
 [Jarvis-Books `Docs/Jarvis-PLOT/`](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/README.md).
 
+## Unreleased
+
+- Handle `-v` / `--version` without initializing the plotting runtime and
+  support structured version output with `--json`, also through `Jarvis plot`.
+
 ## 2.1.11 — 2026-10-18
 
 - Exclude maintainer release helpers, local configuration, credentials, and

@@ -14,6 +14,17 @@ def main(argv=None, *, prog="jplot"):
     from jarvisplot.verbs import route
 
     tokens = list(sys.argv[1:] if argv is None else argv)
+    if {"-v", "--version"}.intersection(tokens) and set(tokens) <= {"-v", "--version", "--json"}:
+        from jarvisplot.version import get_version
+
+        version = get_version()
+        if "--json" in tokens:
+            import json
+            print(json.dumps({"ok": True, "command": "version", "name": "JarvisPLOT",
+                              "version": version}, indent=2))
+        else:
+            print(f"JarvisPLOT {version}")
+        return 0
     handled, code = route(tokens, prog=prog)
     if handled:
         return code

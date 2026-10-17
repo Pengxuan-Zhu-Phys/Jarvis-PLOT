@@ -1,7 +1,28 @@
 """CLI and generated images report one distribution provenance version."""
 from importlib.metadata import PackageNotFoundError
 
+import json
+import sys
+
+import pytest
+
 from jarvisplot import version
+
+
+@pytest.mark.parametrize("tokens", [["-v"], ["--version"], ["-v", "--json"], ["--json", "--version"]])
+def test_cli_version_without_render_runtime(tokens, monkeypatch, capsys):
+    from jarvisplot.client import main
+
+    monkeypatch.setitem(sys.modules, "jarvisplot.core", None)
+    assert main(tokens) == 0
+    output = capsys.readouterr().out
+    if "--json" in tokens:
+        assert json.loads(output) == {
+            "ok": True, "command": "version", "name": "JarvisPLOT",
+            "version": version.get_version(),
+        }
+    else:
+        assert output.strip() == f"JarvisPLOT {version.get_version()}"
 
 
 def test_official_installed_distribution_wins_over_source_and_legacy(monkeypatch):
