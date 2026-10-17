@@ -119,7 +119,7 @@ human:
         - "Layer names can be omitted. A declared layer must provide exactly one supported artist/container; multiple series require distinct layers. Native errorbar containers remain intact."
         - "JP-LEG-005 reports invalid object grouping, roles or order; JP-LEG-003 reports card/template problems. Validation and rendering share the data-only resolver."
         - "When migrating, move object/label/role onto scientific layers, retain overall axes settings and optional order, and delete hand-built legend_key layers and label text."
-        - "Example/compact_legend.yaml and Example/legend_cards.yaml are complete runnable forward-declaration examples. docs/specs/LEGEND.md defines the contract."
+        - "Example/compact_legend.yaml and Example/legend_cards.yaml are complete runnable forward-declaration examples. https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/specs/LEGEND.md defines the contract."
 agent:
   examples:
     - title: four train/test objects

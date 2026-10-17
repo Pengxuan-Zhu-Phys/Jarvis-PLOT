@@ -6,7 +6,7 @@ but it can also be used as a **standalone scientific plotting tool**.
 It provides a simple command-line interface (CLI) to generate publication-quality figures from YAML configuration files, with most layout and style decisions handled by predefined profiles and style cards.
 
 Current source candidate: **2.1.10** (`jplot -v` reports the installed version).
-Local release review does not publish or tag a release; see [release notes](docs/release/releases/v2.1.10.md).
+Release history: [CHANGELOG.md](CHANGELOG.md). Design documents and specifications: [Jarvis-Books `Docs/Jarvis-PLOT/`](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/README.md).
 
 ---
 
@@ -105,7 +105,7 @@ Figures:
 
 The style card's `Debug` block decides what the annotations look like and which
 of them appear; a per-figure `debug:` mapping overrides the card for that figure
-only. See `jplot man debug-overlay` and `docs/specs/STYLE_SCHEMA.md`.
+only. See `jplot man debug-overlay` and [STYLE_SCHEMA.md](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/specs/STYLE_SCHEMA.md).
 
 > `Figures[].debug` is not the `jplot --debug` flag — the flag only raises the
 > log level.
@@ -153,13 +153,13 @@ with the same object regroup automatically using card templates such as
 single-component object. `frame.<axes>.legend` owns card selection, `order`,
 `ncols`, position and spacing. JSON cards provide
 reusable defaults, and YAML can override them. See
-[the legend contract](docs/specs/LEGEND.md) and the
+[the legend contract](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/specs/LEGEND.md) and the
 [self-contained example](Example/compact_legend.yaml).
 
 For continuous one-dimensional distributions from raw samples, use `PDF1D`
 (CDF plus PDF) or `CDF1D` in a data transform. `coordinates.x` owns `expr`,
 `lim`, and `grid`; optional `repeat` computes independent batch means and
-standard deviations. See [the contract](docs/specs/PDF_CDF_1D.md) and the
+standard deviations. See [the contract](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/specs/PDF_CDF_1D.md) and the
 [runnable example](Example/pdf_cdf_1d.yaml).
 Reconstruction defaults to adaptive true CDF anchors and `monotone_c2`
 interpolation (C2 CDF / C1 PDF). Set `anchors: all` and `interpolation: pchip`
@@ -170,7 +170,7 @@ Two things worth knowing before trusting a config:
 - `jplot validate` checks shape and contracts and never touches the data;
   `jplot dryrun` loads the data and reports the row ledger and JP-VIZ render
   health. Passing the first says nothing about the second.
-- `docs/specs/AGENT_DATA_API.md` describes a *different*, still-frozen bridge
+- [AGENT_DATA_API.md](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/specs/AGENT_DATA_API.md) describes a *different*, still-frozen bridge
   (a numeric digest channel for Jarvis-Agent). The surface above is what ships
   today.
 
@@ -266,7 +266,7 @@ Figures:
   - dynesty_runplot
 ```
 
-See `docs/specs/DYNESTY_RUNPLOT.md` for the default axes, KDE, scatter overlay,
+See [DYNESTY_RUNPLOT.md](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/specs/DYNESTY_RUNPLOT.md) for the default axes, KDE, scatter overlay,
 and evidence summary behavior.
 
 ---
@@ -308,19 +308,19 @@ and evidence summary behavior.
 ### Documentation
 [https://pengxuan-zhu-phys.github.io/Jarvis-Docs/](https://pengxuan-zhu-phys.github.io/Jarvis-Docs/)
 
-### Repository Docs
+### Project Docs
 
-Tracked project docs live in `docs/`.
+This repository keeps only `README.md` and `CHANGELOG.md`. Design documents,
+specifications and the roadmap live in Jarvis-Books:
 
-- `docs/README.md` - repo doc index
-- `docs/context/JARVIS_PLOT_CONTEXT.md` - primary Codex-facing boundary doc
-- `docs/context/CODE_MAP_JARVIS_PLOT.md` - concrete code owner map
-- `docs/context/JARVIS_PLOT_FRAMEWORK_LOGIC.md` - runtime execution contract
-- `docs/roadmap/IMPLEMENTATION_ROADMAP.md` - active backlog and future work list
-- `docs/specs/AGENT_DATA_API.md` - planned numeric agent bridge (spec only, frozen — not the shipped CLI agent surface above)
-- `docs/specs/STYLE_SCHEMA.md` - style card contract, including the `Debug` overlay block
-- `docs/dev/DEVELOPER_RULES.md` - current pipeline and cache rules
-- `docs/dev/MEMORY_OPTIMIZATION_GUIDE.md` - narrow-table memory notes
+- [Doc index](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/README.md)
+- [JARVIS_PLOT_CONTEXT.md](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/context/JARVIS_PLOT_CONTEXT.md) - project boundary; read before changing code
+- [CODE_MAP_JARVIS_PLOT.md](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/context/CODE_MAP_JARVIS_PLOT.md) - code owner map
+- [JARVIS_PLOT_FRAMEWORK_LOGIC.md](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/context/JARVIS_PLOT_FRAMEWORK_LOGIC.md) - runtime execution contract
+- [IMPLEMENTATION_ROADMAP.md](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/roadmap/IMPLEMENTATION_ROADMAP.md) - open work
+- [RELEASING.md](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/release/RELEASING.md) - versioning, `tools/check_release.py` and CI publishing
+- [STYLE_SCHEMA.md](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/specs/STYLE_SCHEMA.md) - style card contract, including the `Debug` overlay block
+- [DEVELOPER_RULES.md](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/dev/DEVELOPER_RULES.md) - pipeline and cache rules
 
 Read the context docs and roadmap before changing parsing, transforms, rendering, or layout-related behavior.
 
@@ -330,6 +330,6 @@ Read the context docs and roadmap before changing parsing, transforms, rendering
 
 MIT License
 
-Create a continuous forest figure with `type: forest`, a generic row table, optional points and multiple supplied intervals per row. Native YAML supports class-specific interval lanes, CSV value annotations, explicit `x.ticks`, opt-in MathText, header notes and a shared-format legend. The default Swiss-column card uses 82.5 mm width and 5.5 mm row pitch; every row shares one numerical x domain. See [the forest contract](docs/specs/FOREST.md), [native examples](Example/forest/README.md), or `jplot man forest --json`.
+Create a continuous forest figure with `type: forest`, a generic row table, optional points and multiple supplied intervals per row. Native YAML supports class-specific interval lanes, CSV value annotations, explicit `x.ticks`, opt-in MathText, header notes and a shared-format legend. The default Swiss-column card uses 82.5 mm width and 5.5 mm row pitch; every row shares one numerical x domain. See [the forest contract](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/specs/FOREST.md), [native examples](Example/forest/README.md), or `jplot man forest --json`.
 
 AI agents: start with `jplot man agent-readme --json` for the official-package YAML workflow and missing-feature reporting instructions. Feature requests include the installed version from `jplot --version`; the CLI does not send email automatically.

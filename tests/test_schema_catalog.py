@@ -1,6 +1,7 @@
 """B1/B2/B3 acceptance: the schema catalog, its self-check, and closed vocabulary.
 
-The four cases at the top of `docs/roadmap/V2_YAML_AGENT_ERGONOMICS.md` §1 are
+The four cases at the top of Jarvis-Books
+`Docs/archive/Jarvis-PLOT/2026-10-17/docs/roadmap/V2_YAML_AGENT_ERGONOMICS.md` §1 are
 the reason this track exists; three of them are regression-tested here.
 """
 

@@ -49,7 +49,7 @@ human:
         - Axes JSON styles declare frame.<axes>.legend.card defaults; YAML can select compact, paper, presentation, default or a local JSON card. Native fontsize/prop, ncols, loc and bbox_to_anchor still apply.
         - Layer legend object/label/role declarations regroup automatically using card item templates such as band_line, line_errorbar and error_bounds. YAML legend.item_formats overrides or adds definitions from the card.
         - Declare legend object/label/role on each layer; role is optional for a single-component object. axes legend.order uses object names. Axes entries/preset/handles/labels and figure-level legend are unsupported.
-        - Assembled items fill columns first and inherit real artist styles. See jplot man legend --json and docs/specs/LEGEND.md. Delete hand-built legend_key layers and their label text when migrating.
+        - Assembled items fill columns first and inherit real artist styles. See jplot man legend --json and https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/specs/LEGEND.md. Delete hand-built legend_key layers and their label text when migrating.
 agent:
   anti_patterns:
     - Inventing style token strings

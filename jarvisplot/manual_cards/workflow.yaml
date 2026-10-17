@@ -43,7 +43,7 @@ human:
         - "Put agent_output on the figure (method: voronoi, max_cells, path: auto)."
         - "Digest is lossy reference with provenance — figure content after execute, not a doctor re-run."
         - "doctor partial_renderable on type: is by design; do not rewrite YAML for that alone."
-        - "See docs/dev/AGENT_OUTPUT_YAML_DESIGN.md"
+        - "See https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/dev/AGENT_OUTPUT_YAML_DESIGN.md"
     - kind: yaml
       title: Minimal type-first sketch
       lexer: yaml

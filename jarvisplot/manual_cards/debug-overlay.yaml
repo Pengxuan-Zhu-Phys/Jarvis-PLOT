@@ -56,7 +56,7 @@ human:
         - "A bad Debug key warns and falls back; the overlay never breaks a plot."
 agent:
   body_markdown: |
-    Full card contract: docs/specs/STYLE_SCHEMA.md, section "The Debug Block".
+    Full card contract: https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/specs/STYLE_SCHEMA.md, section "The Debug Block".
   anti_patterns:
     - "Expecting jplot --debug (the CLI flag) to draw the overlay -- it only raises the log level"
     - "Editing a card to switch the overlay off for one figure; use a debug: mapping"

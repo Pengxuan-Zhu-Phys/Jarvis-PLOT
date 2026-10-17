@@ -9,17 +9,11 @@ import zipfile
 
 LIVE_DOCS = {
     'README.md': 'Current source candidate:',
-    'docs/README.md': 'Current package version:',
-    'docs/context/JARVIS_PLOT_CONTEXT.md': '- package / product release candidate:',
-    'docs/design/ARCHITECTURE_OVERVIEW.md': 'This document captures the runtime architecture',
-    'docs/roadmap/IMPLEMENTATION_ROADMAP.md': '- package version is',
-    'docs/release/README.md': 'Track the live package version',
-    'docs/release/releases/README.md': 'Live version is tracked',
 }
 
 
 def check_source(root):
-    """Check the explicit project table and maintained live-version documents."""
+    """Check the project table, VERSION, README version line and latest CHANGELOG entry."""
     text = (root/'pyproject.toml').read_text(encoding='utf-8')
     project = re.search(r'(?ms)^\[project\]\s*(.*?)(?=^\[|\Z)', text)
     if project is None:
@@ -34,9 +28,10 @@ def check_source(root):
     version = field('version')
     if (root/'VERSION').read_text(encoding='utf-8').strip() != version:
         raise ValueError('VERSION and pyproject.toml disagree')
-    note = root/'docs'/'release'/'releases'/f'v{version}.md'
-    if not note.is_file():
-        raise ValueError(f'Missing current release note: {note}')
+    changelog = (root/'CHANGELOG.md').read_text(encoding='utf-8')
+    releases = re.findall(r'(?m)^##[ \t]+v?(\d+\.\d+\.\d+)(?=[ \t\u2014\u2013:-]|$)', changelog)
+    if not releases or releases[0] != version:
+        raise ValueError(f'CHANGELOG.md: latest release entry must be {version}')
     for relative, marker in LIVE_DOCS.items():
         lines = (root/relative).read_text(encoding='utf-8').splitlines()
         live = next((line for line in lines if line.startswith(marker)), '')

@@ -78,7 +78,7 @@ time — so those are resolved by `prebuild_correlations`, which writes the
 resolved order into the transform's `columns`. Everything else describes **one
 cell** and is applied at draw time. Nothing reorders a matrix after its labels
 exist. `jplot man type-correlation-matrix` and
-`docs/specs/CORRELATION_MATRIX.md` carry the full crosswalk.
+[CORRELATION_MATRIX.md](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/specs/CORRELATION_MATRIX.md) carry the full crosswalk.
 
 ### Where it stops working
 

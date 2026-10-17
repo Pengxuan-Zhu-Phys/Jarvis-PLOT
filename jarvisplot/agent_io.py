@@ -2,7 +2,7 @@
 
 """The single JSON wire format every agent-facing ``jplot`` verb speaks.
 
-Contract (``docs/specs/AGENT_DATA_API.md`` §2): each agent verb prints **exactly
+Contract (Jarvis-Books ``Docs/Jarvis-PLOT/specs/AGENT_DATA_API.md`` §2): each agent verb prints **exactly
 one** JSON object on stdout; humans and logs go to stderr. This module owns the
 envelope shape and the exit-code mapping so no verb hand-rolls either.
 

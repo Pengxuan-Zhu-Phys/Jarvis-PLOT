@@ -39,3 +39,6 @@ test02.py
 
 # PyPI release files 
 jarvisplot.egg-info/
+
+# Documentation lives in Jarvis-Books/Docs; a local docs/ is never committed.
+/docs/

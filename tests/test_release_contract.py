@@ -14,8 +14,7 @@ def source(tmp_path):
         path = tmp_path/relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(marker+' **2.1.9**\n')
-    note = tmp_path/'docs'/'release'/'releases'/'v2.1.9.md'
-    note.write_text('Release candidate, not published.\n')
+    (tmp_path/'CHANGELOG.md').write_text('# Changelog\n\n## Unreleased\n\n## 2.1.9 \u2014 2026-10-13\n\n## 2.1.8\n')
     module = tmp_path/'jarvisplot'/'version.py'
     module.parent.mkdir()
     module.write_text('VERSION = "2.1.9"\n')
@@ -38,7 +37,7 @@ def wheel(root, *, omit=None, stale=None):
     return target
 
 
-def test_live_source_and_current_note_agree():
+def test_live_source_and_changelog_agree():
     assert check_source(Path(__file__).resolve().parents[1])
 
 
@@ -52,6 +51,17 @@ def test_source_gate_rejects_version_and_live_doc_drift(tmp_path):
     # Historical text containing 2.1.9 must not mask a stale live-version line.
     (root/'README.md').write_text('Current source candidate: **2.1.8**\nOld note: 2.1.9\n')
     with pytest.raises(ValueError, match='live-version'):
+        check_source(root)
+
+
+def test_source_gate_requires_current_changelog_entry(tmp_path):
+    root = source(tmp_path)
+    # An older entry below the latest heading must not satisfy the gate.
+    (root/'CHANGELOG.md').write_text('## Unreleased\n\n## 2.1.8 \u2014 2026-10-01\n\n## 2.1.9\n')
+    with pytest.raises(ValueError, match='CHANGELOG'):
+        check_source(root)
+    (root/'CHANGELOG.md').unlink()
+    with pytest.raises(OSError):
         check_source(root)
 
 

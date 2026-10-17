@@ -5,7 +5,8 @@
 ``jplot <file>`` is the **render** path (not a verb). That is intentional:
 ``Jarvis2 plot`` forwards argv wholesale to ``jplot``, so a ``run`` verb would
 surface as ``Jarvis2 plot run …`` and collide with HEP's ``Jarvis2 run``
-(scan) muscle memory. See DR-08 in ``docs/roadmap/V2_DEV_LEDGER.md``.
+(scan) muscle memory. See the CLI rule in Jarvis-Books
+``Docs/Jarvis-PLOT/context/JARVIS_PLOT_CONTEXT.md``.
 
 This package sits *in front* of the legacy flat parser and claims argv only
 when the first token is a registered non-render verb. Handlers are imported

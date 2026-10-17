@@ -50,7 +50,7 @@ human:
         - "jplot <yaml> --report writes an ephemeral JP-VIZ report; delete after final plots."
 agent:
   body_markdown: |
-    Full design: docs/dev/AGENT_OUTPUT_YAML_DESIGN.md
+    Full design: https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/dev/AGENT_OUTPUT_YAML_DESIGN.md
   anti_patterns:
     - Expecting doctor to write agent JSON
     - Treating digest cells as exact samples
