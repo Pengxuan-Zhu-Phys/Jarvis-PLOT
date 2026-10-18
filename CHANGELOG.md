@@ -1,51 +1,61 @@
 # Changelog
 
 Release history of the `JarvisPLOT` distribution (import package `jarvisplot`,
-CLI `jplot`). Design documents, specifications and the roadmap live in
+CLI `jplot`). User guides and reference documentation are available in
 [Jarvis-Books `Docs/Jarvis-PLOT/`](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/README.md).
 
 ## Unreleased
 
-- Bound registered plot caches to a configurable 5 GiB global budget and
-  30-day idle age, with automatic session-boundary maintenance and eviction
-  to 80% of the budget. Configure `plot-cache.json` or `JP_CACHE_MAX_GIB` /
-  `JP_CACHE_MAX_AGE_DAYS`; `cache list` exposes the effective `data.policy`.
-- Protect rebuild and final-render cleanup with exclusive lifetime leases.
-  `--print` defers deletion until other readers finish; rebuild fails when
-  busy and preserves unrelated cache content. Unavailable lifetime locks
-  stop cache use instead of continuing without protection.
-- Publish cache files atomically, merge manifest entries under a writer lock,
-  and retain immutable HDF5 generations until active readers finish. Reclaim
-  interrupted temporary files on the next idle maintenance pass.
-- Display `Jarvis-PLOT` in text and JSON version reports; the PyPI distribution
-  remains `JarvisPLOT`.
-- Handle `-v` / `--version` without initializing the plotting runtime and
-  support structured version output with `--json`, also through `Jarvis plot`.
+### Added
+
+- Automatically manage registered plot caches with a default 5 GiB total budget
+  and a 30-day idle limit. Configure `~/.jarvis/plot-cache.json` (under `JARVIS_HOME`
+  when set), `JP_CACHE_MAX_GIB` or `JP_CACHE_MAX_AGE_DAYS`. `jplot cache list`
+  reports the effective policy.
+- Run cache maintenance when sessions open and close. Idle caches are removed
+  toward 80% of the budget; active caches remain protected and may temporarily
+  exceed the limit.
+
+### Fixed
+
+- Keep caches used by another plotting session available during final rendering
+  and cleanup. `--print` defers deletion until readers finish; rebuilding a busy
+  cache reports an error without deleting its contents.
+- Prevent concurrent cache writes from exposing incomplete files or losing
+  registered entries. If safe locking is unavailable, cache use stops with an
+  error. Interrupted temporary files are reclaimed during idle maintenance.
+
+### Changed
+
+- Display `Jarvis-PLOT` in text and JSON version reports; its PyPI name remains
+  `JarvisPLOT`.
+- Show `-v` / `--version` without starting the plotting runtime. Structured
+  `--json` output is also available through `Jarvis plot`.
 
 ## 2.1.11 — 2026-10-18
 
-- Exclude maintainer release helpers, local configuration, credentials, and
-  generated files from distribution archives.
+### Added
 
-- `./jprel X.Y.Z` now completes PyPI upload, local editable install, Git tag,
-  and GitHub release. `--dry` checks inputs without changing the checkout.
-- Remove private research cards and scripts under `bin/` from version control
-  and distribution archives; public examples remain under `Example/`.
-- Cache cleanup removes empty registered cache directories whose marker is
-  missing, while retaining unmarked directories containing files.
-- Font card: `jplot fonts show|list|resolve|check|set|reset` and
-  `jplot man fonts`. Normal YAML rendering applies the bundled role card
-  (Helvetica sans, STIXGeneral serif, STIX MathText); explicit YAML fonts and
-  sizes take precedence. Personal overrides live in
-  `~/.jarvis/plot-fonts.json` (`JARVIS_HOME` overrides the directory).
-- When Helvetica is absent, the first installed of Arial, Liberation Sans,
-  Nimbus Sans and DejaVu Sans is used; `check` and `resolve` report the actual
-  font and the substitution reason.
-- Cut descriptions take their MathText font from the font card by default.
-- Documentation moved to Jarvis-Books; the repository keeps only `README.md`,
-  `CHANGELOG.md` and the example READMEs. The source distribution ships
-  `CHANGELOG.md` instead of a `docs/` tree, and `tools/check_release.py` checks
-  the latest `CHANGELOG.md` entry instead of the old release-note files.
+- Manage plot fonts with `jplot fonts show|list|resolve|check|set|reset` and
+  `jplot man fonts`. The default font card uses Helvetica sans, STIXGeneral serif
+  and STIX MathText. Explicit YAML fonts and sizes take precedence.
+- Save personal font overrides in `~/.jarvis/plot-fonts.json`; `JARVIS_HOME`
+  changes the configuration directory.
+- When Helvetica is unavailable, use the first installed font among Arial,
+  Liberation Sans, Nimbus Sans and DejaVu Sans. `check` and `resolve` report the
+  selected font and the reason for substitution.
+
+### Fixed
+
+- Remove empty registered cache directories whose marker is missing while
+  preserving unmarked directories that contain files.
+
+### Changed
+
+- Use the font card's MathText font for cut descriptions by default.
+- Find the plotting guides and reference documentation in
+  [Jarvis-Books](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/README.md).
+  Public examples remain available in `Example/`.
 
 ## 2.1.10 — 2026-10-13
 
@@ -59,14 +69,12 @@ CLI `jplot`). Design documents, specifications and the roadmap live in
   layout uses the actual font, glyph and annotation bounds.
 - TTC faces keep their weight and slant; an explicit font size governs
   measurement.
-- CLI, manuals, render reports and image metadata read the version from
-  `jarvisplot/version.py`. SVG output carries Dublin Core metadata; export
-  retries only on a backend's unsupported-metadata error and reports drawing
-  and I/O failures.
+- Show consistent versions in the CLI, manuals, render reports and image
+  metadata. SVG output includes Dublin Core metadata. Export reports drawing
+  and I/O failures and retries only when a backend rejects metadata support.
 - Packaged AI README (`jplot man agent-readme --json`), schema, manual and
   example updates.
-- `tools/check_release.py` source, tag and wheel gates; the sdist includes the
-  native forest examples; CI runs Linux Python 3.10–3.13 and macOS 3.13.
+- Include native forest examples in the source distribution.
 
 Existing forest YAML needs no migration. Custom export metadata must use keys
 the selected backend supports; invalid SVG keys are now reported.
@@ -75,5 +83,3 @@ the selected backend supports; invalid SVG keys are now reported.
 
 See the [PyPI release history](https://pypi.org/project/JarvisPLOT/#history)
 and [GitHub Releases](https://github.com/Pengxuan-Zhu-Phys/Jarvis-PLOT/releases).
-Earlier release notes are archived in Jarvis-Books
-`Docs/archive/Jarvis-PLOT/2026-10-17/docs/release/`.
