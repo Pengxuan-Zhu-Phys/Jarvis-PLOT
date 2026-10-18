@@ -6,6 +6,17 @@ CLI `jplot`). Design documents, specifications and the roadmap live in
 
 ## Unreleased
 
+- Bound registered plot caches to a configurable 5 GiB global budget and
+  30-day idle age, with automatic session-boundary maintenance and eviction
+  to 80% of the budget. Configure `plot-cache.json` or `JP_CACHE_MAX_GIB` /
+  `JP_CACHE_MAX_AGE_DAYS`; `cache list` exposes the effective `data.policy`.
+- Protect rebuild and final-render cleanup with exclusive lifetime leases.
+  `--print` defers deletion until other readers finish; rebuild fails when
+  busy and preserves unrelated cache content. Unavailable lifetime locks
+  stop cache use instead of continuing without protection.
+- Publish cache files atomically, merge manifest entries under a writer lock,
+  and retain immutable HDF5 generations until active readers finish. Reclaim
+  interrupted temporary files on the next idle maintenance pass.
 - Display `Jarvis-PLOT` in text and JSON version reports; the PyPI distribution
   remains `JarvisPLOT`.
 - Handle `-v` / `--version` without initializing the plotting runtime and

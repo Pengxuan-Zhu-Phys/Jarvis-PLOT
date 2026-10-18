@@ -234,7 +234,7 @@ from jarvisplot import render_flowchart, render_flowchart_file
 - You can set `project.workdir` in YAML.
 - If `output.dir` is omitted, Jarvis-PLOT defaults to `<workdir>/plots/`.
 - Data cache is stored in `<workdir>/.cache/`.
-- `--print` accepts the current settings and renders final figures without the logo. It announces that, after all enabled figures are saved successfully, cache payloads used or created by this run will be deleted (pipeline data and metadata, named/shared data, summaries, and HDF5 materialization slots). Rendering failures or a run with no enabled figures keep the cache. Unrelated cache entries and the lightweight fingerprint manifest are retained; later renders rebuild deleted entries as needed.
+- `--print` accepts the current settings and renders final figures without the logo. After all enabled figures are saved successfully, it requests deletion of this run's cache payloads. Cleanup waits until every reader of the workdir has finished. Rendering failures or a run with no enabled figures do not request immediate cleanup; ordinary age and capacity limits still apply. Unrelated entries and source fingerprints are retained unless the whole idle cache is evicted.
 - Profiling pipelines are prebuilt once and reused from cache when source fingerprint and profile settings are unchanged.
 - Profiling uses a fast two-stage grid reduction (`pregrid` + render `bin`) for large datasets.
 
@@ -254,6 +254,34 @@ jplot cache clean --all                         # clean all registered inactive 
 jplot cache -h
 jplot man cache
 ```
+
+Automatic maintenance runs when a cache session starts and closes. The default
+global budget is **5 GiB** of registered cache file sizes; idle workdirs unused
+for **30 days** expire. Above the budget, the least recently used idle workdirs
+are removed until usage falls to 80% of the limit (4 GiB by default). Active
+workdirs may temporarily exceed the budget and are reconsidered after closing.
+Eviction works on whole workdirs; it does not track each file's access time.
+There is no background timer, and unregistered caches require `cache scan` first.
+
+Configure positive finite limits in `~/.jarvis/plot-cache.json`
+(`$JARVIS_HOME/plot-cache.json` when overridden):
+
+```json
+{"max_size_gib": 5, "max_age_days": 30}
+```
+
+`JP_CACHE_MAX_GIB` and `JP_CACHE_MAX_AGE_DAYS` override the corresponding file
+settings. For example, `JP_CACHE_MAX_GIB=10 JP_CACHE_MAX_AGE_DAYS=14 jplot plot.yaml`.
+`jplot cache list` shows the effective policy; its JSON adds `data.policy`.
+Invalid limits fail before rendering or automatic deletion.
+
+`--rebuild-cache` requires exclusive access for the entire session and reports
+an error if the workdir is active. A normal session also reports an error if a
+rebuild holds the exclusive lease. Rebuild and cleanup remove only owned cache
+components, preserving source files, figures, and unrelated `.cache` content.
+Interrupted temporary writes and superseded HDF5 generations are reclaimed
+when the workdir becomes idle. Failure to acquire a lifetime lock stops cache
+use; index-registration failures with a valid lock remain warnings.
 
 `--workdir PATH` selects registered caches in PATH itself and all of its
 subdirectories, even when PATH has no cache of its own. Repeat it to select

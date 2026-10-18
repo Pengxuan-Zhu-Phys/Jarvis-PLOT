@@ -31,10 +31,23 @@ def main(argv=None, *, prog="jplot"):
 
     from jarvisplot.agent_io import system_exit_code
     from jarvisplot.core import JarvisPLOT
+    from jarvisplot.cache_registry import CacheUsageError
 
     jp = JarvisPLOT(prog=prog, argv=tokens)
     try:
         jp.init()
     except SystemExit as exc:
         return system_exit_code(exc)
+    except CacheUsageError as exc:
+        import os
+        from rich.console import Console
+        from rich.panel import Panel
+        from rich.text import Text
+
+        Console(stderr=True, no_color=bool(os.environ.get("NO_COLOR"))).print(
+            Panel(Text(str(exc)), title=Text(prog), title_align="left", border_style="red"))
+        if "--debug" in tokens or "-d" in tokens:
+            import traceback
+            traceback.print_exc()
+        return 2
     return 0

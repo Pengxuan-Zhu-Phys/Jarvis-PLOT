@@ -7,13 +7,24 @@ import hashlib
 import json
 import os
 import re
-import shutil
 import time
 import weakref
+import tempfile
+import threading
+from functools import wraps
+from contextlib import contextmanager
 
 import pandas as pd
 from .memtrace import memtrace_checkpoint, memtrace_file_checkpoint, memtrace_object_inventory
-from .cache_registry import CacheRegistry
+from .cache_registry import CacheRegistry, CacheUsageError, TEMP_PREFIX, _write_json
+
+
+def _serialized(method):
+    @wraps(method)
+    def call(self, *args, **kwargs):
+        with self._writing():
+            return method(self, *args, **kwargs)
+    return call
 
 
 class ProjectCache:
@@ -30,42 +41,76 @@ class ProjectCache:
         self.manifest_path = self.root / "manifest.json"
         self.rebuild = bool(rebuild)
         self._lease_finalizer = None
+        self._closed = False
+        self._thread_lock = threading.RLock()
+        self._write_depth = 0
         self.registry = CacheRegistry()
+        # Invalid policy is an input error; maintenance I/O errors are warnings.
+        self.registry.policy()
+        self._maintain()
         try:
-            lease = self.registry.lease(self.workdir)
-            self._lease_finalizer = weakref.finalize(self, lease.close)
+            lease = self.registry.lease(self.workdir, shared=not self.rebuild,
+                                        blocking=False)
+        except BlockingIOError as exc:
+            action = "rebuild active" if self.rebuild else "open exclusively held"
+            raise CacheUsageError(f"Cannot {action} plot cache: {self.root}; retry after other tasks finish") from exc
         except OSError as exc:
-            self._warn(f"Failed locking plot cache: {exc}")
-
-        if self.rebuild and self.root.exists():
-            shutil.rmtree(self.root, ignore_errors=True)
-
-        self.root.mkdir(parents=True, exist_ok=True)
-        self.data_dir.mkdir(parents=True, exist_ok=True)
-        self.summary_dir.mkdir(parents=True, exist_ok=True)
-        self.named_dir.mkdir(parents=True, exist_ok=True)
-        self.materialized_dir.mkdir(parents=True, exist_ok=True)
-
-        self.manifest: Dict[str, Any] = self._load_json(
-            self.manifest_path,
-            default={"schema": 1, "files": {}, "named": {}},
-        )
-        # In rebuild mode we ignore old cache on disk, but we still want to
-        # reuse artifacts written during the same process execution.
-        self._written_dataframe_keys: set[str] = set()
-        self._written_materialized_keys: set[str] = set()
-        self._written_named_keys: set[str] = set()
-        self._written_summary_keys: set[str] = set()
-        self._used_paths: set[Path] = set()
-        self._used_named_names: set[str] = set()
+            raise CacheUsageError(f"Cannot lock plot cache {self.root}: {exc}; restore access to {self.registry.path.parent}") from exc
+        self._lease_finalizer = weakref.finalize(self, lease.close)
         try:
-            self.registry.register(self.workdir, config_path=config_path)
-        except (OSError, ValueError) as exc:
-            self._warn(f"Failed registering plot cache: {exc}")
-
-    def close(self) -> None:
-        if self._lease_finalizer is not None:
+            if self.root.is_symlink():
+                raise CacheUsageError(f"Cannot use a symlink plot cache: {self.root}")
+            self.root.mkdir(parents=True, exist_ok=True)
+            if self.rebuild:
+                # The exclusive lease is retained throughout this session, with
+                # no unlock/relock window for another reader to see a rebuild.
+                self.registry.register(self.workdir, config_path=config_path)
+                from .cache_registry import _marker
+                self.registry._remove_owned(self.root, _marker(self.root))
+            for directory in (self.root, self.data_dir, self.summary_dir,
+                              self.named_dir, self.materialized_dir):
+                directory.mkdir(parents=True, exist_ok=True)
+            self.manifest = self._load_json(
+                self.manifest_path, default={"schema": 1, "files": {}, "named": {}})
+            self._written_dataframe_keys: set[str] = set()
+            self._written_materialized_keys: set[str] = set()
+            self._written_named_keys: set[str] = set()
+            self._written_summary_keys: set[str] = set()
+            self._used_paths: set[Path] = set()
+            self._used_named_names: set[str] = set()
+            self._materialized_builds: dict[str, Path] = {}
+            try:
+                self.registry.register(self.workdir, config_path=config_path)
+            except (OSError, ValueError) as exc:
+                self._warn(f"Failed registering plot cache: {exc}")
+        except BaseException:
             self._lease_finalizer()
+            raise
+
+    def _maintain(self) -> dict:
+        try:
+            result = self.registry.maintain()
+            for error in result["errors"]:
+                self._warn(f"Cache maintenance: {error['path']}: {error['error']}")
+            if result["removed"]:
+                self._info(f"Cache maintenance removed {len(result['removed'])} idle cache(s), {result['bytes']} bytes")
+            return result
+        except (OSError, ValueError) as exc:
+            self._warn(f"Cache maintenance failed: {exc}")
+            return {"cleanup": {}}
+
+    def close(self) -> dict:
+        if self._closed:
+            return {"cleanup": {}}
+        self._closed = True
+        try:
+            self.registry.register(self.workdir)
+        except (OSError, ValueError) as exc:
+            self._warn(f"Failed updating cache last use: {exc}")
+        finally:
+            if self._lease_finalizer is not None:
+                self._lease_finalizer()
+        return self._maintain()
 
     def __enter__(self):
         return self
@@ -74,6 +119,8 @@ class ProjectCache:
         self.close()
 
     def _track_path(self, path: Path) -> Path:
+        if self._closed:
+            raise RuntimeError("Plot cache session is closed")
         # Named paths come from the manifest; never clean outside this cache.
         resolved = path.resolve()
         if resolved != self.root and resolved.is_relative_to(self.root):
@@ -81,37 +128,46 @@ class ProjectCache:
         return path
 
     def clear_used(self) -> dict[str, int]:
-        """Remove this session's payloads after successful final rendering."""
-        removed: set[Path] = set()
-        failed = 0
-        for path in sorted(self._used_paths):
-            try:
-                if path.resolve() == self.root or not path.resolve().is_relative_to(self.root):
-                    raise ValueError("cache path resolves outside the cache root")
-                existed = path.exists() or path.is_symlink()
-                if path.is_dir() and not path.is_symlink():
-                    shutil.rmtree(path)
-                else:
-                    path.unlink(missing_ok=True)
-                if existed:
-                    removed.add(path)
-            except Exception as exc:
-                failed += 1
-                self._warn(f"Failed removing cache '{path}': {exc}")
+        """Finish this session; defer final-render cleanup while readers remain."""
+        if self._closed:
+            return {"removed": 0, "failed": 0, "deferred": 0}
+        try:
+            self.registry.queue_cleanup(self.workdir, self._used_paths)
+        except (OSError, ValueError) as exc:
+            self._warn(f"Failed scheduling cache cleanup: {exc}")
+            return {"removed": 0, "failed": len(self._used_paths), "deferred": 0}
+        result = self.close()
+        return result.get("cleanup", {}).get(str(self.root),
+                    {"removed": 0, "failed": 0, "deferred": len(self._used_paths)})
 
-        # Drop references to deleted payloads, including aliases not read in
-        # this session. Keep source fingerprints and unrelated named entries.
-        named = self.manifest.get("named", {})
-        for name, item in list(named.items()):
-            if item.get("kind") == "dataframe-ref":
-                path = self.data_dir / f"{item.get('ref_key', '')}.pkl"
-            else:
-                path = self.root / item.get("path", "")
-            if path in removed or (name in self._used_named_names and not path.exists()):
-                del named[name]
-        self._save_manifest()
-        self._used_paths.difference_update(removed)
-        return {"removed": len(removed), "failed": failed}
+    @contextmanager
+    def _writing(self):
+        with self._thread_lock:
+            if self._closed:
+                raise RuntimeError("Plot cache session is closed")
+            if self._write_depth:
+                yield
+                return
+            with self.registry.writer(self.workdir):
+                self._write_depth += 1
+                try:
+                    yield
+                finally:
+                    self._write_depth -= 1
+
+    @contextmanager
+    def _atomic_path(self, path: Path):
+        """Write a sibling temporary file and publish only a complete payload."""
+        if self._closed:
+            raise RuntimeError("Plot cache session is closed")
+        fd, temporary = tempfile.mkstemp(prefix=TEMP_PREFIX, dir=path.parent)
+        os.close(fd)
+        temporary = Path(temporary)
+        try:
+            yield temporary
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
 
     def _debug(self, msg: str) -> None:
         if self.logger:
@@ -145,12 +201,14 @@ class ProjectCache:
             pass
         return dict(default)
 
-    def _save_manifest(self) -> None:
-        try:
-            with open(self.manifest_path, "w", encoding="utf-8") as f:
-                json.dump(self.manifest, f, ensure_ascii=True, indent=2, sort_keys=True)
-        except Exception as e:
-            self._warn(f"Failed writing cache manifest: {e}")
+    def _set_manifest_item(self, section: str, key: str, value: dict) -> None:
+        # Merge only the changed entry with the current on-disk manifest.
+        with self._writing():
+            manifest = self._load_json(self.manifest_path,
+                                      default={"schema": 1, "files": {}, "named": {}})
+            manifest.setdefault(section, {})[key] = value
+            _write_json(self.manifest_path, manifest)
+            self.manifest = manifest
 
     @staticmethod
     def _canonical_json(payload: Any) -> str:
@@ -177,6 +235,7 @@ class ProjectCache:
                 sha1.update(chunk)
         return sha1.hexdigest()
 
+    @_serialized
     def source_fingerprint(self, path: str, extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         abs_path = str(Path(path).expanduser().resolve())
         try:
@@ -202,13 +261,14 @@ class ProjectCache:
             self._debug(f"Computed md5 for '{abs_path}' in {dt:.2f}s")
 
         files[abs_path] = {"size": size, "mtime_ns": mtime_ns, "md5": md5}
-        self._save_manifest()
+        self._set_manifest_item("files", abs_path, files[abs_path])
 
         fp = {"path": abs_path, "size": size, "mtime_ns": mtime_ns, "md5": md5}
         if extra:
             fp.update(extra)
         return fp
 
+    @_serialized
     def get_dataframe(self, key: str):
         if self.rebuild and str(key) not in self._written_dataframe_keys:
             return None
@@ -225,6 +285,7 @@ class ProjectCache:
         self._track_path(self.data_dir / f"{key}.json")
         return self._track_path(self.data_dir / f"{key}.pkl")
 
+    @_serialized
     def is_dataframe_meta_consistent(self, key: str, meta: Optional[Dict[str, Any]]) -> bool:
         if self.rebuild and str(key) not in self._written_dataframe_keys:
             return False
@@ -256,6 +317,7 @@ class ProjectCache:
                 return False
         return True
 
+    @_serialized
     def get_dataframe_meta(self, key: str) -> Optional[Dict[str, Any]]:
         if self.rebuild and str(key) not in self._written_dataframe_keys:
             return None
@@ -272,6 +334,7 @@ class ProjectCache:
             self._warn(f"Failed loading dataframe cache meta '{p}': {e}")
             return None
 
+    @_serialized
     def put_dataframe(self, key: str, df, meta: Optional[Dict[str, Any]] = None) -> None:
         p = self.dataframe_cache_path(key)
         try:
@@ -288,7 +351,8 @@ class ProjectCache:
                 roles={"df": "cache-ready dataframe"},
                 min_bytes=64 * 1024 * 1024,
             )
-            df.to_pickle(p)
+            with self._atomic_path(p) as temporary:
+                df.to_pickle(temporary)
             payload: Dict[str, Any] = {}
             if isinstance(meta, dict):
                 payload.update(meta)
@@ -307,8 +371,7 @@ class ProjectCache:
                 pass
 
             m = self.data_dir / f"{key}.json"
-            with open(m, "w", encoding="utf-8") as f:
-                json.dump(payload, f, ensure_ascii=True, indent=2, sort_keys=True, default=str)
+            _write_json(m, payload)
             self._written_dataframe_keys.add(str(key))
             memtrace_file_checkpoint(
                 self.logger,
@@ -343,19 +406,23 @@ class ProjectCache:
     def put_materialized_manifest(self, key: str, manifest: Dict[str, Any]) -> None:
         slot = self.materialized_slot(key)
         slot.mkdir(parents=True, exist_ok=True)
-        path = slot / "manifest.json"
-        try:
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(manifest, f, ensure_ascii=True, indent=2, sort_keys=True, default=str)
-            self._written_materialized_keys.add(str(key))
-        except Exception as e:
-            self._warn(f"Failed writing materialized manifest '{path}': {e}")
+        build = self._materialized_builds.pop(str(key), None)
+        if build is not None:
+            generation = slot / ("gen-" + build.name.removeprefix(TEMP_PREFIX))
+            os.replace(build, generation)
+            manifest["part_files"] = [str(Path(generation.name) / part)
+                                      for part in manifest.get("part_files", [])]
+        # Every published generation is immutable until all reader leases end.
+        _write_json(slot / "manifest.json", manifest)
+        self._written_materialized_keys.add(str(key))
 
     def clear_materialized_slot(self, key: str) -> Path:
+        # Build privately; never remove an existing lazy reader's parquet parts.
         slot = self.materialized_slot(key)
-        shutil.rmtree(slot, ignore_errors=True)
         slot.mkdir(parents=True, exist_ok=True)
-        return slot
+        build = Path(tempfile.mkdtemp(prefix=TEMP_PREFIX, dir=slot))
+        self._materialized_builds[str(key)] = build
+        return build
 
     def get_summary(self, source_fp: Dict[str, Any]) -> Optional[str]:
         key = self.cache_key({"kind": "summary", "source": source_fp})
@@ -372,7 +439,8 @@ class ProjectCache:
     def put_summary(self, source_fp: Dict[str, Any], text: str) -> None:
         p = self._summary_path(source_fp)
         try:
-            p.write_text(str(text), encoding="utf-8")
+            with self._atomic_path(p) as temporary:
+                temporary.write_text(str(text), encoding="utf-8")
             key = self.cache_key({"kind": "summary", "source": source_fp})
             self._written_summary_keys.add(str(key))
         except Exception as e:
@@ -382,6 +450,7 @@ class ProjectCache:
     def _safe_name(name: str) -> str:
         return re.sub(r"[^A-Za-z0-9_.-]+", "_", str(name))
 
+    @_serialized
     def put_named(self, name: str, signature: str, df) -> None:
         safe = self._safe_name(name)
         slot = self.cache_key({"name": name, "signature": signature})[:12]
@@ -395,7 +464,8 @@ class ProjectCache:
                 df,
                 extra={"name": str(name), "signature": str(signature)[:16]},
             )
-            df.to_pickle(p)
+            with self._atomic_path(p) as temporary:
+                df.to_pickle(temporary)
             named = self.manifest.setdefault("named", {})
             sha1 = None
             size = None
@@ -419,7 +489,7 @@ class ProjectCache:
                 "mtime_ns": mtime_ns,
             }
             self._written_named_keys.add(str(name))
-            self._save_manifest()
+            self._set_manifest_item("named", str(name), named[str(name)])
             memtrace_file_checkpoint(
                 self.logger,
                 "cache.put_named.after",
@@ -429,6 +499,7 @@ class ProjectCache:
         except Exception as e:
             self._warn(f"Failed writing named cache '{name}': {e}")
 
+    @_serialized
     def put_named_reference(self, name: str, signature: str, data_key: str) -> None:
         key = str(data_key or "").strip()
         if not key:
@@ -449,11 +520,13 @@ class ProjectCache:
         }
         self._written_named_keys.add(str(name))
         self._used_named_names.add(str(name))
-        self._save_manifest()
+        self._set_manifest_item("named", str(name), named[str(name)])
 
+    @_serialized
     def get_named(self, name: str, signature: str):
         if self.rebuild and str(name) not in self._written_named_keys:
             return None
+        self.manifest = self._load_json(self.manifest_path, default=self.manifest)
         named = self.manifest.get("named", {})
         item = named.get(str(name))
         if not item:

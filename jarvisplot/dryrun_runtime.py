@@ -74,7 +74,23 @@ def dryrun_config(
     try:
         if with_data and out_dir is None and isinstance(config, dict):
             try:
-                lease = registry.lease(workdir)
+                registry.policy()
+            except (OSError, ValueError) as exc:
+                bag = DiagnosticBag()
+                bag.error("JP-CACHE-001", "$.output", str(exc))
+                return {"ok": False, "layers": [], "coverage": "failed"}, bag
+            try:
+                registry.maintain()
+            except (OSError, ValueError) as exc:
+                warning = f"Cache maintenance failed: {exc}"
+            # Never export into a managed cache without protecting its lifetime.
+            try:
+                lease = registry.lease(workdir, blocking=False)
+            except OSError as exc:
+                bag = DiagnosticBag()
+                bag.error("JP-CACHE-001", "$.output", f"Cannot lock plot cache: {exc}; retry after other tasks finish and check registry access")
+                return {"ok": False, "layers": [], "coverage": "failed"}, bag
+            try:
                 registry.register(workdir, components=("agent_twins",), config_path=config_path)
             except (OSError, ValueError) as exc:
                 warning = f"Failed registering plot cache: {exc}"
@@ -84,7 +100,16 @@ def dryrun_config(
         return report, bag
     finally:
         if lease is not None:
-            lease.close()
+            try:
+                registry.register(workdir, components=("agent_twins",), config_path=config_path)
+            except (OSError, ValueError):
+                pass
+            finally:
+                lease.close()
+            try:
+                registry.maintain()
+            except (OSError, ValueError):
+                pass
 
 
 def _dryrun_config(

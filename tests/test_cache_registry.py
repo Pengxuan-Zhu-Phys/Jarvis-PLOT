@@ -15,7 +15,7 @@ import pytest
 from rich.cells import cell_len
 from rich.text import Text
 
-from jarvisplot.cache_registry import CACHE_SCHEMA, MARKER, PIPELINE_COMPONENTS, CacheRegistry
+from jarvisplot.cache_registry import CACHE_SCHEMA, MARKER, PIPELINE_COMPONENTS, CacheRegistry, CacheUsageError
 from jarvisplot.cache_store import ProjectCache
 from jarvisplot.client import main
 
@@ -113,9 +113,9 @@ def test_clean_nested_workdirs_retains_age_and_active_guards(tmp_path, capsys):
     recent = _cache(parent / "recent")
     registry = CacheRegistry()
     stamp = (datetime.now(timezone.utc) - timedelta(days=40)).isoformat()
-    with registry.lease(old.parent):
-        registry.register(old.parent, last_used=stamp)
     with ProjectCache(str(parent / "nested" / "active")) as active:
+        with registry.lease(old.parent):
+            registry.register(old.parent, last_used=stamp)
         result = _command(capsys, "clean", "--workdir", str(parent), "--older-than", "30")
         assert result["ok"] is None
         assert result["data"]["removed"] == [str(old)]
@@ -379,10 +379,10 @@ def test_human_results_use_existing_panels_and_grid(tmp_path, monkeypatch, capsy
 
 def test_human_skip_missing_and_errors_stay_inside_panels(tmp_path, monkeypatch, capsys):
     missing = _cache(tmp_path / "missing")
-    shutil.rmtree(missing)
     invalid = _cache(tmp_path / "invalid")
     (invalid / MARKER).unlink()
     cache = ProjectCache(str(tmp_path / "active"))
+    shutil.rmtree(missing)
     monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
     try:
         assert main(["cache", "clean", "--all"]) == 1
@@ -465,13 +465,13 @@ def test_default_twins_register_and_custom_exports_stay_unmanaged(tmp_path, caps
     assert list((tmp_path / "export").iterdir())
 
 
-def test_registry_unavailable_does_not_prevent_cache_use(tmp_path, monkeypatch):
+def test_unavailable_lease_fails_before_using_shared_cache(tmp_path, monkeypatch):
     blocked = tmp_path / "blocked"
     blocked.write_text("not a directory")
     monkeypatch.setenv("JARVIS_HOME", str(blocked))
-    with ProjectCache(str(tmp_path / "plot")) as cache:
-        cache.put_dataframe("payload", pd.DataFrame({"x": [1]}))
-        assert cache.get_dataframe("payload") is not None
+    with pytest.raises(CacheUsageError, match="Cannot lock"):
+        ProjectCache(str(tmp_path / "plot"))
+    assert not (tmp_path / "plot" / ".cache").exists()
 
 
 @pytest.mark.parametrize("field,value", [("last_used", None), ("configs", [1])])

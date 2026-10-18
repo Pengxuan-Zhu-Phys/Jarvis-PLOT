@@ -88,8 +88,9 @@ class JarvisPLOT():
                 self.logger.warning(
                     "--print: accepting all settings for final output (without the logo). "
                     "After all enabled figures are saved successfully, the cache entries "
-                    f"used or created by this run will be deleted from {self.cache.root}. "
-                    "If rendering fails, the cache will be kept."
+                    f"used or created by this run will be deleted from {self.cache.root} "
+                    "once all workdir readers finish. If rendering fails, no immediate cleanup "
+                    "is requested; normal age and capacity limits still apply."
                 )
             self.load_dataset(eager=False)
             if self.shared is None:
@@ -252,7 +253,8 @@ class JarvisPLOT():
             stats = self.cache.clear_used()
             self.logger.info(
                 "--print: final figures saved; cache cleanup finished "
-                f"(removed={stats['removed']}, failed={stats['failed']})."
+                f"(removed={stats['removed']}, failed={stats['failed']}, "
+                f"deferred={stats['deferred']})."
             )
 
     @staticmethod

@@ -22,6 +22,7 @@ def test_cleanup_removes_used_and_new_payloads_and_dangling_references(tmp_path)
         (seed.materialized_slot(key) / "part.parquet").write_bytes(b"parquet payload")
     # This alias will not be read, but its payload is about to be deleted.
     seed.put_named_reference("unread-alias", "sig", "used")
+    seed.close()
 
     cache = ProjectCache(str(tmp_path))
     assert cache.get_named("used-ref", "sig") is not None
@@ -60,7 +61,7 @@ def test_cleanup_reports_delete_failure_and_keeps_valid_reference(tmp_path, monk
         return original_unlink(path, *args, **kwargs)
 
     monkeypatch.setattr(Path, "unlink", locked_unlink)
-    assert cache.clear_used() == {"removed": 1, "failed": 1}
+    assert cache.clear_used() == {"removed": 1, "failed": 1, "deferred": 0}
     assert (cache.data_dir / "locked.pkl").is_file()
     assert "ref" in json.loads(cache.manifest_path.read_text())["named"]
 

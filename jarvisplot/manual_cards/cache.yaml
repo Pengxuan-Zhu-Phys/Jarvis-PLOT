@@ -26,6 +26,15 @@ human:
         Cache payloads stay in <workdir>/.cache; ~/.jarvis/plot.json indexes their locations.
         JARVIS_HOME overrides the registry directory. Workdirs shared by multiple YAMLs have one entry.
         Plotting, data describe, and default dryrun --with-data exports register automatically.
+        Automatic maintenance runs at cache-session start and close, without a background timer.
+    - kind: overview
+      title: Automatic limits
+      body: |
+        Defaults: 5 GiB global registered file sizes and 30 days since last workdir use.
+        Set max_size_gib and max_age_days in ~/.jarvis/plot-cache.json (JARVIS_HOME applies).
+        JP_CACHE_MAX_GIB and JP_CACHE_MAX_AGE_DAYS override the file; both must be finite and positive.
+        Over budget: evict the least recently used idle workdirs down to 80% of the limit.
+        Active caches may temporarily exceed the limit. cache list shows the effective policy.
     - kind: steps
       title: Commands
       items:
@@ -44,7 +53,11 @@ human:
         - "Missing paths and unmarked caches with only empty component directories are pruned; caches with unmarked content remain invalid."
         - "Failed deletions retain their records."
         - "--dry-run changes neither payloads nor registry records."
-        - "--print cleans session-used payloads; cache clean also handles historical payloads."
+        - "--print requests cleanup after successful final output; deletion waits for all workdir readers to finish."
+        - "Failed renders retain reusable cache subject to ordinary age and capacity limits."
+        - "--rebuild-cache requires exclusive access for the entire session and reports an error if busy."
+        - "Rebuild preserves unrelated .cache contents. Normal sessions fail while an exclusive rebuild is active."
+        - "Interrupted temporary files and superseded HDF5 generations are reclaimed only when idle."
         - "Legacy scan requires the four pipeline directories and a compatible manifest."
         - "Unmarked twin-only caches register on their next default dryrun; custom --out-dir exports are unmanaged."
 agent:
@@ -56,3 +69,6 @@ agent:
     Each --workdir selects registered caches in that directory and all nested directories, including when the parent has no cache.
     Overlapping selectors are deduplicated; an unmatched selector is a usage error before any cleanup.
     Use --dry-run to inspect the same selection without deleting payloads or changing the index.
+    list adds data.policy with max_size_gib and max_age_days. Maintenance uses whole-workdir
+    last use and logical file sizes, not per-entry LRU or filesystem allocated blocks.
+    Failed lifetime locking stops cache use. Index registration with a valid lease may warn.

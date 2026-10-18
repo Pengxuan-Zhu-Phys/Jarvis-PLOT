@@ -19,6 +19,29 @@ CACHE_SCHEMA = "jarvisplot.cache/v1"
 MARKER = ".jarvisplot.json"
 PIPELINE_COMPONENTS = ("data", "named", "summary", "materialized")
 COMPONENTS = frozenset((*PIPELINE_COMPONENTS, "agent_twins"))
+PENDING = ".pending-cleanup.json"
+TEMP_PREFIX = ".jp-tmp-"
+
+
+def cache_policy(path: Path | None = None) -> dict:
+    """User-wide limits; environment overrides sparse JSON configuration."""
+    path = path or registry_path().with_name("plot-cache.json")
+    try:
+        values = _read_json(path) if path.is_file() else {}
+    except (OSError, ValueError) as exc:
+        raise CacheUsageError(f"Cannot read cache policy {path}: {exc}") from exc
+    result = {}
+    for key, default, env in (("max_size_gib", 5, "JP_CACHE_MAX_GIB"),
+                              ("max_age_days", 30, "JP_CACHE_MAX_AGE_DAYS")):
+        raw = os.environ.get(env, values.get(key, default))
+        try:
+            value = float(raw)
+        except (ValueError, TypeError):
+            raise CacheUsageError(f"{key} must be a finite positive number") from None
+        if isinstance(raw, bool) or not math.isfinite(value) or value <= 0:
+            raise CacheUsageError(f"{key} must be a finite positive number")
+        result[key] = value
+    return result
 
 
 class CacheUsageError(ValueError):
@@ -40,10 +63,10 @@ def _read_json(path: Path) -> dict:
 def _write_json(path: Path, data: dict) -> None:
     """Replace a complete JSON file; readers never see a partial write."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    descriptor, temporary = tempfile.mkstemp(prefix=f"{TEMP_PREFIX}{path.name}.", dir=path.parent)
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            json.dump(data, handle, ensure_ascii=False, indent=2, sort_keys=True)
+            json.dump(data, handle, ensure_ascii=False, indent=2, sort_keys=True, default=str)
             handle.write("\n")
         os.replace(temporary, path)
     finally:
@@ -144,7 +167,7 @@ def _marker(root: Path) -> dict:
 
 def _stats(root: Path, components: list[str]) -> tuple[int, float]:
     size, newest = 0, 0.0
-    for name in [*components, "manifest.json", MARKER]:
+    for name in [*components, "manifest.json", MARKER, PENDING]:
         path = root / name
         if path.is_symlink():
             continue
@@ -200,6 +223,171 @@ class CacheRegistry:
         root = str(Path(workdir).expanduser().resolve() / ".cache")
         digest = hashlib.sha256(root.encode()).hexdigest()
         return FileLock(self.path.parent / "plot-locks" / f"{digest}.lock", shared=shared, blocking=blocking)
+
+    def writer(self, workdir: str | Path) -> FileLock:
+        """Short mutation lock, always acquired inside a live workdir lease."""
+        root = str(Path(workdir).expanduser().resolve() / ".cache")
+        digest = hashlib.sha256(root.encode()).hexdigest()
+        return FileLock(self.path.parent / "plot-locks" / f"{digest}.writer.lock")
+
+    def policy(self) -> dict:
+        return cache_policy(self.path.with_name("plot-cache.json"))
+
+    def queue_cleanup(self, workdir: Path, paths: set[Path]) -> None:
+        """Persist a final-render request before releasing the reader lease."""
+        root = workdir / ".cache"
+        with self.writer(workdir):
+            _marker(root)
+            pending = _read_json(root / PENDING) if (root / PENDING).exists() else {}
+            for path in paths:
+                if path.resolve() == root or not path.resolve().is_relative_to(root):
+                    continue
+                try:
+                    st = path.stat()
+                except FileNotFoundError:
+                    continue
+                pending[str(path.relative_to(root))] = [st.st_ino, st.st_size, st.st_mtime_ns]
+            _write_json(root / PENDING, pending)
+
+    @staticmethod
+    def _pending_cleanup(root: Path) -> dict:
+        """Requires an exclusive lease. Do not delete replacements of queued files."""
+        result = {"removed": 0, "failed": 0, "deferred": 0}
+        path = root / PENDING
+        if not path.exists():
+            return result
+        pending = _read_json(path)
+        for relative, identity in list(pending.items()):
+            target = root / relative
+            try:
+                if (target.resolve() == root or not target.resolve().is_relative_to(root)
+                        or Path(relative).parts[0] not in PIPELINE_COMPONENTS):
+                    raise ValueError(f"Invalid pending cache path: {relative}")
+                try:
+                    st = target.stat()
+                except FileNotFoundError:
+                    del pending[relative]
+                    continue
+                if identity == [st.st_ino, st.st_size, st.st_mtime_ns]:
+                    if target.is_dir():
+                        shutil.rmtree(target)
+                    else:
+                        target.unlink()
+                    result["removed"] += 1
+                del pending[relative]
+            except OSError:
+                result["failed"] += 1
+        manifest_path = root / "manifest.json"
+        if manifest_path.exists():
+            manifest = _read_json(manifest_path)
+            for name, item in list(manifest.get("named", {}).items()):
+                target = (root / "data" / f"{item.get('ref_key', '')}.pkl"
+                          if item.get("kind") == "dataframe-ref" else root / item.get("path", ""))
+                if not target.exists():
+                    del manifest["named"][name]
+            _write_json(manifest_path, manifest)
+        if pending:
+            _write_json(path, pending)
+        else:
+            path.unlink(missing_ok=True)
+        return result
+
+    @staticmethod
+    def _remove_owned(root: Path, marker: dict) -> None:
+        for name in [*marker["components"], "manifest.json", PENDING]:
+            path = root / name
+            if path.is_dir() and not path.is_symlink():
+                shutil.rmtree(path)
+            else:
+                path.unlink(missing_ok=True)
+        (root / MARKER).unlink()
+        if not any(root.iterdir()):
+            root.rmdir()
+
+    @staticmethod
+    def _reap_temporary(root: Path, marker: dict) -> None:
+        # No reader/writer can still own these files while the lease is exclusive.
+        for path in root.glob(TEMP_PREFIX + "*"):
+            if path.is_file() or path.is_symlink():
+                path.unlink()
+        for name in marker["components"]:
+            component = root / name
+            if component.is_symlink():
+                continue
+            for directory, dirs, files in os.walk(component, followlinks=False):
+                for filename in [*dirs, *files]:
+                    path = Path(directory) / filename
+                    if filename.startswith(TEMP_PREFIX):
+                        if path.is_dir() and not path.is_symlink():
+                            shutil.rmtree(path)
+                        else:
+                            path.unlink(missing_ok=True)
+                dirs[:] = [d for d in dirs if not d.startswith(TEMP_PREFIX)
+                           and not (Path(directory) / d).is_symlink()]
+        # Superseded immutable HDF5 generations are safe to reclaim only now.
+        materialized = root / "materialized"
+        if materialized.is_dir() and not materialized.is_symlink():
+            for slot in materialized.iterdir():
+                if not slot.is_dir() or slot.is_symlink():
+                    continue
+                manifest = _read_json(slot / "manifest.json") if (slot / "manifest.json").exists() else {}
+                keep = {Path(p).parts[0] for p in manifest.get("part_files", []) if p}
+                for generation in slot.glob("gen-*"):
+                    if generation.name not in keep and generation.is_dir() and not generation.is_symlink():
+                        shutil.rmtree(generation)
+
+    def maintain(self) -> dict:
+        """Reap idle caches at session boundaries; active roots may exceed limits."""
+        policy = self.policy()
+        limit = int(policy["max_size_gib"] * 1024**3)
+        result = {"removed": [], "skipped": [], "errors": [], "cleanup": {}, "bytes": 0}
+        with self._locked() as registry:
+            entries = registry["caches"]
+            inventory = []
+            total = 0
+            for key, entry in list(entries.items()):
+                try:
+                    root = _entry_root(key, entry)
+                    try:
+                        lease = self.lease(root.parent, shared=False, blocking=False)
+                    except BlockingIOError:
+                        marker = _marker(root)
+                        total += _stats(root, marker["components"])[0]
+                        result["skipped"].append(key)
+                        continue
+                    with lease:
+                        if not root.exists() and not root.is_symlink():
+                            del entries[key]
+                            continue
+                        marker = _marker(root)
+                        result["cleanup"][key] = self._pending_cleanup(root)
+                        self._reap_temporary(root, marker)
+                        size = _stats(root, marker["components"])[0]
+                        total += size
+                        inventory.append((_date(marker["last_used"]), key, size))
+                except (OSError, ValueError, KeyError, TypeError) as exc:
+                    result["errors"].append({"path": key, "error": str(exc)})
+            over_limit = total > limit
+            for used, key, size in sorted(inventory):
+                expired = (datetime.now(timezone.utc) - used).total_seconds() >= policy["max_age_days"] * 86400
+                if not expired and not (over_limit and total > int(limit * 0.8)):
+                    continue
+                root = Path(key)
+                try:
+                    # A new reader may have arrived since inventory: recheck the lease.
+                    with self.lease(root.parent, shared=False, blocking=False):
+                        marker = _marker(root)
+                        self._remove_owned(root, marker)
+                        del entries[key]
+                        total -= size
+                        result["bytes"] += size
+                        result["removed"].append(key)
+                except BlockingIOError:
+                    result["skipped"].append(key)
+                except (OSError, ValueError, KeyError, TypeError) as exc:
+                    result["errors"].append({"path": key, "error": str(exc)})
+            _write_json(self.path, registry)
+        return result
 
     def register(self, workdir: str | Path, *, components=PIPELINE_COMPONENTS,
                  config_path: str | None = None, last_used: str | None = None) -> dict:
@@ -341,15 +529,7 @@ class CacheRegistry:
                             continue
                         size, _ = _stats(root, marker["components"])
                         if not dry_run:
-                            for name in [*marker["components"], "manifest.json"]:
-                                path = root / name
-                                if path.is_dir() and not path.is_symlink():
-                                    shutil.rmtree(path)
-                                else:
-                                    path.unlink(missing_ok=True)
-                            (root / MARKER).unlink()
-                            if not any(root.iterdir()):
-                                root.rmdir()
+                            self._remove_owned(root, marker)
                             del entries[key]
                         result["removed"].append(key)
                         result["bytes"] += size

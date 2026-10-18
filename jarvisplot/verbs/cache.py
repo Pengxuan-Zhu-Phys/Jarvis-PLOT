@@ -60,7 +60,7 @@ def run(argv: Sequence[str], *, prog: str = "jplot cache") -> int:
     kind = f"cache.{args.action}"
     try:
         if args.action == "list":
-            data = {"registry": str(registry.path), "caches": registry.list()}
+            data = {"registry": str(registry.path), "caches": registry.list(), "policy": registry.policy()}
             verdict = not any(row["status"] == "invalid" for row in data["caches"])
         elif args.action == "scan":
             data = registry.scan(args.directories)
@@ -137,7 +137,9 @@ def _render_human(action: str, data: dict, registry: CacheRegistry, *, prog: str
     if action == "list":
         caches = data["caches"]
         size = sum(row["bytes"] for row in caches)
-        overview(f"Registry: {registry.path}\nCaches: {len(caches)} · Size: {_size_label(size)}")
+        policy = data["policy"]
+        overview(f"Registry: {registry.path}\nCaches: {len(caches)} · Size: {_size_label(size)}\n"
+                 f"Policy: {policy['max_size_gib']:g} GiB · {policy['max_age_days']:g} days · idle caches only")
         inventory = Table.grid(expand=True, padding=(0, 0))
         inventory.add_column(width=max(3, len(str(len(caches))) + 2), no_wrap=True, style="bold cyan")
         inventory.add_column(ratio=1, overflow="fold")

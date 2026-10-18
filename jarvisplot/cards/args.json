@@ -187,13 +187,13 @@
         {
             "long": "--print",
             "dest": "no_logo",
-            "help": "accept settings and render final figures without the logo; delete this run's cache entries after successful output",
+            "help": "accept settings and render final figures without the logo; clean this run's cache after success, deferring until other readers finish",
             "action": "store_true"
         },
         {
             "long": "--rebuild-cache",
             "dest": "rebuild_cache",
-            "help": "rebuild the project cache before plotting",
+            "help": "rebuild owned project cache with exclusive access; fail if another task is using it",
             "action": "store_true"
         },
         {
