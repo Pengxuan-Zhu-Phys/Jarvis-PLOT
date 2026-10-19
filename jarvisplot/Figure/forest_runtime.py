@@ -91,7 +91,10 @@ class ForestFigure(Figure):
     def _render(self):
         from matplotlib.patches import Rectangle
         from .legend_runtime import apply_legend
-        from .forest_legend import ForestGlyph, HandlerForestGlyph, HandlerForestPoint, PhysicalLegendColumn, group_glyph_and_points
+        from .forest_legend import (
+            ForestGlyph, HandlerForestGlyph, HandlerForestPoint,
+            PhysicalLegendColumn, boxes_overlap, group_glyph_and_points,
+        )
         from matplotlib.collections import PathCollection
         info, layout, ax = self.info, self.forest_layout, self.axes['ax']
         g, fonts, style = layout['geometry'], layout['typography'], layout['style']
@@ -468,9 +471,9 @@ class ForestFigure(Figure):
         if legend:
             for column in legend._legend_handle_box.get_children():
                 for item in column.get_children():
-                    if any(physical_box(item).overlaps(b) for b in badge_boxes):
+                    if any(boxes_overlap(physical_box(item), b) for b in badge_boxes):
                         raise ValueError('forest footer legend overlaps axlogo; adjust forest.geometry footer/legend/logo positions or frame.ax.legend layout')
-                    if any(physical_box(item).overlaps(b) for b in description_boxes):
+                    if any(boxes_overlap(physical_box(item), b) for b in description_boxes):
                         raise ValueError('forest footer legend overlaps description; adjust forest.geometry column starts or frame.ax.legend layout')
         for row, artists in annotations:
             boxes = [physical_box(artist) for artist in artists]

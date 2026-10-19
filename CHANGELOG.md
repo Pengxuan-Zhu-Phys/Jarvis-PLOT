@@ -12,6 +12,9 @@ CLI `jplot`). User guides and reference documentation are available in
   Linux, for the full-width, standard and colorbar cards.
 - Keep the GAMBIT `rectcmap` colorbar label inside the page with Matplotlib 3.10
   while preserving its separation from tick labels.
+- Allow forest footer legends to meet the badge at their shared grid boundary
+  with macOS Helvetica and Matplotlib 3.10.9. Actual overlap with the badge or
+  description remains an error.
 
 ## 2.1.12 — 2026-10-19
 

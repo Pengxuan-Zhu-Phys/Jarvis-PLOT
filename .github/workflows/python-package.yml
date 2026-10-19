@@ -18,9 +18,14 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
+        matplotlib-version: ["latest"]
         include:
           - os: macos-latest
             python-version: "3.13"
+            matplotlib-version: "latest"
+          - os: macos-latest
+            python-version: "3.13"
+            matplotlib-version: "3.10.9"
 
     steps:
     - uses: actions/checkout@v5
@@ -34,6 +39,9 @@ jobs:
         python -m pip install flake8
         python -m pip install -e ".[test]" --no-build-isolation
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        if [ "${{ matrix.matplotlib-version }}" != "latest" ]; then
+          python -m pip install "matplotlib==${{ matrix.matplotlib-version }}"
+        fi
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names

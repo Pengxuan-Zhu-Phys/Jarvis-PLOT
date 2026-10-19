@@ -702,6 +702,13 @@ def test_grouped_legend_retains_empty_semantic_column(group, tmp_path):
     assert occupied.get_children()[0].get_children()[-1]._text.get_text().replace('\n', ' ') == ('Estimate + bounds' if group == 'glyph' else 'Ordinary')
 
 
+def test_footer_legend_still_rejects_actual_badge_overlap(tmp_path):
+    info, frames = fixture()
+    info['forest'] = {'geometry': {'logo_bottom_mm': 5}}
+    with pytest.raises(ValueError, match='footer legend overlaps axlogo'):
+        draw(info, frames, tmp_path)
+
+
 def test_yaml_description_moves_to_third_footer_column_without_losing_text(tmp_path):
     config, bag = validate_file(str(EXAMPLE/'real-demo.yaml'))
     assert bag.ok

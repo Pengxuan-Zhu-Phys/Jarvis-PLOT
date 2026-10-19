@@ -6,6 +6,17 @@ from matplotlib.patches import Rectangle
 from matplotlib.offsetbox import VPacker
 
 
+def boxes_overlap(first, second):
+    """Require positive overlap on both physical axes, measured in mm.
+
+    Footer columns and the badge share grid boundaries. Touching those edges
+    is valid; Bbox.overlaps also counts contact and floating-point roundoff.
+    """
+    width = min(first.xmax, second.xmax) - max(first.xmin, second.xmin)
+    height = min(first.ymax, second.ymax) - max(first.ymin, second.ymin)
+    return min(width, height) > 1e-9
+
+
 class PhysicalLegendColumn(VPacker):
     """Recompute physical column width for each raster/vector renderer."""
     def __init__(self, width_mm, **kwargs):
