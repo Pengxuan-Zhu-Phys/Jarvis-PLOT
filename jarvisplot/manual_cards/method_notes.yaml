@@ -65,9 +65,11 @@ voronoi:
     - "Heavy for large N; prefer type: posterior_2d density path when possible."
 
 voronoif:
-  summary: "Filled Voronoi field."
+  summary: "Hatched boundary layer of a selected Voronoi region."
   notes:
-    - "Sibling of voronoi with filled faces."
+    - "Fills the cells of the points picked by the optional `where` coordinate (a boolean expression), only the ones whose point lies near the edge of the selected region; without `where` every cell is selected."
+    - "There is no z and no colour map: use voronoi with z for a colour field."
+    - "style takes the fill keys: hatch, facecolor, edgecolor, linewidth, alpha."
 
 corrplot:
   summary: "Correlation matrix in R's corrplot style; draws the `correlation` transform's long table."

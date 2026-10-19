@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from .diagnostics import did_you_mean
-from .expr_names import EXPR_IDENTIFIER_IGNORE, expr_identifiers
+from .expr_names import EXPR_IDENTIFIER_IGNORE, expr_identifiers, expr_namespace_names
 
 __all__ = [
     "DESCRIBE_CACHE_VERSION",
@@ -276,10 +276,11 @@ def eval_on_file(
     df = load_dataframe(resolved, kind=kind, group=group)
     columns = [str(c) for c in df.columns]
     symbols = _expr_symbols(text)
+    namespaces = expr_namespace_names([text])
     unresolved = sorted(
         s
         for s in symbols
-        if s not in columns and s not in EXPR_IDENTIFIER_IGNORE
+        if s not in columns and s not in EXPR_IDENTIFIER_IGNORE and s not in namespaces
     )
     # allow namespace attributes like np.log10 — tokens include log10 which is ignored
     if unresolved:

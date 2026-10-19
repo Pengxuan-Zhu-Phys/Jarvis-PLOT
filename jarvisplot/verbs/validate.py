@@ -19,7 +19,7 @@ from typing import Any, Sequence
 from ..agent_io import EXIT_FAILED, EXIT_OK, EXIT_USAGE, emit, envelope, system_exit_code
 from ..fix_apply import apply_fixes, planned_fixes
 from ..validation import validate_config, validate_file
-from ..yaml_io import dump_yaml_doc
+from ..yaml_io import dump_yaml_doc, load_yaml_doc
 
 __all__ = ["build_parser", "run"]
 
@@ -149,8 +149,11 @@ def _run_fix(
 
     fixes = planned_fixes(bag, include_heuristic=include_heuristic)
     original_text = Path(path).read_text(encoding="utf-8")
-    repaired, applied = apply_fixes(config, fixes)
-    new_text = _dump_yaml(repaired)
+    # Repair the round-trip document, not the plain mapping the validator read,
+    # so comments, quoting and layout survive; PyYAML only when ruamel is absent.
+    document, meta = load_yaml_doc(path)
+    repaired, applied = apply_fixes(document, fixes)
+    new_text = dump_yaml_doc(repaired, meta=meta, keep_layout=True)
     diff_text = None
     if show_diff or not write:
         diff_text = "".join(
@@ -171,7 +174,7 @@ def _run_fix(
     elif applied:
         # re-validate the in-memory repair so the envelope reflects post-fix state
         bag = validate_config(
-            repaired,
+            apply_fixes(config, fixes)[0],
             base_dir=str(Path(path).resolve().parent),
             check_columns=check_columns,
         )
@@ -183,14 +186,10 @@ def _run_fix(
             "fixes_applied": applied,
             "wrote": wrote,
             "diff": diff_text or None,
-            "comments_preserved": False,
+            "comments_preserved": bool(meta.get("comments_preserved", False)),
         },
         "bag": bag,
     }
-
-
-def _dump_yaml(config: Any) -> str:
-    return dump_yaml_doc(config, meta={"engine": "pyyaml"})
 
 
 def _print_human(path: str, bag) -> None:

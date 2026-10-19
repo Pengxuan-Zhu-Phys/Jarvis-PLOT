@@ -260,6 +260,23 @@ _GUIDANCE_BY_CODE: dict[str, tuple[str, Optional[str]]] = {
         "pick a rect- or tri-compatible method (jplot cap methods / styles).",
         _EX_SCATTER,
     ),
+    "JP-MTH-004": (
+        "A layer without method is drawn as scatter. Write the method down so a "
+        "layer meant for hist, plot, ... does not silently become a scatter.",
+        _EX_SCATTER,
+    ),
+
+    # Layer required keys
+    "JP-LAY-001": (
+        "Name the axes the layer draws on; the style card lists them "
+        "(jplot cap styles). Most cards have ax.",
+        "axes: ax",
+    ),
+    "JP-LAY-002": (
+        "A coordinate written as {expr: ...} reads a table. Give the layer a "
+        "data block, or write the coordinate as a literal list.",
+        "data: [{source: df}]",
+    ),
 }
 
 # Path-prefix rules (longer / more specific first). Parameter codes above win.

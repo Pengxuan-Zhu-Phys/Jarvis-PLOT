@@ -183,3 +183,119 @@ def test_hdf5_pushdown_and_csv_pandas_agree_end_to_end(tmp_path):
     )
     assert from_hdf5["y"].tolist() == [1, 2, 3]
     assert JP_ROW_IDX in from_hdf5.columns
+
+
+# --------------------------------------------------------------------------- #
+# The built-in math names take a whole column, not only a number
+# --------------------------------------------------------------------------- #
+
+U = np.linspace(0.1, 0.9, 9)
+
+
+def _gauss(mean, err):
+    return np.exp(-0.5 * ((U - mean) / err) ** 2)
+
+
+COLUMN_CASES = [
+    ("sinh(u)", np.sinh(U)),
+    ("cosh(u)", np.cosh(U)),
+    ("tanh(u)", np.tanh(U)),
+    ("sech(u)", 1 / np.cosh(U)),
+    ("csch(u)", 1 / np.sinh(U)),
+    ("coth(u)", 1 / np.tanh(U)),
+    ("asin(u)", np.arcsin(U)),
+    ("acos(u)", np.arccos(U)),
+    ("atan(u)", np.arctan(U)),
+    ("atan2(u, 1 - u)", np.arctan2(U, 1 - U)),
+    ("asinh(u)", np.arcsinh(U)),
+    ("acosh(1 + u)", np.arccosh(1 + U)),
+    ("atanh(u)", np.arctanh(U)),
+    ("sec(u)", 1 / np.cos(U)),
+    ("csc(u)", 1 / np.sin(U)),
+    ("cot(u)", 1 / np.tan(U)),
+    ("asec(1 + u)", np.arccos(1 / (1 + U))),
+    ("acsc(1 + u)", np.arcsin(1 / (1 + U))),
+    ("acot(u)", np.arctan(1 / U)),
+    ("acoth(1 + u)", np.arctanh(1 / (1 + U))),
+    ("asech(u)", np.arccosh(1 / U)),
+    ("acsch(u)", np.arcsinh(1 / U)),
+    ("sinc(u)", np.sin(U) / U),
+    ("root(u, 3)", np.cbrt(U)),
+    ("Abs(u - 0.5)", np.abs(U - 0.5)),
+    ("Min(u, 1 - u)", np.minimum(U, 1 - U)),
+    ("Max(u, 1 - u)", np.maximum(U, 1 - U)),
+    ("min(u, 1 - u)", np.minimum(U, 1 - U)),
+    ("max(u, 1 - u)", np.maximum(U, 1 - U)),
+    ("Heaviside(u - 0.45)", (U > 0.45).astype(float)),
+    ("Gauss(u, 0.5, 0.2)", _gauss(0.5, 0.2)),
+    ("Normal(u, 0.5, 0.2)", _gauss(0.5, 0.2) / (0.2 * np.sqrt(2 * np.pi))),
+    ("LogGauss(u, 0.5, 0.2)", -0.5 * ((U - 0.5) / 0.2) ** 2),
+    ("u * Pi", U * np.pi),
+    ("u * pi", U * np.pi),
+    ("u * E", U * np.e),
+]
+
+
+@pytest.mark.parametrize(("expr", "expected"), COLUMN_CASES, ids=[c[0] for c in COLUMN_CASES])
+def test_builtin_math_names_evaluate_on_a_column(expr, expected):
+    frame = pd.DataFrame({"u": U})
+
+    got = eval_dataframe_expression(frame, expr)
+
+    np.testing.assert_allclose(got, expected, rtol=1e-12)
+
+
+@pytest.mark.parametrize(("expr", "expected"), COLUMN_CASES, ids=[c[0] for c in COLUMN_CASES])
+def test_builtin_math_names_push_down_to_polars(expr, expected):
+    lf = pl.DataFrame({"u": U}).lazy()
+
+    out = lf.with_columns(polars_expression(expr, lf.collect_schema()).alias("v")).collect()["v"]
+
+    np.testing.assert_allclose(out.to_numpy(), expected, rtol=1e-12)
+
+
+@pytest.mark.parametrize(
+    ("name", "args"),
+    [
+        ("sinc", (0.3,)),
+        ("acot", (-0.7,)),
+        ("asec", (1.8,)),
+        ("acsc", (1.8,)),
+        ("acoth", (1.8,)),
+        ("asech", (0.4,)),
+        ("acsch", (0.4,)),
+        ("root", (0.3, 3)),
+        ("Heaviside", (0.2,)),
+    ],
+)
+def test_builtin_math_names_keep_the_sympy_definitions(name, args):
+    import sympy
+
+    from jarvisplot.utils.expression import build_eval_globals
+
+    expected = float(getattr(sympy, name)(*args))
+
+    assert float(build_eval_globals()[name](*args)) == pytest.approx(expected, rel=1e-12)
+
+
+def test_min_and_max_of_one_column_reduce_it():
+    frame = pd.DataFrame({"u": U})
+
+    assert eval_dataframe_expression(frame, "min(u)") == pytest.approx(0.1)
+    assert eval_dataframe_expression(frame, "max(u)") == pytest.approx(0.9)
+
+
+def test_the_validator_and_the_evaluator_agree_on_the_math_names():
+    from jarvisplot import inner_func
+    from jarvisplot.expr_names import EXPR_IDENTIFIER_IGNORE
+    from jarvisplot.utils.expression import build_eval_globals
+
+    names = set(inner_func._Inner_FCs) | set(inner_func._Constant)
+    names |= {"Gauss", "LogGauss", "Normal", "Heaviside"}
+
+    assert names <= set(build_eval_globals())
+    assert names <= EXPR_IDENTIFIER_IGNORE
+    # A bare `e` is a column name, not Euler's number, and says so.
+    assert "e" not in EXPR_IDENTIFIER_IGNORE
+    assert "e" not in build_eval_globals()
+

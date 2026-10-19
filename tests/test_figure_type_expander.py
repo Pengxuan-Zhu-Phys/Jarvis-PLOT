@@ -278,3 +278,50 @@ def test_profile_2d_extra_layer_and_custom_output_names():
 def test_profile_2d_requires_core_fields():
     with pytest.raises(ValueError, match="requires x, y, and z"):
         expand_profile_2d({"type": "profile_2d", "data": "samples", "x": {"expr": "x"}, "y": {"expr": "y"}})
+
+
+@pytest.mark.parametrize(
+    "slots",
+    [
+        {"bins": 40},
+        {"bin": 40},
+        {"method": "grid", "bins": 20, "objective": "min"},
+        {"seed": 3, "grid_points": "rect", "fill_empty": True, "empty_value": -30.0, "grid": 200},
+    ],
+)
+def test_profile_2d_slots_the_runtime_reads_pass_validate(slots):
+    from jarvisplot.validation import validate_config
+
+    figure = {
+        "name": "prof",
+        "type": "profile_2d",
+        "data": "df",
+        "x": {"expr": "a"},
+        "y": {"expr": "b"},
+        "z": {"expr": "L"},
+        **slots,
+    }
+    config = {"DataSet": [{"name": "df", "path": "./x.csv", "type": "csv"}], "Figures": [figure]}
+
+    bag = validate_config(config, check_columns=False)
+
+    assert [d.message for d in bag if d.code.startswith("JP-SCH-")] == []
+    # ...and the runtime does read what the schema now allows.
+    out = expand_profile_2d(figure)
+    profile = out["layers"][0]["data"][0]["transform"][0]["profile"]
+    assert profile["bin"] == slots.get("bins", slots.get("bin", 100))
+
+
+def test_profile_2d_bins_must_be_a_positive_integer():
+    from jarvisplot.validation import validate_config
+
+    config = {
+        "DataSet": [{"name": "df", "path": "./x.csv", "type": "csv"}],
+        "Figures": [
+            {"name": "prof", "type": "profile_2d", "data": "df", "x": {"expr": "a"},
+             "y": {"expr": "b"}, "z": {"expr": "L"}, "bins": 0}
+        ],
+    }
+
+    assert any(d.path == "$.Figures[0].bins" for d in validate_config(config, check_columns=False))
+

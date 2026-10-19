@@ -395,6 +395,18 @@ def _correlation_cfg_columns(cfg: Any, which: str) -> Set[str]:
         return set()
 
 
+def _significance_cfg_output_columns(step: Mapping[str, Any]) -> Set[str]:
+    """bin_index / zn / the carried bin edges / the S and B columns of a ``significance`` step."""
+    if not ("significance" in step or str(step.get("type", "")).strip().lower() == "significance"):
+        return set()
+    from .Figure.significance_runtime import significance_config, significance_output_columns
+
+    try:
+        return set(significance_output_columns(significance_config(step)))
+    except Exception:
+        return set()
+
+
 def _transform_needs_all_columns(transform: Any) -> bool:
     """Whether any step in this pipeline picks its inputs from the table itself.
 
@@ -443,6 +455,7 @@ def _transform_output_columns(transform: Any) -> Set[str]:
                 name = add_cfg.get("name")
                 if isinstance(name, str) and name.strip():
                     out.add(name.strip())
+        out.update(_significance_cfg_output_columns(step))
         if "profile" in step:
             cfg = step.get("profile", {})
             out.update(_profile_cfg_columns(cfg))

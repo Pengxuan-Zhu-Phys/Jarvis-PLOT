@@ -557,3 +557,51 @@ def test_posterior_density_runtime_projection_and_output_name():
     assert "LogL" in projection
     assert "posterior_pdf" in projection
     assert list(out.columns) == ["x", "y", "posterior_pdf"]
+
+
+def _contract_methods():
+    from jarvisplot.transform_contracts import TRANSFORM_CONTRACTS
+
+    return TRANSFORM_CONTRACTS["make_density_core"]["enums"]["method"]
+
+
+@pytest.mark.parametrize("method", ["voronoi", "adaptive", "kde", "grid"])
+def test_density_cell_runs_every_method_the_contract_lists(method):
+    assert method in _contract_methods()
+    cfg = _base_cfg(method)
+    cfg["bins"] = 6
+    cfg["seed"] = 11
+    if method == "kde":
+        cfg["coordinates"]["x"].pop("lim")
+        cfg["coordinates"]["y"].pop("lim")
+
+    out = density_cell(_sample_df(), cfg, _logger())
+
+    assert list(out.columns) == ["x", "y", "weight"]
+    assert float(out["weight"].sum()) == pytest.approx(1.0, abs=1e-12)
+
+
+def test_density_cell_voronoi_is_the_bridson_core():
+    voronoi = _base_cfg("voronoi") | {"voronoi": {"k": 12}, "bins": 6, "seed": 5}
+    bridson = _base_cfg("bridson") | {"bridson": {"k": 12, "bin": 6, "seed": 5}}
+
+    a = density_cell(_sample_df(), voronoi, _logger())
+    b = density_cell(_sample_df(), bridson, _logger())
+
+    pd.testing.assert_frame_equal(a, b)
+
+
+def test_density_cell_adaptive_reads_its_refinement_options():
+    cfg = _base_cfg("adaptive") | {"bins": 6, "seed": 5, "adaptive": {"enabled": False}}
+    plain = density_cell(_sample_df(), _base_cfg("voronoi") | {"bins": 6, "seed": 5}, _logger())
+
+    out = density_cell(_sample_df(), cfg, _logger())
+
+    # `enabled: false` is the unrefined Voronoi core, so the options did arrive.
+    pd.testing.assert_frame_equal(out, plain)
+
+
+def test_density_cell_unknown_method_names_the_contract_methods():
+    with pytest.raises(ValueError, match="voronoi, adaptive, kde, grid"):
+        density_cell(_sample_df(), _base_cfg("nope"), _logger())
+

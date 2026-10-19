@@ -30,50 +30,101 @@ _AllSCNum = (
     np.int32,
     np.int64
 )
-_Inner_FCs = { 
+def _reciprocal(fn):
+    """``1 / fn(x)`` for sec / csc / cot and their hyperbolic siblings."""
+    def wrapped(x):
+        with np.errstate(divide="ignore", invalid="ignore"):
+            return 1.0 / fn(x)
+    return wrapped
+
+
+def _of_reciprocal(fn):
+    """``fn(1 / x)`` for asec / acsc / acot and their hyperbolic siblings."""
+    def wrapped(x):
+        with np.errstate(divide="ignore", invalid="ignore"):
+            return fn(1.0 / np.asarray(x, dtype=float))
+    return wrapped
+
+
+def _sinc(x):
+    # sin(x) / x, as sympy writes it; np.sinc is the normalised sin(pi x) / (pi x).
+    return np.sinc(np.asarray(x, dtype=float) / np.pi)
+
+
+def _root(x, n):
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return np.power(x, 1.0 / n)
+
+
+def _min(*args):
+    """Elementwise minimum of several columns; the smallest value of a single one."""
+    if len(args) == 1:
+        return np.min(np.asarray(args[0]))
+    return np.minimum.reduce(np.broadcast_arrays(*args))
+
+
+def _max(*args):
+    """Elementwise maximum of several columns; the largest value of a single one."""
+    if len(args) == 1:
+        return np.max(np.asarray(args[0]))
+    return np.maximum.reduce(np.broadcast_arrays(*args))
+
+
+def _heaviside(x, h0=0.5):
+    return np.heaviside(x, h0)
+
+
+# Expressions are evaluated over whole columns, so every function here takes a
+# pandas Series / numpy array as readily as a scalar.  sympy's versions raise
+# "'Series' object has no attribute 'is_Number'" on a column, which is why
+# these are numpy rather than ``sympy.<name>``.
+_Inner_FCs = {
         # Natural Logarithm
-        "log":  sympy.log,
-        "exp":  sympy.exp,
-        "ln":   sympy.ln,
+        "log":  np.log,
+        "exp":  np.exp,
+        "ln":   np.log,
         # Triangle Function
-        "sin":  sympy.sin,
-        "cos":  sympy.cos,
-        "tan":  sympy.tan,
-        "sec":  sympy.sec,
-        "csc":  sympy.csc,
-        "cot":  sympy.cot,
-        "sinc": sympy.sinc,
-        "asin": sympy.asin,
-        "acos": sympy.acos,
-        "atan": sympy.atan,
-        "asec": sympy.asec,
-        "acsc": sympy.acsc,
-        "acot": sympy.acot,
-        "atan2":sympy.atan2,
+        "sin":  np.sin,
+        "cos":  np.cos,
+        "tan":  np.tan,
+        "sec":  _reciprocal(np.cos),
+        "csc":  _reciprocal(np.sin),
+        "cot":  _reciprocal(np.tan),
+        "sinc": _sinc,
+        "asin": np.arcsin,
+        "acos": np.arccos,
+        "atan": np.arctan,
+        "asec": _of_reciprocal(np.arccos),
+        "acsc": _of_reciprocal(np.arcsin),
+        "acot": _of_reciprocal(np.arctan),
+        "atan2":np.arctan2,
         # Hyperbolic Function 
-        "sinh": sympy.sinh,
-        "cosh": sympy.cosh,
-        "tanh": sympy.tanh,
-        "sech": sympy.sech,
-        "csch": sympy.csch,
-        "coth": sympy.coth,
-        "asinh":    sympy.asinh,
-        "acosh":    sympy.acosh,
-        "atanh":    sympy.atanh,
-        "acoth":    sympy.acoth,
-        "asech":    sympy.asech,
-        "acsch":    sympy.acsch,
+        "sinh": np.sinh,
+        "cosh": np.cosh,
+        "tanh": np.tanh,
+        "sech": _reciprocal(np.cosh),
+        "csch": _reciprocal(np.sinh),
+        "coth": _reciprocal(np.tanh),
+        "asinh":    np.arcsinh,
+        "acosh":    np.arccosh,
+        "atanh":    np.arctanh,
+        "acoth":    _of_reciprocal(np.arctanh),
+        "asech":    _of_reciprocal(np.arccosh),
+        "acsch":    _of_reciprocal(np.arcsinh),
         # General Math
-        "sqrt": sympy.sqrt,
-        "Min":  sympy.Min,
-        "Max":  sympy.Max,
-        "root": sympy.root,
-        "Abs":  sympy.Abs,
+        "sqrt": np.sqrt,
+        "Min":  _min,
+        "Max":  _max,
+        "min":  _min,
+        "max":  _max,
+        "root": _root,
+        "Abs":  np.abs,
     }
 
 _Constant = {
-    "Pi":   sympy.pi,
-    "E":    sympy.E,
+    "Pi":   np.pi,
+    "pi":   np.pi,
+    "E":    np.e,
     "Inf":  np.inf
 }
 
@@ -116,7 +167,7 @@ def clear_external_funcs() -> None:
     _EXTERNAL_FCS_GETTER = None
 
 def Gauss(xx, mean, err):
-    prob = sympy.exp(-0.5 * ((xx - mean) / err)**2)
+    prob = np.exp(-0.5 * ((xx - mean) / err)**2)
     return prob 
 
 
@@ -128,7 +179,7 @@ def Gauss(xx, mean, err):
 
 def Normal(xx, mean, err):
     # from math import sqrt, pi, exp
-    prob = 1./ (err * sympy.sqrt(2 * sympy.pi)) * sympy.exp(-0.5*((xx - mean)/err)**2)
+    prob = 1./ (err * np.sqrt(2 * np.pi)) * np.exp(-0.5*((xx - mean)/err)**2)
     return prob
 
 def LogGauss(xx, mean, err):
@@ -166,10 +217,11 @@ def update_funcs(funcs):
     funcs['Gauss'] = Gauss
     funcs['LogGauss'] = LogGauss
     funcs['Normal'] = Normal
-    funcs['Heaviside'] = sympy.Heaviside
+    funcs['Heaviside'] = _heaviside
 
-    # Built-in functions
+    # Built-in functions and constants
     funcs.update(_Inner_FCs)
+    funcs.update(_Constant)
 
     # Jarvis-Operas registered functions.
     # Keep both symbolic and numeric views, and provide namespace-style

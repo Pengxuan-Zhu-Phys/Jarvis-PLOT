@@ -109,3 +109,36 @@ def test_fix_diff_json_lists_applied(tmp_path, capsys):
     assert env["data"]["fixes_planned"] >= 1
     assert env["data"]["wrote"] is False
     assert env["data"]["diff"] and "layers" in env["data"]["diff"]
+
+
+def test_fix_write_keeps_comments_quoting_and_layout(tmp_path, capsys):
+    (tmp_path / "samples.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+    path = tmp_path / "typo.yaml"
+    original = textwrap.dedent(
+        """
+        # header comment
+        DataSet:
+          - {name: df, path: ./samples.csv, type: csv}   # the data
+        Figures:
+          - name: f1
+            layers:
+              # the only layer
+              - name: s
+                data: [{source: df}]
+                axes: ax
+                metod: scatter
+                coordinates:
+                  x: {expr: x}   # x column
+                  y: {expr: y}
+                style: {color: "#cc3311"}
+        """
+    ).lstrip()
+    path.write_text(original, encoding="utf-8")
+
+    main(["validate", str(path), "--fix", "--write", "--no-columns", "--json"])
+    env = json.loads(capsys.readouterr().out)
+
+    assert env["data"]["comments_preserved"] is True
+    # The one renamed key is the whole diff; nothing else moved.
+    assert path.read_text(encoding="utf-8") == original.replace("metod:", "method:")
+

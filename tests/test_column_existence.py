@@ -300,3 +300,136 @@ def test_disabled_figures_contribute_no_demand():
         ).lstrip()
     )
     assert "gone" not in plan_source_demand(config)["df"].required
+
+
+# --------------------------------------------------------------------------- #
+# Names that are not columns: functions, namespaces, what a transform makes
+# --------------------------------------------------------------------------- #
+
+_ONE_LAYER = """
+DataSet:
+  - {{name: df, path: ./samples.csv, type: csv}}
+{extra}
+Figures:
+  - name: f1
+    layers:
+      - name: s
+        data: [{{source: df}}]
+        axes: ax
+        method: scatter
+        coordinates:
+          x: {{expr: "{x}"}}
+          y: {{expr: "{y}"}}
+"""
+
+
+def _scatter(tmp_path, x, y, extra=""):
+    return _validate(tmp_path, _ONE_LAYER.format(x=x, y=y, extra=extra))
+
+
+def test_builtin_function_names_are_not_columns(csv_data):
+    bag = _scatter(
+        csv_data,
+        "Gauss(m_A, 100, 5) + LogGauss(m_A, 100, 5)",
+        "Normal(tanb, 10, 2) + Heaviside(LogL) + sympy.sin(tanb)",
+    )
+
+    assert _column_errors(bag) == []
+
+
+def test_operas_namespaces_are_not_columns(csv_data):
+    bag = _scatter(csv_data, "m_A * pdg.alphaEM(m_A)", "tanb")
+
+    assert _column_errors(bag) == []
+
+
+def test_a_name_used_bare_and_dotted_is_still_a_column(csv_data):
+    bag = _scatter(csv_data, "weight.sum() + weight", "tanb")
+
+    assert [d.context["column"] for d in _column_errors(bag)] == ["weight"]
+
+
+def test_functions_declared_in_the_yaml_are_not_columns(csv_data):
+    bag = _scatter(
+        csv_data, "f_cut(m_A)", "tanb",
+        extra="Functions:\n  - {name: f_cut, source: {path: ./cut.csv, x: a, y: b}}",
+    )
+
+    assert _column_errors(bag) == []
+
+
+def test_a_real_missing_column_is_still_reported_next_to_functions(csv_data):
+    bag = _scatter(csv_data, "Gauss(aa, 1, 2)", "tanb")
+
+    assert [d.context["column"] for d in _column_errors(bag)] == ["aa"]
+
+
+def test_significance_outputs_are_not_missing_columns(csv_data):
+    bag = _validate(
+        csv_data,
+        """
+        DataSet:
+          - {name: df, path: ./samples.csv, type: csv}
+        Figures:
+          - name: f1
+            layers:
+              - name: sig
+                axes: ax
+                method: step
+                data:
+                  - source: df
+                    transform:
+                      - bin_stat: {x: m_A, bins: 4, range: [0, 400], scale_to: {name: Sn, value: 50}}
+                      - to_df: sig_bins
+                  - source: df
+                    transform:
+                      - bin_stat: {x: m_A, bins: 4, range: [0, 400], scale_to: {name: Bn, value: 400}}
+                      - to_df: bkg_bins
+                  - source: df
+                    transform:
+                      - significance:
+                          dfS: {source: sig_bins, Sn: Sn}
+                          dfB: {source: bkg_bins, Bn: Bn}
+                coordinates:
+                  x: {expr: x_center}
+                  y: {expr: zn}
+        """,
+    )
+
+    assert _column_errors(bag) == []
+
+
+def test_density_and_interpolation_outputs_are_not_missing_columns(csv_data):
+    bag = _validate(
+        csv_data,
+        """
+        DataSet:
+          - {name: df, path: ./samples.csv, type: csv}
+        Figures:
+          - name: f1
+            layers:
+              - name: dens
+                axes: ax
+                method: pcolormesh
+                data:
+                  - source: df
+                    transform:
+                      - make_density_core:
+                          method: voronoi
+                          x: {expr: m_A}
+                          y: {expr: tanb}
+                          weight: {expr: exp(LogL)}
+                      - make_interp_2d:
+                          coordinates:
+                            x: {expr: x}
+                            y: {expr: y}
+                            z: {expr: weight}
+                coordinates:
+                  x: {expr: x}
+                  y: {expr: y}
+                  z: {expr: z}
+        """,
+    )
+
+    assert _column_errors(bag) == []
+

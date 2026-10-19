@@ -532,6 +532,13 @@ def _to_plain(doc: Any) -> Any:
         return {k: _to_plain(v) for k, v in doc.items()}
     if isinstance(doc, list):
         return [_to_plain(v) for v in doc]
+    # ruamel keeps the quoting of a scalar as a str / int / float subclass
+    # (DoubleQuotedScalarString, ScalarFloat, ...) that PyYAML cannot dump.
+    if isinstance(doc, bool) or doc is None:
+        return doc
+    for base in (str, int, float):
+        if isinstance(doc, base):
+            return base(doc)
     return doc
 
 

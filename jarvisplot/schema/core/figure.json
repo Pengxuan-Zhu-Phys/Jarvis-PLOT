@@ -51,7 +51,7 @@
             "boolean"
           ],
           "x-jarvis-zone": "delegated",
-          "description": "Forest badge settings or false; ordinary figures use a settings mapping."
+          "description": "Badge settings merged over the style card's, or false to leave the badge out (true keeps the card's)."
         }
       }
     },
@@ -121,6 +121,56 @@
     "interp": {
       "x-jarvis-zone": "delegated",
       "description": "type: profile_2d interpolation toggle / options."
+    },
+    "bins": {
+      "type": "integer",
+      "minimum": 1,
+      "x-jarvis-zone": "delegated",
+      "description": "type: profile_2d cell count of the reduction (default 100). `bin` is the same slot."
+    },
+    "bin": {
+      "type": "integer",
+      "minimum": 1,
+      "x-jarvis-zone": "delegated",
+      "description": "type: profile_2d alias of bins."
+    },
+    "objective": {
+      "enum": [
+        "max",
+        "min"
+      ],
+      "x-jarvis-zone": "delegated",
+      "description": "type: profile_2d which extreme of z a cell keeps (default max)."
+    },
+    "seed": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "x-jarvis-zone": "delegated",
+      "description": "type: profile_2d seed of the Bridson cores."
+    },
+    "grid_points": {
+      "type": "string",
+      "x-jarvis-zone": "delegated",
+      "description": "type: profile_2d where the reduction places its points (default rect)."
+    },
+    "fill_empty": {
+      "type": "boolean",
+      "x-jarvis-zone": "delegated",
+      "description": "type: profile_2d fill a cell that caught no sample."
+    },
+    "empty_value": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "x-jarvis-zone": "delegated",
+      "description": "type: profile_2d z value of a cell that caught no sample."
+    },
+    "grid": {
+      "x-jarvis-zone": "delegated",
+      "description": "type: profile_2d resolution of the interpolated grid (default 500)."
     },
     "pcolormesh": {
       "type": "object",
@@ -547,7 +597,10 @@
           "frame": {
             "properties": {
               "axlogo": {
-                "type": "object",
+                "type": [
+                  "object",
+                  "boolean"
+                ],
                 "x-jarvis-zone": "delegated"
               }
             }

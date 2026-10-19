@@ -1036,6 +1036,19 @@ class StdAxesAdapter:
 
         return _auto_clip(artists, self.ax, self._clip_path)
 
+    def triplot(self, **kwargs):
+        """Edges (and optional markers) of the Delaunay mesh of the points.
+
+        Matplotlib wants ``x`` and ``y`` positionally; left as keywords they
+        reach its argument parser as nothing at all and it indexes an empty
+        argument list.
+        """
+        x = kwargs.pop("x")
+        y = kwargs.pop("y")
+        kw = self._merge("triplot", kwargs)
+        artists = self.ax.triplot(x, y, **kw)
+        return _auto_clip(artists, self.ax, self._clip_path)
+
     def tripcolor(self, **kwargs):
         """Triangulated color field.
 

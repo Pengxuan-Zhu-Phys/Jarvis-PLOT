@@ -62,7 +62,9 @@ METHOD_COORDINATES: dict[str, dict[str, Any]] = {
     "tricontourf": {"required": ("x", "y", "z"), "optional": ()},
     "triplot": {"required": ("x", "y"), "optional": ()},
     "voronoi": {"required": ("x", "y"), "optional": ("z",)},
-    "voronoif": {"required": ("x", "y", "z"), "optional": ()},
+    # A hatched boundary layer of the `where`-selected cells, not a colour
+    # field: there is no z, and the mask is optional (default: every cell).
+    "voronoif": {"required": ("x", "y"), "optional": ("where",)},
     # corrplot reads the `correlation` transform's own output columns
     # (x_index / y_index / rho), so nothing has to be restated.  The optional
     # three are overrides for a table whose columns were renamed.

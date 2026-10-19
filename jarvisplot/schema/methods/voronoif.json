@@ -13,13 +13,14 @@
   "x-jarvis-coordinates": {
     "required": [
       "x",
-      "y",
-      "z"
+      "y"
     ],
-    "optional": [],
+    "optional": [
+      "where"
+    ],
     "alternatives": []
   },
-  "x-jarvis-example": "method: voronoif\ncoordinates:\n  x: {expr: x}\n  y: {expr: y}\n  z: {expr: z}",
+  "x-jarvis-example": "method: voronoif\ncoordinates:\n  x: {expr: x}\n  y: {expr: y}",
   "type": "object",
   "properties": {
     "method": {
@@ -29,7 +30,7 @@
       "type": "object",
       "x-jarvis-zone": "delegated",
       "additionalProperties": true,
-      "description": "Required axes for voronoif: x, y, z. Optional: (none)."
+      "description": "Required axes for voronoif: x, y. Optional: where."
     }
   },
   "additionalProperties": true

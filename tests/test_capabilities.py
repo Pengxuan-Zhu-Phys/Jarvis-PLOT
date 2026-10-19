@@ -39,16 +39,11 @@ def test_style_cards_expose_axes_and_usable():
     assert cmap_hits, "expected at least one *cmap style token"
     assert any("axc" in (s.get("axes") or []) for s in cmap_hits)
 
-    # Broken 1x1 Ternary cards (Figure top-level, no Frame) must be unusable.
-    broken = [
-        s
-        for s in styles
-        if s["token"] == "Ternary" and "1x1" in s["bundle"] and not s.get("usable", True)
-    ]
-    assert broken, "a4paper_1x1/gambit_1x1 Ternary should be flagged unusable"
-    for entry in broken:
-        assert entry.get("axes") == []
-        assert "Frame" in (entry.get("error") or "")
+    # Every advertised card renders. The stub 1x1 Ternary cards (a `Figure`
+    # block, no `Frame`) were dropped from the package rather than advertised
+    # as unusable.
+    assert [(s["bundle"], s["token"], s.get("error")) for s in styles if not s.get("usable", True)] == []
+    assert not any("1x1" in s["bundle"] for s in styles)
 
 
 def test_correlation_capabilities_expose_type_method_and_cards():

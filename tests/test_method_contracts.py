@@ -141,3 +141,73 @@ def test_jplot_validate_json_includes_mth_002(tmp_path, capsys):
     env = json.loads(capsys.readouterr().out)
     codes = {d["code"] for d in env["diagnostics"]}
     assert "JP-MTH-002" in codes
+
+
+def test_voronoif_contract_is_what_its_adapter_takes():
+    contract = METHOD_COORDINATES["voronoif"]
+    assert tuple(contract["required"]) == ("x", "y")
+    assert "z" not in contract["required"] and "z" not in contract["optional"]
+    assert "where" in contract["optional"]
+    assert missing_coordinates("voronoif", {"x": {"expr": "a"}, "y": {"expr": "b"}}) == []
+    by_name = {m["name"]: m for m in section("methods")}
+    assert by_name["voronoif"]["coordinates"]["required"] == ["x", "y"]
+
+
+def test_voronoif_schema_file_matches_the_contract():
+    from jarvisplot.method_contracts import schema_payload
+
+    on_disk = json.loads((SCHEMA_METHODS / "voronoif.json").read_text(encoding="utf-8"))
+
+    assert on_disk == schema_payload("voronoif")
+
+
+def _layer_diagnostics(tmp_path, layer_yaml):
+    (tmp_path / "samples.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+    config = yaml.safe_load(
+        "DataSet:\n  - {name: df, path: ./samples.csv, type: csv}\n"
+        "Figures:\n  - name: f1\n    layers:\n      - " + layer_yaml
+    )
+    return validate_config(config, base_dir=str(tmp_path))
+
+
+COMPLETE = "name: a, axes: ax, method: scatter, data: [{source: df}], coordinates: {x: {expr: x}, y: {expr: y}}"
+
+
+def test_a_complete_layer_has_no_layer_key_diagnostics(tmp_path):
+    codes = {d.code for d in _layer_diagnostics(tmp_path, "{" + COMPLETE + "}")}
+
+    assert not codes & {"JP-LAY-001", "JP-LAY-002", "JP-MTH-004"}
+
+
+def test_validate_reports_a_layer_without_axes(tmp_path):
+    bag = _layer_diagnostics(tmp_path, "{" + COMPLETE.replace("axes: ax, ", "") + "}")
+
+    found = [d for d in bag if d.code == "JP-LAY-001"]
+    assert len(found) == 1 and found[0].level == "error"
+    assert found[0].path == "$.Figures[0].layers[0].axes"
+    assert found[0].suggestion
+
+
+def test_validate_reports_a_layer_without_method(tmp_path):
+    bag = _layer_diagnostics(tmp_path, "{" + COMPLETE.replace("method: scatter, ", "") + "}")
+
+    found = [d for d in bag if d.code == "JP-MTH-004"]
+    assert len(found) == 1
+    # The renderer draws it as scatter, so this is a warning and the figure still renders.
+    assert found[0].level == "warning" and bag.ok
+    assert found[0].path == "$.Figures[0].layers[0].method"
+
+
+def test_validate_reports_expression_coordinates_without_data(tmp_path):
+    bag = _layer_diagnostics(tmp_path, "{" + COMPLETE.replace("data: [{source: df}], ", "") + "}")
+
+    found = [d for d in bag if d.code == "JP-LAY-002"]
+    assert len(found) == 1 and found[0].level == "error"
+    assert found[0].path == "$.Figures[0].layers[0].data"
+
+
+def test_literal_coordinates_need_no_data(tmp_path):
+    layer = "{name: guide, axes: ax, method: plot, coordinates: {x: [0, 5], y: [2.5, 2.5]}}"
+
+    assert not [d for d in _layer_diagnostics(tmp_path, layer) if d.code == "JP-LAY-002"]
+

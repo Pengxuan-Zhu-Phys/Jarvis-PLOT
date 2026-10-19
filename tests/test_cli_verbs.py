@@ -195,6 +195,7 @@ def test_validate_reports_every_problem_in_one_pass(tmp_path, capsys):
             layers:
               - name: a
                 data: [{source: dff}]
+                axes: ax
                 method: scatter
                 coordinates: {x: {expr: x}, y: {expr: y}}
           - name: f1
@@ -252,10 +253,12 @@ def test_validate_accepts_share_data_as_a_source(tmp_path, capsys):
               - name: a
                 data: [{source: df}]
                 share_data: prof
+                axes: ax
                 method: scatter
                 coordinates: {x: {expr: x}, y: {expr: y}}
               - name: b
                 data: [{source: prof}]
+                axes: ax
                 method: voronoi
                 coordinates: {x: {expr: x}, y: {expr: y}}
         """,

@@ -447,6 +447,40 @@ def _export_mesh_debug(mesh, cfg: Mapping[str, Any], xs: np.ndarray, ys: np.ndar
     _logger_emit(logger, "warning", f"posterior mesh diagnostics exported -> {out_path}")
 
 
+def adaptive_refinement_cfg(cfg: Mapping[str, Any]) -> dict[str, Any]:
+    """Refinement options of ``method: adaptive``, read from ``cfg['adaptive']``."""
+    adaptive_cfg = cfg.get("adaptive", {})
+    if not isinstance(adaptive_cfg, Mapping):
+        adaptive_cfg = {}
+    refinement = dict(adaptive_cfg)
+    refinement["enabled"] = bool(refinement.get("enabled", True))
+    if "split" in refinement and "split_enabled" not in refinement:
+        refinement["split_enabled"] = bool(refinement.pop("split"))
+    if "merge" in refinement and "merge_enabled" not in refinement:
+        refinement["merge_enabled"] = bool(refinement.pop("merge"))
+    if "seed" not in refinement and cfg.get("seed", None) is not None:
+        refinement["seed"] = cfg.get("seed")
+    return refinement
+
+
+def _bridson_alias_cfg(cfg: Mapping[str, Any], *, adaptive: bool) -> dict[str, Any]:
+    """``method: voronoi`` / ``adaptive`` as the Bridson core they are built on.
+
+    The contract names the options ``voronoi: {k, ...}`` and ``adaptive: {...}``;
+    the core reads them as ``bridson`` and ``refinement``.
+    """
+    core = dict(cfg)
+    voronoi = cfg.get("voronoi", {})
+    bridson = cfg.get("bridson", {})
+    core["bridson"] = {
+        **(dict(voronoi) if isinstance(voronoi, Mapping) else {}),
+        **(dict(bridson) if isinstance(bridson, Mapping) else {}),
+    }
+    if adaptive and "refinement" not in core:
+        core["refinement"] = adaptive_refinement_cfg(cfg)
+    return core
+
+
 def density_cell(df: pd.DataFrame, cfg: Mapping[str, Any], logger=None) -> pd.DataFrame:
     """
     Construct a minimal posterior density-support table from raw samples.
@@ -459,8 +493,14 @@ def density_cell(df: pd.DataFrame, cfg: Mapping[str, Any], logger=None) -> pd.Da
         raise TypeError("make_density_core expects a pandas DataFrame.")
     cfg = cfg if isinstance(cfg, Mapping) else {}
     method = str(cfg.get("method", "bridson")).strip().lower()
+    if method in {"voronoi", "adaptive"}:
+        cfg = _bridson_alias_cfg(cfg, adaptive=(method == "adaptive"))
+        method = "bridson"
     if method not in {"grid", "bridson", "kde"}:
-        raise ValueError("make_density_core method must be one of: grid, bridson, kde.")
+        raise ValueError(
+            "make_density_core method must be one of: voronoi, adaptive, kde, grid "
+            "(bridson is the older name of voronoi)."
+        )
     memtrace_checkpoint(logger, "make_density_core.before", df)
     density_cell.last_mesh = None
     x, y, w, input_count = _prepare_samples(df, cfg, logger)

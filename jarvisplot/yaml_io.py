@@ -111,20 +111,33 @@ def load_yaml_doc(path: str | Path) -> tuple[Any, dict[str, Any]]:
     return doc, {"engine": "pyyaml", "comments_preserved": False, "raw_text": text}
 
 
-def dump_yaml_doc(doc: Any, *, meta: dict[str, Any] | None = None) -> str:
-    """Serialize ``doc`` using the same engine preference as load."""
+def dump_yaml_doc(
+    doc: Any, *, meta: dict[str, Any] | None = None, keep_layout: bool = False
+) -> str:
+    """Serialize ``doc`` using the same engine preference as load.
+
+    A ruamel document is written with scalar-only mappings and lists in flow
+    style (``{a: 1}``). ``keep_layout=True`` leaves the style each node was
+    loaded with, for an edit that should not move anything it did not touch.
+    """
     prefer_ruamel = bool(meta is None or meta.get("engine") == "ruamel")
     if prefer_ruamel and has_ruamel():
         from ruamel.yaml import YAML
 
         if hasattr(doc, "fa"):
-            _mark_ruamel_leaf_flow(doc)
+            if not keep_layout:
+                _mark_ruamel_leaf_flow(doc)
         else:
             doc = _to_ruamel_node(doc)
         yaml = YAML(typ="rt")
         yaml.preserve_quotes = True
         yaml.default_flow_style = False
         yaml.width = 4096
+        if keep_layout:
+            # The indentation hand-written configs use: `- item` two columns in.
+            yaml.indent(mapping=2, sequence=4, offset=2)
+            # `[{source: df}]` stays as written instead of becoming `[source: df]`.
+            yaml.brace_single_entry_mapping_in_flow_sequence = True
         buf = StringIO()
         yaml.dump(doc, buf)
         return buf.getvalue()

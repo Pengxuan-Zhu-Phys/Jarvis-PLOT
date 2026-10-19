@@ -346,6 +346,11 @@ class Figure:
             # default append lists. Explicit YAML also enables a disabled card
             # default, unless enabled:false was supplied by the user.
             value = deepcopy(value)
+            # `axlogo: false` leaves the badge out; `true` keeps the card's.
+            # Neither is a mapping to merge over the card's settings.
+            drop_logo = False
+            if isinstance(value, dict) and isinstance(value.get("axlogo"), bool):
+                drop_logo = not value.pop("axlogo")
             legends = {}
             for name, node in (value or {}).items():
                 if isinstance(node, dict) and "legend" in node:
@@ -356,8 +361,20 @@ class Figure:
                 _color = _node.get("color") if isinstance(_node, dict) else None
                 if isinstance(_color, dict) and "cmap" in _color:
                     self._yaml_axc_cmaps.add(str(_name))
-            from deepmerge import always_merger
-            self._frame = always_merger.merge(self._frame, value)
+            # A list written in the YAML is the list the figure gets: appending
+            # it to the card's (deepmerge's default) turns `rect: [x, y, w, h]`
+            # into eight numbers and a tick list into the card's ticks plus
+            # its own.
+            from deepmerge import Merger
+            frame_merger = Merger(
+                [(list, ["override"]), (dict, ["merge"]), (set, ["union"])],
+                ["override"],
+                ["override"],
+            )
+            self._frame = frame_merger.merge(self._frame, value)
+            if drop_logo:
+                self._frame.pop("axlogo", None)
+                self._frame.get("axes", {}).pop("axlogo", None)
             for name, legend in legends.items():
                 self._frame.setdefault(name, {})["legend"] = legend
 
@@ -444,6 +461,10 @@ class Figure:
             info['share_name'] = layer.get("share_data")
             info['combine'] = layer.get("combine", "concat")
             info['coor'] = layer.get("coordinates", {})
+            if "method" not in layer:
+                self.logger.warning(
+                    "layer '{}' has no method; drawing it as scatter".format(info['name'])
+                )
             info['method'] = layer.get("method", "scatter")
             info['style'] = layer.get("style", {})
             info['colorbar'] = layer.get("colorbar", "axc")

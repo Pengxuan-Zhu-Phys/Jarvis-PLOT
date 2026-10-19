@@ -455,13 +455,18 @@ def _funcs() -> dict[str, Any]:
         if len(names) >= 80:
             break
 
+    from .inner_func import update_const
+
     return {
         "names": names,
+        "constants": sorted(update_const({})),
         "namespaces": modules,
         "names_full_count": len(all_callable),
         "note": (
             "Public sample for agents (hashed/internal Operas helpers omitted). "
             "`names_full_count` is the raw callable count in the eval namespace. "
+            "The built-in math names (exp ... Heaviside, Gauss, Min, Max) take a "
+            "whole column as well as a number; `constants` are plain numbers. "
             "Use `jplot data eval` to check one expression; signatures are not "
             "yet published (most are numpy/math-like unary/binary)."
         ),

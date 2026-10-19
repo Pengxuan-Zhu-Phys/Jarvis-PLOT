@@ -18,6 +18,31 @@ CLI `jplot`). User guides and reference documentation are available in
 
 ### Fixed
 
+- Draw layers with `method: voronoif` and `method: triplot`. `voronoif` takes
+  `x`, `y` and an optional `where` (it hatches the boundary layer of the selected
+  region and has no `z`); `jplot cap methods` now says so. `triplot` works on
+  rectangular and ternary axes.
+- Evaluate `sinh cosh tanh asin acos atan atan2 sec csc cot sinc Abs Min Max
+  Heaviside Gauss Normal` and the other built-in math names on whole columns.
+  `Pi`, `pi`, `E`, `Inf`, `min` and `max` are defined; `jplot cap funcs` lists the
+  constants.
+- Stop `jplot validate` and `jplot data eval` from reporting function names
+  (`Gauss`, `Heaviside`, `Functions:` entries), namespaces such as `pdg.alphaEM`
+  and the columns a `significance` step makes as missing columns.
+- Accept `voronoi` and `adaptive` in `make_density_core`, as its contract says.
+- Accept `bins`, `bin`, `objective`, `seed`, `grid_points`, `fill_empty`,
+  `empty_value` and `grid` on a `type: profile_2d` figure in `jplot validate`.
+- Print a mapping that holds quoted strings with `jplot config get` on a terminal.
+- Accept `frame.axlogo: false` on every figure to leave the badge out. `true`
+  keeps the card's badge.
+- Replace, instead of appending to, the style card's lists when `frame` writes a
+  list (`frame.axes.ax.rect`, tick lists, ...).
+- Keep comments, quoting and layout when `jplot validate --fix --write` edits a file.
+- Report a layer without `axes` (`JP-LAY-001`), without `data` while it has
+  expression coordinates (`JP-LAY-002`) and without `method` (`JP-MTH-004`, drawn
+  as `scatter`) in `jplot validate`; a layer without `method` also says so in the log.
+- Keep the y label of `[a4paper_2x1, dynesty_runplot]` inside the page and the
+  colour-bar label of `[gambit_2x1, rectcmap]` clear of its tick numbers.
 - Keep caches used by another plotting session available during final rendering
   and cleanup. `--print` defers deletion until readers finish; rebuilding a busy
   cache reports an error without deleting its contents.
@@ -27,6 +52,8 @@ CLI `jplot`). User guides and reference documentation are available in
 
 ### Changed
 
+- Remove the placeholder cards `[a4paper_1x1, Ternary]` and `[gambit_1x1, Ternary]`;
+  they had no `Frame` and could not render.
 - Display `Jarvis-PLOT` in text and JSON version reports; its PyPI name remains
   `JarvisPLOT`.
 - Show `-v` / `--version` without starting the plotting runtime. Structured

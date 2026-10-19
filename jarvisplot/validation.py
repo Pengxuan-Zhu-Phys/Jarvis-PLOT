@@ -130,6 +130,7 @@ def validate_config(
     resolved_paths = _check_dataset_files(config, base_dir, bag)
     _check_unique_names(config, bag)
     _check_layer_sources(config, set(resolved_paths) | _collect_shared_names(config), bag)
+    _check_layer_keys(config, bag)
     _check_method_contracts(config, bag)
     _check_corrplot_contracts(config, bag)
     _check_forest_contracts(config, bag, base_dir=base_dir)
@@ -437,8 +438,18 @@ def _check_columns_exist(
     :func:`jarvisplot.column_demand.plan_source_demand`, which attributes columns
     to the source a layer actually names instead of the union used for pruning.
     """
-    from .column_demand import plan_source_demand
+    from .column_demand import expression_texts, plan_source_demand
     from .column_probe import probe_dataset_columns
+    from .expr_names import expr_namespace_names
+
+    # Names an expression calls or reaches into, which no data file has: the
+    # YAML's own `Functions`, and a namespace such as Operas' `pdg` in
+    # `pdg.alphaEM`.
+    not_columns = expr_namespace_names(expression_texts(config)) | {
+        str(entry["name"]).strip()
+        for entry in config.get("Functions") or ()
+        if isinstance(entry, dict) and isinstance(entry.get("name"), str)
+    }
 
     entries = {
         str(entry["name"]).strip(): entry
@@ -453,7 +464,7 @@ def _check_columns_exist(
         generated = str(entry.get("type", "")).strip().lower() == "generated"
         if wanted is None or (not path and not generated):
             continue
-        candidates = wanted.missing_candidates
+        candidates = wanted.missing_candidates - not_columns
         if not candidates:
             continue
 
@@ -508,6 +519,51 @@ def _index_of(config: dict[str, Any], name: str) -> int:
         if isinstance(entry, dict) and str(entry.get("name", "")).strip() == name:
             return index
     return 0
+
+
+# --------------------------------------------------------------------------- #
+# Layer keys the renderer needs
+# --------------------------------------------------------------------------- #
+
+
+def _check_layer_keys(config: dict[str, Any], bag: DiagnosticBag) -> None:
+    """Report what a layer lacks before the render does -- or does not.
+
+    The schema keeps ``axes``, ``method`` and ``data`` optional, but without
+    ``axes`` the figure stops ("asks for axes 'None'"), without ``data`` a layer
+    with expression coordinates stops, and without ``method`` the layer is
+    quietly drawn as ``scatter``.
+    """
+    for figure_index, figure in enumerate(config.get("Figures") or ()):
+        if not isinstance(figure, dict) or "type" in figure:
+            continue
+        for layer_index, layer in enumerate(figure.get("layers") or ()):
+            if not isinstance(layer, dict):
+                continue
+            base = join_path("Figures", figure_index, "layers", layer_index)
+            name = layer.get("name", layer_index)
+            if not layer.get("axes"):
+                bag.error(
+                    "JP-LAY-001",
+                    join_path(base, "axes"),
+                    f"layer {name!r} has no axes",
+                )
+            if not layer.get("method"):
+                bag.warning(
+                    "JP-MTH-004",
+                    join_path(base, "method"),
+                    f"layer {name!r} has no method and is drawn as 'scatter'",
+                )
+            coordinates = layer.get("coordinates")
+            reads_table = isinstance(coordinates, dict) and any(
+                isinstance(spec, dict) and "expr" in spec for spec in coordinates.values()
+            )
+            if reads_table and not layer.get("data"):
+                bag.error(
+                    "JP-LAY-002",
+                    join_path(base, "data"),
+                    f"layer {name!r} has expression coordinates and no data",
+                )
 
 
 # --------------------------------------------------------------------------- #

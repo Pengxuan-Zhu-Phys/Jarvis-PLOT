@@ -36,9 +36,7 @@ Examples are grouped by geometry family and paper ratio:
 | `compact_legend.yaml` | `[a4paper_2x1, rect]` — layer-declared compact legend objects with band/line overlays and stacked boundary/mean keys |
 | `legend_cards.yaml` | `[a4paper_2x1, rect]` — forward layer membership, object sorting, JSON card selection and a native line/errorbar composite |
 
-These are every style registered in `jarvisplot/cards/style_preference.json`,
-except `a4paper_1x1/Ternary` and `gambit_1x1/Ternary`, whose card JSONs are still
-placeholder stubs (no `Frame`) and cannot render yet.
+These are every style registered in `jarvisplot/cards/style_preference.json`.
 
 ## The `corrplot` family is different
 

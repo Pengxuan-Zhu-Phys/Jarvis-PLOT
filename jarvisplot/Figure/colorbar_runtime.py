@@ -157,7 +157,7 @@ _COLORED_Z_METHODS = frozenset({
     "jpcontour", "jpcontourf", "jpfield",
     "tripcolor", "tripcolor_axes",
     "pcolor", "pcolormesh", "imshow",
-    "voronoi", "voronoif",
+    "voronoi",
 })
 
 _CONTOUR_LIKE_METHODS = frozenset({

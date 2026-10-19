@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 
-__all__ = ["EXPR_IDENTIFIER_IGNORE", "expr_identifiers"]
+__all__ = ["EXPR_IDENTIFIER_IGNORE", "expr_identifiers", "expr_namespace_names"]
 
 #: Keep in lockstep with :func:`jarvisplot.utils.expression.build_eval_globals`
 #: and :data:`jarvisplot.inner_func._Inner_FCs` / ``_Constant``. Agents type
@@ -46,7 +46,6 @@ EXPR_IDENTIFIER_IGNORE: frozenset[str] = frozenset(
         "bool",
         "round",
         "pi",
-        "e",
         # expression.py aliases
         "exp",
         "log",
@@ -87,6 +86,11 @@ EXPR_IDENTIFIER_IGNORE: frozenset[str] = frozenset(
         "Pi",
         "E",
         "Inf",
+        "Gauss",
+        "LogGauss",
+        "Normal",
+        "Heaviside",
+        "sympy",
         # common numpy method tokens after `np.`
         "log2",
         "log1p",
@@ -144,3 +148,27 @@ def expr_identifiers(text: str) -> set[str]:
         t for t in _IDENTIFIER_RE.findall(stripped)
         if t not in EXPR_IDENTIFIER_IGNORE
     }
+
+
+#: An identifier, and whether an attribute access (``.name``) follows it.
+_IDENTIFIER_OR_HEAD_RE = re.compile(r"(?<![\w.])([A-Za-z_][A-Za-z0-9_]*)(\s*\.\s*[A-Za-z_])?")
+
+
+def expr_namespace_names(texts) -> set[str]:
+    """Names that only ever head an attribute access, across all ``texts``.
+
+    ``pdg`` in ``pdg.alphaEM`` is a Jarvis-Operas namespace, not a column; the
+    registered namespaces cannot be listed without importing Operas, which
+    pulls in the render stack this module exists to avoid. A name used both as
+    ``w.groupby(...)`` and as a bare ``w`` is a column and stays out of the
+    result. A column that is only ever used as ``name.method()`` and is missing
+    from the data is the price: the check cannot tell it from a namespace, and
+    the render reports it instead.
+    """
+    heads: set[str] = set()
+    bare: set[str] = set()
+    for text in texts:
+        stripped = _STRING_LITERAL_RE.sub(" ", str(text))
+        for name, attribute in _IDENTIFIER_OR_HEAD_RE.findall(stripped):
+            (heads if attribute else bare).add(name)
+    return heads - bare

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import io
 import json
 import textwrap
 from pathlib import Path
+
+import yaml
 
 from jarvisplot.client import main
 from jarvisplot.config_address import delete_address, set_address
@@ -53,6 +56,7 @@ def test_config_set_diff_default(tmp_path, capsys):
                 layers:
                   - name: pts
                     data: [{source: samples}]
+                    axes: ax
                     method: scatter
                     coordinates:
                       x: {expr: x}
@@ -101,6 +105,7 @@ def test_config_set_write_and_preserve_comment_when_ruamel(tmp_path, capsys):
                 layers:
                   - name: pts
                     data: [{source: samples}]
+                    axes: ax
                     method: scatter
                     coordinates:
                       x: {expr: x}
@@ -147,6 +152,7 @@ def test_config_set_bad_value_does_not_write(tmp_path, capsys):
                 layers:
                   - name: pts
                     data: [{source: samples}]
+                    axes: ax
                     method: scatter
                     coordinates:
                       x: {expr: x}
@@ -189,12 +195,14 @@ def test_config_rm_layer(tmp_path, capsys):
                 layers:
                   - name: pts
                     data: [{source: samples}]
+                    axes: ax
                     method: scatter
                     coordinates:
                       x: {expr: x}
                       y: {expr: y}
                   - name: extra
                     data: [{source: samples}]
+                    axes: ax
                     method: scatter
                     coordinates:
                       x: {expr: x}
@@ -271,3 +279,34 @@ def test_dump_yaml_doc_compacts_leaf_collections(tmp_path):
     assert "labels: ['0.1', '1', '5']" in text
     assert "labels: {x: $x$, y: $y$}" in text
     assert "x: {expr: xx}" in text
+
+
+class _Tty(io.StringIO):
+    def isatty(self):
+        return True
+
+
+def test_config_get_prints_a_mapping_that_holds_quoted_strings(tmp_path, monkeypatch):
+    path = tmp_path / "c.yaml"
+    path.write_text(
+        textwrap.dedent(
+            """
+            DataSet: []
+            Figures:
+              - name: f1
+                layers:
+                  - name: pts
+                    style: {color: "#cc3311", label: 'two words', s: 4, alpha: 0.5}
+            """
+        ).lstrip(),
+        encoding="utf-8",
+    )
+    out = _Tty()
+    monkeypatch.setattr("sys.stdout", out)
+
+    code = main(["config", "get", str(path), "Figures[f1].layers[pts].style"])
+
+    assert code == 0
+    printed = yaml.safe_load(out.getvalue())
+    assert printed == {"color": "#cc3311", "label": "two words", "s": 4, "alpha": 0.5}
+

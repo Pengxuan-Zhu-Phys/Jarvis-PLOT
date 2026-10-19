@@ -9,6 +9,7 @@ from .density_cell_runtime import (
     _axis_lim as _density_axis_lim,
     _axis_scale as _density_axis_scale,
     _resolve_array as _density_resolve_array,
+    adaptive_refinement_cfg,
     density_cell,
 )
 from .interp_2d_runtime import make_interp_2d
@@ -114,18 +115,7 @@ def _bridson_core_cfg(cfg: Mapping[str, Any], *, adaptive: bool, x_out: str, y_o
     }
     core["bridson"] = {k: v for k, v in bridson.items() if v is not None}
     if adaptive:
-        adaptive_cfg = cfg.get("adaptive", {})
-        if not isinstance(adaptive_cfg, Mapping):
-            adaptive_cfg = {}
-        refinement = dict(adaptive_cfg)
-        refinement["enabled"] = bool(refinement.get("enabled", True))
-        if "split" in refinement and "split_enabled" not in refinement:
-            refinement["split_enabled"] = bool(refinement.pop("split"))
-        if "merge" in refinement and "merge_enabled" not in refinement:
-            refinement["merge_enabled"] = bool(refinement.pop("merge"))
-        if "seed" not in refinement and cfg.get("seed", None) is not None:
-            refinement["seed"] = cfg.get("seed")
-        core["refinement"] = refinement
+        core["refinement"] = adaptive_refinement_cfg(cfg)
     return core
 
 

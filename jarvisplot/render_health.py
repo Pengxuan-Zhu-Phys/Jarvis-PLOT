@@ -32,7 +32,6 @@ _MESH_METHODS = frozenset(
         "jpcontourf",
         "tripcolor",
         "tricontourf",
-        "voronoif",
     }
 )
 
