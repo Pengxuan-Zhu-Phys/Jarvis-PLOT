@@ -8,7 +8,6 @@ include tests/conftest.py
 exclude jprel
 prune docs
 prune .github
-prune .claude
 prune .codex
 prune .agents
 prune .cursor
