@@ -31,7 +31,7 @@ related_cli:
   why: short skeleton and source slots
 - argv:
   - jplot
-  - validate
+  - doctor
   - <yaml>
   - --json
   why: shape, sources, fields and appearance
@@ -242,8 +242,8 @@ human:
       legend text; prop.size/weight/style control its typography. Changing only the formula font
       retains the existing fontsize. The formula choice affects only legend mathematical glyphs.
       man legend --json and this manual expose legend_fonts with defaults and YAML paths.'
-    - 'The Swiss axlogo uses the shared JarvisHEP.png icon and wordmark on the grid. frame.axlogo:
-      false disables it; a mapping overrides text or selects an image file. --print policy applies.
+    - 'The Swiss axlogo uses the shared JarvisHEP.png icon and wordmark on the grid. Only --print
+      hides it; frame.axlogo is a settings mapping for text or an image file.
       Default 20 mm header and 20 mm footer yield an 82.5 x 573.5 mm figure for 97 rows.'
     - Plain white canvas; no row shading, automatic numbered metadata or legend heading. Point
       legend keys use legend_point_key_mm (default 1.2 mm) with consistently left-aligned marker
@@ -260,7 +260,7 @@ human:
 agent:
   body_markdown: |
     Create native forest YAML from standard row, optional point and optional interval DataSets.
-    Use validate for schema/sources, doctor for data/physical solve, config expand for the
+    Use doctor for schema/sources and data/physical solve, config expand for the
     solved scene, and formal jplot rendering for actual text/legend/glyph bounds. All supplied
     coordinates and statistics belong to the producer. Every original point and interval is
     retained; the renderer does not compute means, SDs, quartiles, cuts or classifier results.
@@ -352,12 +352,6 @@ agent:
   - Do not place numeric per-row values into the legend or compute them from interval endpoints.
   - Do not split dollar-delimited formulas, or enable math implicitly for literal text.
   verification:
-    validate:
-      argv:
-      - jplot
-      - validate
-      - <yaml>
-      - --json
     doctor:
       argv:
       - jplot

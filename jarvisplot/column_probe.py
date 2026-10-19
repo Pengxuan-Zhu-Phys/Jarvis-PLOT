@@ -3,7 +3,7 @@
 """Read the *names* of a data file's columns, and nothing else.
 
 Everything here is a header/metadata read: no row is ever materialized, so
-``jplot validate`` can answer "is there a column called ``aa``?" for a 200k-row
+internal configuration validation can answer "is there a column called ``aa``?" for a 200k-row
 scan without paying for it.
 
 Imports are deliberately function-local. Loading this module costs nothing;

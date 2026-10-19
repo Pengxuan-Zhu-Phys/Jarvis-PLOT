@@ -7,8 +7,6 @@ see_also: [yaml-root, transforms, layer-method, dryrun-viz]
 related_cli:
   - argv: [jplot, cap, datasets, --json]
     why: live generated-data vocabulary and separate-compatible methods
-  - argv: [jplot, validate, "<yaml>", --json]
-    why: schema, generator shape, and source/generate exclusivity
   - argv: [jplot, dryrun, "<yaml>", --json]
     why: materialise generated data and inspect its row ledger without rendering
 live_sources:

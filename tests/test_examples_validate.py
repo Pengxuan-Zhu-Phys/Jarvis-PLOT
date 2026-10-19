@@ -1,4 +1,4 @@
-"""Every shipped example must pass ``jplot validate`` with nothing to report.
+"""Every shipped example must pass internal configuration validation with nothing to report.
 
 The examples are what users copy from, so a validator rule that rejects one of
 them is a bug in the validator (or in the example) either way.

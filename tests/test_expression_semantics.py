@@ -285,6 +285,11 @@ def test_min_and_max_of_one_column_reduce_it():
     assert eval_dataframe_expression(frame, "max(u)") == pytest.approx(0.9)
 
 
+def test_heaviside_preserves_the_H0_keyword():
+    frame = pd.DataFrame({"u": [-1.0, 0.0, 1.0]})
+    np.testing.assert_array_equal(eval_dataframe_expression(frame, "Heaviside(u, H0=0)"), [0, 0, 1])
+
+
 def test_the_validator_and_the_evaluator_agree_on_the_math_names():
     from jarvisplot import inner_func
     from jarvisplot.expr_names import EXPR_IDENTIFIER_IGNORE

@@ -39,11 +39,10 @@ def test_style_cards_expose_axes_and_usable():
     assert cmap_hits, "expected at least one *cmap style token"
     assert any("axc" in (s.get("axes") or []) for s in cmap_hits)
 
-    # Every advertised card renders. The stub 1x1 Ternary cards (a `Figure`
-    # block, no `Frame`) were dropped from the package rather than advertised
-    # as unusable.
+    # Full-width Ternary cards are usable layouts, with a ternary panel and badge.
     assert [(s["bundle"], s["token"], s.get("error")) for s in styles if not s.get("usable", True)] == []
-    assert not any("1x1" in s["bundle"] for s in styles)
+    for family in ("a4paper_1x1", "gambit_1x1"):
+        assert {"axtri", "axlogo"} <= set(by_key[(family, "Ternary")]["axes"])
 
 
 def test_correlation_capabilities_expose_type_method_and_cards():
@@ -227,13 +226,13 @@ def test_jplot_cap_cmaps_human_separates_matplotlib_registry(monkeypatch, capsys
     assert out.count("━━━━━━━━") >= 2
 
 
-def test_jplot_cap_styles_json_marks_broken_cards(capsys):
+def test_jplot_cap_styles_json_has_no_broken_cards(capsys):
     assert main(["cap", "styles", "--json"]) == 0
     env = json.loads(capsys.readouterr().out)
     assert env["kind"] == "cap.styles"
     styles = env["data"]["styles"]
     broken = [s for s in styles if not s.get("usable", True)]
-    assert broken
+    assert not broken
     axc_cards = [s for s in styles if "axc" in (s.get("axes") or [])]
     assert axc_cards
 

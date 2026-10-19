@@ -4,60 +4,68 @@ Release history of the `JarvisPLOT` distribution (import package `jarvisplot`,
 CLI `jplot`). User guides and reference documentation are available in
 [Jarvis-Books `Docs/Jarvis-PLOT/`](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/README.md).
 
-## Unreleased
+## 2.1.12 — 2026-10-19
 
 ### Added
 
 - Automatically manage registered plot caches with a default 5 GiB total budget
-  and a 30-day idle limit. Configure `~/.jarvis/plot-cache.json` (under `JARVIS_HOME`
-  when set), `JP_CACHE_MAX_GIB` or `JP_CACHE_MAX_AGE_DAYS`. `jplot cache list`
-  reports the effective policy.
-- Run cache maintenance when sessions open and close. Idle caches are removed
-  toward 80% of the budget; active caches remain protected and may temporarily
-  exceed the limit.
+  and a 30-day idle limit. Configure `~/.jarvis/plot-cache.json` (under
+  `JARVIS_HOME` when set), `JP_CACHE_MAX_GIB` or `JP_CACHE_MAX_AGE_DAYS`.
+  `jplot cache list` reports the effective policy. Idle caches are reclaimed
+  toward 80% of the budget; active caches remain protected.
+- Show `-v` / `--version` without loading the plotting runtime. Structured
+  `--json` version output is also available through `Jarvis plot`.
 
 ### Fixed
 
-- Draw layers with `method: voronoif` and `method: triplot`. `voronoif` takes
-  `x`, `y` and an optional `where` (it hatches the boundary layer of the selected
-  region and has no `z`); `jplot cap methods` now says so. `triplot` works on
-  rectangular and ternary axes.
-- Evaluate `sinh cosh tanh asin acos atan atan2 sec csc cot sinc Abs Min Max
-  Heaviside Gauss Normal` and the other built-in math names on whole columns.
-  `Pi`, `pi`, `E`, `Inf`, `min` and `max` are defined; `jplot cap funcs` lists the
-  constants.
-- Stop `jplot validate` and `jplot data eval` from reporting function names
-  (`Gauss`, `Heaviside`, `Functions:` entries), namespaces such as `pdg.alphaEM`
-  and the columns a `significance` step makes as missing columns.
-- Accept `voronoi` and `adaptive` in `make_density_core`, as its contract says.
-- Accept `bins`, `bin`, `objective`, `seed`, `grid_points`, `fill_empty`,
-  `empty_value` and `grid` on a `type: profile_2d` figure in `jplot validate`.
-- Print a mapping that holds quoted strings with `jplot config get` on a terminal.
-- Accept `frame.axlogo: false` on every figure to leave the badge out. `true`
-  keeps the card's badge.
-- Replace, instead of appending to, the style card's lists when `frame` writes a
-  list (`frame.axes.ax.rect`, tick lists, ...).
-- Keep comments, quoting and layout when `jplot validate --fix --write` edits a file.
-- Report a layer without `axes` (`JP-LAY-001`), without `data` while it has
-  expression coordinates (`JP-LAY-002`) and without `method` (`JP-MTH-004`, drawn
-  as `scatter`) in `jplot validate`; a layer without `method` also says so in the log.
-- Keep the y label of `[a4paper_2x1, dynesty_runplot]` inside the page and the
-  colour-bar label of `[gambit_2x1, rectcmap]` clear of its tick numbers.
-- Keep caches used by another plotting session available during final rendering
-  and cleanup. `--print` defers deletion until readers finish; rebuilding a busy
-  cache reports an error without deleting its contents.
-- Prevent concurrent cache writes from exposing incomplete files or losing
-  registered entries. If safe locking is unavailable, cache use stops with an
-  error. Interrupted temporary files are reclaimed during idle maintenance.
+- Draw `voronoif` and `triplot` layers. `voronoif` takes `x`, `y` and an
+  optional `where` mask for the selected region's hatched boundary; it has no
+  `z` or colorbar. `triplot` works on rectangular and ternary axes.
+- Evaluate built-in mathematical functions, including hyperbolic and inverse
+  trigonometric functions, `Gauss`, `Normal` and `Heaviside`, on whole columns.
+  Preserve the `Heaviside(x, H0=...)` keyword. Define `Pi`, `pi`, `E` and `Inf`,
+  and publish them through `jplot cap funcs`.
+- Avoid false missing-column errors for built-in functions, keyword argument
+  labels, YAML `Functions`, Operas namespaces and columns produced by
+  `significance` transforms.
+- Accept `voronoi` and `adaptive` in `make_density_core`, and recognize the
+  existing `profile_2d` reduction and grid options during YAML checks.
+- Restore usable full-width `[a4paper_1x1, Ternary]` and
+  `[gambit_1x1, Ternary]` cards. See the
+  [runnable example](https://github.com/Pengxuan-Zhu-Phys/Jarvis-PLOT/blob/main/Example/ternary_1x1.yaml).
+- Print mappings containing quoted YAML strings with `jplot config get`.
+- Keep `dynesty_runplot` y labels inside the page and the GAMBIT `rectcmap`
+  colorbar label clear of its tick numbers.
+- Protect caches used by concurrent plotting sessions. `--print` defers
+  cleanup until readers finish, and rebuilding a busy cache reports an error
+  without deleting it. Atomic writes prevent incomplete payloads and lost
+  registry updates; interrupted temporary files are reclaimed when idle.
+  Cache use reports an error if reliable locking is unavailable.
+- Report missing layer axes or data before rendering. A layer without a method
+  reports a warning and continues to use `scatter`.
 
-### Changed
+### Compatibility and upgrade notes
 
-- Remove the placeholder cards `[a4paper_1x1, Ternary]` and `[gambit_1x1, Ternary]`;
-  they had no `Frame` and could not render.
-- Display `Jarvis-PLOT` in text and JSON version reports; its PyPI name remains
-  `JarvisPLOT`.
-- Show `-v` / `--version` without starting the plotting runtime. Structured
-  `--json` output is also available through `Jarvis plot`.
+- Use `jplot doctor <file>` in place of the removed `jplot validate <file>`
+  command. Automatic `--fix` / `--fix-unsafe` YAML rewriting has been removed.
+  `doctor` performs internal YAML checks and a light dryrun; configuration
+  editing and suggestions also retain their internal checks.
+- Remove boolean `frame.axlogo` entries from YAML. The field accepts a settings
+  mapping only, including for forest figures. Use `jplot <file> --print` for
+  final output without the badge.
+- Lists in `frame` now replace the style card's lists in full. Review text,
+  tick and other list overrides; include every entry you want to keep. This
+  also fixes four-element axes rectangles being appended to the card's rectangle.
+- `Min` / `Max` and their lowercase aliases are elementwise with multiple
+  arguments; a single column argument reduces the whole column to one value.
+  Lowercase `e` is a column name, not a built-in constant; use `E` for Euler's number.
+- Text and JSON version reports display `Jarvis-PLOT`. The PyPI distribution
+  name remains `JarvisPLOT`, and the import package remains `jarvisplot`.
+
+### Documentation
+
+- Include the public YAML examples and their supplied CSV data in the source
+  distribution, including the repaired full-width ternary example.
 
 ## 2.1.11 — 2026-10-18
 

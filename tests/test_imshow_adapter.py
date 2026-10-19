@@ -2,7 +2,7 @@
 
 ``method_contracts`` declares ``z`` as imshow's one coordinate, so the layer
 hands the adapter ``z=<column>`` -- while ``Axes.imshow`` takes its array
-positionally as ``X``.  Every imshow layer therefore passed ``jplot validate``
+positionally as ``X``.  Every imshow layer therefore passed configuration validation
 and then died with "missing 1 required positional argument".  These tests
 pin the route down to the drawn artist.
 """

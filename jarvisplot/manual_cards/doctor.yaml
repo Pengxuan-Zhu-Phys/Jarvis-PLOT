@@ -1,0 +1,41 @@
+id: doctor
+title: doctor
+summary: Check YAML contracts, sources and columns, then perform a light dryrun without rendering.
+role: how-to
+priority: 50
+see_also: [dryrun-viz, diagnostics, workflow]
+related_cli:
+  - argv: [jplot, doctor, "<yaml>", "--json"]
+    why: schema diagnostics and light data checks in one report
+live_sources:
+  - verb: doctor
+    truth: schema, references, column existence and light dryrun
+human:
+  panels:
+    - kind: overview
+      title: When
+      body: |
+        Run doctor after editing YAML. Prefer --json for agents.
+        It checks structure and sources, then performs a light dryrun.
+        Heavy profile/density/interpolation execution and final layout require jplot <file>.
+        The command reads the YAML; it does not rewrite it.
+    - kind: steps
+      title: Commands
+      items:
+        - "jplot doctor plot.yaml --json"
+        - "jplot plot.yaml --report"
+    - kind: notes
+      title: Exit codes and partial
+      items:
+        - "0 = ok or partial_renderable (structure ok); 1 = failed; 2 = usage"
+        - "ok null + status partial_renderable on type: figures is expected"
+        - "--no-columns skips the column-existence check; the light dryrun can still read data"
+agent:
+  anti_patterns:
+    - Rewriting good YAML because doctor ok is null / coverage is partial
+    - Expecting doctor to write agent_output JSON (only jplot <yaml> writes)
+    - Treating light checks as proof of final rendered layout
+  diagnostics:
+    - code: JP-OWN-001
+      when: ignored keys on layer coordinates
+      fix_hint: move lim/scale to frame or type slots

@@ -1,4 +1,4 @@
-"""B7 acceptance: `jplot validate` answers before the render stack exists.
+"""B7 acceptance: internal configuration validation answers before the render stack exists.
 
 This is not a performance test. Every error a config can contain is discovered
 during rendering today, so a ten-figure config takes ten rounds to converge.
@@ -30,8 +30,9 @@ DATA_STACK = ("pandas", "polars", "h5py", "pyarrow")
 _PROBE = """
 import sys
 sys.path.insert(0, {root!r})
-from jarvisplot.client import main
-code = main(["validate", {config!r}, "--json"] + {extra!r})
+from jarvisplot.validation import validate_file
+_, bag = validate_file({config!r}, check_columns={check_columns!r})
+code = 0 if bag.ok else 1
 loaded = sorted(m for m in {watched!r} if m in sys.modules)
 print("EXIT", code, file=sys.stderr)
 print("LOADED", ",".join(loaded), file=sys.stderr)
@@ -74,7 +75,7 @@ def _probe(config_path, watched, extra=()) -> subprocess.CompletedProcess:
                 root=str(REPO_ROOT),
                 config=str(config_path),
                 watched=list(watched),
-                extra=list(extra),
+                check_columns="--no-columns" not in extra,
             ),
         ],
         capture_output=True,
@@ -112,11 +113,7 @@ def test_column_check_costs_only_a_header_read(config):
     assert report.get("LOADED", "") == ""
 
 
-def test_validate_emits_exactly_one_json_object_on_stdout(config):
-    import json
-
+def test_internal_validation_writes_nothing_to_stdout(config):
     result = _probe(config, RENDER_STACK)
-    payload = json.loads(result.stdout)
-    assert payload["kind"] == "validate"
-    assert payload["data"]["columns_checked"] is True
-    assert result.stdout.count("\n") == 1
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == ""

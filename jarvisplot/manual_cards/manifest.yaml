@@ -64,7 +64,7 @@ topics:
   - fonts
   - legend
   - data-columns
-  - validate
+  - doctor
   - dryrun-viz
   - diagnostics
   - cli-map

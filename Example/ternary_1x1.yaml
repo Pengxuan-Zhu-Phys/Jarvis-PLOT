@@ -1,0 +1,39 @@
+# Full-width ternary cards. Use --print for final figures without the badge.
+DataSet:
+  - name: fractions
+    type: generated
+    generate:
+      columns:
+        a: [0.7, 0.2, 0.1]
+        b: [0.1, 0.6, 0.3]
+        c: [0.2, 0.2, 0.6]
+Figures:
+  - name: a4paper_1x1_Ternary
+    style: [a4paper_1x1, Ternary]
+    debug: true
+    frame:
+      axtri: {labels: {left: A, bottom: B, right: C}}
+    layers:
+      - axes: axtri
+        method: scatter
+        data: [{source: fractions}]
+        coordinates:
+          left: {expr: a}
+          right: {expr: b}
+          bottom: {expr: c}
+        style: {s: 12, color: '#0072B2'}
+  - name: gambit_1x1_Ternary
+    style: [gambit_1x1, Ternary]
+    debug: true
+    frame:
+      axtri: {labels: {left: A, bottom: B, right: C}}
+    layers:
+      - axes: axtri
+        method: scatter
+        data: [{source: fractions}]
+        coordinates:
+          left: {expr: a}
+          right: {expr: b}
+          bottom: {expr: c}
+        style: {s: 12, color: '#D55E00'}
+output: {dir: ./plots, formats: [png, pdf], dpi: 150}

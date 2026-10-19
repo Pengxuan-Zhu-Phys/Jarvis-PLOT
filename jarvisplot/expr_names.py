@@ -3,7 +3,7 @@
 """Identifier tokens that are never column names in Jarvis-PLOT expressions.
 
 Stdlib-only on purpose: :mod:`jarvisplot.column_demand` (used by
-``jplot validate``) and the eval surface must share one table without forcing
+internal configuration validation) and the eval surface must share one table without forcing
 numpy / sympy into the pure-shape validation path.
 """
 
@@ -135,15 +135,19 @@ _STRING_LITERAL_RE = re.compile(r"'[^']*'|\"[^\"]*\"")
 #: and one that is not yet listed becomes a phantom ``JP-COL-001``.
 _IDENTIFIER_RE = re.compile(r"(?<![\w.])[A-Za-z_][A-Za-z0-9_]*")
 
+# Keyword labels are not data reads; their values still are. Do not match ==.
+_KEYWORD_ARGUMENT_RE = re.compile(r"(?<![\w.])[A-Za-z_][A-Za-z0-9_]*\s*=(?!=)")
+
 
 def expr_identifiers(text: str) -> set[str]:
     """Return the identifiers in an expression that could name a column.
 
-    Attribute names, quoted literals and the :data:`EXPR_IDENTIFIER_IGNORE`
+    Attribute names, keyword labels, quoted literals and :data:`EXPR_IDENTIFIER_IGNORE`
     table are all dropped, so what comes back is only what the caller should
     look for among the data source's real columns.
     """
     stripped = _STRING_LITERAL_RE.sub(" ", str(text))
+    stripped = _KEYWORD_ARGUMENT_RE.sub(" ", stripped)
     return {
         t for t in _IDENTIFIER_RE.findall(stripped)
         if t not in EXPR_IDENTIFIER_IGNORE

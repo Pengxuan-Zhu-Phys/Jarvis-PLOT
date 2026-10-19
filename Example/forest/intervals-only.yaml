@@ -25,7 +25,6 @@ Figures:
       $p_T > 25\,\mathrm{GeV}$
     fontsize: 4.3
     math: true
-  frame: {axlogo: false}
   forest:
     legend_math: true
     typography: {family: DejaVu Sans}

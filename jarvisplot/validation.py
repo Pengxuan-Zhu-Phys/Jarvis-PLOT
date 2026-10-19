@@ -4,7 +4,7 @@
 
 Two hard constraints:
 
-- **No matplotlib.** ``jplot validate`` must answer before any renderer is
+- **No matplotlib.** internal configuration validation must answer before any renderer is
   imported, otherwise a ten-figure config still takes ten rounds to converge.
 - **Never raise on the first problem.** Every check appends to a
   :class:`~jarvisplot.diagnostics.DiagnosticBag` and keeps walking, so one run

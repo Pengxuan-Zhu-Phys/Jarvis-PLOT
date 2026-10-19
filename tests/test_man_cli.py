@@ -69,7 +69,7 @@ def test_man_index_json(capsys):
     )
     ids = {t["id"] for t in env["data"]["topics"]}
     assert "workflow" in ids
-    assert "validate" in ids
+    assert "doctor" in ids
 
 
 def test_man_topic_json_keys(capsys):
@@ -232,8 +232,8 @@ def test_man_does_not_import_matplotlib():
 def test_render_helpers_nonempty():
     text = render_index(prog="jplot")
     assert "Topics" in text
-    text2 = render_topic("validate", prog="jplot")
-    assert "validate" in text2.lower()
+    text2 = render_topic("doctor", prog="jplot")
+    assert "doctor" in text2.lower()
 
 
 def test_root_help_lists_man(monkeypatch):
@@ -285,7 +285,7 @@ def test_man_corrplot_json_has_both_type_first_forms_and_verification(capsys):
     assert "style: [corrplot, diamond]" in yaml_by_title["diamond correlation matrix"]
     verification = next(section for section in data["sections"] if section["id"] == "verification")
     names = {item["name"] for item in verification["items"]}
-    assert names == {"validate", "doctor", "render"}
+    assert names == {"doctor", "render"}
     assert any(
         item["argv"] == ["jplot", "doctor", "<yaml>", "--json"]
         for item in verification["items"]
@@ -305,14 +305,14 @@ def test_man_correlation_type_json_has_both_forms(capsys):
     assert len(data["examples"]) == 2
     assert any("style: [corrplot, diamond]" in item["yaml"] for item in data["examples"])
     assert any(
-        item["argv"] == ["jplot", "validate", "<yaml>", "--json"]
+        item["argv"] == ["jplot", "doctor", "<yaml>", "--json"]
         for section in data["sections"]
         if section["id"] == "verification"
         for item in section["items"]
     )
-    assert data["verification"]["validate"]["argv"] == [
+    assert data["verification"]["doctor"]["argv"] == [
         "jplot",
-        "validate",
+        "doctor",
         "<yaml>",
         "--json",
     ]

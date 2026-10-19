@@ -137,7 +137,7 @@ def test_jplot_validate_json_includes_mth_002(tmp_path, capsys):
         ).lstrip(),
         encoding="utf-8",
     )
-    assert main(["validate", str(config), "--json", "--no-columns"]) == 1
+    assert main(["doctor", str(config), "--json", "--no-columns"]) == 1
     env = json.loads(capsys.readouterr().out)
     codes = {d["code"] for d in env["diagnostics"]}
     assert "JP-MTH-002" in codes

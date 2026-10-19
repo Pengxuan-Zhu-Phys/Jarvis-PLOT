@@ -4,7 +4,7 @@
 
 Pure analysis: regex over expression strings and a walk over the config mapping.
 No pandas, no matplotlib, no file I/O -- which is what lets both the render
-planner (``core_runtime.plan_dataset_required_columns``) and ``jplot validate``
+planner (``core_runtime.plan_dataset_required_columns``) and internal configuration validation
 share one owner instead of growing two answers to the same question.
 
 Two consumers with different needs:

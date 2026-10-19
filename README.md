@@ -5,8 +5,8 @@ but it can also be used as a **standalone scientific plotting tool**.
 
 It provides a simple command-line interface (CLI) to generate publication-quality figures from YAML configuration files, with most layout and style decisions handled by predefined profiles and style cards.
 
-Current source candidate: **2.1.11** (`jplot -v` reports the installed version).
-Release history: [CHANGELOG.md](CHANGELOG.md). Design documents and specifications: [Jarvis-Books `Docs/Jarvis-PLOT/`](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/README.md).
+Current source candidate: **2.1.12** (`jplot -v` reports the installed version).
+Release history: [CHANGELOG.md](https://github.com/Pengxuan-Zhu-Phys/Jarvis-PLOT/blob/main/CHANGELOG.md). Design documents and specifications: [Jarvis-Books `Docs/Jarvis-PLOT/`](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/README.md).
 
 ---
 
@@ -81,9 +81,8 @@ jplot config expand plot.yaml --figure p --write   # type: → layers
 **Judge** — check without rendering:
 
 ```bash
-jplot validate plot.yaml            # schema/contracts + source paths/column headers; no transforms
 jplot dryrun plot.yaml              # load data + transforms, row ledger, JP-VIZ health
-jplot doctor plot.yaml              # validate + dryrun in one pass
+jplot doctor plot.yaml              # internal YAML checks + light dryrun in one pass
 ```
 
 Every one of these takes `--json`.
@@ -172,7 +171,7 @@ for the typography defaults and actual installed font choices.
    strings, read live from the registries rather than from documentation.
 3. Edit the YAML in an editor (or `jplot config set … --write`). Reach for a
    `type:` macro first, drop to explicit `layers` when the macro cannot say it.
-4. `jplot doctor <file> --json` — validate + dryrun in one pass. Diagnostics
+4. `jplot doctor <file> --json` — YAML checks + light dryrun in one pass. Diagnostics
    carry `JP-*` codes; `jplot explain JP-XXX-NNN` expands any of them.
 5. `jplot <file>` — render, only when the figure itself is needed.
 
@@ -203,9 +202,9 @@ to reproduce the original all-node reconstruction.
 
 Two things worth knowing before trusting a config:
 
-- `jplot validate` checks shape and contracts and never touches the data;
-  `jplot dryrun` loads the data and reports the row ledger and JP-VIZ render
-  health. Passing the first says nothing about the second.
+- `jplot doctor` checks YAML contracts, source paths and column headers, then
+  performs a light dryrun. Heavy transforms and final layout require rendering
+  the YAML and inspecting the figures.
 - [AGENT_DATA_API.md](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/specs/AGENT_DATA_API.md) describes a *different*, still-frozen bridge
   (a numeric digest channel for Jarvis-Agent). The surface above is what ships
   today.
@@ -402,19 +401,6 @@ AI agents: start with `jplot man agent-readme --json` for the official-package Y
 
 ## Releasing
 
-`jprel` is a maintainer-local script, excluded from Git and distribution archives.
-
-Record changes in `CHANGELOG.md`, then run from this checkout (replace the
-example version with the intended release):
-
-```bash
-./jprel 2.1.11 --dry
-./jprel 2.1.11
-```
-
-`--dry` performs read-only source and release-note checks. The normal command
-requires a clean Git checkout, builds and checks the wheel and sdist, uploads
-to PyPI, refreshes the local version with `python3 -m pip install -e .`, and
-verifies the installed version. Only then does it commit the version, push the
-`vX.Y.Z` tag, and create a GitHub release with changelog notes. Configure Twine
-and `gh` authentication before publishing.
+Maintainer release instructions are maintained in
+[Jarvis-Books](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/release/RELEASING.md).
+The root [CHANGELOG.md](https://github.com/Pengxuan-Zhu-Phys/Jarvis-PLOT/blob/main/CHANGELOG.md) provides the public English release notes.

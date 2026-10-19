@@ -33,7 +33,7 @@ def test_root_help_uses_one_fixed_panel_width_and_aligned_columns(monkeypatch):
     assert "╭─ Options" in rendered
     assert "╭─ Commands" not in rendered
     assert "╭─ Inputs" not in rendered
-    assert "│ validate" in rendered
+    assert "│ validate" not in rendered
     assert "│ cap" in rendered
     assert "│ data" in rendered
     assert "│ man" in rendered
@@ -152,10 +152,10 @@ def test_cli_parser_preserves_plot_and_flowchart_argument_semantics():
 
 def test_verb_help_uses_rich_panels(monkeypatch, capsys):
     monkeypatch.setattr(sys.stdout, "isatty", lambda: False)
-    assert main(["validate", "-h"]) == 0
+    assert main(["doctor", "-h"]) == 0
     out = capsys.readouterr().out
     assert "╭─" in out
-    assert "validate" in out
+    assert "doctor" in out
     assert "│ --json" in out or "--json" in out
     assert "usage:" not in out.lower().split("\n")[0]  # not raw argparse header
 

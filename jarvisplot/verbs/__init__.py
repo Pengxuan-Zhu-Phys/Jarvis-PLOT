@@ -10,7 +10,7 @@ surface as ``Jarvis2 plot run …`` and collide with HEP's ``Jarvis2 run``
 
 This package sits *in front* of the legacy flat parser and claims argv only
 when the first token is a registered non-render verb. Handlers are imported
-lazily so ``jplot validate`` never pulls in matplotlib.
+lazily so discovery commands never pull in matplotlib.
 """
 
 from __future__ import annotations
@@ -33,7 +33,6 @@ __all__ = [
 #: verb name -> "module:function". The function takes ``(argv, *, prog)`` and
 #: returns a process exit code.
 VERBS: dict[str, str] = {
-    "validate": "jarvisplot.verbs.validate:run",
     "cap": "jarvisplot.verbs.cap:run",
     "data": "jarvisplot.verbs.data:run",
     "dryrun": "jarvisplot.verbs.dryrun:run",
@@ -94,7 +93,7 @@ def route(argv: Sequence[str], *, prog: str = "jplot") -> tuple[bool, int]:
     ``flowchart``, which is still owned by :mod:`jarvisplot.core`.
 
     A config file whose name collides with a verb is reachable as
-    ``jplot ./validate``; the bare token always wins for the verb, because a
+    ``jplot ./doctor``; the bare token always wins for the verb, because a
     silently-different meaning is the exact failure mode this track exists to
     remove.
 

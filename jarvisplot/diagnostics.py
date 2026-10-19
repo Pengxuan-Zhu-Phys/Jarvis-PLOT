@@ -4,7 +4,7 @@
 
 This module is deliberately dependency-free (stdlib only) so any layer -- config
 loading, schema validation, column planning, render health -- can report through
-it without creating an import cycle, and so ``jplot validate`` can run without
+it without creating an import cycle, and so internal configuration validation can run without
 importing matplotlib.
 
 A diagnostic is not just an error message. Every one of them carries the four
@@ -110,8 +110,8 @@ class Fix:
     """A machine-applicable repair for one diagnostic.
 
     ``op`` is one of ``rename_key`` / ``set_value`` / ``remove_key`` /
-    ``move_key``. ``confidence="certain"`` fixes are applied by ``--fix``;
-    ``heuristic`` ones require ``--fix-unsafe``.
+    ``move_key``. ``confidence`` distinguishes certain repairs from heuristic
+    suggestions; diagnostics describe repairs without applying them.
     """
 
     op: str
@@ -188,7 +188,7 @@ class Diagnostic:
 class DiagnosticBag:
     """Collector that lets one pass report every problem instead of the first.
 
-    The whole point of ``jplot validate`` is that a ten-figure config converges
+    The whole point of internal configuration validation is that a ten-figure config converges
     in one round instead of ten, so validation code must add to a bag and keep
     going rather than raise on first contact.
     """

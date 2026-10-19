@@ -337,6 +337,26 @@ def test_builtin_function_names_are_not_columns(csv_data):
     assert _column_errors(bag) == []
 
 
+def test_function_keyword_labels_are_not_columns(csv_data):
+    bag = _scatter(csv_data, "m_A", "Heaviside(LogL, H0=0)")
+    assert _column_errors(bag) == []
+
+
+@pytest.mark.parametrize(
+    ("expression", "names"),
+    [
+        ("Heaviside(x, H0=H0)", {"x", "H0"}),
+        ("Heaviside(x, H0=missing)", {"x", "missing"}),
+        ("x == y", {"x", "y"}),
+        ("x >= y and x != z", {"x", "y", "z"}),
+    ],
+)
+def test_keyword_labels_preserve_value_references_and_comparisons(expression, names):
+    from jarvisplot.expr_names import expr_identifiers
+
+    assert expr_identifiers(expression) == names
+
+
 def test_operas_namespaces_are_not_columns(csv_data):
     bag = _scatter(csv_data, "m_A * pdg.alphaEM(m_A)", "tanb")
 

@@ -5,8 +5,6 @@ role: reference
 priority: 20
 see_also: [generated-data, type-posterior-2d, layer-method, style-axes, workflow]
 related_cli:
-  - argv: [jplot, validate, "<yaml>", "--json"]
-    why: shape + silent-key diagnostics
   - argv: [jplot, template, list, "--json"]
     why: type-first templates
   - argv: [jplot, man, type-posterior-2d, "--json"]

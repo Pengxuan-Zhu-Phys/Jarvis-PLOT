@@ -2,7 +2,7 @@
 
 Each test renders a small scene through ``JarvisPLOT`` the way ``jplot <yaml>``
 does and looks at the figure that came out: the method that used to raise, the
-badge that used to survive ``axlogo: false``, the card list that used to be
+badge controlled by ``--print``, the card list that used to be
 appended to instead of replaced, and the two cards whose labels left the page
 or sat on the tick labels.
 """
@@ -75,7 +75,7 @@ def _write_data(tmp_path: Path) -> None:
     ).to_csv(tmp_path / "dynesty.csv", index=False)
 
 
-def _render(tmp_path: Path, figs: list[dict]) -> int:
+def _render(tmp_path: Path, figs: list[dict], *options: str) -> int:
     _write_data(tmp_path)
     config = {
         "DataSet": [
@@ -88,7 +88,7 @@ def _render(tmp_path: Path, figs: list[dict]) -> int:
     path = tmp_path / "plot.yaml"
     path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
     try:
-        JarvisPLOT(argv=[str(path)]).init()
+        JarvisPLOT(argv=[str(path), *options]).init()
     except SystemExit as exc:
         return int(exc.code or 0)
     return 0
@@ -175,18 +175,36 @@ def test_triplot_layer_renders_on_ternary_axes(tmp_path):
 # --------------------------------------------------------------------------- #
 
 
-def test_frame_axlogo_false_leaves_the_badge_out(tmp_path, figures):
-    figs = [
-        _figure("no_logo", [_layer("scatter", {"x": "x", "y": "y"})], frame={"axlogo": False}),
-        _figure("keep_logo", [_layer("scatter", {"x": "x", "y": "y"})], frame={"axlogo": True}),
-        _figure("plain", [_layer("scatter", {"x": "x", "y": "y"})]),
-    ]
+@pytest.mark.parametrize("value", [False, True])
+def test_frame_rejects_logo_switch(value):
+    fig = Figure()
+    with pytest.raises(ValueError, match='use --print'):
+        fig.frame = {"axlogo": value}
 
-    assert _render(tmp_path, figs) == 0
-    by_name = {fig.name: fig for fig in figures}
-    assert "axlogo" not in by_name["no_logo"].axes
-    assert "axlogo" in by_name["keep_logo"].axes
-    assert "axlogo" in by_name["plain"].axes
+
+def test_print_controls_the_badge(tmp_path, figures):
+    fig = _figure("badge", [_layer("scatter", {"x": "x", "y": "y"})])
+    assert _render(tmp_path, [fig]) == 0
+    assert "axlogo" in figures[-1].axes
+    assert _render(tmp_path, [fig], "--print") == 0
+    assert "axlogo" not in figures[-1].axes
+
+
+@pytest.mark.parametrize("family", ["a4paper_1x1", "gambit_1x1"])
+def test_full_width_ternary_cards_render(tmp_path, figures, family):
+    fig = _figure(
+        family,
+        [_layer("scatter", {"left": "x", "right": "y", "bottom": "z"}, axes="axtri")],
+        style=(family, "Ternary"),
+        frame={"axtri": {"labels": {"left": "A", "bottom": "B", "right": "C"}}},
+    )
+    assert _render(tmp_path, [fig]) == 0
+    assert _png(tmp_path, family).is_file()
+    assert {"axtri", "axlogo"} <= set(figures[-1].axes)
+    assert figures[-1].fig.get_size_inches() == pytest.approx([6.7, 5.6])
+    assert _render(tmp_path, [fig], "--print") == 0
+    assert "axtri" in figures[-1].axes
+    assert "axlogo" not in figures[-1].axes
 
 
 def test_frame_list_replaces_the_cards_list(tmp_path, figures):

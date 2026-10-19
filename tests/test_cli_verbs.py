@@ -1,4 +1,4 @@
-"""A2 acceptance: the verb router, and `jplot validate` end to end.
+"""The verb router and the internal configuration checks retained by doctor.
 
 The load-bearing assertion here is the *negative* one: adding verbs must not
 change what ``jplot <file>`` does.
@@ -6,7 +6,6 @@ change what ``jplot <file>`` does.
 
 from __future__ import annotations
 
-import json
 import textwrap
 
 import pytest
@@ -14,6 +13,7 @@ import pytest
 from jarvisplot.cli import CLI, render_help
 from jarvisplot.client import main
 from jarvisplot.verbs import is_verb, route
+from jarvisplot.validation import validate_file
 
 
 # --------------------------------------------------------------------------- #
@@ -59,7 +59,8 @@ def good_config(tmp_path):
 
 
 def test_known_verbs_are_claimed_by_the_router():
-    assert is_verb("validate")
+    assert not is_verb("validate")
+    assert is_verb("doctor")
     assert is_verb("cap")
     assert is_verb("data")
     assert is_verb("man")
@@ -126,7 +127,8 @@ def test_legacy_parser_semantics_are_untouched():
 
 def test_root_help_lists_commands_from_the_card():
     rendered = render_help()
-    assert "validate" in rendered
+    assert "│ validate" not in rendered
+    assert "doctor" in rendered
     assert "flowchart" in rendered
     # DR-08: render is bare path; never advertise `run` as a command.
     assert "│ run " not in rendered
@@ -167,27 +169,21 @@ def test_every_verb_accepts_json(verb):
 # --------------------------------------------------------------------------- #
 
 
-def test_validate_clean_config_exits_zero(good_config, capsys):
-    assert main(["validate", str(good_config)]) == 0
-    captured = capsys.readouterr()
-    assert captured.out == "", "human mode must not write to stdout"
-    assert "OK" in captured.err
+def test_removed_validate_command_cannot_rewrite_yaml(good_config, capsys):
+    original = good_config.read_text()
+    assert main(["validate", str(good_config), "--fix", "--write"]) == 2
+    _assert_unknown_cli_message(capsys.readouterr().err, "validate")
+    assert good_config.read_text() == original
 
 
-def test_validate_json_stdout_is_pure(good_config, capsys):
-    assert main(["validate", str(good_config), "--json"]) == 0
-    captured = capsys.readouterr()
-    env = json.loads(captured.out)
-    assert env["kind"] == "validate"
-    assert env["ok"] is True
-    assert env["diagnostics"] == []
+def test_internal_validation_accepts_clean_config(good_config):
+    config, bag = validate_file(str(good_config))
+    assert config is not None
+    assert bag.ok and not len(bag)
 
 
-def test_validate_reports_every_problem_in_one_pass(tmp_path, capsys):
-    config = _write(
-        tmp_path,
-        "bad.yaml",
-        """
+def test_internal_validation_reports_every_problem_in_one_pass(tmp_path):
+    config = _write(tmp_path, "bad.yaml", """
         DataSet:
           - {name: df, path: ./missing.csv, type: csv}
         Figures:
@@ -200,51 +196,34 @@ def test_validate_reports_every_problem_in_one_pass(tmp_path, capsys):
                 coordinates: {x: {expr: x}, y: {expr: y}}
           - name: f1
             layers: {}
-        """,
-    )
-    assert main(["validate", str(config), "--json"]) == 1
-    env = json.loads(capsys.readouterr().out)
-    codes = {d["code"] for d in env["diagnostics"]}
-    assert codes == {
-        "JP-DAT-004",  # missing.csv does not exist
-        "JP-REF-001",  # source: dff is not a declared dataset
-        "JP-SCH-004",  # layers: {} is a mapping, not a list
-        "JP-FIG-003",  # figure name f1 used twice
-    }
-    assert env["data"]["error_count"] == 4
+        """)
+    _, bag = validate_file(str(config))
+    assert {d.code for d in bag} == {"JP-DAT-004", "JP-REF-001", "JP-SCH-004", "JP-FIG-003"}
+    assert len(bag.errors) == 4
 
 
-def test_validate_suggests_the_right_dataset_name(tmp_path, capsys):
-    (tmp_path / "samples.csv").write_text("x\n1\n", encoding="utf-8")
-    config = _write(
-        tmp_path,
-        "typo.yaml",
-        """
+def test_internal_validation_suggests_dataset_name(tmp_path):
+    (tmp_path / "samples.csv").write_text("x\n1\n")
+    config = _write(tmp_path, "typo.yaml", """
         DataSet:
           - {name: df_samples_0, path: ./samples.csv, type: csv}
         Figures:
           - name: f1
             layers:
-              - name: a
-                data: [{source: df_smaples_0}]
+              - data: [{source: df_smaples_0}]
+                axes: ax
                 method: scatter
-                coordinates: {x: {expr: x}, y: {expr: y}}
-        """,
-    )
-    main(["validate", str(config), "--json"])
-    env = json.loads(capsys.readouterr().out)
-    ref = next(d for d in env["diagnostics"] if d["code"] == "JP-REF-001")
-    assert ref["context"]["did_you_mean"] == ["df_samples_0"]
-    assert ref["path"] == "$.Figures[0].layers[0].data[0].source"
+                coordinates: {x: {expr: x}, y: {expr: x}}
+        """)
+    _, bag = validate_file(str(config))
+    diagnostic = next(d for d in bag if d.code == "JP-REF-001")
+    assert diagnostic.context["did_you_mean"] == ["df_samples_0"]
+    assert diagnostic.path == "$.Figures[0].layers[0].data[0].source"
 
 
-def test_validate_accepts_share_data_as_a_source(tmp_path, capsys):
-    """`share_data` publishes a name; consuming it is not an unknown source."""
-    (tmp_path / "samples.csv").write_text("x,y\n1,2\n", encoding="utf-8")
-    config = _write(
-        tmp_path,
-        "shared.yaml",
-        """
+def test_internal_validation_accepts_shared_source(tmp_path):
+    (tmp_path / "samples.csv").write_text("x,y\n1,2\n")
+    config = _write(tmp_path, "shared.yaml", """
         DataSet:
           - {name: df, path: ./samples.csv, type: csv}
         Figures:
@@ -261,35 +240,28 @@ def test_validate_accepts_share_data_as_a_source(tmp_path, capsys):
                 axes: ax
                 method: voronoi
                 coordinates: {x: {expr: x}, y: {expr: y}}
-        """,
-    )
-    assert main(["validate", str(config), "--json"]) == 0
-    assert json.loads(capsys.readouterr().out)["diagnostics"] == []
+        """)
+    _, bag = validate_file(str(config))
+    assert bag.ok and not len(bag)
 
 
-def test_validate_reports_yaml_syntax_errors_with_a_location(tmp_path, capsys):
-    config = tmp_path / "syntax.yaml"
-    config.write_text("Figures:\n  - name: f1\n   layers: []\n", encoding="utf-8")
-    assert main(["validate", str(config), "--json"]) == 1
-    env = json.loads(capsys.readouterr().out)
-    assert env["data"]["parsed"] is False
-    assert env["diagnostics"][0]["code"] == "JP-YML-001"
-    assert "line" in env["diagnostics"][0]["message"]
+def test_internal_validation_reports_yaml_location(tmp_path):
+    path = tmp_path / "syntax.yaml"
+    path.write_text("Figures:\n  - name: f1\n   layers: []\n")
+    config, bag = validate_file(str(path))
+    assert config is None
+    assert bag.errors[0].code == "JP-YML-001"
+    assert "line" in bag.errors[0].message
 
 
-def test_validate_missing_file_is_a_diagnostic_not_a_traceback(tmp_path, capsys):
-    assert main(["validate", str(tmp_path / "nope.yaml"), "--json"]) == 1
-    env = json.loads(capsys.readouterr().out)
-    assert env["diagnostics"][0]["code"] == "JP-YML-000"
+def test_internal_validation_reports_missing_file(tmp_path):
+    config, bag = validate_file(str(tmp_path / "nope.yaml"))
+    assert config is None
+    assert bag.errors[0].code == "JP-YML-000"
 
 
-def test_validate_requires_datasets_and_figures(tmp_path, capsys):
-    config = _write(tmp_path, "empty.yaml", "version: '0.3'\n")
-    main(["validate", str(config), "--json"])
-    env = json.loads(capsys.readouterr().out)
-    missing = {d["message"].split("'")[1] for d in env["diagnostics"] if d["code"] == "JP-SCH-002"}
+def test_internal_validation_requires_datasets_and_figures(tmp_path):
+    path = _write(tmp_path, "empty.yaml", "version: '0.3'\n")
+    _, bag = validate_file(str(path))
+    missing = {d.message.split("'")[1] for d in bag if d.code == "JP-SCH-002"}
     assert missing == {"DataSet", "Figures"}
-
-
-def test_validate_bad_usage_exits_two(capsys):
-    assert main(["validate"]) == 2

@@ -1,4 +1,10 @@
 {
+    "a4paper_1x1": {
+        "Ternary": "&JP/jarvisplot/cards/a4paper/1x1/ternary.json"
+    },
+    "gambit_1x1": {
+        "Ternary": "&JP/jarvisplot/cards/gambit/1x1/ternary.json"
+    },
     "a4paper_2x1": {
         "Ternary": "&JP/jarvisplot/cards/a4paper/2x1/ternary.json",
         "rect": "&JP/jarvisplot/cards/a4paper/2x1/rect.json",

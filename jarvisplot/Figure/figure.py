@@ -327,6 +327,8 @@ class Figure:
     
     @frame.setter
     def frame(self, value) -> None: 
+        if isinstance(value, Mapping) and "axlogo" in value and not isinstance(value["axlogo"], Mapping):
+            raise ValueError("frame.axlogo must be a settings mapping; use --print to hide the logo")
         from ..font_runtime import prepare_font_overrides, prepare_frame_fonts
         if getattr(self, '_font_card', None) is not None:
             value = prepare_frame_fonts(self._frame, value, self._font_card)
@@ -346,11 +348,6 @@ class Figure:
             # default append lists. Explicit YAML also enables a disabled card
             # default, unless enabled:false was supplied by the user.
             value = deepcopy(value)
-            # `axlogo: false` leaves the badge out; `true` keeps the card's.
-            # Neither is a mapping to merge over the card's settings.
-            drop_logo = False
-            if isinstance(value, dict) and isinstance(value.get("axlogo"), bool):
-                drop_logo = not value.pop("axlogo")
             legends = {}
             for name, node in (value or {}).items():
                 if isinstance(node, dict) and "legend" in node:
@@ -372,9 +369,6 @@ class Figure:
                 ["override"],
             )
             self._frame = frame_merger.merge(self._frame, value)
-            if drop_logo:
-                self._frame.pop("axlogo", None)
-                self._frame.get("axes", {}).pop("axlogo", None)
             for name, legend in legends.items():
                 self._frame.setdefault(name, {})["legend"] = legend
 

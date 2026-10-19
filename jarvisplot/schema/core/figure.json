@@ -46,12 +46,9 @@
       },
       "properties": {
         "axlogo": {
-          "type": [
-            "object",
-            "boolean"
-          ],
+          "type": "object",
           "x-jarvis-zone": "delegated",
-          "description": "Badge settings merged over the style card's, or false to leave the badge out (true keeps the card's)."
+          "description": "Badge settings merged over the style card's. Only the --print CLI option hides the badge."
         }
       }
     },
@@ -597,10 +594,7 @@
           "frame": {
             "properties": {
               "axlogo": {
-                "type": [
-                  "object",
-                  "boolean"
-                ],
+                "type": "object",
                 "x-jarvis-zone": "delegated"
               }
             }

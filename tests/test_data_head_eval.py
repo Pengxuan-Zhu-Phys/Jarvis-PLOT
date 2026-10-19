@@ -79,6 +79,13 @@ def test_jplot_data_eval_json(csv_file, capsys):
     assert env["data"]["n_finite"] == 6
 
 
+def test_jplot_data_eval_accepts_function_keyword_arguments(csv_file, capsys):
+    assert main(["data", "eval", "Heaviside(LogL, H0=0)", "--data", str(csv_file), "--json"]) == 0
+    data = json.loads(capsys.readouterr().out)["data"]
+    assert data["symbols_used"] == ["LogL"]
+    assert data["n_finite"] == 6
+
+
 def test_eval_unknown_column_did_you_mean(csv_file, capsys):
     assert main(["data", "eval", "exp(LogLL)", "--data", str(csv_file), "--json"]) == 1
     env = json.loads(capsys.readouterr().out)

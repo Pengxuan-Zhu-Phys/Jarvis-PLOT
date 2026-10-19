@@ -18,8 +18,6 @@ related_cli:
     why: confirm default card fonts and inspect the actual Helvetica substitute when needed
   - argv: [jplot, data, describe, "<file>", "--json"]
     why: confirm real source fields instead of inventing names
-  - argv: [jplot, validate, "<yaml>", "--json"]
-    why: check schema, source names and explicit field references
   - argv: [jplot, doctor, "<yaml>", "--json"]
     why: check data and layout with the official runtime
   - argv: [jplot, "<yaml>", "--report"]
@@ -40,7 +38,7 @@ human:
         - Read fonts show --json and fonts check --json. Defaults use Helvetica for sans text, STIXGeneral for serif text and stix for MathText formulas. If Helvetica is missing, the runtime selects a similar sans family and reports it through fonts check/resolve; other missing families fail explicitly.
         - Inspect input fields with data describe; author a YAML file against the published contract.
         - Use the installed Jarvis-PLOT package plus YAML. Keep producer-supplied coordinates and statistics unchanged unless the user requested a calculation.
-        - Run validate, doctor and the bare-path render command; inspect the actual output. Store verification output in a temporary directory when existing figures must be preserved.
+        - Run doctor and the bare-path render command; inspect the actual output. Store verification output in a temporary directory when existing figures must be preserved.
         - Do not copy Jarvis-PLOT into an analysis outputs directory, silently add a PYTHONPATH preview implementation, or introduce a separate plotting script to claim native support.
     - kind: notes
       title: Report a missing capability promptly
@@ -66,7 +64,7 @@ agent:
   body_markdown: |
     Start with `jplot --version`, `jplot cap all --json`, and `jplot man <topic> --json`.
     The manual and capability catalog describe the installed package; inspect their schemas
-    and the real source fields before authoring YAML. Run `validate`, `doctor`, then
+    and the real source fields before authoring YAML. Run `doctor`, then
     `jplot <yaml> --report` and inspect exported figures. Doctor's partial coverage is not
     proof that heavy transforms or final rendered ink were checked.
 
@@ -115,7 +113,7 @@ agent:
       - detailed requirements and compatibility constraints
   anti_patterns:
     - Inventing unsupported YAML keys without checking the installed contract.
-    - Reporting validate success as proof of final rendered layout.
+    - Reporting schema-check success as proof of final rendered layout.
     - Copying the package into research outputs or hiding a preview implementation in PYTHONPATH.
     - Recalculating supplied statistical or physics results to make a figure fit.
     - Sending a feature-request email without explicit user authorization.

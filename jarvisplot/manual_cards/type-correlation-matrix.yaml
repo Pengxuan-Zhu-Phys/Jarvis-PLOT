@@ -15,8 +15,6 @@ related_cli:
     why: live corrplot drawing-method contract
   - argv: [jplot, man, corrplot, "--json"]
     why: every R formal, and where each one is applied (use --json for agent data)
-  - argv: [jplot, validate, "<yaml>", "--json"]
-    why: schema, references, data paths, columns and method gate
   - argv: [jplot, doctor, "<yaml>", "--json"]
     why: validate plus data loading and type expansion without rendering
   - argv: [jplot, config, expand, "<yaml>", "--figure", "<name>", "--json"]
@@ -78,16 +76,13 @@ agent:
     `jplot cap styles --json` and `jplot cap methods --json`. The two canonical
     type-first forms are in `examples`: omit `style` for the square matrix, or
     set `style: [corrplot, diamond]` for the rotated triangle. After editing a
-    YAML, run `jplot validate <yaml> --json`, then `jplot doctor <yaml> --json`;
+    YAML, run `jplot doctor <yaml> --json`;
     render only with the bare YAML path.
   sections:
     - id: verification
       title: Verification
       kind: commands
       items:
-        - name: validate
-          argv: [jplot, validate, "<yaml>", "--json"]
-          purpose: schema, references, data paths, columns and method contract
         - name: doctor
           argv: [jplot, doctor, "<yaml>", "--json"]
           purpose: validate plus data loading and type expansion without rendering
@@ -95,9 +90,6 @@ agent:
           argv: [jplot, "<yaml>", "--report"]
           purpose: actual matplotlib render and render-health report
   verification:
-    validate:
-      argv: [jplot, validate, "<yaml>", "--json"]
-      purpose: schema, references, data paths, columns and method contract
     doctor:
       argv: [jplot, doctor, "<yaml>", "--json"]
       purpose: validate plus data loading and type expansion without rendering

@@ -620,7 +620,10 @@ def test_grid_coordinate_merge_ignores_floating_point_overlap():
 def test_logo_switch_and_title_block_schema(tmp_path):
     info, frames = fixture()
     info['frame'] = {'axlogo': False}
-    assert len(draw(info, frames, tmp_path).axes) == 1
+    with pytest.raises(ValueError, match='object'):
+        draw(info, frames, tmp_path)
+    info['frame'] = {'axlogo': {}}
+    assert 'axlogo' in draw(info, frames, tmp_path).axes
     info['title'] = 'old unstructured title'
     from jarvisplot.schema_catalog import config_validator
     assert list(config_validator().iter_errors({'DataSet': [], 'Figures': [info]}))

@@ -21,7 +21,6 @@
         {
             "title": "Judge",
             "commands": [
-                "validate",
                 "dryrun",
                 "doctor"
             ]
@@ -110,13 +109,6 @@
             "group": "Draft & edit"
         },
         {
-            "name": "validate",
-            "help": "check a YAML config without rendering it",
-            "usage": "jplot validate <file> [--json] [--fix [--diff|--write]]",
-            "kind": "agent",
-            "group": "Judge"
-        },
-        {
             "name": "dryrun",
             "help": "load data + transforms, row ledger + JP-VIZ health (no render)",
             "usage": "jplot dryrun <file> [--json] [--with-data]",
@@ -125,7 +117,7 @@
         },
         {
             "name": "doctor",
-            "help": "validate + dryrun in one pass",
+            "help": "check YAML contracts and perform a light dryrun without rendering",
             "usage": "jplot doctor <file> [--json]",
             "kind": "agent",
             "group": "Judge"

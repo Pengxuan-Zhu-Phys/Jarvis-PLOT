@@ -62,8 +62,8 @@ def _unknown_key(error: ValidationError) -> list[Diagnostic]:
     for key in keys:
         near = did_you_mean(key, allowed)
         # Case-only renames are certain. A single high-ratio match (e.g.
-        # outputs→output) is also safe enough for default ``--fix``; weaker
-        # guesses stay heuristic and need ``--fix-unsafe``.
+        # outputs→output) is tagged as certain; weaker guesses stay heuristic.
+        # These are diagnostic suggestions, not automatic edits.
         certain = False
         if near:
             if near[0].lower() == key.lower():

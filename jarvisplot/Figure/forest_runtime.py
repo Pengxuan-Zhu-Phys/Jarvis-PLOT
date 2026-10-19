@@ -53,12 +53,12 @@ class ForestFigure(Figure):
         g = self.forest_layout
         from ..forest_contract import merge
         logo = self._frame.get('axlogo', {})
-        logo_override = info.get('frame', {}).get('axlogo', True)
+        logo_override = info.get('frame', {}).get('axlogo', {})
         if isinstance(logo_override, dict):
             logo = merge(logo, logo_override)
         self._frame = {'figure': {'figsize': [g['width_mm']/25.4, g['height_mm']/25.4]},
                        'axes': {'ax': {'rect': [0, 0, 1, 1]}}}
-        if logo_override is not False and not self.print:
+        if not self.print:
             self._frame['axlogo'] = logo
             size = g['geometry']['logo_size_mm']
             self._frame['axes']['axlogo'] = {'rect': [g['geometry']['margin_left_mm']/g['width_mm'], g['geometry']['logo_bottom_mm']/g['height_mm'], g['geometry']['grid_unit_mm']/g['width_mm'], size/g['height_mm']], 'frameon': False, 'xticks': [], 'yticks': []}

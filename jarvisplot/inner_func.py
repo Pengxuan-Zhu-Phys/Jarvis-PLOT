@@ -70,8 +70,8 @@ def _max(*args):
     return np.maximum.reduce(np.broadcast_arrays(*args))
 
 
-def _heaviside(x, h0=0.5):
-    return np.heaviside(x, h0)
+def _heaviside(x, H0=0.5):
+    return np.heaviside(x, H0)
 
 
 # Expressions are evaluated over whole columns, so every function here takes a

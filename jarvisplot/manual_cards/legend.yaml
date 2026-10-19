@@ -3,12 +3,10 @@ title: Layer legend objects and JSON cards
 summary: Declare object, label and role on layers; automatically regroup components using JSON cards.
 role: reference
 priority: 46
-see_also: [style-axes, layer-method, validate]
+see_also: [style-axes, layer-method, doctor]
 related_cli:
   - argv: [jplot, cap, styles, --json]
     why: axes default legend card selections
-  - argv: [jplot, validate, "<yaml>", --json]
-    why: check object grouping, component roles and ordering
   - argv: [jplot, "<yaml>"]
     why: render the assembled legend with the figure
 live_sources:

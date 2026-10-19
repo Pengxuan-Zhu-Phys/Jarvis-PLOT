@@ -253,13 +253,18 @@ def test_valid_config_produces_nothing():
     ids=["expressions", "literal-arrays", "ternary-axes"],
 )
 def test_layer_coordinates_accept_every_form_the_runtime_supports(coordinates):
+    data = "data: [{source: samples}], " if "expr:" in coordinates else ""
     bag = _validate(
         f"""
-        DataSet: []
+        DataSet:
+          - name: samples
+            type: generated
+            generate:
+              columns: {{a: [1, 2], b: [2, 3], c: [3, 4]}}
         Figures:
           - name: f1
             layers:
-              - {{name: s, axes: ax, method: plot, coordinates: {coordinates}}}
+              - {{name: s, {data}axes: ax, method: plot, coordinates: {coordinates}}}
         """
     )
     assert list(bag) == []

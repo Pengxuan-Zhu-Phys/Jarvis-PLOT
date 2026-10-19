@@ -37,7 +37,6 @@ def test_multi_interval_examples_formal_cli_and_supplied_data(example, point_cou
         assert result.returncode == 0, result.stdout + result.stderr
         return result
 
-    assert json.loads(command("validate", str(path), "--json").stdout)["ok"] is True
     assert json.loads(command("doctor", str(path), "--json").stdout)["ok"] is True
     command(str(path), "--report")
 
@@ -46,6 +45,7 @@ def test_multi_interval_examples_formal_cli_and_supplied_data(example, point_cou
     assert (output / f"{name}.png").read_bytes().startswith(b"\x89PNG")
     assert (output / f"{name}.pdf").read_bytes().startswith(b"%PDF")
     layout = json.loads((output / f"{name}.layout.json").read_text())
+    assert layout["canvas_axes"] == 2
     assert layout["point_count"] == point_count
     assert layout["interval_count"] == 6
     assert layout["shared_ticks"] == config["Figures"][0]["x"]["ticks"]
@@ -68,3 +68,5 @@ def test_multi_interval_examples_formal_cli_and_supplied_data(example, point_cou
             source = rows[row["row"]]
             assert row["box_annotation"] == source["stats"]
             assert row["coordinates"] == {key: float(source[key]) for key in ("lower", "q1", "median", "q3", "upper")}
+    command(str(path), "--print")
+    assert json.loads((output / f"{name}.layout.json").read_text())["canvas_axes"] == 1

@@ -5,7 +5,7 @@ summary: >
   Never re-runs profile/density/interp; execute with jplot <yaml>.
 role: how-to
 priority: 55
-see_also: [validate, diagnostics, workflow]
+see_also: [doctor, diagnostics, workflow]
 related_cli:
   - argv: [jplot, dryrun, "<yaml>", "--json"]
     why: row ledger + light JP-VIZ codes

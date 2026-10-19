@@ -251,44 +251,36 @@
           "additionalProperties": false
         },
         "axlogo": {
-          "type": [
-            "boolean",
-            "object"
-          ],
-          "if": {
-            "type": "object"
-          },
-          "then": {
-            "type": "object",
-            "x-jarvis-zone": "closed",
-            "properties": {
-              "file": {
-                "type": "string",
-                "minLength": 1
-              },
-              "text": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "x-jarvis-zone": "delegated"
-                }
-              },
-              "clip": {
-                "type": "boolean"
-              },
-              "anchor": {
-                "enum": [
-                  "left",
-                  "right"
-                ]
-              },
-              "color": {
-                "type": "string",
-                "minLength": 1
+          "type": "object",
+          "x-jarvis-zone": "closed",
+          "properties": {
+            "file": {
+              "type": "string",
+              "minLength": 1
+            },
+            "text": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "x-jarvis-zone": "delegated"
               }
             },
-            "additionalProperties": false
-          }
+            "clip": {
+              "type": "boolean"
+            },
+            "anchor": {
+              "enum": [
+                "left",
+                "right"
+              ]
+            },
+            "color": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false,
+          "description": "Badge settings only. Use the --print CLI option to hide the badge."
         }
       },
       "additionalProperties": false

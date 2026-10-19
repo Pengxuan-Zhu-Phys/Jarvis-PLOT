@@ -28,6 +28,7 @@ def _type_yaml(path, *, name: str = "p") -> None:
                 layers:
                   - name: pts
                     data: [{{source: samples}}]
+                    axes: ax
                     method: scatter
                     coordinates:
                       x: {{expr: m_A}}

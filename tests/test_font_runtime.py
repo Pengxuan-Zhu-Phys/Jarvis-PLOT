@@ -196,7 +196,7 @@ def test_forest_role_measurements_render_and_explicit_native_family(tmp_path):
     info = {'name': 'forest-fonts', 'type': 'forest', 'data': 'rows',
             'title': {'text': 'Role title', 'fontsize': 8},
             'description': {'text': '$p_T$ caption', 'math': True},
-            'frame': {'axlogo': False}, 'forest': {'geometry': {'footer_mm': 30}},
+            'forest': {'geometry': {'footer_mm': 30}},
             'columns': [{'field': 'label', 'label': 'Group', 'role': 'row_name'},
                         {'field': 'n', 'label': 'N', 'role': 'right', 'fontweight': 'bold'}]}
     figure = ForestFigure()

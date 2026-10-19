@@ -61,7 +61,7 @@ _GUIDANCE_BY_CODE: dict[str, tuple[str, Optional[str]]] = {
     # YAML load / root
     "JP-YML-000": (
         "Check the path; jplot resolves it relative to the current directory.",
-        "jplot validate path/to/config.yaml",
+        "jplot doctor path/to/config.yaml",
     ),
     "JP-YML-001": (
         "Fix the YAML syntax first; nothing else can be checked until the file parses.",

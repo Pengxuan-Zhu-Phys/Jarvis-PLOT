@@ -269,10 +269,6 @@ def load_method_card(name: str) -> dict[str, Any]:
     if name == "corrplot":
         agent_examples = _corrplot_examples()
         verification = {
-            "validate": {
-                "argv": ["jplot", "validate", "<yaml>", "--json"],
-                "purpose": "schema, references, data paths, columns and method contract",
-            },
             "doctor": {
                 "argv": ["jplot", "doctor", "<yaml>", "--json"],
                 "purpose": "validate plus data loading and type expansion without rendering",
@@ -288,11 +284,6 @@ def load_method_card(name: str) -> dict[str, Any]:
                 "title": "Verification",
                 "kind": "commands",
                 "items": [
-                    {
-                        "name": "validate",
-                        "argv": ["jplot", "validate", "<yaml>", "--json"],
-                        "purpose": "schema, references, data paths, columns, and method contract",
-                    },
                     {
                         "name": "doctor",
                         "argv": ["jplot", "doctor", "<yaml>", "--json"],
@@ -318,7 +309,6 @@ def load_method_card(name: str) -> dict[str, Any]:
                 {"argv": ["jplot", "cap", "types", "--json"], "why": "correlation_matrix type and its compatible cards"},
                 {"argv": ["jplot", "cap", "styles", "--json"], "why": "matrix/diamond axes and card options"},
                 {"argv": ["jplot", "man", "type-correlation-matrix", "--json"], "why": "type-first YAML examples and card rules"},
-                {"argv": ["jplot", "validate", "<yaml>", "--json"], "why": "cheap schema/reference/column gate"},
                 {"argv": ["jplot", "doctor", "<yaml>", "--json"], "why": "validate plus data/type expansion without rendering"},
             ]
         )

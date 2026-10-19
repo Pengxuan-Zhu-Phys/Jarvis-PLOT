@@ -3,7 +3,7 @@ title: Layer methods and coordinates
 summary: method + coordinates contracts; live list always from jplot cap methods.
 role: reference
 priority: 40
-see_also: [methods, type-posterior-2d, style-axes, legend, validate]
+see_also: [methods, type-posterior-2d, style-axes, legend, doctor]
 related_cli:
   - argv: [jplot, man, legend, "--json"]
     why: layer legend object/label/role declarations and automatic composition

@@ -3,7 +3,7 @@ title: Data columns discipline
 summary: Column names only come from the data file — never from imagination.
 role: how-to
 priority: 25
-see_also: [workflow, validate, cli-map]
+see_also: [workflow, doctor, cli-map]
 related_cli:
   - argv: [jplot, data, describe, "<file>", "--json"]
     why: authoritative column list

@@ -1,9 +1,9 @@
 id: workflow
 title: Coding-agent workflow
-summary: Discover columns and vocabulary, write YAML yourself, then validate/dryrun.
+summary: Discover columns and vocabulary, write YAML yourself, then doctor/dryrun.
 role: how-to
 priority: 10
-see_also: [data-columns, validate, dryrun-viz, cli-map, type-posterior-2d]
+see_also: [data-columns, doctor, dryrun-viz, cli-map, type-posterior-2d]
 related_cli:
   - argv: [jplot, data, describe, "<file>", "--json"]
     why: column-name whitelist from the real file
@@ -11,8 +11,6 @@ related_cli:
     why: methods/styles/cmaps/funcs whitelist
   - argv: [jplot, man, transforms, "--json"]
     why: transform contracts when hand-writing pipelines
-  - argv: [jplot, validate, "<yaml>", "--json"]
-    why: shape + columns gate
   - argv: [jplot, doctor, "<yaml>", "--json"]
     why: validate + dryrun + planned agent_output exports
   - argv: [jplot, "plot.yaml"]
@@ -74,7 +72,7 @@ agent:
     ## Full agent playbook
     1. **Discover** — `data describe` + `cap` subsets.
     2. **Author** — edit `*.yaml` in the workspace (type macros preferred); write scalar-only leaf lists/maps in compact flow style, e.g. `xlim: [0.1, 5.0]` and `labels: {x: $x$, y: $y$}`.
-    3. **Judge (light only)** — `validate` / `doctor --json`. No heavy re-run; partial on type: is OK.
+    3. **Judge (light only)** — `doctor --json`. No heavy re-run; partial on type: is OK.
     4. **Execute once** — `jplot <file>` for PNG/PDF + agent_output digest.
     5. **Learn** — `explain JP-*` or `man diagnostics`; figure content from digest, not doctor mesh.
   anti_patterns:

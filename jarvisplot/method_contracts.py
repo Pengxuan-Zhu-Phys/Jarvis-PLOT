@@ -3,7 +3,7 @@
 """Per-method coordinate contracts for YAML layers.
 
 Authoritative table of which ``coordinates`` axes each ``method`` requires.
-Schema files under ``schema/methods/`` and ``jplot validate`` both read this
+Schema files under ``schema/methods/`` and internal configuration validation both read this
 module so the two cannot drift. Axes families still come from
 :mod:`jarvisplot.Figure.method_registry`.
 """

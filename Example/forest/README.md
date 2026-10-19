@@ -8,19 +8,17 @@
 - `intervals-only.yaml`: row IDs/labels plus three intervals per row; no primary glyph or scatter source.
 - `real-demo.yaml`: producer-exported generic tables, 97 rows/241 points. This fixture preserves supplied box coordinates, classification and annotations. Producer-specific metadata in CSV is inspectable and never used by the renderer.
 
-Run `jplot validate Example/forest/real-demo.yaml --json`, `jplot doctor Example/forest/real-demo.yaml --json`, then `jplot Example/forest/real-demo.yaml --report`. Outputs go to `Workshop/forest_native/`; each native PNG/SVG has a `.layout.json` receipt with shared limits/ticks, physical positions, annotations, styles and verification. Generated images/reports are not package assets.
+Run `jplot doctor Example/forest/real-demo.yaml --json`, then `jplot Example/forest/real-demo.yaml --report`. Outputs go to `Workshop/forest_native/`; each native PNG/SVG has a `.layout.json` receipt with shared limits/ticks, physical positions, annotations, styles and verification. Generated images/reports are not package assets.
 
 The two multi-interval examples write PNG/PDF and receipts only to
 `/tmp/jarvisplot-forest-examples`. They select the commonly installed DejaVu Sans font;
 the original examples retain the Swiss card's Helvetica default. Run with the official package:
 
 ```sh
-jplot validate Example/forest/multi-interval.yaml --json
 jplot doctor Example/forest/multi-interval.yaml --json
-jplot Example/forest/multi-interval.yaml --report
-jplot validate Example/forest/intervals-only.yaml --json
+jplot Example/forest/multi-interval.yaml --report --print
 jplot doctor Example/forest/intervals-only.yaml --json
-jplot Example/forest/intervals-only.yaml --report
+jplot Example/forest/intervals-only.yaml --report --print
 ```
 
 `summary-rows.csv` supplies the already formatted box values; `summary-intervals.csv`
@@ -58,8 +56,8 @@ Python environment (`python -m pip install -e .` from the Jarvis-PLOT repository
 remove its preview path from the shell/launcher PYTHONPATH, and call the formal `jplot` on
 the existing YAML. The native interface accepts the established `intervals`, annotation,
 MathText, header_note and geometry keys; no task-specific names or data conversion are needed.
-For a one-off check use `env -u PYTHONPATH jplot validate <existing.yaml> --json`, followed
-by doctor and rendering in that clean environment. Verify `jplot --version` in that environment.
+For a one-off check use `env -u PYTHONPATH jplot doctor <existing.yaml> --json`, followed
+by rendering in that clean environment. Verify `jplot --version` in that environment.
 To preserve existing study figures during verification, use a temporary YAML with only
 `project.workdir` and `output.dir` redirected to a temporary directory; retain the absolute
 source paths and all Figures/coordinates/statistical strings. Normal image output is governed

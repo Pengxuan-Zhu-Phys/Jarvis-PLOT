@@ -31,7 +31,6 @@ Figures:
     math: true
     math_fontfamily: stix
   frame:
-    axlogo: false
     ax:
       legend:
         prop: {math_fontfamily: stix}
