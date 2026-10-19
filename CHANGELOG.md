@@ -4,6 +4,15 @@ Release history of the `JarvisPLOT` distribution (import package `jarvisplot`,
 CLI `jplot`). User guides and reference documentation are available in
 [Jarvis-Books `Docs/Jarvis-PLOT/`](https://github.com/Pengxuan-Zhu-Phys/Jarvis-Books/blob/main/Docs/Jarvis-PLOT/README.md).
 
+## Unreleased
+
+### Fixed
+
+- Correct A4 ternary badge image paths on case-sensitive filesystems, including
+  Linux, for the full-width, standard and colorbar cards.
+- Keep the GAMBIT `rectcmap` colorbar label inside the page with Matplotlib 3.10
+  while preserving its separation from tick labels.
+
 ## 2.1.12 — 2026-10-19
 
 ### Added

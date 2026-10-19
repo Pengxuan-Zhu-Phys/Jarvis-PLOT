@@ -27,6 +27,9 @@ dependencies = [
   "rich"
 ]
 
+[project.optional-dependencies]
+test = ["pytest", "pyarrow"]
+
 [project.scripts]
 jplot = "jarvisplot.client:main"
 

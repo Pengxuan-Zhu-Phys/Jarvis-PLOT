@@ -73,3 +73,24 @@ def test_ternary_knobs_only_ship_on_cards_that_have_a_ternary_axes(relpath, _use
 
 def test_all_registered_cards_are_covered():
     assert len(CARD_FILES) >= 13
+
+
+def test_card_resource_paths_match_exact_case():
+    """Catch Linux-only missing assets even on a case-insensitive filesystem."""
+    resources = {p.relative_to(ROOT).as_posix() for p in CARDS.rglob("*") if p.is_file()}
+    missing = []
+
+    def walk(node, card):
+        if isinstance(node, dict):
+            for value in node.values():
+                walk(value, card)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value, card)
+        elif isinstance(node, str) and node.startswith("&JP/"):
+            if node.removeprefix("&JP/") not in resources:
+                missing.append(f"{card}: {node}")
+
+    for path in sorted(CARDS.rglob("*.json")):
+        walk(json.loads(path.read_text(encoding="utf-8")), path.relative_to(CARDS))
+    assert missing == [], "Missing or incorrectly cased card resources:\n" + "\n".join(missing)
